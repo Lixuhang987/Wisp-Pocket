@@ -61,6 +61,36 @@ describe("ActivityWindowController", () => {
     expect(window.bounds).toEqual({ x: 1164, y: 810, width: 272, height: 76 });
   });
 
+  it("broadcasts an in-flight theme change after the existing activity window loads", async () => {
+    const window = new FakeBrowserWindow();
+    const loaded = createDeferred<void>();
+    window.loadFile = (filePath: string): Promise<void> => {
+      window.loadedFile = filePath;
+      window.loadFileCount += 1;
+      return loaded.promise;
+    };
+    const controller = new ActivityWindowController({
+      activityWindowHTMLPath: "/dist/activity-window/index.html",
+      preloadPath: "/dist/preload/activityWindowPreload.js",
+      createWindow: () => window,
+      screenProvider: {
+        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
+      },
+    });
+
+    const shown = controller.show();
+    await controller.updateTheme({ preference: "dark", resolved: "dark" });
+    expect(window.webContents.send).not.toHaveBeenCalled();
+
+    loaded.resolve();
+    await shown;
+
+    expect(window.webContents.send).toHaveBeenCalledWith(
+      "handagent:theme-changed",
+      { preference: "dark", resolved: "dark" },
+    );
+  });
+
   it("resets the live window after close", async () => {
     const firstWindow = new FakeBrowserWindow();
     const secondWindow = new FakeBrowserWindow();
@@ -290,4 +320,18 @@ class FakeBrowserWindow extends EventEmitter {
     this.destroyCount += 1;
     this.emit("closed");
   }
+}
+
+function createDeferred<T = void>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (error: unknown) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 }

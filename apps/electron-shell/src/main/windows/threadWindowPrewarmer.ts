@@ -39,6 +39,7 @@ export class ThreadWindowPrewarmer {
   private theme: HostTheme = { preference: "system", resolved: "light" };
   private preparePromise: Promise<void> | null = null;
   private rejectPrepare: ((error: Error) => void) | null = null;
+  private pendingThemeBroadcast = false;
 
   constructor(private readonly options: Options) {}
 
@@ -75,6 +76,10 @@ export class ThreadWindowPrewarmer {
         this.prepared = true;
         this.preparePromise = null;
         this.rejectPrepare = null;
+        if (this.pendingThemeBroadcast && this.window === window) {
+          this.pendingThemeBroadcast = false;
+          window.webContents.send("handagent:theme-changed", this.theme);
+        }
         resolve();
       };
       const fail = (error = new Error("thread window failed to load")) => {
@@ -136,6 +141,8 @@ export class ThreadWindowPrewarmer {
     this.theme = theme;
     if (this.window && this.prepared) {
       this.window.webContents.send("handagent:theme-changed", theme);
+    } else if (this.window) {
+      this.pendingThemeBroadcast = true;
     }
   }
 
@@ -154,6 +161,7 @@ export class ThreadWindowPrewarmer {
     this.window = null;
     this.prepared = false;
     this.visible = false;
+    this.pendingThemeBroadcast = false;
     const rejectPrepare = this.rejectPrepare;
     this.preparePromise = null;
     this.rejectPrepare = null;

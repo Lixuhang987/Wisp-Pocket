@@ -12,7 +12,7 @@
 ## ThreadWindow preload
 
 - 通过 `contextBridge.executeInMainWorld()` 写入 `window.handAgentThreadWindowConfig.threadWebSocketURL` 和 `window.handAgentTheme`。
-- 通过 `contextBridge.exposeInMainWorld()` 暴露 `handAgentSubscribeThemeChange(handler)`；该函数只订阅已校验的 `HostTheme` payload，不暴露原始 `ipcRenderer`。
+- preload 自身持续监听 `handagent:theme-changed`，只接受已校验的 `HostTheme` payload，并保存 latest theme；`handAgentSubscribeThemeChange(handler)` 订阅时会先回放 latest theme，再接收后续变化，不暴露原始 `ipcRenderer`。
 - 初始化 `window.handAgentPendingInitialPrompts`，并在 React receiver 尚未安装时提供临时 `window.handAgentReceiveInitialPrompt(payload)`。
 - 如果 React 已经安装正式 receiver，preload 必须保留它，不覆盖。
 - `handAgentElectron` 只暴露轻量 feature marker，不提供 Electron 或 Node 能力。
@@ -20,7 +20,7 @@
 ## ActivityWindow preload
 
 - 通过 `contextBridge.executeInMainWorld()` 写入 `window.handAgentActivityWindowConfig.activityWebSocketURL` 和 `window.handAgentTheme`。
-- 通过 `contextBridge.exposeInMainWorld()` 暴露 `handAgentSubscribeThemeChange(handler)`；该函数只订阅已校验的 `HostTheme` payload，不暴露原始 `ipcRenderer`。
+- preload 自身持续监听 `handagent:theme-changed`，只接受已校验的 `HostTheme` payload，并保存 latest theme；`handAgentSubscribeThemeChange(handler)` 订阅时会先回放 latest theme，再接收后续变化，不暴露原始 `ipcRenderer`。
 - 通过 `contextBridge.exposeInMainWorld()` 暴露 `handAgentActivityWindow.focusThread(threadId)`。
 - `focusThread` 只发送 `"activity-window:focus-thread"` IPC；main 侧仍要校验 sender 和参数类型。
 

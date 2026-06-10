@@ -18,24 +18,33 @@ declare global {
 
 const activityWebSocketURL = "ws://127.0.0.1:4317/api/activity";
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
-const initialTheme = readInitialTheme();
+let latestTheme = readInitialTheme();
+const themeHandlers = new Set<(theme: HostTheme) => void>();
+
+ipcRenderer.on("handagent:theme-changed", (_event: unknown, theme: HostTheme) => {
+  if (!isHostTheme(theme)) {
+    return;
+  }
+  latestTheme = theme;
+  for (const handler of themeHandlers) {
+    handler(theme);
+  }
+});
 
 contextBridge.executeInMainWorld({
   func: (url: string, theme: HostTheme) => {
     window.handAgentActivityWindowConfig = { activityWebSocketURL: url };
     window.handAgentTheme = theme;
   },
-  args: [activityWebSocketURL, initialTheme],
+  args: [activityWebSocketURL, latestTheme],
 });
 
 contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (theme: HostTheme) => void) => {
-  const listener = (_event: unknown, theme: HostTheme) => {
-    if (isHostTheme(theme)) {
-      handler(theme);
-    }
+  handler(latestTheme);
+  themeHandlers.add(handler);
+  return () => {
+    themeHandlers.delete(handler);
   };
-  ipcRenderer.on("handagent:theme-changed", listener);
-  return () => ipcRenderer.off("handagent:theme-changed", listener);
 });
 
 contextBridge.exposeInMainWorld("handAgentActivityWindow", {

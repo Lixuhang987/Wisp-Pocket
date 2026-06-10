@@ -28,7 +28,7 @@ describe("activityWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    const ipcRenderer = { send: vi.fn() };
+    const ipcRenderer = createIpcRendererMock();
     vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
 
     await import("../../src/preload/activityWindowPreload.js");
@@ -53,7 +53,7 @@ describe("activityWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    const ipcRenderer = { on: vi.fn(), off: vi.fn(), send: vi.fn() };
+    const ipcRenderer = createIpcRendererMock();
     vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
 
     await import("../../src/preload/activityWindowPreload.js");
@@ -72,14 +72,7 @@ describe("activityWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    const listeners = new Map<string, (...args: unknown[]) => void>();
-    const ipcRenderer = {
-      on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
-        listeners.set(channel, listener);
-      }),
-      off: vi.fn(),
-      send: vi.fn(),
-    };
+    const ipcRenderer = createIpcRendererMock();
     vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
 
     await import("../../src/preload/activityWindowPreload.js");
@@ -91,18 +84,35 @@ describe("activityWindowPreload", () => {
     const handler = vi.fn();
     const dispose = exposed?.(handler);
 
-    listeners.get("handagent:theme-changed")?.({}, { preference: "light", resolved: "light" });
-    listeners.get("handagent:theme-changed")?.({}, { preference: "system", resolved: "system" });
-    listeners.get("handagent:theme-changed")?.({}, { preference: "dark", resolved: "dark" });
+    ipcRenderer.emit("handagent:theme-changed", {}, { preference: "light", resolved: "light" });
+    ipcRenderer.emit("handagent:theme-changed", {}, { preference: "system", resolved: "system" });
+    ipcRenderer.emit("handagent:theme-changed", {}, { preference: "dark", resolved: "dark" });
     dispose?.();
 
-    expect(handler).toHaveBeenCalledTimes(2);
-    expect(handler).toHaveBeenNthCalledWith(1, { preference: "light", resolved: "light" });
-    expect(handler).toHaveBeenNthCalledWith(2, { preference: "dark", resolved: "dark" });
-    expect(ipcRenderer.off).toHaveBeenCalledWith(
-      "handagent:theme-changed",
-      expect.any(Function),
-    );
+    expect(handler).toHaveBeenCalledTimes(3);
+    expect(handler).toHaveBeenNthCalledWith(1, { preference: "system", resolved: "light" });
+    expect(handler).toHaveBeenNthCalledWith(2, { preference: "light", resolved: "light" });
+    expect(handler).toHaveBeenNthCalledWith(3, { preference: "dark", resolved: "dark" });
+  });
+
+  it("replays the latest host theme received before subscription", async () => {
+    const contextBridge = {
+      executeInMainWorld: vi.fn(),
+      exposeInMainWorld: vi.fn(),
+    };
+    const ipcRenderer = createIpcRendererMock();
+    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
+
+    await import("../../src/preload/activityWindowPreload.js");
+    ipcRenderer.emit("handagent:theme-changed", {}, { preference: "dark", resolved: "dark" });
+
+    const exposed = contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === "handAgentSubscribeThemeChange")?.[1] as
+      | ((handler: (theme: HostTheme) => void) => () => void)
+      | undefined;
+    const handler = vi.fn();
+    exposed?.(handler);
+
+    expect(handler).toHaveBeenCalledWith({ preference: "dark", resolved: "dark" });
   });
 
   it("exposes a focusThread bridge that sends focus requests to main", async () => {
@@ -110,7 +120,7 @@ describe("activityWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    const ipcRenderer = { on: vi.fn(), off: vi.fn(), send: vi.fn() };
+    const ipcRenderer = createIpcRendererMock();
     vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
 
     await import("../../src/preload/activityWindowPreload.js");
@@ -125,3 +135,19 @@ describe("activityWindowPreload", () => {
     expect(ipcRenderer.send).toHaveBeenCalledWith("activity-window:focus-thread", null);
   });
 });
+
+function createIpcRendererMock() {
+  const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+  return {
+    on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
+      listeners.set(channel, listeners.get(channel) ?? new Set());
+      listeners.get(channel)?.add(listener);
+    }),
+    send: vi.fn(),
+    emit: (channel: string, ...args: unknown[]) => {
+      for (const listener of listeners.get(channel) ?? []) {
+        listener(...args);
+      }
+    },
+  };
+}

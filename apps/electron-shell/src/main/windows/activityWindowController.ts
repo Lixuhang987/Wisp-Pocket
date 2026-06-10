@@ -36,6 +36,7 @@ export class ActivityWindowController {
   private window: BrowserWindowLike | null = null;
   private hasLoaded = false;
   private theme: HostTheme = { preference: "system", resolved: "light" };
+  private pendingThemeBroadcast = false;
 
   constructor(private readonly options: Options) {}
 
@@ -52,6 +53,10 @@ export class ActivityWindowController {
         throw new Error("activity window closed before it was shown");
       }
       this.hasLoaded = true;
+      if (this.pendingThemeBroadcast) {
+        this.pendingThemeBroadcast = false;
+        window.webContents.send("handagent:theme-changed", this.theme);
+      }
     }
 
     window.showInactive();
@@ -69,6 +74,7 @@ export class ActivityWindowController {
 
     this.window = null;
     this.hasLoaded = false;
+    this.pendingThemeBroadcast = false;
     window.destroy();
     void this.show().catch(() => {
       // The close path is best-effort: a later explicit activity_window.show command
@@ -80,6 +86,8 @@ export class ActivityWindowController {
     this.theme = theme;
     if (this.window && this.hasLoaded) {
       this.window.webContents.send("handagent:theme-changed", theme);
+    } else if (this.window) {
+      this.pendingThemeBroadcast = true;
     }
   }
 
@@ -111,6 +119,7 @@ export class ActivityWindowController {
       if (this.window === window) {
         this.window = null;
         this.hasLoaded = false;
+        this.pendingThemeBroadcast = false;
       }
     });
     window.on("focus", () => {
