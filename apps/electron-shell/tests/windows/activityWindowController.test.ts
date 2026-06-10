@@ -214,9 +214,10 @@ describe("ActivityWindowController", () => {
     expect(preventDefault).not.toHaveBeenCalled();
   });
 
-  it("releases stale native window state for the next activity click by rebuilding the window", async () => {
+  it("releases stale native window state for the next activity click without a visible gap", async () => {
     const firstWindow = new FakeBrowserWindow();
-    const secondWindow = new FakeBrowserWindow();
+    const deferredLoad = createDeferred<void>();
+    const secondWindow = new FakeBrowserWindow({ loadFilePromise: deferredLoad.promise });
     const windows = [firstWindow, secondWindow];
     const createWindow = vi.fn(() => {
       const window = windows.shift();
@@ -236,9 +237,15 @@ describe("ActivityWindowController", () => {
 
     await controller.show();
     controller.releaseNativeFocusForNextClick();
-    await Promise.resolve();
 
     expect(createWindow).toHaveBeenCalledTimes(2);
+    expect(firstWindow.destroyCount).toBe(0);
+    expect(secondWindow.showInactiveCount).toBe(0);
+
+    deferredLoad.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
     expect(firstWindow.destroyCount).toBe(1);
     expect(firstWindow.showInactiveCount).toBe(1);
     expect(secondWindow.loadedFile).toBe("/dist/activity-window/index.html");
@@ -271,6 +278,12 @@ class FakeBrowserWindow extends EventEmitter {
   loadFileCount = 0;
   showInactiveCount = 0;
   destroyCount = 0;
+  private readonly loadFilePromise: Promise<void> | null;
+
+  constructor(options: { loadFilePromise?: Promise<void> } = {}) {
+    super();
+    this.loadFilePromise = options.loadFilePromise ?? null;
+  }
 
   setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
     this.bounds = bounds;
@@ -279,7 +292,7 @@ class FakeBrowserWindow extends EventEmitter {
   loadFile(filePath: string): Promise<void> {
     this.loadedFile = filePath;
     this.loadFileCount += 1;
-    return Promise.resolve();
+    return this.loadFilePromise ?? Promise.resolve();
   }
 
   showInactive(): void {
@@ -290,4 +303,12 @@ class FakeBrowserWindow extends EventEmitter {
     this.destroyCount += 1;
     this.emit("closed");
   }
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+  return { promise, resolve };
 }
