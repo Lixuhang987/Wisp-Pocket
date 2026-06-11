@@ -60,6 +60,8 @@ case "${1:-}" in
   worktree)
     if [[ "${2:-}" == "add" && "${4:-}" == "-b" ]]; then
       printf 'git worktree add %s -b %s\n' "${3:-}" "${5:-}" >>"$log_file"
+      printf 'git worktree stdout\n'
+      printf 'git worktree stderr\n' >&2
       mkdir -p "${3:-}/scripts"
       exit 0
     fi
@@ -78,6 +80,8 @@ cat >"$FAKE_BIN_DIR/pnpm" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'pnpm %s cwd=%s\n' "$*" "$PWD" >>"${HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE:?}"
+printf 'pnpm stdout for %s\n' "$*"
+printf 'pnpm stderr for %s\n' "$*" >&2
 EOF
 chmod +x "$FAKE_BIN_DIR/pnpm"
 
@@ -86,9 +90,16 @@ cat >"$FAKE_BIN_DIR/codegraph" <<'EOF'
 set -euo pipefail
 printf 'codegraph %s cwd=%s\n' "$*" "$PWD" >>"${HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE:?}"
 if [[ "${1:-}" == "init" ]]; then
+  printf 'codegraph init stdout\n'
+  printf 'codegraph init stderr\n' >&2
   mkdir -p "${3:-}/.codegraph"
 fi
 if [[ "${1:-}" == "status" ]]; then
+  if [[ "${HANDAGENT_CREATE_WORKTREE_TEST_STATUS_FAIL:-0}" == "1" ]]; then
+    printf 'codegraph status stdout before failure\n'
+    printf 'codegraph status stderr before failure\n' >&2
+    exit 45
+  fi
   if [[ "${HANDAGENT_CREATE_WORKTREE_TEST_STATUS_MISMATCH:-0}" == "1" ]]; then
     printf 'This CodeGraph index belongs to a different git working tree.\n'
     exit 0
@@ -123,10 +134,8 @@ if [[ ! -d "$worktree_path/.codegraph" ]]; then
   exit 1
 fi
 
-if [[ "$output" != *"Worktree ready: $worktree_path"* ]] || \
-  [[ "$output" != *"CodeGraph projectPath: $worktree_path"* ]] || \
-  [[ "$output" != *"Use this exact projectPath for CodeGraph MCP calls."* ]]; then
-  printf 'Expected ready output with projectPath guidance, got:\n%s\n' "$output" >&2
+if [[ "$output" != "CodeGraph projectPath: $worktree_path" ]]; then
+  printf 'Expected successful output to contain only CodeGraph projectPath, got:\n%s\n' "$output" >&2
   exit 1
 fi
 
@@ -140,7 +149,10 @@ custom_output="$(
 
 custom_path="$REPO_ROOT/.worktrees/custom-task"
 grep -q "git worktree add $custom_path -b feature/custom-branch" "$LOG_FILE"
-grep -q "CodeGraph projectPath: $custom_path" <<<"$custom_output"
+if [[ "$custom_output" != "CodeGraph projectPath: $custom_path" ]]; then
+  printf 'Expected custom branch output to contain only CodeGraph projectPath, got:\n%s\n' "$custom_output" >&2
+  exit 1
+fi
 
 if HANDAGENT_CREATE_WORKTREE_TEST_REPO_ROOT="$REPO_ROOT" \
   HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE="$LOG_FILE" \
@@ -153,6 +165,23 @@ if HANDAGENT_CREATE_WORKTREE_TEST_REPO_ROOT="$REPO_ROOT" \
 fi
 
 grep -q 'CodeGraph is still pointing at a different git working tree:' "$TEST_TMP_DIR/mismatch.log"
+
+if HANDAGENT_CREATE_WORKTREE_TEST_REPO_ROOT="$REPO_ROOT" \
+  HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE="$LOG_FILE" \
+  HANDAGENT_CREATE_WORKTREE_TEST_STATUS_FAIL=1 \
+  PATH="$FAKE_BIN_DIR:$PATH" \
+  "$REPO_ROOT/scripts/create-worktree.sh" status-fail \
+  >"$TEST_TMP_DIR/status-fail.log" 2>&1; then
+  printf 'Expected CodeGraph status command failure to fail.\n' >&2
+  exit 1
+fi
+
+status_fail_output="$(cat "$TEST_TMP_DIR/status-fail.log")"
+if [[ "$status_fail_output" != *"codegraph status stdout before failure"* ]] ||
+  [[ "$status_fail_output" != *"codegraph status stderr before failure"* ]]; then
+  printf 'Expected CodeGraph status failure to print captured output, got:\n%s\n' "$status_fail_output" >&2
+  exit 1
+fi
 
 if HANDAGENT_CREATE_WORKTREE_TEST_REPO_ROOT="$REPO_ROOT" \
   HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE="$LOG_FILE" \

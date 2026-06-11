@@ -82,23 +82,43 @@ command -v codegraph >/dev/null || {
   exit 127
 }
 
-git -C "$repo_root" worktree add "$worktree_path" -b "$branch_name"
+run_quiet() {
+  local tmp_log
+  local status
+
+  tmp_log="$(mktemp -t "create-worktree.XXXXXX")"
+  if "$@" >"$tmp_log" 2>&1; then
+    rm -f "$tmp_log"
+    return 0
+  else
+    status=$?
+    cat "$tmp_log"
+    rm -f "$tmp_log"
+    return "$status"
+  fi
+}
+
+run_quiet git -C "$repo_root" worktree add "$worktree_path" -b "$branch_name"
 
 cd "$worktree_path"
 
-pnpm install
-codegraph init -i "$worktree_path"
-codegraph_status="$(codegraph status "$worktree_path")"
-printf '%s\n' "$codegraph_status"
+run_quiet pnpm install
+run_quiet codegraph init -i "$worktree_path"
+
+codegraph_status_log="$(mktemp -t "create-worktree-codegraph-status.XXXXXX")"
+trap 'rm -f "$codegraph_status_log"' EXIT
+if codegraph status "$worktree_path" >"$codegraph_status_log" 2>&1; then
+  codegraph_status="$(cat "$codegraph_status_log")"
+else
+  status=$?
+  cat "$codegraph_status_log"
+  exit "$status"
+fi
 
 if [[ "$codegraph_status" == *"This CodeGraph index belongs to a different git working tree"* ]]; then
+  printf '%s\n' "$codegraph_status" >&2
   printf 'CodeGraph is still pointing at a different git working tree: %s\n' "$worktree_path" >&2
   exit 1
 fi
 
-cat <<EOF
-Worktree ready: $worktree_path
-Branch: $branch_name
-CodeGraph projectPath: $worktree_path
-Use this exact projectPath for CodeGraph MCP calls.
-EOF
+printf 'CodeGraph projectPath: %s\n' "$worktree_path"
