@@ -37,6 +37,7 @@ export class ActivityWindowController {
   private hasLoaded = false;
   private theme: HostTheme = { preference: "system", resolved: "light" };
   private replacementPromise: Promise<void> | null = null;
+  private pendingThemeBroadcast = false;
 
   constructor(private readonly options: Options) {}
 
@@ -61,8 +62,8 @@ export class ActivityWindowController {
 
     this.replacementPromise = this.replaceWindowWithoutVisibleGap(currentWindow)
       .catch(() => {
-      // The close path is best-effort: a later explicit activity_window.show command
-      // still reports load failures through its command ack.
+        // The close path is best-effort: a later explicit activity_window.show command
+        // still reports load failures through its command ack.
       })
       .finally(() => {
         this.replacementPromise = null;
@@ -73,6 +74,8 @@ export class ActivityWindowController {
     this.theme = theme;
     if (this.window && this.hasLoaded) {
       this.window.webContents.send("handagent:theme-changed", theme);
+    } else if (this.window) {
+      this.pendingThemeBroadcast = true;
     }
   }
 
@@ -83,6 +86,7 @@ export class ActivityWindowController {
     if (isPromiseLike(loadResult)) {
       await loadResult;
     }
+    replacementWindow.webContents.send("handagent:theme-changed", this.theme);
     replacementWindow.showInactive();
 
     if (this.window !== currentWindow) {
@@ -92,6 +96,7 @@ export class ActivityWindowController {
 
     this.window = replacementWindow;
     this.hasLoaded = true;
+    this.pendingThemeBroadcast = false;
     currentWindow.destroy();
   }
 
@@ -129,6 +134,7 @@ export class ActivityWindowController {
       if (this.window === window) {
         this.window = null;
         this.hasLoaded = false;
+        this.pendingThemeBroadcast = false;
       }
     });
     window.on("focus", () => {
@@ -169,6 +175,10 @@ export class ActivityWindowController {
         throw new Error("activity window closed before it was shown");
       }
       this.hasLoaded = true;
+      if (this.pendingThemeBroadcast) {
+        this.pendingThemeBroadcast = false;
+        window.webContents.send("handagent:theme-changed", this.theme);
+      }
     }
 
     window.showInactive();

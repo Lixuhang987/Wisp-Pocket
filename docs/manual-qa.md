@@ -177,7 +177,8 @@
 ### 跨端主题 token 与 light/dark/system 同步验收
 
 - 完成日期：待实机 QA
-- 实现位置：`design/tokens.json`、`scripts/generate-theme-tokens.mjs`、`apps/desktop/Sources/AppServices/Appearance/`、`apps/desktop/Sources/Settings/AppearanceSettingsView.swift`、`apps/electron-shell/src/main/windows/threadWindowPrewarmer.ts`、`apps/electron-shell/src/preload/threadWindowPreload.ts`、`apps/thread-window-web/src/native/themeConfig.ts`、`apps/thread-window-web/src/styles/generated-theme.css`
+- 实现位置：`design/tokens.json`、`scripts/generate-theme-tokens.mjs`、`apps/desktop/Sources/AppServices/Appearance/`、`apps/desktop/Sources/Settings/AppearanceSettingsView.swift`、`apps/electron-shell/src/main/windows/threadWindowPrewarmer.ts`、`apps/electron-shell/src/main/windows/activityWindowController.ts`、`apps/electron-shell/src/preload/threadWindowPreload.ts`、`apps/electron-shell/src/preload/activityWindowPreload.ts`、`apps/thread-window-web/src/native/themeConfig.ts`、`apps/thread-window-web/src/styles/generated-theme.css`
+- 链路证明：本次失败边界定位为 Electron `BrowserWindow` 已创建但 renderer 尚未完成加载时收到 `theme.changed`；main 侧只更新内存 theme，没有在 `did-finish-load` / `loadFile` 完成后补发，preload 侧也没有缓存订阅前收到的 latest theme，导致 ThreadWindow 和 StatusBubble 可能停留在窗口创建时的旧 `additionalArguments` 主题。
 - 自动化前提：已执行 `pnpm test:theme-tokens`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`pnpm --filter handagent-electron-shell test`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：
   1. 执行 `bash ./scripts/swiftw run HandAgentDesktop`，确认启动前会运行 `pnpm generate:theme-tokens`，且生成文件无 diff。
@@ -185,6 +186,7 @@
   3. 每次选择后打开或聚焦 Electron ThreadWindow，确认 React 根节点 `data-theme` 与 Swift 解析后的 theme 一致；已打开的 ThreadWindow 应实时切换，不需要刷新 renderer。
   4. 退出并重新启动桌面 App，确认 `~/.spotAgent/settings.json` 中的 `appearance.themePreference` 被保留，Electron ThreadWindow 首次创建时使用同一偏好解析后的主题。
   5. 切换回 `跟随系统` 后修改 macOS 系统外观，确认 Swift 重新解析并下发 `light` / `dark`，已打开的 ThreadWindow 跟随变化。
+  6. 启动后立刻连续切换浅色 / 深色，同时观察正在创建或刚出现的 ThreadWindow 与 StatusBubble；确认两者最终都落到最后一次选择的 resolved theme，不需要关闭重开。
 - 边界确认：React 不写主题偏好，不使用 `localStorage` 持久化主题；`tailwind.config.js` 不存在；Swift Theme 不再维护手写 color literal token 源。
 
 ### SwiftUI 启动阶段外观监听不崩溃

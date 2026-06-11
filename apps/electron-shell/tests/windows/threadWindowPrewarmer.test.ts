@@ -62,6 +62,26 @@ describe("ThreadWindowPrewarmer", () => {
     ]);
   });
 
+  it("broadcasts an in-flight theme change after the existing window finishes loading", async () => {
+    const window = new FakeBrowserWindow();
+    const prewarmer = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
+      preloadPath: "/preload.js",
+      createWindow: () => window,
+    });
+
+    const prepared = prewarmer.prepare();
+    await prewarmer.updateTheme({ preference: "dark", resolved: "dark" });
+    expect(window.sentMessages).toEqual([]);
+
+    window.webContents.emit("did-finish-load");
+    await prepared;
+
+    expect(window.sentMessages).toEqual([
+      ["handagent:theme-changed", { preference: "dark", resolved: "dark" }],
+    ]);
+  });
+
   it("delivers initial prompt before showing the prepared window", async () => {
     const window = new FakeBrowserWindow();
     const prewarmer = new ThreadWindowPrewarmer({

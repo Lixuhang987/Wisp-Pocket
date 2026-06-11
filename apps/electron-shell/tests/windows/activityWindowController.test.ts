@@ -61,6 +61,36 @@ describe("ActivityWindowController", () => {
     expect(window.bounds).toEqual({ x: 1164, y: 810, width: 272, height: 76 });
   });
 
+  it("broadcasts an in-flight theme change after the existing activity window loads", async () => {
+    const window = new FakeBrowserWindow();
+    const loaded = createDeferred<void>();
+    window.loadFile = (filePath: string): Promise<void> => {
+      window.loadedFile = filePath;
+      window.loadFileCount += 1;
+      return loaded.promise;
+    };
+    const controller = new ActivityWindowController({
+      activityWindowHTMLPath: "/dist/activity-window/index.html",
+      preloadPath: "/dist/preload/activityWindowPreload.js",
+      createWindow: () => window,
+      screenProvider: {
+        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
+      },
+    });
+
+    const shown = controller.show();
+    await controller.updateTheme({ preference: "dark", resolved: "dark" });
+    expect(window.webContents.send).not.toHaveBeenCalled();
+
+    loaded.resolve();
+    await shown;
+
+    expect(window.webContents.send).toHaveBeenCalledWith(
+      "handagent:theme-changed",
+      { preference: "dark", resolved: "dark" },
+    );
+  });
+
   it("resets the live window after close", async () => {
     const firstWindow = new FakeBrowserWindow();
     const secondWindow = new FakeBrowserWindow();
@@ -251,6 +281,42 @@ describe("ActivityWindowController", () => {
     expect(secondWindow.loadedFile).toBe("/dist/activity-window/index.html");
     expect(secondWindow.showInactiveCount).toBe(1);
     expect(secondWindow.bounds).toEqual({ x: 1144, y: 800, width: 272, height: 76 });
+  });
+
+  it("replays the latest theme to the replacement activity window after it loads", async () => {
+    const firstWindow = new FakeBrowserWindow();
+    const deferredLoad = createDeferred<void>();
+    const secondWindow = new FakeBrowserWindow({ loadFilePromise: deferredLoad.promise });
+    const windows = [firstWindow, secondWindow];
+    const controller = new ActivityWindowController({
+      activityWindowHTMLPath: "/dist/activity-window/index.html",
+      preloadPath: "/dist/preload/activityWindowPreload.js",
+      createWindow: () => {
+        const window = windows.shift();
+        if (!window) {
+          throw new Error("unexpected createWindow");
+        }
+        return window;
+      },
+      screenProvider: {
+        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
+      },
+    });
+
+    await controller.show();
+    controller.releaseNativeFocusForNextClick();
+    await controller.updateTheme({ preference: "dark", resolved: "dark" });
+
+    expect(secondWindow.webContents.send).not.toHaveBeenCalled();
+
+    deferredLoad.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(secondWindow.webContents.send).toHaveBeenCalledWith(
+      "handagent:theme-changed",
+      { preference: "dark", resolved: "dark" },
+    );
   });
 
   it("ignores native focus release before the activity window exists", () => {

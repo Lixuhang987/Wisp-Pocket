@@ -30,7 +30,7 @@ describe("threadWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    vi.doMock("electron", () => ({ contextBridge }));
+    vi.doMock("electron", () => ({ contextBridge, ipcRenderer: createIpcRendererMock() }));
 
     await import("../../src/preload/threadWindowPreload.js");
 
@@ -57,7 +57,7 @@ describe("threadWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    vi.doMock("electron", () => ({ contextBridge }));
+    vi.doMock("electron", () => ({ contextBridge, ipcRenderer: createIpcRendererMock() }));
 
     await import("../../src/preload/threadWindowPreload.js");
 
@@ -118,8 +118,29 @@ describe("threadWindowPreload", () => {
     unsubscribe?.();
     ipcRenderer.emit("handagent:theme-changed", {}, { preference: "dark", resolved: "dark" });
 
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler).toHaveBeenCalledWith({ preference: "light", resolved: "light" });
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(handler).toHaveBeenNthCalledWith(1, { preference: "system", resolved: "light" });
+    expect(handler).toHaveBeenNthCalledWith(2, { preference: "light", resolved: "light" });
+  });
+
+  it("replays the latest theme received before subscription", async () => {
+    const contextBridge = {
+      executeInMainWorld: vi.fn(),
+      exposeInMainWorld: vi.fn(),
+    };
+    const ipcRenderer = createIpcRendererMock();
+    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
+
+    await import("../../src/preload/threadWindowPreload.js");
+    ipcRenderer.emit("handagent:theme-changed", {}, { preference: "dark", resolved: "dark" });
+
+    const exposed = contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === "handAgentSubscribeThemeChange")?.[1] as
+      | ((handler: (theme: HostTheme) => void) => () => void)
+      | undefined;
+    const handler = vi.fn();
+    exposed?.(handler);
+
+    expect(handler).toHaveBeenCalledWith({ preference: "dark", resolved: "dark" });
   });
 });
 
