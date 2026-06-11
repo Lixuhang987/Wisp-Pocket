@@ -45,6 +45,9 @@ set -euo pipefail
 if [[ -n "${SWIFTW_TEST_CALLS_LOG:-}" ]]; then
   printf 'pnpm %s\n' "$*" >>"$SWIFTW_TEST_CALLS_LOG"
 fi
+
+printf 'pnpm stdout for %s\n' "$*"
+printf 'pnpm stderr for %s\n' "$*" >&2
 EOF
 chmod +x "$FAKE_BIN_DIR/pnpm"
 
@@ -99,8 +102,10 @@ fi
 rm -rf "$TEMP_ROOT/node_modules"
 install_run_output="$(SWIFTW_TEST_CALLS_LOG="$CALLS_LOG" PATH="$FAKE_BIN_DIR:$PATH" "$TEMP_ROOT/scripts/swiftw" run HandAgentDesktop 2>&1)"
 
-if [[ "$install_run_output" != *"[swiftw] node_modules missing, running pnpm install..."* ]]; then
-  printf 'Expected missing node_modules message, got:\n%s\n' "$install_run_output" >&2
+if [[ "$install_run_output" == *"[swiftw] node_modules missing"* ]] ||
+  [[ "$install_run_output" == *"pnpm stdout"* ]] ||
+  [[ "$install_run_output" == *"pnpm stderr"* ]]; then
+  printf 'Expected successful run setup to hide dependency/build output, got:\n%s\n' "$install_run_output" >&2
   exit 1
 fi
 
@@ -116,7 +121,13 @@ HANDAGENT_SWIFT_MODULE_CACHE_DIR="$TEST_TMP_DIR/shared-module-cache" \
 HANDAGENT_SWIFTPM_CACHE_DIR="$TEST_TMP_DIR/shared-swiftpm-cache" \
   SWIFTW_TEST_CALLS_LOG="$CALLS_LOG" \
   PATH="$FAKE_BIN_DIR:$PATH" \
-  "$TEMP_ROOT/scripts/swiftw" test >/dev/null 2>&1
+  "$TEMP_ROOT/scripts/swiftw" test >"$TEST_TMP_DIR/swiftw-test-output.log" 2>&1
+
+test_output="$(cat "$TEST_TMP_DIR/swiftw-test-output.log")"
+if [[ "$test_output" != "success" ]]; then
+  printf 'Expected successful test output to be exactly "success", got:\n%s\n' "$test_output" >&2
+  exit 1
+fi
 
 expected_override_calls=$'swift test --cache-path '"$TEST_TMP_DIR/shared-swiftpm-cache"$'\nclang_cache='"$TEST_TMP_DIR/shared-module-cache/clang-module-cache"$'\nswift_cache='"$TEST_TMP_DIR/shared-module-cache/swift-module-cache"
 actual_override_calls="$(cat "$CALLS_LOG")"

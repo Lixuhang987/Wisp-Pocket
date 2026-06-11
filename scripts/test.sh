@@ -7,14 +7,33 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-bash "$PROJECT_ROOT/scripts/swiftw.test.sh"
-bash "$PROJECT_ROOT/scripts/package-app.test.sh"
-bash "$PROJECT_ROOT/scripts/create-worktree.test.sh"
+run_quiet() {
+  local tmp_log
+  local status
 
-pnpm test:theme-tokens
-pnpm --filter handagent-electron-shell test
+  tmp_log="$(mktemp -t "handagent-test.XXXXXX")"
+  if "$@" >"$tmp_log" 2>&1; then
+    rm -f "$tmp_log"
+    return 0
+  else
+    status=$?
+    cat "$tmp_log"
+    rm -f "$tmp_log"
+    return "$status"
+  fi
+}
 
-pnpm exec vitest run \
+run_quiet bash "$PROJECT_ROOT/scripts/swiftw.test.sh"
+run_quiet bash "$PROJECT_ROOT/scripts/package-app.test.sh"
+run_quiet bash "$PROJECT_ROOT/scripts/create-worktree.test.sh"
+run_quiet bash "$PROJECT_ROOT/scripts/test.test.sh"
+
+run_quiet pnpm test:theme-tokens
+run_quiet pnpm --filter handagent-electron-shell test
+
+run_quiet pnpm exec vitest run \
   --exclude ".worktrees/**" \
   apps/agent-server/tests \
   packages/core/tests
+
+echo "success"

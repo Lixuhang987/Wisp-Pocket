@@ -17,6 +17,18 @@
 
 ## 开发验证记录
 
+### Bash 构建脚本成功静默输出
+
+- 完成日期：待实机 QA
+- 实现位置：`scripts/test.sh`、`scripts/test.test.sh`、`scripts/swiftw`、`scripts/swiftw.test.sh`、`scripts/package-app.sh`、`scripts/package-app.test.sh`、`README.md`、`docs/dev.md`
+- 修复结论：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 `bash ./scripts/package-app.sh [--mock-llm]` 成功时只输出 `success`，避免 Vitest、pnpm、Swift build 和 codesign 的正常日志污染上下文；失败时回放失败步骤 stdout/stderr，并保留原始退出码。`swiftw run HandAgentDesktop` 仍透出最终 Swift run 输出，但会隐藏前置 `pnpm install`、theme token、ThreadWindow Web 和 Electron shell 构建的成功日志。
+- 自动化验证：需执行 `bash ./scripts/test.test.sh`、`bash ./scripts/swiftw.test.sh`、`bash ./scripts/package-app.test.sh`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 执行 `bash ./scripts/test.sh`，确认成功输出只有 `success`。
+  2. 执行 `bash ./scripts/swiftw build`，确认成功输出只有 `success`。
+  3. 执行 `bash ./scripts/package-app.sh --mock-llm`，确认成功输出只有 `success`，且 `dist/HandAgentDesktop.app` 正常生成。
+  4. 人为制造一个构建失败场景，确认脚本只回放失败步骤日志并返回非 0 退出码。
+
 ### Worktree 初始化脚本与 CodeGraph projectPath 约束
 
 - 完成日期：待实机 QA

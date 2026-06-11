@@ -32,6 +32,22 @@ mkdir -p "$CLANG_CACHE_DIR" "$SWIFT_CACHE_DIR" "$SWIFTPM_CACHE_DIR"
 export CLANG_MODULE_CACHE_PATH="$CLANG_CACHE_DIR"
 export SWIFT_MODULECACHE_PATH="$SWIFT_CACHE_DIR"
 
+run_quiet() {
+  local tmp_log
+  local status
+
+  tmp_log="$(mktemp -t "swiftw-step.XXXXXX")"
+  if "$@" >"$tmp_log" 2>&1; then
+    rm -f "$tmp_log"
+    return 0
+  else
+    status=$?
+    cat "$tmp_log"
+    rm -f "$tmp_log"
+    return "$status"
+  fi
+}
+
 swift_with_cache() {
   case "${1:-}" in
     build|test|run|package)
@@ -53,10 +69,9 @@ ensure_workspace_dependencies() {
     return
   fi
 
-  echo "[swiftw] node_modules missing, running pnpm install..." >&2
   (
     cd "$ROOT_DIR"
-    pnpm install
+    run_quiet pnpm install
   )
   WORKSPACE_DEPENDENCIES_READY=1
 }
@@ -69,7 +84,7 @@ ensure_thread_window_web_build() {
   ensure_workspace_dependencies
   (
     cd "$ROOT_DIR"
-    pnpm --filter handagent-thread-window-web build
+    run_quiet pnpm --filter handagent-thread-window-web build
   )
 }
 
@@ -77,7 +92,7 @@ ensure_theme_tokens() {
   ensure_workspace_dependencies
   (
     cd "$ROOT_DIR"
-    pnpm generate:theme-tokens
+    run_quiet pnpm generate:theme-tokens
   )
 }
 
@@ -85,7 +100,7 @@ ensure_electron_shell_build() {
   ensure_workspace_dependencies
   (
     cd "$ROOT_DIR"
-    pnpm --filter handagent-electron-shell build
+    run_quiet pnpm --filter handagent-electron-shell build
   )
 }
 
@@ -95,11 +110,7 @@ if [[ "${1:-}" == "test" || "${1:-}" == "build" ]]; then
   trap 'rm -f "$tmp_log"' EXIT
 
   if swift_with_cache "$@" >"$tmp_log" 2>&1; then
-    if [[ "${1:-}" == "build" ]]; then
-      echo "success"
-    else
-      echo "SUCCESS"
-    fi
+    echo "success"
     exit 0
   else
     status=$?

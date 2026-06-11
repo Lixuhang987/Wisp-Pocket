@@ -68,32 +68,38 @@ done
 tmp_log="$(mktemp -t "package-app.XXXXXX")"
 trap 'rm -f "$tmp_log"' EXIT
 
+run_quiet() {
+  local status
+
+  : >"$tmp_log"
+  if "$@" >"$tmp_log" 2>&1; then
+    return 0
+  else
+    status=$?
+    cat "$tmp_log"
+    return "$status"
+  fi
+}
+
 ensure_workspace_dependencies() {
   if [[ -d "$ROOT_DIR/node_modules" ]]; then
     return
   fi
 
-  echo "[package-app] node_modules missing, running pnpm install..."
-  (cd "$ROOT_DIR" && pnpm install)
+  (cd "$ROOT_DIR" && run_quiet pnpm install)
 }
 
 if [[ -z "${HANDAGENT_THREAD_WINDOW_WEB_DIST_DIR:-}" ]]; then
   ensure_workspace_dependencies
-  echo "[package-app] Building thread-window-web..."
-  (cd "$ROOT_DIR" && pnpm --filter handagent-thread-window-web build)
+  (cd "$ROOT_DIR" && run_quiet pnpm --filter handagent-thread-window-web build)
 fi
 
 if [[ -z "${HANDAGENT_ELECTRON_SHELL_DIST_DIR:-}" ]]; then
   ensure_workspace_dependencies
-  echo "[package-app] Building electron-shell..."
-  (cd "$ROOT_DIR" && pnpm --filter handagent-electron-shell build)
+  (cd "$ROOT_DIR" && run_quiet pnpm --filter handagent-electron-shell build)
 fi
 
-echo "[package-app] Building $APP_NAME release binary..."
-if ! "$SWIFT_BIN" build --cache-path "$SWIFTPM_CACHE_DIR" -c release --product "$APP_NAME" >"$tmp_log" 2>&1; then
-  cat "$tmp_log"
-  exit 1
-fi
+run_quiet "$SWIFT_BIN" build --cache-path "$SWIFTPM_CACHE_DIR" -c release --product "$APP_NAME"
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
@@ -166,12 +172,11 @@ fi
 
 # 本地 QA 默认使用 ad-hoc 签名，但显式写入稳定 designated requirement。
 # 否则默认 requirement 会退化为 cdhash，重构建后二进制 hash 改变，macOS TCC 会把它视为新 App。
-echo "[package-app] Code signing app bundle..."
-"$CODESIGN_BIN" \
+run_quiet "$CODESIGN_BIN" \
   --force \
   --deep \
   --sign "$CODESIGN_IDENTITY" \
   --requirements "$CODESIGN_REQUIREMENT" \
-  "$APP_DIR" >/dev/null 2>&1
+  "$APP_DIR"
 
 echo "success"

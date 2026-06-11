@@ -38,7 +38,7 @@ bash ./scripts/swiftw run HandAgentDesktop
 说明：
 
 - `bash ./scripts/swiftw run HandAgentDesktop` 会先自动执行 `pnpm generate:theme-tokens`、`pnpm --filter handagent-thread-window-web build` 与 `pnpm --filter handagent-electron-shell build`，确保 Swift / Tailwind v4 主题 token 适配层、React 静态资源和 `apps/electron-shell/dist/main/main.js` 都存在。
-- 如果根目录缺少 `node_modules`，`swiftw run HandAgentDesktop` 会先输出 `[swiftw] node_modules missing, running pnpm install...` 并自动执行 `pnpm install`，再生成主题 token、构建 ThreadWindow Web 与 Electron shell。
+- 如果根目录缺少 `node_modules`，`swiftw run HandAgentDesktop` 会先自动执行 `pnpm install`，再生成主题 token、构建 ThreadWindow Web 与 Electron shell；这些前置步骤成功时不打印正常构建日志，失败时才回放对应命令输出。
 - `ThreadWindow` 由 Electron `BrowserWindow` 承载，默认走 `http://127.0.0.1:4317/thread-window/index.html`。这个静态入口由 Electron 监督的 `agent-server` 同端口提供。
 
 4. 如果 `swiftw run` 在当前机器报错，优先检查 Xcode 版本与 `xcode-select` 是否指向完整 Xcode，再执行同样流程。
@@ -63,6 +63,7 @@ bash ./scripts/test.sh
 ```
 
 - 新 worktree 初始化后的默认基线先跑这一项即可。只有任务涉及 Swift desktop、`Package.swift`、Swift 相关脚本、打包脚本或桌面启动链路时，才在开始阶段追加 Swift build。
+- `bash ./scripts/test.sh` 成功时只输出 `success`；任一子步骤失败时输出该失败步骤的 stdout/stderr 并返回原始退出码。
 
 ### Swift 宿主
 
@@ -86,7 +87,7 @@ bash ./scripts/swiftw build
 ### 打包与系统权限
 
 - 本地 QA 打包使用 `bash ./scripts/package-app.sh --mock-llm`。
-- 如果根目录缺少 `node_modules`，打包脚本会先自动执行 `pnpm install`；随后会依次打印 `Building thread-window-web...`、`Building HandAgentDesktop release binary...`、`Code signing app bundle...`。其中 release Swift build 可能持续数分钟，看到 release binary 阶段日志后不代表 web build 卡住。
+- 打包脚本会在缺少 `node_modules` 时自动执行 `pnpm install`，并按需构建 ThreadWindow Web、Electron shell、Swift release binary 与 app bundle 签名。成功时只输出 `success`；失败时才回放失败步骤的 stdout/stderr。
 - 脚本默认用 ad-hoc 签名，但会显式写入 `designated => identifier "com.yourname.HandAgentDesktop"`，避免默认 requirement 退化成随二进制变化的 `cdhash`。这样屏幕录制、辅助功能等 macOS TCC 权限在多次重构建后仍能复用同一个 App 身份。
 - 如果需要换正式签名身份，可设置 `HANDAGENT_PACKAGE_CODESIGN_IDENTITY`；如果 bundle id 或签名策略变化，也要同步设置 `HANDAGENT_PACKAGE_CODESIGN_REQUIREMENT`。
 

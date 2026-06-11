@@ -11,6 +11,8 @@ WEB_DIST_DIR="$TEST_TMP_DIR/thread-window-web-dist"
 ELECTRON_SHELL_DIST_DIR="$TEST_TMP_DIR/electron-shell-dist"
 PACKAGE_ROOT_DIR="$TEST_TMP_DIR/package-root"
 LOG_FILE="$TEST_TMP_DIR/calls.log"
+FAIL_PNPM_MARKER="$TEST_TMP_DIR/fail-pnpm"
+FAIL_CODESIGN_MARKER="$TEST_TMP_DIR/fail-codesign"
 COMMON_GIT_DIR="$(git -C "$ROOT_DIR" rev-parse --git-common-dir)"
 if [[ "$COMMON_GIT_DIR" != /* ]]; then
   COMMON_GIT_DIR="$ROOT_DIR/$COMMON_GIT_DIR"
@@ -39,6 +41,13 @@ cat >"$FAKE_BIN_DIR/swift" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
+printf 'swift stdout for %s\n' "$*"
+printf 'swift stderr for %s\n' "$*" >&2
+
+if [[ "${HANDAGENT_PACKAGE_FAKE_SWIFT_FAIL:-0}" == "1" ]]; then
+  exit 42
+fi
+
 mkdir -p "$HANDAGENT_PACKAGE_BUILD_DIR"
 cat >"$HANDAGENT_PACKAGE_BUILD_DIR/HandAgentDesktop" <<'APP'
 #!/usr/bin/env bash
@@ -51,26 +60,36 @@ printf 'swift_cache:%s\n' "${SWIFT_MODULECACHE_PATH:-}" >>"$HANDAGENT_PACKAGE_LO
 EOF
 chmod +x "$FAKE_BIN_DIR/swift"
 
-cat >"$FAKE_BIN_DIR/codesign" <<'EOF'
+cat >"$FAKE_BIN_DIR/codesign" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-printf 'codesign:%s\n' "$*" >>"$HANDAGENT_PACKAGE_LOG_FILE"
+printf 'codesign stdout for %s\n' "\$*"
+printf 'codesign stderr for %s\n' "\$*" >&2
+if [[ -f "$FAIL_CODESIGN_MARKER" ]]; then
+  exit 43
+fi
+printf 'codesign:%s\n' "\$*" >>"\$HANDAGENT_PACKAGE_LOG_FILE"
 EOF
 chmod +x "$FAKE_BIN_DIR/codesign"
 
-cat >"$FAKE_BIN_DIR/pnpm" <<'EOF'
+cat >"$FAKE_BIN_DIR/pnpm" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-printf 'pnpm:%s\n' "$*" >>"$HANDAGENT_PACKAGE_LOG_FILE"
-if [[ "$*" == "install" ]]; then
-  mkdir -p "$HANDAGENT_PACKAGE_ROOT_DIR/node_modules"
+printf 'pnpm stdout for %s\n' "\$*"
+printf 'pnpm stderr for %s\n' "\$*" >&2
+if [[ -f "$FAIL_PNPM_MARKER" ]]; then
+  exit 44
 fi
-mkdir -p "$HANDAGENT_PACKAGE_ROOT_DIR/apps/thread-window-web/dist"
-cat >"$HANDAGENT_PACKAGE_ROOT_DIR/apps/thread-window-web/dist/index.html" <<'HTML'
+printf 'pnpm:%s\n' "\$*" >>"\$HANDAGENT_PACKAGE_LOG_FILE"
+if [[ "\$*" == "install" ]]; then
+  mkdir -p "\$HANDAGENT_PACKAGE_ROOT_DIR/node_modules"
+fi
+mkdir -p "\$HANDAGENT_PACKAGE_ROOT_DIR/apps/thread-window-web/dist"
+cat >"\$HANDAGENT_PACKAGE_ROOT_DIR/apps/thread-window-web/dist/index.html" <<'HTML'
 <!doctype html><html><body>built web</body></html>
 HTML
-mkdir -p "$HANDAGENT_PACKAGE_ROOT_DIR/apps/electron-shell/dist/main"
-cat >"$HANDAGENT_PACKAGE_ROOT_DIR/apps/electron-shell/dist/main/main.js" <<'JS'
+mkdir -p "\$HANDAGENT_PACKAGE_ROOT_DIR/apps/electron-shell/dist/main"
+cat >"\$HANDAGENT_PACKAGE_ROOT_DIR/apps/electron-shell/dist/main/main.js" <<'JS'
 console.log("built electron shell");
 JS
 EOF
@@ -103,6 +122,7 @@ grep -q 'codesign:--force --deep --sign - --requirements =designated => identifi
 
 rm -rf "$DIST_DIR"
 : >"$LOG_FILE"
+rm -rf "$PACKAGE_ROOT_DIR/node_modules"
 
 package_output="$(
   PATH="$FAKE_BIN_DIR:$PATH" \
@@ -131,13 +151,63 @@ grep -q "clang_cache:$TEST_TMP_DIR/shared-module-cache/clang-module-cache" "$LOG
 grep -q "swift_cache:$TEST_TMP_DIR/shared-module-cache/swift-module-cache" "$LOG_FILE"
 grep -q 'codesign:--force --deep --sign - --requirements =designated => identifier "com.yourname.HandAgentDesktop"' "$LOG_FILE"
 
-if [[ "$package_output" != *"[package-app] node_modules missing, running pnpm install..."* ]] ||
-  [[ "$package_output" != *"[package-app] Building thread-window-web..."* ]] ||
-  [[ "$package_output" != *"[package-app] Building electron-shell..."* ]] ||
-  [[ "$package_output" != *"[package-app] Building HandAgentDesktop release binary..."* ]] ||
-  [[ "$package_output" != *"[package-app] Code signing app bundle..."* ]] ||
-  [[ "$package_output" != *"success"* ]]; then
-  printf 'Expected package-app progress output, got:\n%s\n' "$package_output" >&2
+if [[ "$package_output" != "success" ]]; then
+  printf 'Expected successful package output to be exactly "success", got:\n%s\n' "$package_output" >&2
+  exit 1
+fi
+
+rm -rf "$PACKAGE_ROOT_DIR/node_modules"
+
+set +e
+touch "$FAIL_PNPM_MARKER"
+pnpm_failure_output="$(
+  PATH="$FAKE_BIN_DIR:$PATH" \
+    HANDAGENT_PACKAGE_SWIFT_BIN="$FAKE_BIN_DIR/swift" \
+    HANDAGENT_PACKAGE_CODESIGN_BIN="$FAKE_BIN_DIR/codesign" \
+    HANDAGENT_PACKAGE_BUILD_DIR="$BUILD_DIR" \
+    HANDAGENT_PACKAGE_DIST_DIR="$DIST_DIR" \
+    HANDAGENT_PACKAGE_ROOT_DIR="$PACKAGE_ROOT_DIR" \
+    HANDAGENT_PACKAGE_LOG_FILE="$LOG_FILE" \
+    "$ROOT_DIR/scripts/package-app.sh" 2>&1
+)"
+pnpm_failure_status=$?
+rm -f "$FAIL_PNPM_MARKER"
+set -e
+
+if [[ "$pnpm_failure_status" -ne 44 ]]; then
+  printf 'Expected pnpm failure to exit 44, got %s\n' "$pnpm_failure_status" >&2
+  exit 1
+fi
+
+if [[ "$pnpm_failure_output" != *"pnpm stdout for"* ]] || [[ "$pnpm_failure_output" != *"pnpm stderr for"* ]]; then
+  printf 'Expected failed pnpm step to print captured output, got:\n%s\n' "$pnpm_failure_output" >&2
+  exit 1
+fi
+
+set +e
+touch "$FAIL_CODESIGN_MARKER"
+codesign_failure_output="$(
+  PATH="$FAKE_BIN_DIR:$PATH" \
+    HANDAGENT_PACKAGE_SWIFT_BIN="$FAKE_BIN_DIR/swift" \
+    HANDAGENT_PACKAGE_CODESIGN_BIN="$FAKE_BIN_DIR/codesign" \
+    HANDAGENT_PACKAGE_BUILD_DIR="$BUILD_DIR" \
+    HANDAGENT_PACKAGE_DIST_DIR="$DIST_DIR" \
+    HANDAGENT_THREAD_WINDOW_WEB_DIST_DIR="$WEB_DIST_DIR" \
+    HANDAGENT_ELECTRON_SHELL_DIST_DIR="$ELECTRON_SHELL_DIST_DIR" \
+    HANDAGENT_PACKAGE_LOG_FILE="$LOG_FILE" \
+    "$ROOT_DIR/scripts/package-app.sh" 2>&1
+)"
+codesign_failure_status=$?
+rm -f "$FAIL_CODESIGN_MARKER"
+set -e
+
+if [[ "$codesign_failure_status" -ne 43 ]]; then
+  printf 'Expected codesign failure to exit 43, got %s\n' "$codesign_failure_status" >&2
+  exit 1
+fi
+
+if [[ "$codesign_failure_output" != *"codesign stdout for"* ]] || [[ "$codesign_failure_output" != *"codesign stderr for"* ]]; then
+  printf 'Expected failed codesign step to print captured output, got:\n%s\n' "$codesign_failure_output" >&2
   exit 1
 fi
 
