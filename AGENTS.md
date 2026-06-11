@@ -58,11 +58,12 @@
 
 ### Development Workflow
 
+- 读代码默认使用 CodeGraph
 - 读取代码，确定任务的范围，涉及的文件。涉及文件所在目录的 `<dir>.md` 必须读取，并沿父目录递归向上直到根目录的 `handAgent.md`，确保理解完整的分层上下文。
 - 需要修改代码的任务，必须先在 `.worktrees/<task-name>/` 目录下创建 worktree。统一使用 `bash ./scripts/create-worktree.sh <task-name> [branch-name]`，并且**必须从主 checkout 执行**；**不要直接使用 `EnterWorktree` 工具**，也不要手写 `git worktree add` 跳过初始化。纯文档任务或只读任务不需要 worktree。
 - 执行前必须确保 `.worktrees` 已被 git ignore；若未忽略，先修正 `.gitignore`，不要绕过检查继续创建。
 - `bash ./scripts/create-worktree.sh` 会在 worktree 内依次执行 `pnpm install`、`codegraph init -i <worktree-absolute-path>`、`codegraph status <worktree-absolute-path>`，并输出后续 CodeGraph MCP 调用必须使用的 `projectPath`。若 `codegraph status` 仍提示索引来自其他 git working tree，则不得继续开发。
-- 在 worktree 内使用 CodeGraph MCP 工具时，必须显式传入脚本输出的绝对路径 `projectPath`，不得依赖默认 projectPath，更不能继续使用主 checkout 的索引。
+- 在 worktree 内使用 CodeGraph MCP 工具时，必须显式传入脚本输出的绝对路径 `projectPath`，不得依赖默认 projectPath。
 - 初始化完成后，先按改动范围跑一次分层基线，确认 worktree 可用，再开始浏览代码。默认先跑 `bash ./scripts/test.sh`；若任务涉及 `apps/desktop/`、`Package.swift`、Swift 脚本、打包脚本或会影响桌面启动链路，再追加 `bash ./scripts/swiftw build`。优先阅读目标目录下同名的架构文档。
 - 进行代码修改。
 - 验证通过后，更新已有文档。
