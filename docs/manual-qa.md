@@ -111,6 +111,18 @@
   4. 打开 StatusBubble，在浅色、深色和系统主题切换时确认 ActivityWindow 气泡同步变更，状态点、标题和详情文字不溢出，点击仍只聚焦已有 ThreadWindow。
   5. 打开系统 reduced motion 后重复 running/tool/waiting 状态，确认 StatusBubble 状态点不播放脉冲动画，ThreadWindow 交互动效不影响布局。
 
+### 关闭 ThreadWindow 时 StatusBubble 无闪烁替换
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/electron-shell/src/main/windows/activityWindowController.ts`、`apps/electron-shell/tests/windows/activityWindowController.test.ts`、`apps/electron-shell/src/main/windows/windows.md`、`apps/electron-shell/src/main/main.md`
+- 链路证明：期望链路是 `ThreadWindow close -> ElectronShellRuntime.handleThreadWindowClosed(wasVisible=true) -> ActivityWindowController.releaseNativeFocusForNextClick()`。失败边界已收敛到 ActivityWindow controller：旧实现先 `destroy()` 当前窗口，再异步创建并展示替身窗口，所以 StatusBubble 会先消失再出现。修复后改为先把替身窗口 `loadFile + showInactive()` 完成，再销毁旧窗口，仍然切换到新的 native window identity，但不留下可见空窗。
+- 自动化验证：需执行 `pnpm --filter handagent-electron-shell exec vitest run tests/windows/activityWindowController.test.ts tests/main/electronShellRuntime.test.ts`、`pnpm --filter handagent-electron-shell test`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，确认右下角 StatusBubble 可见。
+  2. 打开任意 ThreadWindow，再直接关闭该窗口，观察 StatusBubble 是否保持连续可见，不出现明显消失后重现。
+  3. 连续重复“打开 ThreadWindow -> 关闭 ThreadWindow”至少 5 次，确认每次都无闪烁、无位置跳动、无主题瞬时回退。
+  4. 关闭 ThreadWindow 后立即点击 StatusBubble，确认仍按当前产品语义只尝试聚焦已有 visible ThreadWindow，不会打开 Swift PromptPanel。
+
 ### Swift 前端迁移残留清理
 
 - 完成日期：待实机 QA

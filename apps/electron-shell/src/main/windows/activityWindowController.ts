@@ -36,25 +36,17 @@ export class ActivityWindowController {
   private window: BrowserWindowLike | null = null;
   private hasLoaded = false;
   private theme: HostTheme = { preference: "system", resolved: "light" };
+  private replacementPromise: Promise<void> | null = null;
 
   constructor(private readonly options: Options) {}
 
   async show(): Promise<void> {
-    const window = this.ensureWindow();
-    window.setBounds(this.boundsForPrimaryWorkArea());
-
-    if (!this.hasLoaded) {
-      const loadResult = window.loadFile(this.options.activityWindowHTMLPath);
-      if (isPromiseLike(loadResult)) {
-        await loadResult;
-      }
-      if (this.window !== window) {
-        throw new Error("activity window closed before it was shown");
-      }
-      this.hasLoaded = true;
+    if (this.replacementPromise) {
+      await this.replacementPromise;
     }
 
-    window.showInactive();
+    const window = this.ensureWindow();
+    await this.loadAndShow(window);
   }
 
   currentWebContents(): BrowserWindowLike["webContents"] | null {
@@ -62,18 +54,19 @@ export class ActivityWindowController {
   }
 
   releaseNativeFocusForNextClick(): void {
-    const window = this.window;
-    if (!window) {
+    const currentWindow = this.window;
+    if (!currentWindow || this.replacementPromise) {
       return;
     }
 
-    this.window = null;
-    this.hasLoaded = false;
-    window.destroy();
-    void this.show().catch(() => {
+    this.replacementPromise = this.replaceWindowWithoutVisibleGap(currentWindow)
+      .catch(() => {
       // The close path is best-effort: a later explicit activity_window.show command
       // still reports load failures through its command ack.
-    });
+      })
+      .finally(() => {
+        this.replacementPromise = null;
+      });
   }
 
   async updateTheme(theme: HostTheme): Promise<void> {
@@ -83,11 +76,36 @@ export class ActivityWindowController {
     }
   }
 
+  private async replaceWindowWithoutVisibleGap(currentWindow: BrowserWindowLike): Promise<void> {
+    const replacementWindow = this.createWindow();
+    replacementWindow.setBounds(this.boundsForPrimaryWorkArea());
+    const loadResult = replacementWindow.loadFile(this.options.activityWindowHTMLPath);
+    if (isPromiseLike(loadResult)) {
+      await loadResult;
+    }
+    replacementWindow.showInactive();
+
+    if (this.window !== currentWindow) {
+      replacementWindow.destroy();
+      return;
+    }
+
+    this.window = replacementWindow;
+    this.hasLoaded = true;
+    currentWindow.destroy();
+  }
+
   private ensureWindow(): BrowserWindowLike {
     if (this.window) {
       return this.window;
     }
 
+    const window = this.createWindow();
+    this.window = window;
+    return window;
+  }
+
+  private createWindow(): BrowserWindowLike {
     const window = this.options.createWindow({
       width: ACTIVITY_WINDOW_WIDTH,
       height: ACTIVITY_WINDOW_HEIGHT,
@@ -136,8 +154,24 @@ export class ActivityWindowController {
       this.options.onNativeMouseDown?.();
     });
 
-    this.window = window;
     return window;
+  }
+
+  private async loadAndShow(window: BrowserWindowLike): Promise<void> {
+    window.setBounds(this.boundsForPrimaryWorkArea());
+
+    if (!this.hasLoaded) {
+      const loadResult = window.loadFile(this.options.activityWindowHTMLPath);
+      if (isPromiseLike(loadResult)) {
+        await loadResult;
+      }
+      if (this.window !== window) {
+        throw new Error("activity window closed before it was shown");
+      }
+      this.hasLoaded = true;
+    }
+
+    window.showInactive();
   }
 
   private boundsForPrimaryWorkArea(): Rectangle {
