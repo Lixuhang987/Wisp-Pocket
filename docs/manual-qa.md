@@ -17,6 +17,18 @@
 
 ## 开发验证记录
 
+### Worktree 初始化脚本与 CodeGraph projectPath 约束
+
+- 完成日期：待实机 QA
+- 实现位置：`scripts/create-worktree.sh`、`scripts/create-worktree.test.sh`、`AGENTS.md`
+- 修复结论：新增统一 worktree 初始化入口，要求代码任务必须通过 `bash ./scripts/create-worktree.sh <task-name> [branch-name]` 创建 `.worktrees/<task-name>`。脚本会串行执行 `git worktree add`、`pnpm install`、`codegraph init -i <worktree-absolute-path>`、`codegraph status <worktree-absolute-path>`，并输出后续 CodeGraph MCP 调用必须使用的绝对 `projectPath`，避免 agent 继续误用主 checkout 索引。
+- 自动化验证：需执行 `bash ./scripts/create-worktree.test.sh`、`bash ./scripts/test.sh`；若本次改动影响 Swift 构建链路或仓库基线要求包含桌面链路，再执行 `bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 在主 checkout 执行 `bash ./scripts/create-worktree.sh qa-worktree-bootstrap`，确认创建 `.worktrees/qa-worktree-bootstrap` 和分支 `codex/qa-worktree-bootstrap`。
+  2. 确认脚本输出包含 `CodeGraph projectPath: /absolute/path/to/.worktrees/qa-worktree-bootstrap`。
+  3. 进入新 worktree 执行 `codegraph status /absolute/path/to/.worktrees/qa-worktree-bootstrap`，确认不再出现 `This CodeGraph index belongs to a different git working tree.`。
+  4. 在后续 CodeGraph MCP 调用中显式传入该 `projectPath`，确认检索结果来自 worktree 当前分支而不是主 checkout。
+
 ### Agent rx_event request-response 收敛
 
 - 完成日期：待实机 QA
