@@ -58,7 +58,7 @@ flowchart TD
 - 平台 RPC 只跑在 `/api/platform`：Swift desktop 发送 `platform_bridge_hello`，处理 `channel: "platform"` 的 `platform_request`，并回写 `platform_response`。
 - `thread.snapshot` 是用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口；React 和 app-server 之间不做断线恢复，非主动断开后不重连、不恢复订阅、不拉取 snapshot、不发送恢复命令。`workspace.listed` 是 `workspace.list` 的连接级响应，不带 `threadId`。
 - `permission.requested` / `workspace.requested` 是 server 向 React 提问、等待 UI 回执的少量交互；不要把它们混入普通 notification 或 platform RPC。
-- 持久化主目录是 `~/.spotAgent/threads/`；workspace、permission、blob、log、plugin、MCP 配置分别由对应模块文档说明。
+- 持久化主目录是 `~/.spotAgent/threads/`；workspace、permission、blob、log、Append Prompt manifest 和 MCP 配置分别由对应模块文档说明。
 - 图片 attachment 先落 Blob/STUB；agent-server 在 runtime 前展开为多模态 image part，最终能否理解图片取决于当前 provider capability。
 
 协议字段详见 [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)。desktop 内部提交模型见 [PromptPanel](/Users/mu9/proj/handAgent/apps/desktop/Sources/PromptPanel/prompt-panel.md)，React UI 状态见 [thread-window-web](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)，agent-server 编排见 [agent-server](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)。

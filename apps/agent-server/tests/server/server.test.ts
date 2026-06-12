@@ -19,7 +19,6 @@ import { AgentActivityPublisher } from "../../src/activity/AgentActivityPublishe
 import {
   AgentManager,
   createSharedAgentStatus,
-  renderUserInputForRuntime,
 } from "../../src/agent/AgentManager.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
 import { ThreadRuntimeOrchestrator } from "../../src/thread/ThreadRuntimeOrchestrator.ts";
@@ -245,7 +244,7 @@ describe("attachThreadSocketHandlers", () => {
               threadId: "Thread-A",
               messageId: op.opId,
               timestamp: op.timestamp,
-              payload: renderUserInputForRuntime(op),
+              payload: op.payload,
             },
             (event) => {
               eventPublisher.publish(event);

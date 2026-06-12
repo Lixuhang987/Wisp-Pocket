@@ -9,7 +9,6 @@ struct AppendPromptSettingsView: View {
     @State private var title = ""
     @State private var description = ""
     @State private var template = ""
-    @State private var requiredArgumentName = ""
 
     var body: some View {
         ScrollView {
@@ -81,9 +80,6 @@ struct AppendPromptSettingsView: View {
                 HStack(spacing: theme.spacing.sm) {
                     Text(prompt.trigger)
                         .font(theme.typography.captionFont.monospaced())
-                    if !prompt.argumentNames.isEmpty {
-                        Text(prompt.argumentNames.joined(separator: ", "))
-                    }
                     Spacer()
                 }
                 .foregroundStyle(theme.colors.textSecondary)
@@ -140,13 +136,8 @@ struct AppendPromptSettingsView: View {
                         .textFieldStyle(SettingsFieldStyle())
                 }
                 SettingsRowDivider()
-                SettingsRow("必填参数") {
-                    TextField("code", text: $requiredArgumentName)
-                        .textFieldStyle(SettingsFieldStyle())
-                }
-                SettingsRowDivider()
                 SettingsRow("Template") {
-                    SettingsTextEditor(text: $template, placeholder: "Explain this code:\n{{code}}")
+                    SettingsTextEditor(text: $template, placeholder: "Explain the code the user provides.")
                 }
                 SettingsRowDivider()
                 formButtons
@@ -172,8 +163,7 @@ struct AppendPromptSettingsView: View {
                     trigger: trigger,
                     title: title,
                     description: description,
-                    template: template,
-                    requiredArgumentName: requiredArgumentName
+                    template: template
                 )
                 if didCreate {
                     resetForm()
@@ -195,7 +185,6 @@ struct AppendPromptSettingsView: View {
         title = ""
         description = ""
         template = ""
-        requiredArgumentName = ""
     }
 
     private func errorFooter(_ error: String) -> some View {

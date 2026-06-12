@@ -288,15 +288,7 @@ export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
             thread.pendingInitialPrompt
             && !thread.messages.some((message) => message.role === "user" && message.pending)
           ) {
-            const pendingText = thread.pendingInitialPrompt.userInput.items
-              .map((item) => {
-                if (item.type === "text" || item.type === "text_selection") {
-                  return item.text;
-                }
-                return "";
-              })
-              .filter((value) => value.length > 0)
-              .join("\n\n");
+            const pendingText = summarizeInputItems(thread.pendingInitialPrompt.userInput.items);
             thread.messages.unshift({
               id: `pending-${thread.pendingInitialPrompt.clientRequestId}`,
               role: "user",
@@ -490,4 +482,18 @@ function cloneInputItem(item: InputItem): InputItem {
     case "text_selection":
       return { type: "text_selection", id: item.id, text: item.text };
   }
+}
+
+function summarizeInputItems(items: InputItem[]): string {
+  return items.map((item) => {
+    switch (item.type) {
+      case "text":
+      case "text_selection":
+        return item.text;
+      case "skill":
+        return item.title || item.prompt;
+      case "image":
+        return "图片附件";
+    }
+  }).filter((value) => value.length > 0).join("\n\n");
 }

@@ -1,5 +1,11 @@
 # 输入框 Item 化与 Plugin 删除实现计划
 
+## 参考视觉
+
+![输入框 item array 参考图](../assets/input-items-composer-reference.svg)
+
+这张图是实现验收标准之一：Tab 选中的 action 必须变成输入框内部的可删除 chip；React composer 的真实状态必须是 item array；数组中只有一个可编辑 `text` item，所有 chip 都渲染在它前面。
+
 ## 修改范围与职责
 
 本计划围绕一个主用例展开：用户把 action/skill、附件和文本组成一个输入框 item 数组，提交后由 core/server 解析成 runtime 用户消息。

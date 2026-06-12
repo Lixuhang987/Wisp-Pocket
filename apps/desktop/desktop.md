@@ -15,7 +15,7 @@
 Swift 原生 UI 只保留 PromptPanel 和 Settings：
 
 - **PromptPanel**：全局热键唤起、输入、用户主动附件采集、提交。
-- **Settings**：模型、外观主题、工具、Plugin、MCP、权限、workspace 和快捷键配置。
+- **Settings**：模型、外观主题、工具、Append Prompt、MCP、权限、workspace 和快捷键配置。
 
 不要新增 Swift ThreadWindow、Swift StatusBubble 或 Swift 侧 thread 状态 mirror。复杂常驻 UI 走 Electron/React。
 
@@ -109,7 +109,7 @@ desktop 与 agent-server 共享的模型、builtin tool 和外观主题配置文
 
 `PromptAttachmentResult` 是 PromptPanel 提交时能进入 initial prompt 的用户主动附件，只包含 5 类：`.noAttachment`、`.textToken`、`.textSelection`、`.imageRegion`、`.selectionError`。屏幕、剪贴板、App 状态不能在这里默认注入。
 
-`ActionDefinition` 来自 `~/.spotAgent/plugins/*/plugin.json` 的 `prompts[]`。desktop 负责 trigger、参数和 template 的本地渲染；plugin action 会把 `{ pluginId, promptName }` 作为 `actionBinding` 随 initial prompt 发给 React，再由 agent-server 重新校验 manifest 并持久化 thread 绑定。
+`ActionDefinition` 来自 `~/.spotAgent/plugins/*/plugin.json` 的 `prompts[]`。desktop 负责 trigger、标题、描述、prompt 文本和快捷键；Tab、点击 action 或 Action 全局快捷键只会把 action 追加为输入框内的 skill chip。提交时 Swift 发送完整 `UserInput.items`，不再发送 `actionBinding`，也不在 desktop 侧渲染参数。
 
 ## 注意事项
 

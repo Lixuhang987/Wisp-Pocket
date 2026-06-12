@@ -64,7 +64,7 @@ describe("Op protocol", () => {
       type: "thread.start",
       commandId: "cmd-1",
       timestamp: "2026-06-10T00:00:00.000Z",
-      payload: { workspaceId: null, actionBinding: null },
+      payload: { workspaceId: null },
     };
 
     expect(command.type).toBe("thread.start");

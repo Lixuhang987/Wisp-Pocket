@@ -32,6 +32,10 @@
 
 采用 Prefix Chips 模型：
 
+![输入框 item array 参考图](../assets/input-items-composer-reference.svg)
+
+参考图是本次交互的视觉合同：action Tab 后生成的 `skill` 是输入框内部可删除 attachment chip，所有 chip 排在唯一可编辑 `text` item 前面，后续输入仍落在同一个 text item 中。
+
 ```mermaid
 flowchart LR
   A["Action Tab"] --> B["ActionSubmission.appendSkill"]

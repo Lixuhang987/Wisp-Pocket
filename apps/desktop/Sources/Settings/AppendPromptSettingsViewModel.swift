@@ -8,7 +8,6 @@ struct AppendPromptEntry: Identifiable, Equatable {
     let title: String
     let description: String
     let template: String
-    let argumentNames: [String]
 }
 
 @Observable
@@ -26,14 +25,19 @@ final class AppendPromptSettingsViewModel {
         fileManager: FileManager = .default
     ) {
         self.fileManager = fileManager
-        self.pluginsDirectoryURL = PluginSettingsViewModel.pluginsDirectoryURL(homeDirectoryURL: homeDirectoryURL)
+        self.pluginsDirectoryURL = Self.promptsDirectoryURL(homeDirectoryURL: homeDirectoryURL)
         reload()
+    }
+
+    static func promptsDirectoryURL(homeDirectoryURL: URL) -> URL {
+        homeDirectoryURL
+            .appendingPathComponent(".spotAgent", isDirectory: true)
+            .appendingPathComponent("plugins", isDirectory: true)
     }
 
     func reload() {
         prompts = loadManifests().flatMap { manifest in
             manifest.prompts.compactMap { prompt in
-                guard prompt.actionKind == .skill else { return nil }
                 return AppendPromptEntry(
                     id: "\(manifest.id)/\(prompt.name)",
                     pluginId: manifest.id,
@@ -41,8 +45,7 @@ final class AppendPromptSettingsViewModel {
                     trigger: prompt.trigger,
                     title: prompt.title,
                     description: prompt.description ?? "",
-                    template: prompt.template,
-                    argumentNames: (prompt.arguments ?? []).map(\.name)
+                    template: prompt.template
                 )
             }
         }
@@ -55,8 +58,7 @@ final class AppendPromptSettingsViewModel {
         trigger: String,
         title: String,
         description: String,
-        template: String,
-        requiredArgumentName: String
+        template: String
     ) -> Bool {
         let promptName = normalizedIdentifier(name)
         guard !promptName.isEmpty else {
@@ -71,7 +73,7 @@ final class AppendPromptSettingsViewModel {
             saveErrorMessage = "标题、Trigger 和 Template 不能为空"
             return false
         }
-        guard !actionTrigger.contains(where: \.isWhitespace) else {
+        guard !actionTrigger.contains(where: { $0.isWhitespace }) else {
             saveErrorMessage = "Trigger 不能包含空白字符"
             return false
         }
@@ -82,21 +84,15 @@ final class AppendPromptSettingsViewModel {
             title: "Append Prompts",
             description: "User-managed append prompt actions",
             enabled: true,
-            mcpServerIds: [],
             prompts: []
         )
-        let argument = normalizedIdentifier(requiredArgumentName)
         let prompt = PluginPromptDefinition(
             name: promptName,
-            kind: .skill,
             trigger: actionTrigger,
             title: actionTitle,
             description: optionalTrimmed(description),
             template: actionTemplate,
             globalShortcut: nil,
-            arguments: argument.isEmpty ? [] : [
-                ActionArgumentDefinition(name: argument, description: nil, required: true)
-            ],
             icons: nil
         )
         manifest = PluginManifestDefinition(
@@ -105,7 +101,6 @@ final class AppendPromptSettingsViewModel {
             title: manifest.title,
             description: manifest.description,
             enabled: manifest.enabled,
-            mcpServerIds: manifest.mcpServerIds,
             prompts: manifest.prompts.filter { $0.name != promptName } + [prompt]
         )
         persist(manifest, pluginId: managedPluginId)
@@ -117,36 +112,24 @@ final class AppendPromptSettingsViewModel {
         let prompts = [
             PluginPromptDefinition(
                 name: "explain-code",
-                kind: .skill,
                 trigger: "explain",
                 title: "Explain Code",
                 description: "Explain a pasted code block.",
                 template: """
-                Explain this code clearly. Call out inputs, outputs, side effects, and any risks.
-
-                {{code}}
+                Explain the code the user provides. Call out inputs, outputs, side effects, and any risks.
                 """,
                 globalShortcut: nil,
-                arguments: [
-                    ActionArgumentDefinition(name: "code", description: "Code to explain", required: true)
-                ],
                 icons: nil
             ),
             PluginPromptDefinition(
                 name: "summarize-text",
-                kind: .skill,
                 trigger: "sum",
                 title: "Summarize Text",
                 description: "Summarize pasted text into concise bullets.",
                 template: """
-                Summarize the text below in Chinese. Keep only the important facts.
-
-                {{text}}
+                Summarize the text the user provides in Chinese. Keep only the important facts.
                 """,
                 globalShortcut: nil,
-                arguments: [
-                    ActionArgumentDefinition(name: "text", description: "Text to summarize", required: true)
-                ],
                 icons: nil
             )
         ]
@@ -156,7 +139,6 @@ final class AppendPromptSettingsViewModel {
             title: "Append Prompts",
             description: "User-managed append prompt actions",
             enabled: true,
-            mcpServerIds: [],
             prompts: prompts
         )
         persist(manifest, pluginId: managedPluginId)
@@ -183,7 +165,6 @@ final class AppendPromptSettingsViewModel {
             title: manifest.title,
             description: manifest.description,
             enabled: manifest.enabled,
-            mcpServerIds: manifest.mcpServerIds,
             prompts: remaining
         )
         persist(manifest, pluginId: pluginId)

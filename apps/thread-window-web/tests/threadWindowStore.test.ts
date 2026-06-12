@@ -17,7 +17,6 @@ describe("threadWindowStore", () => {
     store.getState().enqueueInitialPrompt({
       clientRequestId: "prompt-1",
       userInput: { items: [{ type: "text", id: "text-1", text: "hello" }] },
-      actionBinding: null,
     });
 
     store.getState().handleNotification({
@@ -53,7 +52,6 @@ describe("threadWindowStore", () => {
     store.getState().enqueueInitialPrompt({
       clientRequestId: "prompt-1",
       userInput: { items: [{ type: "text", id: "text-1", text: "hello" }] },
-      actionBinding: null,
     });
     store.getState().handleNotification({
       type: "thread.started",
@@ -352,7 +350,6 @@ describe("threadWindowStore", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     });
 
     store.getState().handleNotification({

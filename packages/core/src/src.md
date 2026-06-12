@@ -9,7 +9,6 @@
 | 子模块 | 子文档 | 一句话职责 |
 |------|------|------|
 | `runtime/` | [runtime/runtime.md](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md) | LLM/tool 主循环、AgentRunner、消息模型、ToolCallEnvelope |
-| `actions/` | [actions/actions.md](/Users/mu9/proj/handAgent/packages/core/src/actions/actions.md) | Action manifest 与 thread binding 解析 |
 | `blob/` | [blob/blob.md](/Users/mu9/proj/handAgent/packages/core/src/blob/blob.md) | 大段上下文内容的本地 Blob 持久化与 summary 元数据 |
 | `llm/` | [llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md) | LLMClient 抽象 + Vercel AI SDK 适配 |
 | `mcp/` | [mcp/mcp.md](/Users/mu9/proj/handAgent/packages/core/src/mcp/mcp.md) | 标准 MCP client 与 MCP tool adapter |
@@ -28,9 +27,9 @@
 
 ### 1. 输入阶段
 
-- `AgentThread.open(input)` 接收 `AgentThreadInput`
-- 内部通过 `selectionTextFromResult()` 提取 `selectedText`
-- `buildInitialUserMessage()` 输出给 runtime 的首轮字符串
+- React ThreadWindow 通过 `op.submit(UserInput)` 提交初始 prompt 和后续输入。
+- `UserInput.items` 是提交真相，当前支持 `text`、`skill`、`text_selection`、`image`。
+- agent-server 在进入 runtime 前统一把 items 组合成持久化 user message 与 LLM 输入；PromptPanel/Composer 不各自生成模型文本。
 
 ### 2. runtime 阶段
 
@@ -54,7 +53,7 @@
 - 平台类（依赖 `PlatformAdapter`）：`clipboard.read`、`app.frontmost`、`window.list`、`screen.capture`、`ocr.read`、`accessibility.snapshot`、`accessibility.action`。
 - 工作区类（依赖 `WorkspaceRegistry`）：`workspace.list`、`workspace.askUser`、`file.read`、`file.write`。
 
-plugin action 绑定的外部能力不由 core tools 目录加载私有插件进程；agent-server 会按 thread metadata 组合 builtin tools 与 MCP tools。skill action 不创建 thread binding，只作为普通 prompt 进入 runtime。
+外部 MCP 能力由 agent-server 按 `~/.spotAgent/mcp.json` 作为全局 MCP tools 注入 thread tool registry；PromptPanel skill action 只作为 `UserInput.items` 中的 `skill` item 进入 runtime。
 
 完整入参 / 实现位置见 [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md)。
 

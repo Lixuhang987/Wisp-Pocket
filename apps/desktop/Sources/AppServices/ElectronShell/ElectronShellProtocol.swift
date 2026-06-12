@@ -3,37 +3,28 @@ import Foundation
 struct ElectronInitialPromptPayload: Encodable, Equatable {
     let clientRequestId: String
     let userInput: PromptUserInput
-    let actionBinding: ActionBindingPayload?
 
     init(
         clientRequestId: String,
-        userInput: PromptUserInput,
-        actionBinding: ActionBindingPayload?
+        userInput: PromptUserInput
     ) {
         self.clientRequestId = clientRequestId
         self.userInput = userInput
-        self.actionBinding = actionBinding
     }
 
     init(prompt: PromptSubmission, clientRequestId: String = UUID().uuidString) {
         self.clientRequestId = clientRequestId
         self.userInput = prompt.userInput
-        self.actionBinding = prompt.actionBinding
     }
 
     private enum CodingKeys: String, CodingKey {
-        case clientRequestId, userInput, actionBinding
+        case clientRequestId, userInput
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(clientRequestId, forKey: .clientRequestId)
         try container.encode(userInput, forKey: .userInput)
-        if let actionBinding {
-            try container.encode(actionBinding, forKey: .actionBinding)
-        } else {
-            try container.encodeNil(forKey: .actionBinding)
-        }
     }
 }
 

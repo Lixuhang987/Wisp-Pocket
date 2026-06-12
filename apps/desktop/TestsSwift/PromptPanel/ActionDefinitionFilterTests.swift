@@ -11,7 +11,6 @@ final class ActionDefinitionFilterTests: XCTestCase {
                 title: "Open File",
                 description: "file document",
                 template: "Open file",
-                arguments: [],
                 defaultShortcut: .init(.o, modifiers: [.command])
             ),
             ActionDefinition.skill(
@@ -20,7 +19,6 @@ final class ActionDefinitionFilterTests: XCTestCase {
                 title: "New Thread",
                 description: "workspace",
                 template: "New thread",
-                arguments: [],
                 defaultShortcut: .init(.n, modifiers: [.command])
             )
         ]

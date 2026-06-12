@@ -31,7 +31,6 @@ Thread 持久化。`PersistedThread`（元数据 + 消息历史 + 事件审计�
     updatedAt,
     messageCount,
     workspaceId: string | null,
-    actionBinding?: { pluginId, promptName, mcpServerIds },
   },
   messages: AgentMessage[],   // LLM 视角
   events: ThreadAuditEvent[], // 审计视角
@@ -51,7 +50,7 @@ Thread 持久化。`PersistedThread`（元数据 + 消息历史 + 事件审计�
 - `ThreadAuditEvent` 是审计而非 UI 渲染源；UI 走 `ConversationMessage`，详见 [conversation](/Users/mu9/proj/handAgent/packages/core/src/conversation/conversation.md)。
 - 不要把 LLM 内部状态（如重试计数）写到 `metadata`，那不是持久化职责。
 - 新增字段时务必给 reasonable default，让旧文件可以无损读出。
-- `metadata.actionBinding` 只表示创建 thread 时绑定的 plugin action 和 MCP server ids；skill action 不写入此字段。不要在消息级别重复写入同一绑定。
+- Thread metadata 不保存 action binding；PromptPanel action 作为 `UserInput.items` 中的 `skill` item 进入消息内容。
 
 ## 相关文档
 

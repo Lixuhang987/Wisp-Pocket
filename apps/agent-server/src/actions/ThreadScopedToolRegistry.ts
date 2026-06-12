@@ -1,6 +1,5 @@
 import type { AgentTool } from "@handagent/core/tools/AgentTool.ts";
 import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
-import type { ThreadActionBinding } from "@handagent/core/storage/index.ts";
 import { MetaToolUseTool } from "@handagent/core/tools/MetaToolUseTool.ts";
 
 export class ThreadScopedToolRegistry {
@@ -20,16 +19,10 @@ export class ThreadScopedToolRegistry {
     } = {},
   ) {}
 
-  async refreshForThread(
-    threadId: string,
-    binding: ThreadActionBinding | undefined,
-  ): Promise<void> {
+  async refreshForThread(threadId: string): Promise<void> {
     const registry = this.registryForThread(threadId);
-    if (binding) {
-      this.activated.add(threadId);
-    }
     if (this.activated.has(threadId)) {
-      await this.refreshActivated(threadId, binding, registry);
+      await this.refreshActivated(threadId, registry);
       return;
     }
     if (this.options.exposeBuiltinToolsBeforeActivation) {
@@ -44,7 +37,7 @@ export class ThreadScopedToolRegistry {
 
   async activate(threadId: string): Promise<void> {
     this.activated.add(threadId);
-    await this.refreshActivated(threadId, undefined, this.registryForThread(threadId));
+    await this.refreshActivated(threadId, this.registryForThread(threadId));
   }
 
   isActivated(threadId: string): boolean {
@@ -67,16 +60,12 @@ export class ThreadScopedToolRegistry {
 
   private async refreshActivated(
     threadId: string,
-    binding: ThreadActionBinding | undefined,
     registry: ToolRegistry,
   ): Promise<void> {
     void threadId;
     const tools: AgentTool[] = [...this.options.builtinRegistry.all()];
 
-    const serverIds = new Set([
-      ...this.options.globalMcpServerIds,
-      ...(binding?.mcpServerIds ?? []),
-    ]);
+    const serverIds = new Set(this.options.globalMcpServerIds);
 
     for (const serverId of serverIds) {
       try {

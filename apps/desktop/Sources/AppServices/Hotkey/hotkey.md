@@ -26,8 +26,8 @@
 - 每个由 manifest prompt 派生的 `ActionDefinition` 通过 `shortcutName` 计算属性生成 `KeyboardShortcuts.Name("action.<id>")`。
 - Action 快捷键使用 `KeyboardShortcuts.Recorder` 配置，存储仍由 KeyboardShortcuts 写入 UserDefaults。
 - Action 快捷键是系统级全局快捷键，由 `ProductionHotkeyRegistrar.registerActionShortcut(...)` 注册。
-- 默认值来自 plugin manifest prompt 级 `globalShortcut`，仅当用户未自定义时写入。
-- Action 快捷键触发后由 Coordinator 根据 `ActionDefinition.submission` 决定行为：无必填参数的 skill/plugin 直接创建 thread；有必填参数的 skill/plugin 打开 PromptPanel 并预填 `trigger [arg: ]`。
+- 默认值来自 action manifest prompt 级 `globalShortcut`，仅当用户未自定义时写入。
+- Action 快捷键触发后由 Coordinator 打开 PromptPanel，并把对应 action 追加为输入框内的 skill chip；用户可继续输入，也可直接提交 skill-only 输入。
 
 ### 设置界面
 

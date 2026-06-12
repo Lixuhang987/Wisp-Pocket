@@ -20,7 +20,6 @@ import { ThreadPersistence } from "../thread/ThreadPersistence.ts";
 import {
   AgentManager,
   createSharedAgentStatus,
-  renderUserInputForRuntime,
   type Agent,
 } from "../agent/AgentManager.ts";
 import { AgentActivityPublisher } from "../activity/AgentActivityPublisher.ts";
@@ -283,7 +282,6 @@ export async function startDefaultServer(port = 4317) {
     { SettingsBackedLLMClient },
     { SettingsBackedToolRegistry },
     { ThreadScopedToolRegistry },
-    { ActionBindingResolver },
     { MCPServerRegistry },
     { StdioMCPClient },
     { StreamableHttpMCPClient },
@@ -300,7 +298,6 @@ export async function startDefaultServer(port = 4317) {
     import("../settings/SettingsBackedLLMClient.ts"),
     import("../settings/SettingsBackedToolRegistry.ts"),
     import("../actions/ThreadScopedToolRegistry.ts"),
-    import("../actions/ActionBindingResolver.ts"),
     import("../actions/MCPServerRegistry.ts"),
     import("@handagent/core/mcp/StdioMCPClient.ts"),
     import("@handagent/core/mcp/StreamableHttpMCPClient.ts"),
@@ -403,21 +400,15 @@ export async function startDefaultServer(port = 4317) {
     undefined,
     async (threadId) => {
       await toolRegistry.refresh();
-      const thread = await persistence.getThread(threadId);
-      const binding = thread?.metadata.actionBinding;
 
       if (!threadScopedTools.isActivated(threadId)) {
-        if (binding) {
+        const history = await persistence.getMessages(threadId);
+        if (historyShowsToolsActivated(history)) {
           await threadScopedTools.activate(threadId);
-        } else {
-          const history = await persistence.getMessages(threadId);
-          if (historyShowsToolsActivated(history)) {
-            await threadScopedTools.activate(threadId);
-          }
         }
       }
 
-      await threadScopedTools.refreshForThread(threadId, binding);
+      await threadScopedTools.refreshForThread(threadId);
     },
   );
   const activityPublisher = new AgentActivityPublisher();
@@ -448,13 +439,12 @@ export async function startDefaultServer(port = 4317) {
             return;
           }
 
-          const runtimeInput = renderUserInputForRuntime(op);
           await orchestrator.submitInput(
             {
               threadId,
               messageId: op.opId,
               timestamp: op.timestamp,
-              payload: runtimeInput,
+              payload: op.payload,
             },
             publishRuntimeEvent,
           );
@@ -477,7 +467,6 @@ export async function startDefaultServer(port = 4317) {
     persistence,
     eventPublisher,
     undefined,
-    new ActionBindingResolver({ pluginsDir: paths.pluginsDir }),
     (threadId) => {
       threadScopedTools.forgetThread(threadId);
       runtimeByThread.delete(threadId);
@@ -550,7 +539,6 @@ interface ServerPaths {
   threadsDir: string;
   logDir: string;
   blobsDir: string;
-  pluginsDir: string;
   workspacesPath: string;
   defaultWorkspaceDir: string;
   mcpConfigPath: string;
@@ -564,7 +552,6 @@ function resolveServerPaths(): ServerPaths {
     threadsDir: join(spotDir, "threads"),
     logDir: join(spotDir, "log"),
     blobsDir: join(spotDir, "blobs"),
-    pluginsDir: join(spotDir, "plugins"),
     workspacesPath: join(spotDir, "workspaces.json"),
     defaultWorkspaceDir: join(spotDir, "workspace"),
     mcpConfigPath: join(spotDir, "mcp.json"),

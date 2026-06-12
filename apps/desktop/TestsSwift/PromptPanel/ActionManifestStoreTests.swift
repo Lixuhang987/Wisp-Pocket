@@ -19,7 +19,7 @@ final class ActionManifestStoreTests: XCTestCase {
         let store = ActionManifestStore(pluginsDirectoryURL: plugins)
         let result = store.load()
 
-        XCTAssertEqual(result.actions.map { $0.pluginBinding?.pluginId }, ["alpha", "beta"])
+        XCTAssertEqual(result.actions.map(\.id), ["alpha/code_review", "beta/code_review"])
         XCTAssertEqual(result.disabled, [])
     }
 
@@ -56,10 +56,7 @@ private func writePlugin(id: String, trigger: String, to url: URL) throws {
           "name": "code_review",
           "trigger": "\(trigger)",
           "title": "Review",
-          "template": "{{code}}",
-          "arguments": [
-            { "name": "code", "required": true }
-          ]
+          "template": "Review the code the user provides."
         }
       ]
     }

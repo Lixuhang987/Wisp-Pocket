@@ -35,28 +35,6 @@ describe("FileThreadStore", () => {
     expect(loaded).toEqual(thread);
   });
 
-  it("persists action binding metadata", async () => {
-    const thread = await store.create({
-      id: "thread-action",
-      preview: "Action",
-      createdAt: "2026-06-05T00:00:00.000Z",
-      actionBinding: {
-        pluginId: "review",
-        promptName: "code_review",
-        mcpServerIds: ["github"],
-      },
-    });
-
-    expect(thread.metadata.actionBinding).toEqual({
-      pluginId: "review",
-      promptName: "code_review",
-      mcpServerIds: ["github"],
-    });
-
-    const loaded = await store.get("thread-action");
-    expect(loaded?.metadata.actionBinding?.mcpServerIds).toEqual(["github"]);
-  });
-
   it("returns null for non-existent thread", async () => {
     const result = await store.get("nonexistent");
     expect(result).toBeNull();

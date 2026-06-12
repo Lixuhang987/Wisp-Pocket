@@ -10,7 +10,7 @@
 | `ThreadWindowManaging.swift` | Coordinator 使用的 ThreadWindow 抽象，当前实现是 Electron command lifecycle |
 | `ElectronThreadWindowLifecycle.swift` | 通过 `ThreadWindowCommanding` 向 Electron main 发送 open/focus command，不持有 Swift window 或 thread UI 状态 |
 | `SettingsLifecycle.swift` | 持有设置窗口；提供 `openOrFocus / handleClosed / close` |
-| `PromptSubmission.swift` | 把 PromptPanel draft、选区、图片和 action prompt 翻译为 `PromptUserInput.items`、摘要与可选 action binding 的纯函数 |
+| `PromptSubmission.swift` | 把 PromptPanel composer items、选区和图片翻译为 `PromptUserInput.items` 与摘要的纯函数 |
 | `PromptCaptureCoordinator.swift` | 把热键 → 选区 / 区域采集 → PromptPanel attachment 的串联从 Coordinator 抽出 |
 
 ## 事件流约束
@@ -25,7 +25,7 @@
 - 历史入口语义：`openHistory` 聚焦全局 Electron ThreadWindow 并刷新左侧历史，不打开独立窗口；右侧当前展示哪个 thread 由 React `App` 本地 state 编排。
 - PromptPanel show/toggle 只负责显示原生输入面板和刷新 action 定义，不触发 ThreadWindow prepare。ThreadWindow 预热由 Electron main 在 agent-server ready 后主动完成。
 - PromptPanel 提交语义：先用 `hide(restoringFocus: false)` 隐藏 PromptPanel，不恢复唤起前的前台应用；再发送 `thread_window.open_initial_prompt` 给 Electron main，payload 是统一的 `UserInput.items`。React 收到后通过 `/api/thread` 发送 `thread.start`，再在 `thread.started` 后发送首轮 `op.submit(UserInput)`。这样 Electron `BrowserWindow.show()/focus()` 后不会被 PromptPanel 的焦点恢复逻辑推到后台。
-- Settings 打开时会创建模型、builtin tool、Plugin、Append Prompt、MCP、权限和 workspace 的 ViewModel。Coordinator 只负责注入，不直接读写 `~/.spotAgent/plugins` 或 `~/.spotAgent/mcp.json`。
+- Settings 打开时会创建模型、外观、builtin tool、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel。Coordinator 只负责注入，不直接读写 `~/.spotAgent/plugins` 或 `~/.spotAgent/mcp.json`。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
 - `AppCoordinator` 在 app-server available 后调用 `ActivityWindowCommanding.showActivityWindow()`；show 失败不回退到 Swift StatusBubble。Electron StatusBubble 点击不再回调 Coordinator 打开 PromptPanel，Coordinator 也不解析 `/api/activity` 状态。
 - `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving`；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。
@@ -34,8 +34,7 @@
 
 ```
 showPromptPanel / hidePromptPanel / togglePromptPanel
-submitPrompt(String, attachments: [PromptAttachmentResult])
-submitActionPrompt(String, actionBinding: ActionBindingPayload, attachments: [PromptAttachmentResult])
+submitPrompt([PromptPanelComposerItem], attachments: [PromptAttachmentResult])
 openSettings / settingsWindowClosed
 openHistory / threadWindowClosed
 ```

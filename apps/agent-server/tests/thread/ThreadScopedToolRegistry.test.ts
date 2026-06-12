@@ -32,7 +32,7 @@ function buildScoped(options?: {
 describe("ThreadScopedToolRegistry lazy activation", () => {
   it("only exposes the meta-tool before activation", async () => {
     const scoped = buildScoped();
-    await scoped.refreshForThread("s1", undefined);
+    await scoped.refreshForThread("s1");
 
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual(["use_tools"]);
     expect(scoped.isActivated("s1")).toBe(false);
@@ -60,7 +60,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     const scoped = buildScoped({
       builtin: [fakeTool("frontmost.app")],
     });
-    await scoped.refreshForThread("s1", undefined);
+    await scoped.refreshForThread("s1");
 
     const client = {
       async *stream(_messages: AgentMessage[], tools: AgentTool[]) {
@@ -104,7 +104,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
   it("isolates activation state per Thread", async () => {
     const scoped = buildScoped();
     await scoped.activate("s1");
-    await scoped.refreshForThread("s2", undefined);
+    await scoped.refreshForThread("s2");
 
     expect(scoped.isActivated("s1")).toBe(true);
     expect(scoped.isActivated("s2")).toBe(false);
@@ -114,20 +114,19 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     ]);
   });
 
-  it("plugin binding Thread skips meta-only and goes straight to full tools", async () => {
+  it("does not activate a Thread only because MCP servers exist globally", async () => {
     const scoped = buildScoped({
       builtin: [fakeTool("frontmost.app")],
       mcp: { srv: [fakeTool("mcp.srv.echo")] },
-      globalMcpServerIds: [],
+      globalMcpServerIds: ["srv"],
     });
 
-    await scoped.refreshForThread("s1", { mcpServerIds: ["srv"] });
+    await scoped.refreshForThread("s1");
 
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
-      "frontmost.app",
-      "mcp.srv.echo",
+      "use_tools",
     ]);
-    expect(scoped.isActivated("s1")).toBe(true);
+    expect(scoped.isActivated("s1")).toBe(false);
   });
 
   it("forgetThread drops activation state", async () => {
@@ -147,7 +146,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     await scoped.activate("s1");
     const s1Registry = scoped.registryForThread("s1");
 
-    await scoped.refreshForThread("s2", undefined);
+    await scoped.refreshForThread("s2");
 
     expect(scoped.registryForThread("s2").list().map((t) => t.name)).toEqual(["use_tools"]);
     expect(s1Registry.list().map((t) => t.name)).toEqual([
@@ -174,7 +173,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
       exposeBuiltinToolsBeforeActivation: true,
     });
 
-    await scoped.refreshForThread("mock-Thread", undefined);
+    await scoped.refreshForThread("mock-Thread");
     const runtime = new AgentRuntime(
       new MockLLMClient(),
       scoped.registryForThread("mock-Thread"),
@@ -214,7 +213,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
       exposeBuiltinToolsBeforeActivation: true,
     });
 
-    await scoped.refreshForThread("mock-Thread", undefined);
+    await scoped.refreshForThread("mock-Thread");
 
     expect(listMcpToolCalls).toBe(0);
     expect(scoped.isActivated("mock-Thread")).toBe(false);

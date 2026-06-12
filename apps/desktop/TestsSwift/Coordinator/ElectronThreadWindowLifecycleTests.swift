@@ -16,7 +16,7 @@ final class ElectronThreadWindowLifecycleTests: XCTestCase {
             onClosed: {}
         )
 
-        XCTAssertEqual(client.openedPrompts.map(\.composed), ["hello"])
+        XCTAssertEqual(client.openedPrompts.map(\.textContent), ["hello"])
         XCTAssertFalse(lifecycle.focus(threadID: nil, onFailure: {}))
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
         XCTAssertEqual(openedCount, 1)

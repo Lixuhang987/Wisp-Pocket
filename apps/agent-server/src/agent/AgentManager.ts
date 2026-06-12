@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentEvent } from "@handagent/core/protocol/AgentEvent.ts";
-import type { Op, UserInputOp } from "@handagent/core/protocol/Op.ts";
-import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
+import type { Op } from "@handagent/core/protocol/Op.ts";
 import type { RunStatus } from "@handagent/core/protocol/ThreadProtocolShared.ts";
 
 export type AgentTxSub = {
@@ -69,41 +68,6 @@ export class AgentManager {
     this.agents.delete(threadId);
     return true;
   }
-}
-
-export function renderUserInputForRuntime(op: UserInputOp): {
-  text: string;
-  attachments?: ThreadAttachment[];
-} {
-  const textParts: string[] = [];
-  const attachments: ThreadAttachment[] = [];
-
-  for (const item of op.payload.items) {
-    switch (item.type) {
-      case "text":
-        textParts.push(item.text);
-        break;
-      case "text_selection":
-        attachments.push({ kind: "text_selection", id: item.id, text: item.text });
-        break;
-      case "image":
-        attachments.push({
-          kind: "image",
-          id: item.id,
-          mimeType: item.mimeType,
-          base64: item.base64,
-        });
-        break;
-      case "skill":
-        textParts.push(item.prompt);
-        break;
-    }
-  }
-
-  return {
-    text: textParts.filter((value) => value.length > 0).join("\n\n"),
-    ...(attachments.length > 0 ? { attachments } : {}),
-  };
 }
 
 export function createSharedAgentStatus(initial: RunStatus = "idle"): SharedAgentStatus {

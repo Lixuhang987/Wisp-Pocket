@@ -17,7 +17,7 @@
   - `thread.read`：按 threadId 拉取完整 thread 快照或分页读取历史。
   - `thread.fork`：从指定消息或 turn 分叉新 thread。
   - `thread.rollback`：回滚到指定消息或 turn，并明确持久化与 UI 展示规则。
-  - thread metadata 更新：标题、preview、workspace、action binding 等字段的更新命令与通知。
+  - thread metadata 更新：标题、preview、workspace 等字段的更新命令与通知。
   - thread settings 更新与通知：模型、工具范围、运行参数等 thread 级配置变更。
   - goal / budget：目标状态、预算、用量统计及 UI 呈现。
   - realtime：语音、低延迟流式输入输出或实时通道。
@@ -28,7 +28,7 @@
   - 子 agent / 多 turn 并行语义。
   - run hooks 输入记录：把输入写进 thread 历史，并触发用户配置的 Hooks，例如审计、提示注入。
   - 历史保存顺序：明确 thread history 初始输入、hook 注入内容与后续消息的持久化顺序。
-  - MCP server 激活来源：plugin 除了用户显式指定，也支持由 skill 声明启用。
+  - MCP server 激活来源：除全局配置外，后续可由动态 tool / skill 声明启用。
 - 补一轮端到端实机验证：thread 创建、thread 恢复、thread 列表、thread 删除、turn 中断、permission / workspace 回流。
 - 补一轮端到端实机验证：React ThreadWindow 只通过 `/api/thread` 承载 thread/turn 主协议，Swift 宿主只通过 `/api/platform` 承载 `PlatformBridgeMessage`，确认两条 WebSocket 独立且互不污染。
 

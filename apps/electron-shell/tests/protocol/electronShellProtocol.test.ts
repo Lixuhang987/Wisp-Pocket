@@ -20,14 +20,12 @@ describe("electronShellProtocol", () => {
             { type: "image", id: "image-1", mimeType: "image/png", base64: "abc123" },
           ],
         },
-        actionBinding: { pluginId: "plugin-a", promptName: "prompt-a" },
       },
     }));
 
     expect(isSwiftToElectronCommand(command)).toBe(true);
     expect(command.type).toBe("thread_window.open_initial_prompt");
     expect(command.payload.userInput.items).toHaveLength(3);
-    expect(command.payload.actionBinding?.pluginId).toBe("plugin-a");
   });
 
   it("rejects commands without the electron shell channel", () => {
@@ -102,7 +100,6 @@ describe("electronShellProtocol", () => {
         clientRequestId: "prompt-4",
         text: "hello",
         attachments: [],
-        actionBinding: null,
       },
     }))).toThrow("unsupported electron shell command");
   });
@@ -117,7 +114,6 @@ describe("electronShellProtocol", () => {
         userInput: {
           items: [{ type: "image", id: "image-1", mimeType: "image/gif", base64: "abc123" }],
         },
-        actionBinding: null,
       },
     }))).toThrow("unsupported electron shell command");
   });

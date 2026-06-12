@@ -22,7 +22,7 @@
 
 - `apps/apps.md`：应用层总览，索引 desktop、thread-window-web 与 agent-server。
 - `packages/packages.md`：包层总览，索引 core 跨平台核心。
-- `examples/examples.md`：可复制到 `~/.spotAgent/` 的 Plugin / Append Prompt / MCP 配置示例。
+- `examples/examples.md`：可复制到 `~/.spotAgent/` 的 Append Prompt / MCP 配置示例。
 - `docs/`：开发说明集合
 - `codex/`：本地 code agent 的参考项目（权限系统 / tool 系统 / UI 流式展示 / 子 agent 系统等可借鉴）。
 

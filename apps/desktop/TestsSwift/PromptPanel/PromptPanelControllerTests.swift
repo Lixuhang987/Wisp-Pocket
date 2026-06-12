@@ -68,17 +68,14 @@ final class PromptPanelControllerTests: XCTestCase {
         XCTAssertEqual(viewModel.attachments.first?.displayLabel, "active selection")
     }
 
-    func testSelectActionAndShowPrefillsArgumentTemplate() async throws {
+    func testSelectActionAndShowAppendsSkillChip() async throws {
         let controller = makeController()
         let action = ActionDefinition.skill(
             id: "review/code",
             trigger: "r",
             title: "Review",
             description: nil,
-            template: "{{code}}",
-            arguments: [
-                ActionArgumentDefinition(name: "code", description: nil, required: true)
-            ],
+            template: "Review the user-provided code.",
             defaultShortcut: nil
         )
         let viewModel = PromptPanelViewModel(actions: [action])
@@ -88,7 +85,8 @@ final class PromptPanelControllerTests: XCTestCase {
         controller.selectActionAndShow(action)
         try await Task.sleep(for: .milliseconds(20))
 
-        XCTAssertEqual(viewModel.draft, "r [code: ]")
+        XCTAssertEqual(viewModel.skillItems.map(\.actionId), ["review/code"])
+        XCTAssertEqual(viewModel.draft, "")
     }
 
     func testHideRestoresFocusToAppCapturedBeforeShow() async throws {

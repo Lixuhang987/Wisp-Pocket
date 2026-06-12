@@ -39,7 +39,7 @@
 
 - **服务与 presenter 分层**：`ElectronBackedAppServer` / `AgentSettingsStore` 等服务保持 UI 无关；生产 window presenter 只能负责窗口构造与关闭回调，不写业务逻辑。
 - **Electron-only UI shell**：agent-server supervisor、ThreadWindow、StatusBubble 与 `/api/activity` subscriber 由 Electron/React 路径承载。
-- **SettingsWindowPresenting 只注入 ViewModel**：Settings 的 Plugin / Append Prompt / MCP 页面各自直接读写 `~/.spotAgent/plugins` 或 `~/.spotAgent/mcp.json`；presenter 只把 ViewModel 交给 `SettingsView`，不解析配置文件。
+- **SettingsWindowPresenting 只注入 ViewModel**：Settings 的 Append Prompt / MCP 页面各自直接读写 `~/.spotAgent/plugins` 或 `~/.spotAgent/mcp.json`；presenter 只把 ViewModel 交给 `SettingsView`，不解析配置文件。
 - **`@Observable` 优先**：新建状态类使用 `@Observable`，View 使用 `@Bindable` / `@State`。
 - **依赖通过 init 注入**：`AgentSettingsStore(homeDirectoryURL:)` 这样允许测试注入临时目录；不要在服务内直接读 `FileManager.default.homeDirectoryForCurrentUser` 之外的全局状态。
 - **错误对外暴露规则**：服务内部捕获错误后写 `xxxErrorMessage` 字段供 UI 读，不要直接 `fatalError` 或抛到 Coordinator。

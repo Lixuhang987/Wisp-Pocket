@@ -9,7 +9,6 @@ describe("AgentRunner", () => {
         model: "test-model",
         provider: "test-provider",
         workspaceId: null,
-        actionBinding: null,
         maxTimes: 1,
       },
       thread: {

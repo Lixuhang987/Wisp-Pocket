@@ -17,7 +17,6 @@ describe("nativeConfig", () => {
         userInput: {
           items: Array<{ type: "text"; id: string; text: string }>;
         };
-        actionBinding: null;
       }>;
     };
   }
@@ -28,7 +27,6 @@ describe("nativeConfig", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     }];
     const received: string[] = [];
 

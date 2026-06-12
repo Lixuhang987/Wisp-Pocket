@@ -5,13 +5,14 @@ import type {
   AgentRuntimeRunOptions,
 } from "@handagent/core/runtime/AgentRuntime.ts";
 import type { ThreadNotification as ProtocolThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
+import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import type { ThreadAuditEvent } from "@handagent/core/storage/index.ts";
 import type { ThreadPersistence } from "./ThreadPersistence.ts";
 import { RUN_INTERRUPTED_CODE, RUN_INTERRUPTED_MESSAGE } from "./ThreadPersistence.ts";
 import { ThreadInputQueue, type ThreadUserInputItem } from "./ThreadInputQueue.ts";
 import {
   agentMessagesToRuntimeMessages,
+  summarizeUserInput,
   toAuditEvent,
   toErrorMessage,
   toThreadNotification,
@@ -38,10 +39,7 @@ type UserInputSubmission = {
   threadId: string;
   messageId: string;
   timestamp: string;
-  payload: {
-    text: string;
-    attachments?: ThreadAttachment[];
-  };
+  payload: UserInput;
 };
 
 type ActiveRun = {
@@ -101,10 +99,7 @@ export class ThreadRuntimeOrchestrator {
       threadId: message.threadId,
       messageId: message.messageId,
       timestamp: message.timestamp,
-      payload: {
-        text: message.payload.text,
-        attachments: message.payload.attachments,
-      },
+      payload: message.payload,
     };
 
     await this.withThreadInputLock(message.threadId, async () => {
@@ -203,12 +198,9 @@ export class ThreadRuntimeOrchestrator {
     item: ThreadUserInputItem,
     push: PushMessage,
   ): Promise<RecordedThreadUserInputItem> {
-    await this.persistence.persistUserMessage(
-      item.threadId,
-      item.payload.text,
-      item.payload.attachments,
-    );
-    await this.persistence.autoTitle(item.threadId, item.payload.text);
+    const summary = summarizeUserInput(item.payload);
+    await this.persistence.persistUserInput(item.threadId, item.payload);
+    await this.persistence.autoTitle(item.threadId, summary);
     push({
       type: "user.message.recorded",
       threadId: item.threadId,
@@ -216,7 +208,7 @@ export class ThreadRuntimeOrchestrator {
       timestamp: this.now(),
       payload: {
         messageId: item.messageId,
-        text: item.payload.text,
+        text: summary,
       },
     });
     return {

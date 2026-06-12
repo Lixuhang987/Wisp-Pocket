@@ -10,17 +10,16 @@ import {
 } from "../src/protocol/threadProtocol.ts";
 
 describe("thread protocol helpers", () => {
-  it("encodes thread.start with nullable payload fields", () => {
+  it("encodes thread.start with workspace only", () => {
     expect(JSON.parse(encodeThreadStart({
       commandId: "cmd-1",
       timestamp: "2026-06-06T00:00:00.000Z",
       workspaceId: null,
-      actionBinding: null,
     }))).toEqual({
       type: "thread.start",
       commandId: "cmd-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      payload: { workspaceId: null, actionBinding: null },
+      payload: { workspaceId: null },
     });
   });
 

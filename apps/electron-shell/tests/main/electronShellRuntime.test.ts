@@ -13,7 +13,6 @@ describe("ElectronShellRuntime", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     };
 
     await harness.runtime.handleCommand({

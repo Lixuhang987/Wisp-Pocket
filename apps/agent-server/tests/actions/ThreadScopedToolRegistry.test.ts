@@ -4,30 +4,18 @@ import type { AgentTool } from "@handagent/core/tools/AgentTool.ts";
 import { ThreadScopedToolRegistry } from "../../src/actions/ThreadScopedToolRegistry.ts";
 
 describe("ThreadScopedToolRegistry", () => {
-  it("adds mcp tools only for Threads bound to their server (after activation)", async () => {
+  it("keeps Threads meta-only until explicit activation", async () => {
     const builtin = new ToolRegistry([makeTool("clipboard.read")]);
     const scoped = new ThreadScopedToolRegistry({
       builtinRegistry: builtin,
-      globalMcpServerIds: [],
+      globalMcpServerIds: ["github"],
       listMcpTools: async (serverId) =>
         serverId === "github" ? [makeTool("mcp.github.create_issue")] : [],
     });
 
-    // plain Thread without binding stays meta-only
-    await scoped.refreshForThread("plain", undefined);
+    await scoped.refreshForThread("plain");
     expect(scoped.registryForThread("plain").list().map((tool) => tool.name)).toEqual([
       "use_tools",
-    ]);
-
-    // Thread with plugin binding gets activated immediately with full tools
-    await scoped.refreshForThread("action", {
-      pluginId: "review",
-      promptName: "code_review",
-      mcpServerIds: ["github"],
-    });
-    expect(scoped.registryForThread("action").list().map((tool) => tool.name)).toEqual([
-      "clipboard.read",
-      "mcp.github.create_issue",
     ]);
   });
 
@@ -41,7 +29,7 @@ describe("ThreadScopedToolRegistry", () => {
     });
 
     // before activation: meta-only (global MCP servers are not loaded until activated)
-    await scoped.refreshForThread("plain", undefined);
+    await scoped.refreshForThread("plain");
     expect(scoped.registryForThread("plain").list().map((tool) => tool.name)).toEqual([
       "use_tools",
     ]);
@@ -54,20 +42,18 @@ describe("ThreadScopedToolRegistry", () => {
     ]);
   });
 
-  it("deduplicates when global and binding reference the same server", async () => {
-    const builtin = new ToolRegistry([makeTool("clipboard.read")]);
+  it("deduplicates tools from global MCP servers", async () => {
     const scoped = new ThreadScopedToolRegistry({
-      builtinRegistry: builtin,
+      builtinRegistry: new ToolRegistry([
+        makeTool("clipboard.read"),
+        makeTool("mcp.github.create_issue"),
+      ]),
       globalMcpServerIds: ["github"],
       listMcpTools: async (serverId) =>
         serverId === "github" ? [makeTool("mcp.github.create_issue")] : [],
     });
 
-    await scoped.refreshForThread("action", {
-      pluginId: "review",
-      promptName: "code_review",
-      mcpServerIds: ["github"],
-    });
+    await scoped.activate("action");
     expect(scoped.registryForThread("action").list().map((tool) => tool.name)).toEqual([
       "clipboard.read",
       "mcp.github.create_issue",

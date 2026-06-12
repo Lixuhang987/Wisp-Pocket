@@ -9,8 +9,7 @@ final class AppCoordinator {
         case showPromptPanel
         case hidePromptPanel
         case togglePromptPanel
-        case submitPrompt(String, attachments: [PromptAttachmentResult])
-        case submitActionPrompt(String, actionBinding: ActionBindingPayload, attachments: [PromptAttachmentResult])
+        case submitPrompt([PromptPanelComposerItem], attachments: [PromptAttachmentResult])
         case openSettings
         case openHistory
         case settingsWindowClosed
@@ -81,10 +80,8 @@ final class AppCoordinator {
         case .togglePromptPanel:
             refreshActionDefinitions()
             promptPanelController.toggle()
-        case .submitPrompt(let draft, let attachments):
-            handleSubmitPrompt(draft, attachments: attachments)
-        case .submitActionPrompt(let draft, let binding, let attachments):
-            handleSubmitPrompt(draft, attachments: attachments, actionBinding: binding)
+        case .submitPrompt(let inputItems, let attachments):
+            handleSubmitPrompt(inputItems, attachments: attachments)
         case .openSettings:
             handleOpenSettings()
         case .openHistory:
@@ -108,10 +105,6 @@ final class AppCoordinator {
         ToolSettingsViewModel(store: services.settingsStore)
     }
 
-    func makePluginSettingsViewModel() -> PluginSettingsViewModel {
-        PluginSettingsViewModel()
-    }
-
     func makeAppendPromptSettingsViewModel() -> AppendPromptSettingsViewModel {
         AppendPromptSettingsViewModel()
     }
@@ -127,11 +120,8 @@ final class AppCoordinator {
     private func setupPromptPanel() {
         promptPanelController.updateTheme(services.appearanceThemeService.appTheme)
         refreshActionDefinitions()
-        promptPanelController.onSubmit = { [weak self] draft, attachments in
-            self?.send(.submitPrompt(draft, attachments: attachments))
-        }
-        promptPanelController.onSubmitAction = { [weak self] prompt, binding, attachments in
-            self?.send(.submitActionPrompt(prompt, actionBinding: binding, attachments: attachments))
+        promptPanelController.onSubmit = { [weak self] inputItems, attachments in
+            self?.send(.submitPrompt(inputItems, attachments: attachments))
         }
         promptPanelController.onOpenSettings = { [weak self] in
             self?.send(.openSettings)
@@ -190,9 +180,8 @@ final class AppCoordinator {
     }
 
     private func handleSubmitPrompt(
-        _ draft: String,
-        attachments: [PromptAttachmentResult],
-        actionBinding: ActionBindingPayload? = nil
+        _ inputItems: [PromptPanelComposerItem],
+        attachments: [PromptAttachmentResult]
     ) {
         if let agentServerError {
             promptPanelController.setSubmissionEnabled(false, message: agentServerError)
@@ -201,9 +190,8 @@ final class AppCoordinator {
         }
 
         guard let prompt = PromptSubmission.compose(
-            draft: draft,
-            attachments: attachments,
-            actionBinding: actionBinding
+            inputItems: inputItems,
+            attachments: attachments
         ) else { return }
         promptPanelController.hide(restoringFocus: false)
         threadWindowLifecycle.createTabWithInitialPrompt(
@@ -228,7 +216,6 @@ final class AppCoordinator {
             settingsViewModel: makeSettingsViewModel(),
             appearanceViewModel: makeAppearanceSettingsViewModel(),
             toolSettingsViewModel: makeToolSettingsViewModel(),
-            pluginSettingsViewModel: makePluginSettingsViewModel(),
             appendPromptSettingsViewModel: makeAppendPromptSettingsViewModel(),
             mcpSettingsViewModel: makeMCPSettingsViewModel(),
             permissionRulesViewModel: makePermissionRulesViewModel(),
@@ -318,28 +305,6 @@ final class AppCoordinator {
     }
 
     private func performActionShortcut(_ action: ActionDefinition) {
-        switch action.submission {
-        case .appendPrompt, .plugin:
-            if action.requiresArguments {
-                promptPanelController.selectActionAndShow(action)
-                return
-            }
-            do {
-                let parsed = ParsedActionInvocation(action: action, values: [:])
-                let prompt = try parsed.renderedPrompt()
-                switch action.submission {
-                case .appendPrompt:
-                    handleSubmitPrompt(prompt, attachments: [])
-                case .plugin(let binding):
-                    handleSubmitPrompt(
-                        prompt,
-                        attachments: [],
-                        actionBinding: ActionBindingPayload(pluginId: binding.pluginId, promptName: binding.promptName)
-                    )
-                }
-            } catch {
-                promptPanelController.show()
-            }
-        }
+        promptPanelController.selectActionAndShow(action)
     }
 }

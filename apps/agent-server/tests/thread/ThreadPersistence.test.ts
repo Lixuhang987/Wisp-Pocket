@@ -61,7 +61,6 @@ describe("ThreadPersistence", () => {
         updatedAt: "2026-05-17T00:00:00.000Z",
         messageCount: 0,
         workspaceId: null,
-        actionBinding: undefined,
       },
     ]);
 

@@ -92,7 +92,6 @@ export class ThreadSocketClient {
       commandId: prompt.clientRequestId,
       timestamp: this.now(),
       workspaceId: null,
-      actionBinding: prompt.actionBinding,
     }));
   }
 

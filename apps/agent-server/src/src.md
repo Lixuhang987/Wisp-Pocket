@@ -16,17 +16,17 @@
 | `thread/` | [thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md) | thread 路由、一轮 turn 编排、持久化恢复与删除 |
 | `protocol/` | [protocol/protocol.md](/Users/mu9/proj/handAgent/apps/agent-server/src/protocol/protocol.md) | core runtime event、thread 消息、审计事件与多模态 STUB 的翻译 |
 | `settings/` | [settings/settings.md](/Users/mu9/proj/handAgent/apps/agent-server/src/settings/settings.md) | `~/.spotAgent/settings.json` 驱动的 LLM client 与 builtin tool 热加载 |
-| `actions/` | [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md) | plugin action binding、全局 / thread scoped MCP、Computer Use 兼容层与 thread 级工具表 |
+| `actions/` | [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md) | builtin / 全局 MCP / Computer Use 兼容层与 thread 级工具表 |
 | `bridges/` | [bridges/bridges.md](/Users/mu9/proj/handAgent/apps/agent-server/src/bridges/bridges.md) | desktop 平台 RPC bridge；thread request-response 归 `agent/AgentRequestBroker` |
 
 ## 内部依赖方向
 
 - `server/` 是组合根；只有这里创建长驻依赖、读取 `~/.spotAgent` 路径并绑定 HTTP / WebSocket。
 - `agent/` 维护持久 Agent 映射，运行期输入和 UI 回执进入 Agent 的 `tx_sub`；ThreadNotification 与 ServerRequest 从 Agent `rx_event` 交给 app-server 分发；旧 `ThreadRuntimeOrchestrator` 只作为 Agent 内部 turn 执行器被调用。
-- `thread/` 消费已经注入的 agent manager、persistence、publisher、workspace registry 和 action binding resolver，不直接创建 LLM client、MCP client 或 platform adapter；公开运行期输入只处理 `op.submit`。
+- `thread/` 消费已经注入的 agent manager、persistence、publisher 和 workspace registry，不直接创建 LLM client、MCP client 或 platform adapter；公开运行期输入只处理 `op.submit`。
 - `protocol/` 只做 runtime event、conversation message、audit event 和 attachment STUB 的翻译。
 - `settings/` 把 `settings.json` 热加载成 LLM client 与 builtin tool registry。
-- `actions/` 组合 builtin tools、MCP tools 与 plugin action binding，产出 thread 级工具表。
+- `actions/` 组合 builtin tools 与全局 MCP tools，产出 thread 级工具表。
 - `bridges/` 只把 platform bridge 映射到 desktop socket，不执行 tool 业务逻辑；permission/workspace request-response 不再放在 bridges。
 
 ## 边界规则

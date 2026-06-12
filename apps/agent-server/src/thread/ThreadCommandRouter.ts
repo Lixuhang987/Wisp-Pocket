@@ -13,24 +13,12 @@ import type {
   WorkspaceAnsweredResponse,
 } from "@handagent/core/protocol/ClientResponse.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type {
-  ThreadActionBinding,
-  ThreadSummary,
-} from "@handagent/core/storage/index.ts";
+import type { ThreadSummary } from "@handagent/core/storage/index.ts";
 import type { WorkspaceRegistry } from "@handagent/core/workspace/Workspace.ts";
 import type { Agent, AgentManager } from "../agent/AgentManager.ts";
 import { threadIdFromRequestId } from "../agent/AgentRequestBroker.ts";
 import { ThreadNotificationPublisher } from "./ThreadNotificationPublisher.ts";
 import type { ThreadPersistence } from "./ThreadPersistence.ts";
-
-type CreateThreadActionBinding = {
-  pluginId: string;
-  promptName: string;
-};
-
-type ActionBindingResolver = {
-  resolve(binding: CreateThreadActionBinding): Promise<ThreadActionBinding>;
-};
 
 type AgentFactory = (threadId: string) => Agent;
 
@@ -51,7 +39,6 @@ export class ThreadCommandRouter {
     private readonly persistence: ThreadPersistence,
     private readonly publisher: ThreadNotificationPublisher,
     private readonly now: () => string = () => new Date().toISOString(),
-    private readonly actionBindingResolver?: ActionBindingResolver,
     private readonly onThreadDeleted?: (threadId: string) => void,
     private readonly responseHandlers: ResponseHandlers = {},
     private readonly workspaceRegistry?: WorkspaceRegistry,
@@ -94,29 +81,8 @@ export class ThreadCommandRouter {
     command: ThreadStartCommand,
     connectionId: string,
   ): Promise<void> {
-    let actionBinding: ThreadActionBinding | undefined;
-    if (command.payload.actionBinding) {
-      actionBinding = await this.actionBindingResolver?.resolve(
-        command.payload.actionBinding,
-      );
-      if (!actionBinding) {
-        this.publisher.publishToConnection(connectionId, {
-          type: "thread.error",
-          notificationId: this.makeNotificationId(),
-          commandId: command.commandId,
-          timestamp: this.now(),
-          payload: {
-            code: "invalid_request",
-            message: "Action binding resolver is not configured",
-          },
-        });
-        return;
-      }
-    }
-
     const thread = await this.persistence.createThread(
       undefined,
-      actionBinding,
       command.payload.workspaceId,
     );
     const threadId = thread.metadata.id;

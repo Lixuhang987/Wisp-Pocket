@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { AgentRuntimeEvent } from "@handagent/core/runtime/AgentRuntime.ts";
 import type { ThreadNotification, AssistantDeltaNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
+import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import { InMemoryThreadStore } from "@handagent/core/storage/index.ts";
 import { MemoryBlobStore } from "../support/MemoryBlobStore.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
@@ -16,16 +16,13 @@ function createUserMessage(
   threadId: string;
   messageId: string;
   timestamp: string;
-  payload: {
-    text: string;
-    attachments?: ThreadAttachment[];
-  };
+  payload: UserInput;
 } {
   return {
     threadId,
     messageId,
     timestamp: "2026-05-11T10:00:00.000Z",
-    payload: { text },
+    payload: { items: [{ type: "text", id: `${messageId}-text`, text }] },
   };
 }
 
@@ -676,10 +673,10 @@ describe("ThreadRuntimeOrchestrator", () => {
       {
         ...createUserMessage("Thread-image", "描述图片", "user-1"),
         payload: {
-          text: "描述图片",
-          attachments: [
+          items: [
+            { type: "text", id: "text-1", text: "描述图片" },
             {
-              kind: "image",
+              type: "image",
               id: "img-1",
               mimeType: "image/png",
               base64: Buffer.from("png-bytes").toString("base64"),

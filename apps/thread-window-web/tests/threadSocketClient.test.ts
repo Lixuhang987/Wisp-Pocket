@@ -95,7 +95,6 @@ describe("ThreadSocketClient", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     });
     socket.onmessage?.({
       data: JSON.stringify({
@@ -111,7 +110,7 @@ describe("ThreadSocketClient", () => {
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
       { type: "workspace.list", commandId: "workspace-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { actionBinding: null, workspaceId: null } },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       { type: "op.submit", threadId: "thread-1", commandId: "input-1", payload: { op: { type: "user_input", opId: "prompt-1", payload: { items: [{ type: "text", id: "text-1", text: "hello" }] } } } },
     ]);
@@ -220,7 +219,6 @@ describe("ThreadSocketClient", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello before open" }],
       },
-      actionBinding: null,
     })).not.toThrow();
     expect(socket.sent).toEqual([]);
 
@@ -237,7 +235,7 @@ describe("ThreadSocketClient", () => {
     });
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "thread.start", commandId: "prompt-1", payload: { actionBinding: null, workspaceId: null } },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
       { type: "workspace.list", commandId: "workspace-list-1" },
       { type: "thread.list", commandId: "list-1" },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
@@ -302,7 +300,6 @@ describe("ThreadSocketClient", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     });
 
     socket.onmessage?.({
@@ -348,7 +345,7 @@ describe("ThreadSocketClient", () => {
     expect(sent).toMatchObject([
       { type: "workspace.list", commandId: "workspace-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { actionBinding: null, workspaceId: null } },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
     ]);
     expect(sent.some((command) => command.type === "input.submit")).toBe(false);
     expect(sent.some((command) => command.type === "thread.resume" && command.threadId === "thread-1")).toBe(false);
@@ -377,7 +374,6 @@ describe("ThreadSocketClient", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "first" }],
       },
-      actionBinding: null,
     });
 
     expect(() => client.startInitialPrompt({
@@ -385,7 +381,6 @@ describe("ThreadSocketClient", () => {
       userInput: {
         items: [{ type: "text", id: "text-2", text: "second" }],
       },
-      actionBinding: null,
     })).toThrow(/already pending/);
 
     socket.onmessage?.({
@@ -402,7 +397,7 @@ describe("ThreadSocketClient", () => {
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
       { type: "workspace.list", commandId: "workspace-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { actionBinding: null, workspaceId: null } },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       {
         type: "op.submit",

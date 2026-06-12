@@ -1,6 +1,3 @@
-import type {
-  ActionBindingPayload,
-} from "./ThreadProtocolShared.ts";
 import type { RuntimeOp } from "./Op.ts";
 
 export type ThreadStartCommand = {
@@ -9,7 +6,6 @@ export type ThreadStartCommand = {
   timestamp: string;
   payload: {
     workspaceId: string | null;
-    actionBinding: ActionBindingPayload | null;
   };
 };
 

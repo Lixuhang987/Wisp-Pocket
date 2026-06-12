@@ -40,9 +40,9 @@ final class AppCoordinatorTests: XCTestCase {
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(services: electronServices(commandClient: client))
 
-        coordinator.send(.submitPrompt("hello", attachments: []))
+        coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
 
-        XCTAssertEqual(client.openedPrompts.map(\.composed), ["hello"])
+        XCTAssertEqual(client.openedPrompts.map(\.textContent), ["hello"])
     }
 
     @MainActor
@@ -56,7 +56,7 @@ final class AppCoordinatorTests: XCTestCase {
             )
         )
 
-        coordinator.send(.submitPrompt("hello", attachments: []))
+        coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
 
         XCTAssertEqual(appliedPolicies.last, .regular)
@@ -73,7 +73,7 @@ final class AppCoordinatorTests: XCTestCase {
             )
         )
 
-        coordinator.send(.submitPrompt("hello", attachments: []))
+        coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
         coordinator.send(.threadWindowClosed)
 
@@ -91,7 +91,7 @@ final class AppCoordinatorTests: XCTestCase {
             )
         )
 
-        coordinator.send(.submitPrompt("hello", attachments: []))
+        coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
         coordinator.send(.openHistory)
         client.complete(commandId: "open-history-1", kind: .openHistory, ok: true)
@@ -242,7 +242,7 @@ final class AppCoordinatorTests: XCTestCase {
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(services: electronServices(commandClient: client))
 
-        coordinator.send(.submitPrompt("   ", attachments: []))
+        coordinator.send(.submitPrompt(promptItems("   "), attachments: []))
 
         XCTAssertEqual(client.commandCount, 0)
     }
@@ -256,7 +256,7 @@ final class AppCoordinatorTests: XCTestCase {
 
         stub.publishAvailability(false)
         try await Task.sleep(for: .milliseconds(10))
-        coordinator.send(.submitPrompt("hello", attachments: []))
+        coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
 
         XCTAssertEqual(client.commandCount, 0)
         XCTAssertEqual(coordinator.agentServerError, "agent-server 已断开，正在尝试重连…")
@@ -278,10 +278,10 @@ final class AppCoordinatorTests: XCTestCase {
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(services: electronServices(commandClient: client))
 
-        coordinator.send(.submitPrompt("first", attachments: []))
-        coordinator.send(.submitPrompt("second", attachments: []))
+        coordinator.send(.submitPrompt(promptItems("first"), attachments: []))
+        coordinator.send(.submitPrompt(promptItems("second"), attachments: []))
 
-        XCTAssertEqual(client.openedPrompts.map(\.composed), ["first", "second"])
+        XCTAssertEqual(client.openedPrompts.map(\.textContent), ["first", "second"])
     }
 
     @MainActor
@@ -536,7 +536,6 @@ final class StubSettingsWindowPresenter: SettingsWindowPresenting {
         settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
-        pluginSettingsViewModel: PluginSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,

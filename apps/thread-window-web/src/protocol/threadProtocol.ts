@@ -3,13 +3,9 @@ import type { InputItem, RuntimeOp, UserInput } from "@handagent/core/protocol/O
 import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
 import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type {
-  ActionBindingPayload,
-  ThreadAttachment,
-} from "@handagent/core/protocol/ThreadProtocolShared.ts";
+import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
 
 export type {
-  ActionBindingPayload,
   RunStatus,
   ThreadAttachment,
   ThreadListEntry,
@@ -25,14 +21,12 @@ export type { ThreadNotification } from "@handagent/core/protocol/ThreadNotifica
 export type InitialPromptPayload = {
   clientRequestId: string;
   userInput: UserInput;
-  actionBinding: ActionBindingPayload | null;
 };
 
 export function encodeThreadStart(input: {
   commandId: string;
   timestamp: string;
   workspaceId: string | null;
-  actionBinding: ActionBindingPayload | null;
 }): string {
   const command: ThreadCommand = {
     type: "thread.start",
@@ -40,7 +34,6 @@ export function encodeThreadStart(input: {
     timestamp: input.timestamp,
     payload: {
       workspaceId: input.workspaceId,
-      actionBinding: input.actionBinding,
     },
   };
   return encode(command);

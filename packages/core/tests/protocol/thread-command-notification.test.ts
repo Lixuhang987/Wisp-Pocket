@@ -43,7 +43,6 @@ describe("thread command/notification protocol", () => {
       timestamp: "2026-06-05T00:00:00.000Z",
       payload: {
         workspaceId: null,
-        actionBinding: null,
       },
     };
     const resume: ThreadCommand = {

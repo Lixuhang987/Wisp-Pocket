@@ -35,11 +35,6 @@ export type WorkspaceAskCandidate = {
   isDefault: boolean;
 };
 
-export type ActionBindingPayload = {
-  pluginId: string;
-  promptName: string;
-};
-
 export type ThreadSnapshotPayload = {
   messages: ConversationMessage[];
   status: RunStatus;

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
 import { ThreadInputQueue, type ThreadInputItem } from "../../src/thread/ThreadInputQueue.ts";
 
 function userItem(messageId: string, text: string): ThreadInputItem {
@@ -8,7 +7,7 @@ function userItem(messageId: string, text: string): ThreadInputItem {
     threadId: "thread-queue",
     messageId,
     timestamp: "2026-06-07T00:00:00.000Z",
-    payload: { text },
+    payload: { items: [{ type: "text", id: `${messageId}-text`, text }] },
   };
 }
 
@@ -50,10 +49,7 @@ describe("ThreadInputQueue", () => {
     expect(queue.hasPending()).toBe(false);
   });
 
-  it("keeps attachment payloads on user input items", () => {
-    const attachments: ThreadAttachment[] = [
-      { kind: "text_selection", id: "selection-1", text: "selected text" },
-    ];
+  it("keeps structured payloads on user input items", () => {
     const queue = new ThreadInputQueue();
 
     queue.enqueue({
@@ -61,12 +57,22 @@ describe("ThreadInputQueue", () => {
       threadId: "thread-queue",
       messageId: "u1",
       timestamp: "2026-06-07T00:00:00.000Z",
-      payload: { text: "with attachment", attachments },
+      payload: {
+        items: [
+          { type: "text_selection", id: "selection-1", text: "selected text" },
+          { type: "text", id: "text-1", text: "with selection" },
+        ],
+      },
     });
 
     expect(queue.takeAll()[0]).toMatchObject({
       kind: "user",
-      payload: { attachments },
+      payload: {
+        items: [
+          { type: "text_selection", id: "selection-1", text: "selected text" },
+          { type: "text", id: "text-1", text: "with selection" },
+        ],
+      },
     });
   });
 

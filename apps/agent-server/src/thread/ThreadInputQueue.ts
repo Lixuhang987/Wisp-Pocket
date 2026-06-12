@@ -1,4 +1,4 @@
-import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
+import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 
 export type ThreadUserInputItem = {
@@ -6,10 +6,7 @@ export type ThreadUserInputItem = {
   threadId: string;
   messageId: string;
   timestamp: string;
-  payload: {
-    text: string;
-    attachments?: ThreadAttachment[];
-  };
+  payload: UserInput;
 };
 
 export type ThreadResponseInputItem = {

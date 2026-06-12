@@ -19,7 +19,6 @@ final class ElectronBackedAppServerTests: XCTestCase {
             return XCTFail("expected text item")
         }
         XCTAssertEqual(text, "hello")
-        XCTAssertNil(payload.actionBinding)
     }
 
     func testOpenHistorySendsOpenHistoryCommand() throws {

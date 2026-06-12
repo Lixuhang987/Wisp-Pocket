@@ -97,11 +97,18 @@ flowchart LR
 - `AgentRuntimeEvent` 到 `ThreadNotification` 的归一化由 agent-server thread 层维护，随后作为 `thread.notification` 进入 Agent `rx_event`，避免 runtime 内部事件直接暴露给 UI。
 - permission/workspace ask resolver 会把待回执请求包装成 `server.request` 进入 Agent `rx_event`；app-server 发布后，React 的 `ClientResponse` 会被包装成 `client_response` Op 投回同一 Agent。
 
-## Action Binding
+## UserInput Items
 
-plugin action 绑定信息位于 `thread.start.payload.actionBinding`。agent-server 会重新读取本地 manifest，确认该 prompt 是可绑定的 plugin action，解析并持久化 thread metadata 的 `actionBinding.mcpServerIds`，随后只在该 thread 的 runtime 前组合对应 MCP tools。`kind: "skill"` 的 action 只提交渲染后的普通 prompt，不携带 action binding。
+`thread.start` 只创建 thread，不携带 action binding。初始 prompt 和后续 composer 都通过 `op.submit(UserInput)` 提交结构化输入数组。
 
-普通 `op.submit(UserInput)` 不携带 action binding；一个 thread 的 MCP scope 由创建时 metadata 决定，不随后续消息变化。
+`UserInput.items` 当前支持：
+
+- `text`：唯一可编辑文本项提交后的内容。
+- `skill`：PromptPanel 或 React composer 中追加的 skill chip，包含 `actionId`、`title` 与 `prompt`。
+- `text_selection`：用户主动文本选区。
+- `image`：用户主动区域截图或图片附件。
+
+agent-server 在进入 runtime 前统一解析这些 item，并组合成持久化 user message 与 LLM 输入。Prompt/action 不再通过 `thread.start.payload.actionBinding` 或 thread metadata 改变工具 scope。
 
 ## Turn 中断
 

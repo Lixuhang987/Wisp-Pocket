@@ -4,8 +4,7 @@ import XCTest
 final class PromptPanelViewModelTests: XCTestCase {
     @MainActor
     func testFilteredActionsReturnsAllWhenDraftIsEmpty() {
-        let actions = makeTestActions()
-        let vm = PromptPanelViewModel(actions: actions)
+        let vm = PromptPanelViewModel(actions: makeTestActions())
 
         XCTAssertEqual(vm.filteredActions.map(\.id), ["new-thread", "weather/current"])
         XCTAssertEqual(vm.selectedActionId, "new-thread")
@@ -13,8 +12,7 @@ final class PromptPanelViewModelTests: XCTestCase {
 
     @MainActor
     func testFilteredActionsFiltersByDraft() {
-        let actions = makeTestActions()
-        let vm = PromptPanelViewModel(actions: actions)
+        let vm = PromptPanelViewModel(actions: makeTestActions())
 
         vm.draft = "weather"
 
@@ -23,151 +21,121 @@ final class PromptPanelViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testUpdateActionsReplacesFilteredActions() {
+    func testSubmitCallsOnSubmitWithTextItemArray() {
         let vm = PromptPanelViewModel(actions: makeTestActions())
-
-        vm.updateActions([
-            ActionDefinition.skill(
-                id: "recent-thread-1",
-                trigger: "history",
-                title: "最近Thread：API 设计",
-                description: "thread",
-                template: "{{query}}",
-                arguments: [
-                    ActionArgumentDefinition(name: "query", description: nil, required: false)
-                ],
-                defaultShortcut: nil
-            )
-        ])
-
-        vm.draft = "history"
-
-        XCTAssertEqual(vm.filteredActions.map(\.id), ["recent-thread-1"])
-        XCTAssertEqual(vm.selectedActionId, "recent-thread-1")
-    }
-
-    @MainActor
-    func testSubmitCallsOnSubmitWithTrimmedDraft() {
-        let actions = makeTestActions()
-        let vm = PromptPanelViewModel(actions: actions)
-        var submitted: String?
-        vm.onSubmit = { draft, _ in submitted = draft }
+        var submitted: [PromptPanelComposerItem] = []
+        vm.onSubmit = { items, _ in submitted = items }
 
         vm.draft = "  hello world  "
         vm.submit()
 
-        XCTAssertEqual(submitted, "hello world")
+        XCTAssertEqual(texts(in: submitted), ["  hello world  "])
         XCTAssertEqual(vm.draft, "")
     }
 
     @MainActor
-    func testSubmitIgnoresEmptyDraft() {
-        let actions = makeTestActions()
-        let vm = PromptPanelViewModel(actions: actions)
-        var submitted: String?
-        vm.onSubmit = { draft, _ in submitted = draft }
+    func testSubmitIgnoresEmptyInput() {
+        let vm = PromptPanelViewModel(actions: makeTestActions())
+        var didSubmit = false
+        vm.onSubmit = { _, _ in didSubmit = true }
 
         vm.draft = "   "
         vm.submit()
 
-        XCTAssertNil(submitted)
+        XCTAssertFalse(didSubmit)
     }
 
     @MainActor
     func testSubmitIsBlockedWhenAgentServerUnavailableAndKeepsDraft() {
-        let actions = makeTestActions()
-        let vm = PromptPanelViewModel(actions: actions)
-        var submitted: String?
-        vm.onSubmit = { draft, _ in submitted = draft }
+        let vm = PromptPanelViewModel(actions: makeTestActions())
+        var didSubmit = false
+        vm.onSubmit = { _, _ in didSubmit = true }
 
         vm.draft = "hello"
         vm.setSubmissionEnabled(false, message: "agent-server 已断开，正在尝试重连…")
         vm.submit()
 
-        XCTAssertNil(submitted)
+        XCTAssertFalse(didSubmit)
         XCTAssertEqual(vm.draft, "hello")
         XCTAssertEqual(vm.submissionDisabledMessage, "agent-server 已断开，正在尝试重连…")
     }
 
     @MainActor
     func testSubmitWorksAfterAgentServerBecomesAvailableAgain() {
-        let actions = makeTestActions()
-        let vm = PromptPanelViewModel(actions: actions)
-        var submitted: String?
-        vm.onSubmit = { draft, _ in submitted = draft }
+        let vm = PromptPanelViewModel(actions: makeTestActions())
+        var didSubmit = false
+        vm.onSubmit = { _, _ in didSubmit = true }
 
         vm.draft = "hello"
         vm.setSubmissionEnabled(false, message: "agent-server 已断开，正在尝试重连…")
         vm.setSubmissionEnabled(true, message: nil)
         vm.submit()
 
-        XCTAssertEqual(submitted, "hello")
+        XCTAssertTrue(didSubmit)
         XCTAssertNil(vm.submissionDisabledMessage)
     }
 
     @MainActor
-    func testSubmitActionInvocationRendersPromptAndForwardsBinding() {
+    func testSelectActionAppendsSkillChipAndClearsEditableText() {
         let action = makeReviewAction()
         let vm = PromptPanelViewModel(actions: [action])
-        var submitted: (String, ActionBindingPayload)?
-        vm.onSubmitAction = { prompt, binding, _ in submitted = (prompt, binding) }
 
-        vm.draft = "r [code: let x = 1]"
-        vm.submit()
+        vm.draft = "review"
+        vm.selectAction(action)
 
-        XCTAssertEqual(submitted?.0, "Review:\\nlet x = 1")
-        XCTAssertEqual(submitted?.1.pluginId, "review")
-        XCTAssertEqual(submitted?.1.promptName, "code_review")
+        XCTAssertEqual(vm.skillItems.map(\.actionId), ["review/code_review"])
+        XCTAssertEqual(vm.skillItems.first?.prompt, "Review the user-provided code.")
+        XCTAssertEqual(vm.draft, "")
+        XCTAssertEqual(vm.inputItems.count, 2)
     }
 
     @MainActor
-    func testSubmitActionInvocationKeepsDraftWhenRequiredArgumentMissing() {
-        let action = makeReviewAction()
-        let vm = PromptPanelViewModel(actions: [action])
-        var submitted = false
-        vm.onSubmitAction = { _, _, _ in submitted = true }
+    func testSubmitSelectedActionAppendsSelectedSkillWithoutSubmitting() {
+        let vm = PromptPanelViewModel(actions: makeTestActions())
+        var didSubmit = false
+        vm.onSubmit = { _, _ in didSubmit = true }
 
-        vm.draft = "r"
-        vm.submit()
+        vm.moveSelectedAction(.next)
+        vm.submitSelectedAction()
 
-        XCTAssertFalse(submitted)
-        XCTAssertEqual(vm.draft, "r")
-        XCTAssertEqual(vm.submissionDisabledMessage, "缺少必填参数：code")
-    }
-
-    @MainActor
-    func testSubmitSkillInvocationAppendsRenderedPromptWithoutActionBinding() {
-        let action = ActionDefinition.skill(
-            id: "skill/weather",
-            trigger: "weather",
-            title: "天气",
-            description: nil,
-            template: "查询当前天气",
-            arguments: [],
-            defaultShortcut: nil
-        )
-        let vm = PromptPanelViewModel(actions: [action])
-        var submitted: String?
-        var submittedAction = false
-        vm.onSubmit = { prompt, _ in submitted = prompt }
-        vm.onSubmitAction = { _, _, _ in submittedAction = true }
-
-        vm.draft = "weather"
-        vm.submit()
-
-        XCTAssertEqual(submitted, "查询当前天气")
-        XCTAssertFalse(submittedAction)
+        XCTAssertFalse(didSubmit)
+        XCTAssertEqual(vm.skillItems.map(\.title), ["当前天气"])
         XCTAssertEqual(vm.draft, "")
     }
 
     @MainActor
-    func testSelectActionWritesTriggerIntoDraft() {
-        let action = makeReviewAction()
-        let vm = PromptPanelViewModel(actions: [action])
+    func testSkillOnlyInputCanSubmit() {
+        let vm = PromptPanelViewModel(actions: [makeReviewAction()])
+        var submitted: [PromptPanelComposerItem] = []
+        vm.onSubmit = { items, _ in submitted = items }
 
-        vm.selectAction(action)
+        vm.submitSelectedAction()
+        vm.submit()
 
-        XCTAssertEqual(vm.draft, "r [code: ]")
+        XCTAssertEqual(skills(in: submitted).map(\.title), ["Review"])
+        XCTAssertEqual(vm.skillItems, [])
+    }
+
+    @MainActor
+    func testDeleteChipBeforeTextRemovesLastSkillWhenTextIsEmpty() {
+        let vm = PromptPanelViewModel(actions: makeTestActions())
+
+        vm.appendSkill(makeTestActions()[0])
+        vm.appendSkill(makeTestActions()[1])
+
+        XCTAssertTrue(vm.deleteChipBeforeText())
+        XCTAssertEqual(vm.skillItems.map(\.title), ["新建Thread"])
+    }
+
+    @MainActor
+    func testDeleteChipBeforeTextDoesNotRemoveWhenTextHasContent() {
+        let vm = PromptPanelViewModel(actions: makeTestActions())
+
+        vm.appendSkill(makeTestActions()[0])
+        vm.draft = "hello"
+
+        XCTAssertFalse(vm.deleteChipBeforeText())
+        XCTAssertEqual(vm.skillItems.count, 1)
     }
 
     @MainActor
@@ -179,88 +147,19 @@ final class PromptPanelViewModelTests: XCTestCase {
 
         vm.moveSelectedAction(.next)
         XCTAssertEqual(vm.selectedActionId, "new-thread")
-
-        vm.moveSelectedAction(.next)
-        XCTAssertEqual(vm.selectedActionId, "weather/current")
-
-        vm.moveSelectedAction(.previous)
-        XCTAssertEqual(vm.selectedActionId, "new-thread")
-    }
-
-    @MainActor
-    func testMoveSelectedActionUsesCurrentFilter() {
-        let vm = PromptPanelViewModel(actions: makeTestActions())
-
-        vm.draft = "weather"
-        vm.moveSelectedAction(.next)
-
-        XCTAssertEqual(vm.selectedActionId, "weather/current")
-    }
-
-    @MainActor
-    func testSelectedActionIsNilWhenFilteredOut() {
-        let vm = PromptPanelViewModel(actions: makeTestActions())
-
-        vm.draft = "weather"
-
-        XCTAssertEqual(vm.selectedAction?.id, "weather/current")
-    }
-
-    @MainActor
-    func testSubmitSelectedActionSubmitsNoArgumentActionWithoutChangingDraftFirst() {
-        let vm = PromptPanelViewModel(actions: makeTestActions())
-        var submitted: String?
-        vm.onSubmit = { prompt, _ in submitted = prompt }
-
-        vm.moveSelectedAction(.next)
-        vm.submitSelectedAction()
-
-        XCTAssertEqual(submitted, "查询当前天气")
-        XCTAssertEqual(vm.draft, "")
-    }
-
-    @MainActor
-    func testSubmitSelectedActionUsesCurrentDraftArgumentsWhenDraftTargetsSelection() {
-        let action = makeReviewAction()
-        let vm = PromptPanelViewModel(actions: [action])
-        var submitted: (String, ActionBindingPayload)?
-        vm.onSubmitAction = { prompt, binding, _ in submitted = (prompt, binding) }
-
-        vm.draft = "r [code: let x = 1]"
-        vm.moveSelectedAction(.next)
-        vm.submitSelectedAction()
-
-        XCTAssertEqual(submitted?.0, "Review:\\nlet x = 1")
-        XCTAssertEqual(submitted?.1.pluginId, "review")
-    }
-
-    @MainActor
-    func testSubmitSelectedRequiredArgumentActionPromptsForMissingArgument() {
-        let action = makeReviewAction()
-        let vm = PromptPanelViewModel(actions: [action])
-        var submitted = false
-        vm.onSubmitAction = { _, _, _ in submitted = true }
-
-        vm.draft = "review"
-        vm.moveSelectedAction(.next)
-        vm.submitSelectedAction()
-
-        XCTAssertFalse(submitted)
-        XCTAssertEqual(vm.draft, "r [code: ]")
-        XCTAssertEqual(vm.submissionDisabledMessage, "缺少必填参数：code")
     }
 
     @MainActor
     func testSubmitSelectedActionFallsBackToPlainSubmitWhenNoFilteredActionExists() {
         let vm = PromptPanelViewModel(actions: makeTestActions())
-        var submitted: String?
-        vm.onSubmit = { prompt, _ in submitted = prompt }
+        var submitted: [PromptPanelComposerItem] = []
+        vm.onSubmit = { items, _ in submitted = items }
 
         vm.draft = "hello"
         XCTAssertNil(vm.selectedAction)
         vm.submitSelectedAction()
 
-        XCTAssertEqual(submitted, "hello")
+        XCTAssertEqual(texts(in: submitted), ["hello"])
     }
 
     @MainActor
@@ -268,23 +167,6 @@ final class PromptPanelViewModelTests: XCTestCase {
         let vm = PromptPanelViewModel(actions: [])
         vm.appendAttachment(.noAttachment)
         XCTAssertEqual(vm.attachments.count, 0)
-    }
-
-    @MainActor
-    func testAppendAttachmentAddsTextSelection() {
-        let vm = PromptPanelViewModel(actions: [])
-        vm.appendAttachment(.textSelection(id: "a", text: "hello"))
-        XCTAssertEqual(vm.attachments.count, 1)
-        XCTAssertEqual(vm.attachments.first?.id, "a")
-    }
-
-    @MainActor
-    func testRemoveAttachmentByID() {
-        let vm = PromptPanelViewModel(actions: [])
-        vm.appendAttachment(.textSelection(id: "a", text: "x"))
-        vm.appendAttachment(.textSelection(id: "b", text: "y"))
-        vm.removeAttachment(id: "a")
-        XCTAssertEqual(vm.attachments.map(\.id), ["b"])
     }
 
     @MainActor
@@ -305,8 +187,7 @@ final class PromptPanelViewModelTests: XCTestCase {
 
     @MainActor
     func testOpenSettingsCallsOnOpenSettingsAndOnHide() {
-        let actions = makeTestActions()
-        let vm = PromptPanelViewModel(actions: actions)
+        let vm = PromptPanelViewModel(actions: makeTestActions())
         var didOpenSettings = false
         var didHide = false
         vm.onOpenSettings = { didOpenSettings = true }
@@ -325,10 +206,7 @@ final class PromptPanelViewModelTests: XCTestCase {
                 trigger: "new",
                 title: "新建Thread",
                 description: "thread",
-                template: "{{query}}",
-                arguments: [
-                    ActionArgumentDefinition(name: "query", description: nil, required: false)
-                ],
+                template: "Start a new thread.",
                 defaultShortcut: nil
             ),
             ActionDefinition.skill(
@@ -337,29 +215,33 @@ final class PromptPanelViewModelTests: XCTestCase {
                 title: "当前天气",
                 description: "weather",
                 template: "查询当前天气",
-                arguments: [],
                 defaultShortcut: nil
             )
         ]
     }
 
     private func makeReviewAction() -> ActionDefinition {
-        ActionDefinition.plugin(
+        ActionDefinition.skill(
             id: "review/code_review",
             trigger: "r",
             title: "Review",
             description: nil,
-            template: "Review:\\n{{code}}",
-            arguments: [
-                ActionArgumentDefinition(name: "code", description: nil, required: true)
-            ],
-            icons: [],
-            defaultShortcut: nil,
-            binding: ActionPluginBinding(
-                pluginId: "review",
-                promptName: "code_review",
-                mcpServerIds: ["github"]
-            )
+            template: "Review the user-provided code.",
+            defaultShortcut: nil
         )
+    }
+
+    private func texts(in items: [PromptPanelComposerItem]) -> [String] {
+        items.compactMap {
+            if case .text(let item) = $0 { return item.text }
+            return nil
+        }
+    }
+
+    private func skills(in items: [PromptPanelComposerItem]) -> [PromptPanelSkillInputItem] {
+        items.compactMap {
+            if case .skill(let item) = $0 { return item }
+            return nil
+        }
     }
 }

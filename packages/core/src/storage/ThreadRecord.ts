@@ -7,13 +7,6 @@ export type ThreadMetadata = {
   updatedAt: string;
   messageCount: number;
   workspaceId: string | null;
-  actionBinding?: ThreadActionBinding;
-};
-
-export type ThreadActionBinding = {
-  pluginId: string;
-  promptName: string;
-  mcpServerIds: string[];
 };
 
 export type ThreadAuditEventType =

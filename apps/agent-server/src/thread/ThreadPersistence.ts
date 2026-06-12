@@ -1,9 +1,9 @@
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
 import { FilesystemBlobStore } from "@handagent/core/blob/FilesystemBlobStore.ts";
+import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import type {
   PersistedThread,
-  ThreadActionBinding,
   ThreadAuditEvent,
   ThreadStore,
   ThreadSummary,
@@ -11,6 +11,7 @@ import type {
 import {
   agentMessagesToConversation,
   composeUserContent,
+  composeUserInputContent,
   deriveTitle,
 } from "../protocol/MessageTranslator.ts";
 
@@ -23,11 +24,10 @@ export class ThreadPersistence {
 
   async createThread(
     preview?: string,
-    actionBinding?: ThreadActionBinding,
     workspaceId?: string | null,
   ): Promise<PersistedThread> {
     const id = generateThreadId();
-    return this.store.create({ id, preview, createdAt: this.now(), workspaceId, actionBinding });
+    return this.store.create({ id, preview, createdAt: this.now(), workspaceId });
   }
 
   async deleteThread(threadId: string): Promise<void> {
@@ -64,6 +64,14 @@ export class ThreadPersistence {
     const userMessage: AgentMessage = {
       role: "user",
       content: await composeUserContent(text, attachments, this.blobStore),
+    };
+    await this.store.appendMessages(threadId, [userMessage], this.now());
+  }
+
+  async persistUserInput(threadId: string, userInput: UserInput): Promise<void> {
+    const userMessage: AgentMessage = {
+      role: "user",
+      content: await composeUserInputContent(userInput, this.blobStore),
     };
     await this.store.appendMessages(threadId, [userMessage], this.now());
   }

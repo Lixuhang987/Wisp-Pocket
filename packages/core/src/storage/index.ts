@@ -2,7 +2,6 @@ export type {
   ThreadMetadata,
   ThreadAuditEvent,
   ThreadAuditEventType,
-  ThreadActionBinding,
   PersistedThread,
 } from "./ThreadRecord.ts";
 export type {

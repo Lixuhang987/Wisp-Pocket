@@ -2,25 +2,21 @@ import XCTest
 @testable import HandAgentDesktop
 
 final class ActionDefinitionTests: XCTestCase {
-    func testParsesEnabledPluginPromptIntoActionDefinition() throws {
+    func testParsesPromptManifestIntoAppendSkillActionDefinition() throws {
         let data = """
         {
           "version": 1,
           "id": "review",
           "title": "Review",
           "enabled": true,
-          "mcpServerIds": ["github"],
           "prompts": [
             {
               "name": "code_review",
               "trigger": "r",
               "title": "Request Code Review",
               "description": "Review code",
-              "template": "Review this code:\\n{{code}}",
-              "globalShortcut": { "key": "r", "modifiers": ["command", "shift"] },
-              "arguments": [
-                { "name": "code", "description": "The code", "required": true }
-              ]
+              "template": "Review the code the user provides.",
+              "globalShortcut": { "key": "r", "modifiers": ["command", "shift"] }
             }
           ]
         }
@@ -31,85 +27,44 @@ final class ActionDefinitionTests: XCTestCase {
 
         XCTAssertEqual(actions.enabled.map(\.id), ["review/code_review"])
         XCTAssertEqual(actions.enabled.first?.trigger, "r")
-        XCTAssertEqual(actions.enabled.first?.arguments.map(\.name), ["code"])
+        XCTAssertEqual(actions.enabled.first?.template, "Review the code the user provides.")
         XCTAssertEqual(actions.enabled.first?.shortcutName.rawValue, "action.review/code_review")
         XCTAssertEqual(actions.enabled.first?.defaultShortcut, .init(.r, modifiers: [.command, .shift]))
-        XCTAssertEqual(
-            actions.enabled.first?.submission,
-            .plugin(
-                ActionPluginBinding(
-                    pluginId: "review",
-                    promptName: "code_review",
-                    mcpServerIds: ["github"]
-                )
-            )
-        )
+        XCTAssertEqual(actions.enabled.first?.submission, .appendSkill)
         XCTAssertEqual(actions.disabled, [])
     }
 
-    func testBuildsAppendPromptSubmissionForSkillDefinition() {
+    func testBuildsAppendSkillDefinition() {
         let action = ActionDefinition.skill(
             id: "weather/current",
             trigger: "weather",
             title: "查询当前天气",
             description: "按当前上下文查询天气",
             template: "查询当前天气",
-            arguments: [],
             defaultShortcut: .init(.w, modifiers: [.command, .shift])
         )
 
         XCTAssertEqual(action.id, "weather/current")
         XCTAssertEqual(action.trigger, "weather")
-        XCTAssertEqual(action.submission, .appendPrompt)
+        XCTAssertEqual(action.submission, .appendSkill)
         XCTAssertEqual(action.defaultShortcut, .init(.w, modifiers: [.command, .shift]))
     }
 
-    func testParsesSkillPromptKindIntoAppendPromptSubmission() throws {
-        let data = """
-        {
-          "version": 1,
-          "id": "weather",
-          "title": "Weather",
-          "enabled": true,
-          "prompts": [
-            {
-              "name": "current",
-              "kind": "skill",
-              "trigger": "weather",
-              "title": "当前天气",
-              "template": "查询当前天气"
-            }
-          ]
-        }
-        """.data(using: .utf8)!
-
-        let manifest = try PluginManifestDefinition.decode(data)
-        let actions = ActionDefinition.buildActions(from: [manifest])
-
-        XCTAssertEqual(actions.enabled.map(\.id), ["weather/current"])
-        XCTAssertEqual(actions.enabled.first?.submission, .appendPrompt)
-        XCTAssertNil(actions.enabled.first?.pluginBinding)
-        XCTAssertEqual(actions.disabled, [])
-    }
-
-    func testDisablesPromptWhenTemplateReferencesUnknownArgument() throws {
+    func testTemplatePlaceholdersArePlainTextNow() {
         let manifest = PluginManifestDefinition(
             version: 1,
             id: "review",
             title: "Review",
             description: nil,
             enabled: true,
-            mcpServerIds: [],
             prompts: [
                 PluginPromptDefinition(
-                    name: "bad",
-                    kind: nil,
-                    trigger: "b",
-                    title: "Bad",
+                    name: "prompt",
+                    trigger: "r",
+                    title: "Review",
                     description: nil,
-                    template: "Hello {{missing}}",
+                    template: "Review {{code}}",
                     globalShortcut: nil,
-                    arguments: [],
                     icons: nil
                 )
             ]
@@ -117,18 +72,17 @@ final class ActionDefinitionTests: XCTestCase {
 
         let actions = ActionDefinition.buildActions(from: [manifest])
 
-        XCTAssertEqual(actions.enabled, [])
-        XCTAssertEqual(actions.disabled.map(\.id), ["review/bad"])
-        XCTAssertEqual(actions.disabled.first?.reason, "template references undeclared argument: missing")
+        XCTAssertEqual(actions.enabled.first?.template, "Review {{code}}")
+        XCTAssertEqual(actions.disabled, [])
     }
 
-    func testTriggerConflictKeepsFirstPluginByStableOrder() throws {
+    func testTriggerConflictKeepsFirstManifestByStableOrder() throws {
         let first = PluginManifestDefinition.testManifest(id: "alpha", trigger: "r")
         let second = PluginManifestDefinition.testManifest(id: "beta", trigger: "R")
 
         let actions = ActionDefinition.buildActions(from: [second, first])
 
-        XCTAssertEqual(actions.enabled.map { $0.pluginBinding?.pluginId }, ["alpha"])
+        XCTAssertEqual(actions.enabled.map(\.id), ["alpha/code_review"])
         XCTAssertEqual(actions.disabled.map(\.id), ["beta/code_review"])
         XCTAssertEqual(actions.disabled.first?.reason, "trigger conflicts with alpha/code_review")
     }
@@ -142,23 +96,14 @@ private extension PluginManifestDefinition {
             title: id,
             description: nil,
             enabled: true,
-            mcpServerIds: [],
             prompts: [
                 PluginPromptDefinition(
                     name: "code_review",
-                    kind: nil,
                     trigger: trigger,
                     title: "Review",
                     description: nil,
-                    template: "{{code}}",
+                    template: "Review the code the user provides.",
                     globalShortcut: nil,
-                    arguments: [
-                        ActionArgumentDefinition(
-                            name: "code",
-                            description: nil,
-                            required: true
-                        )
-                    ],
                     icons: nil
                 )
             ]

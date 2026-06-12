@@ -54,18 +54,19 @@
   4. 点击停止或关闭 ThreadWindow，确认 running turn 被中断，当前 pending permission/workspace 请求被取消，thread 级临时权限规则被清理，后续新输入不复用本次临时 allow/deny。
 
 
-### PromptPanel Action 键盘选择与提交
+### PromptPanel 输入框 item 化与 Action chip
 
 - 完成日期：待实机 QA
-- 实现位置：`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelGrowingTextView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelInputCommand.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelViewModel.swift`、`apps/desktop/Sources/PromptPanel/ActionDefinition.swift`
-- 修复结论：PromptPanel 输入框现在把上下键解析为 action 选中切换，在当前过滤结果内循环高亮，并默认选中第一条匹配 action。Return 始终只走 PromptPanel 自身提交；只有 Tab 才会提交当前选中 action。若当前 draft 已是同一 trigger 的参数形式，Tab 提交会复用参数；若必填参数缺失，则预填 `trigger [arg: ]` 并保留缺参提示。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanel`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 实现位置：`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelGrowingTextView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelInputCommand.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelViewModel.swift`、`apps/desktop/Sources/Coordinator/PromptSubmission.swift`、`apps/thread-window-web/src/components/Composer.tsx`
+- 修复结论：PromptPanel 与 React Composer 都以输入 item 数组作为提交模型。Action Tab/点击/快捷键不再提交或预填参数，而是追加内嵌 skill chip；数组中始终只有一个 editable text item，chip 位于 text 前面。提交统一发送 `UserInput.items`，core/server 再组合成模型输入。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanel`、`pnpm --filter handagent-thread-window-web test`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：
-  1. 打开 PromptPanel，确认空 draft 时第一条 action 默认高亮；按 Down 循环到下一条，按 Up 可反向循环。
-  2. 输入能过滤 action 的文本，确认上下键只在过滤结果中切换，高亮行视觉与 hover 高亮一致。
-  3. 选中无必填参数 action 后按 Return，确认只提交当前 draft，不因为高亮 action 触发 action 提交；按 Tab 才直接提交该 action 并打开 Electron ThreadWindow。
-  4. 选中有必填参数 action 后按 Tab，确认 draft 变为 `trigger [arg: ]`，显示缺参提示且不丢附件；补全参数后按 Tab 可提交。
-  5. 输入普通 prompt 并按 Return，确认仍按普通 prompt 提交；Shift/Option + Return 仍插入换行。
+  1. 打开 PromptPanel，输入能过滤 action 的文本，按 Down/Up 在过滤结果中循环高亮。
+  2. 选中 action 后按 Tab，确认输入行内出现 skill chip，原过滤文本清空，光标仍在同一个输入框中，可继续输入后续文本。
+  3. 在 text 为空时按 Backspace，确认前一个 skill chip 被整体删除；chip 删除按钮也能删除对应 chip。
+  4. 只保留 skill chip 不输入文本，按 Return 提交，确认 Electron ThreadWindow 打开并记录首轮用户输入。
+  5. 输入普通 prompt 并按 Return，确认仍按普通 text item 提交；Shift/Option + Return 仍插入换行。
+  6. 用包含 `skill` item 的 initial prompt 或测试入口打开 React ThreadWindow，确认 Composer 的 chip 内嵌在输入框内，删除 chip 不影响后续输入，提交 payload 中包含 `skill` 与唯一 `text` item。
 
 ### 全局快捷键只唤起 PromptPanel
 
@@ -106,7 +107,7 @@
   2. 深色主题打开 PromptPanel：无固定浅色残留，hover/focus、warning/error、selection error chip、图片附件预览 affordance 均可辨认。
   3. 空 draft 时 PromptPanel 仍可拖动；输入内容后编辑区占满设置按钮左侧剩余宽度；超过 5 行后滚动。
   4. 已打开 Settings 时切换外观：Settings 自身立即刷新，PromptPanel 下次或当前显示时使用同一 resolved theme，Electron ThreadWindow 收到同步主题。
-  5. agent-server 不可用或 Action 缺必填参数时，banner 使用 warning/error 语义，草稿不丢失。
+  5. agent-server 不可用时，banner 使用 warning/error 语义，草稿不丢失。
   6. 图片附件 chip 可预览，删除按钮点击区域与视觉边界一致。
   7. 输入超过 5 行后，PromptPanel 输入区滚动条轨道保持透明，不出现白色边条；浅色和深色主题下 thumb 都沿用当前面板背景语义，不突兀跳成系统默认样式。
 
@@ -438,4 +439,4 @@
 - 本文件中对应条目的用户可见行为、持久化记录、错误文案和隔离边界均符合预期。
 - 所有错误路径均有明确文案，不出现静默失败。
 - 每个通过的条目都已从本文件删除，并在 [archive.md](./archive.md) 保留完整验证记录。
-- 2026-06-11 这轮重构已完成协议、runtime 骨架与 agent-server Agent owner 接线验证：`packages/core/src/protocol/Op.ts` 新增 `Op` / `UserInput` / `InputItem`，`ThreadCommand` 运行期输入只保留 `op.submit`；React ThreadWindow、Electron shell、Swift `ElectronInitialPromptPayload` 均已切到 `userInput` 载荷。`packages/core/src/runtime/AgentRunner.ts`、`AgentSession.ts`、`AgentThreadPort.ts` 已补最小实现；`apps/agent-server/src/agent/AgentManager.ts` 新增持久 Agent owner，`thread.start` 注册 Agent，`op.submit(UserInput | Interrupt)` 通过 `tx_sub` 进入对应 Agent，`input.submit` / `turn.interrupt` 已从公开 server 路径移除。独立文档审核子 agent 已核对 spec、代码和相关 md，并补齐 Electron/Swift/core/selection/agent 文档。最终自动化验证覆盖 `pnpm exec vitest run apps/agent-server/tests/agent/AgentManager.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。仍需补实机 QA：PromptPanel plain text、text selection、image region、skill action、plugin action、ThreadWindow composer follow-up、running stop。
+- 2026-06-11 这轮重构已完成协议、runtime 骨架与 agent-server Agent owner 接线验证：`packages/core/src/protocol/Op.ts` 新增 `Op` / `UserInput` / `InputItem`，`ThreadCommand` 运行期输入只保留 `op.submit`；React ThreadWindow、Electron shell、Swift `ElectronInitialPromptPayload` 均已切到 `userInput` 载荷。`packages/core/src/runtime/AgentRunner.ts`、`AgentSession.ts`、`AgentThreadPort.ts` 已补最小实现；`apps/agent-server/src/agent/AgentManager.ts` 新增持久 Agent owner，`thread.start` 注册 Agent，`op.submit(UserInput | Interrupt)` 通过 `tx_sub` 进入对应 Agent，`input.submit` / `turn.interrupt` 已从公开 server 路径移除。独立文档审核子 agent 已核对 spec、代码和相关 md，并补齐 Electron/Swift/core/selection/agent 文档。最终自动化验证覆盖 `pnpm exec vitest run apps/agent-server/tests/agent/AgentManager.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。仍需补实机 QA：PromptPanel plain text、text selection、image region、skill action、ThreadWindow composer follow-up、running stop。

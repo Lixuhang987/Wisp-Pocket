@@ -33,7 +33,6 @@ final class HotkeyRegistrarTests: XCTestCase {
             title: "测试动作",
             description: nil,
             template: "reload",
-            arguments: [],
             defaultShortcut: nil
         )
         let oldShortcut = KeyboardShortcuts.Shortcut(.k, modifiers: [.command])
@@ -69,7 +68,6 @@ final class HotkeyRegistrarTests: XCTestCase {
             title: "测试动作",
             description: nil,
             template: "dispatch",
-            arguments: [],
             defaultShortcut: shortcut
         )
         ActionShortcutDefaults.ensureDefault(shortcut, for: name)

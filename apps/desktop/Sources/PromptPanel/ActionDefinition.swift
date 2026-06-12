@@ -8,7 +8,6 @@ struct PluginManifestDefinition: Codable, Equatable {
     let title: String
     let description: String?
     let enabled: Bool?
-    let mcpServerIds: [String]?
     let prompts: [PluginPromptDefinition]
 
     static func decode(_ data: Data) throws -> PluginManifestDefinition {
@@ -18,21 +17,12 @@ struct PluginManifestDefinition: Codable, Equatable {
 
 struct PluginPromptDefinition: Codable, Equatable {
     let name: String
-    let kind: PluginPromptKind?
     let trigger: String
     let title: String
     let description: String?
     let template: String
     let globalShortcut: ActionShortcutDefinition?
-    let arguments: [ActionArgumentDefinition]?
     let icons: [ActionIconDefinition]?
-
-    var actionKind: PluginPromptKind { kind ?? .plugin }
-}
-
-enum PluginPromptKind: String, Codable, Equatable {
-    case plugin
-    case skill
 }
 
 struct ActionShortcutDefinition: Codable, Equatable {
@@ -127,15 +117,6 @@ struct ActionShortcutDefinition: Codable, Equatable {
     }
 }
 
-struct ActionArgumentDefinition: Codable, Equatable, Identifiable {
-    let name: String
-    let description: String?
-    let required: Bool?
-
-    var id: String { name }
-    var isRequired: Bool { required ?? false }
-}
-
 struct ActionIconDefinition: Codable, Equatable {
     let src: String
     let mimeType: String?
@@ -152,15 +133,8 @@ struct ActionDefinitionBuildResult: Equatable {
     let disabled: [DisabledActionDefinition]
 }
 
-struct ActionPluginBinding: Equatable {
-    let pluginId: String
-    let promptName: String
-    let mcpServerIds: [String]
-}
-
 enum ActionSubmission: Equatable {
-    case appendPrompt
-    case plugin(ActionPluginBinding)
+    case appendSkill
 }
 
 struct ActionDefinition: Equatable, Identifiable {
@@ -169,7 +143,6 @@ struct ActionDefinition: Equatable, Identifiable {
     let title: String
     let description: String?
     let template: String
-    let arguments: [ActionArgumentDefinition]
     let icons: [ActionIconDefinition]
     let defaultShortcut: KeyboardShortcuts.Shortcut?
     let submission: ActionSubmission
@@ -178,24 +151,13 @@ struct ActionDefinition: Equatable, Identifiable {
         KeyboardShortcuts.Name("action.\(id)")
     }
 
-    var requiresArguments: Bool {
-        arguments.contains(where: \.isRequired)
-    }
-
-    var pluginBinding: ActionPluginBinding? {
-        if case .plugin(let binding) = submission {
-            return binding
-        }
-        return nil
-    }
-
     static func skill(
         id: String,
         trigger: String,
         title: String,
         description: String?,
         template: String,
-        arguments: [ActionArgumentDefinition],
+        icons: [ActionIconDefinition] = [],
         defaultShortcut: KeyboardShortcuts.Shortcut?
     ) -> ActionDefinition {
         ActionDefinition(
@@ -204,34 +166,9 @@ struct ActionDefinition: Equatable, Identifiable {
             title: title,
             description: description,
             template: template,
-            arguments: arguments,
-            icons: [],
-            defaultShortcut: defaultShortcut,
-            submission: .appendPrompt
-        )
-    }
-
-    static func plugin(
-        id: String,
-        trigger: String,
-        title: String,
-        description: String?,
-        template: String,
-        arguments: [ActionArgumentDefinition],
-        icons: [ActionIconDefinition],
-        defaultShortcut: KeyboardShortcuts.Shortcut?,
-        binding: ActionPluginBinding
-    ) -> ActionDefinition {
-        ActionDefinition(
-            id: id,
-            trigger: trigger,
-            title: title,
-            description: description,
-            template: template,
-            arguments: arguments,
             icons: icons,
             defaultShortcut: defaultShortcut,
-            submission: .plugin(binding)
+            submission: .appendSkill
         )
     }
 
@@ -242,24 +179,23 @@ struct ActionDefinition: Equatable, Identifiable {
 
         for manifest in manifests.sorted(by: { $0.id < $1.id }) {
             guard manifest.version == 1 else {
-                disabled.append(.init(id: manifest.id, reason: "unsupported plugin version"))
+                disabled.append(.init(id: manifest.id, reason: "unsupported manifest version"))
                 continue
             }
             guard manifest.enabled != false else {
                 disabled.append(contentsOf: manifest.prompts.map {
-                    .init(id: "\(manifest.id)/\($0.name)", reason: "plugin disabled")
+                    .init(id: "\(manifest.id)/\($0.name)", reason: "manifest disabled")
                 })
                 continue
             }
             guard !manifest.prompts.isEmpty else {
-                disabled.append(.init(id: manifest.id, reason: "plugin prompts must not be empty"))
+                disabled.append(.init(id: manifest.id, reason: "prompts must not be empty"))
                 continue
             }
 
             for prompt in manifest.prompts {
                 let promptId = "\(manifest.id)/\(prompt.name)"
-                let validationError = validate(manifest: manifest, prompt: prompt)
-                if let validationError {
+                if let validationError = validate(manifest: manifest, prompt: prompt) {
                     disabled.append(.init(id: promptId, reason: validationError))
                     continue
                 }
@@ -270,37 +206,18 @@ struct ActionDefinition: Equatable, Identifiable {
                     continue
                 }
 
-                let action: ActionDefinition
-                switch prompt.actionKind {
-                case .skill:
-                    action = ActionDefinition.skill(
+                triggers[normalizedTrigger] = promptId
+                enabled.append(
+                    ActionDefinition.skill(
                         id: promptId,
                         trigger: prompt.trigger,
                         title: prompt.title,
                         description: prompt.description,
                         template: prompt.template,
-                        arguments: prompt.arguments ?? [],
+                        icons: prompt.icons ?? [],
                         defaultShortcut: prompt.globalShortcut?.shortcut
                     )
-                case .plugin:
-                    action = ActionDefinition.plugin(
-                        id: promptId,
-                        trigger: prompt.trigger,
-                        title: prompt.title,
-                        description: prompt.description,
-                        template: prompt.template,
-                        arguments: prompt.arguments ?? [],
-                        icons: prompt.icons ?? [],
-                        defaultShortcut: prompt.globalShortcut?.shortcut,
-                        binding: ActionPluginBinding(
-                            pluginId: manifest.id,
-                            promptName: prompt.name,
-                            mcpServerIds: manifest.mcpServerIds ?? []
-                        )
-                    )
-                }
-                triggers[normalizedTrigger] = promptId
-                enabled.append(action)
+                )
             }
         }
 
@@ -312,7 +229,7 @@ struct ActionDefinition: Equatable, Identifiable {
         prompt: PluginPromptDefinition
     ) -> String? {
         if manifest.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "plugin id must not be empty"
+            return "manifest id must not be empty"
         }
         if prompt.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return "prompt name must not be empty"
@@ -332,22 +249,7 @@ struct ActionDefinition: Equatable, Identifiable {
         if prompt.globalShortcut != nil, prompt.globalShortcut?.shortcut == nil {
             return "global shortcut is invalid"
         }
-
-        let declared = Set((prompt.arguments ?? []).map(\.name))
-        for placeholder in placeholders(in: prompt.template) where !declared.contains(placeholder) {
-            return "template references undeclared argument: \(placeholder)"
-        }
         return nil
-    }
-
-    static func placeholders(in template: String) -> [String] {
-        let pattern = #"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let nsRange = NSRange(template.startIndex..<template.endIndex, in: template)
-        return regex.matches(in: template, range: nsRange).compactMap { match in
-            guard let range = Range(match.range(at: 1), in: template) else { return nil }
-            return String(template[range])
-        }
     }
 
     static func filter(_ actions: [ActionDefinition], query: String) -> [ActionDefinition] {

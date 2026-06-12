@@ -21,8 +21,7 @@ final class PromptPanelController {
     private let presentationMode: PromptPanelPresentationMode
     private var previousFocusOwner: Any?
 
-    var onSubmit: ((String, [PromptAttachmentResult]) -> Void)?
-    var onSubmitAction: ((String, ActionBindingPayload, [PromptAttachmentResult]) -> Void)?
+    var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)?
     var onOpenSettings: (() -> Void)?
     var onDidShow: (() -> Void)?
 
@@ -53,11 +52,8 @@ final class PromptPanelController {
     func register(actions: [ActionDefinition]) {
         if viewModel == nil {
             let vm = PromptPanelViewModel(actions: actions)
-            vm.onSubmit = { [weak self] draft, attachments in
-                self?.onSubmit?(draft, attachments)
-            }
-            vm.onSubmitAction = { [weak self] prompt, binding, attachments in
-                self?.onSubmitAction?(prompt, binding, attachments)
+            vm.onSubmit = { [weak self] inputItems, attachments in
+                self?.onSubmit?(inputItems, attachments)
             }
             vm.onHide = { [weak self] in
                 self?.hide()
@@ -88,7 +84,7 @@ final class PromptPanelController {
     }
 
     func selectActionAndShow(_ action: ActionDefinition) {
-        viewModel?.selectAction(action)
+        viewModel?.appendSkill(action)
         show()
     }
 

@@ -3,7 +3,7 @@ import XCTest
 
 final class AppendPromptSettingsViewModelTests: XCTestCase {
     @MainActor
-    func testLoadsSkillPromptsFromPluginManifests() throws {
+    func testLoadsSkillPromptsFromManifestsWithoutArguments() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
         try TestFiles.writePlugin(
@@ -18,12 +18,10 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
               "prompts": [
                 {
                   "name": "summarize",
-                  "kind": "skill",
                   "trigger": "sum",
                   "title": "Summarize",
                   "description": "Summarize pasted text",
-                  "template": "Summarize {{text}}",
-                  "arguments": [{ "name": "text", "required": true }]
+                  "template": "Summarize the text the user provides."
                 }
               ]
             }
@@ -34,11 +32,11 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.prompts.map(\.id), ["append-prompts/summarize"])
         XCTAssertEqual(viewModel.prompts.first?.trigger, "sum")
-        XCTAssertEqual(viewModel.prompts.first?.argumentNames, ["text"])
+        XCTAssertEqual(viewModel.prompts.first?.template, "Summarize the text the user provides.")
     }
 
     @MainActor
-    func testCreatesSkillPromptInAppendPromptsManifest() throws {
+    func testCreatesSkillPromptInAppendPromptsManifestWithoutArguments() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
         let viewModel = AppendPromptSettingsViewModel(homeDirectoryURL: homeURL)
@@ -48,15 +46,15 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
             trigger: "explain",
             title: "Explain Code",
             description: "Explain a code block",
-            template: "Explain this code:\n{{code}}",
-            requiredArgumentName: "code"
+            template: "Explain the code the user provides."
         )
 
-        let manifest = try PluginManifestDefinition.decode(Data(contentsOf: TestFiles.pluginsDirectoryURL(homeURL).appendingPathComponent("append-prompts/plugin.json")))
+        let manifest = try PluginManifestDefinition.decode(
+            Data(contentsOf: TestFiles.pluginsDirectoryURL(homeURL).appendingPathComponent("append-prompts/plugin.json"))
+        )
         XCTAssertEqual(manifest.id, "append-prompts")
-        XCTAssertEqual(manifest.prompts.first?.actionKind, .skill)
         XCTAssertEqual(manifest.prompts.first?.name, "explain")
-        XCTAssertEqual(manifest.prompts.first?.arguments?.first?.name, "code")
+        XCTAssertEqual(manifest.prompts.first?.template, "Explain the code the user provides.")
         XCTAssertEqual(viewModel.prompts.first?.id, "append-prompts/explain")
     }
 
@@ -71,8 +69,7 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
             trigger: "",
             title: "Broken",
             description: "",
-            template: "",
-            requiredArgumentName: "text"
+            template: ""
         )
 
         XCTAssertFalse(didCreate)
@@ -90,8 +87,7 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
             trigger: "explain",
             title: "Explain Code",
             description: "",
-            template: "Explain {{code}}",
-            requiredArgumentName: "code"
+            template: "Explain the code the user provides."
         )
 
         viewModel.deletePrompt(id: "append-prompts/explain")
@@ -101,7 +97,7 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testInstallExamplePromptsCreatesSkillActions() throws {
+    func testInstallExamplePromptsCreatesSkillActionsWithoutArguments() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
         let viewModel = AppendPromptSettingsViewModel(homeDirectoryURL: homeURL)
@@ -112,6 +108,6 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
             "append-prompts/explain-code",
             "append-prompts/summarize-text",
         ])
-        XCTAssertTrue(viewModel.prompts.allSatisfy { !$0.argumentNames.isEmpty })
+        XCTAssertTrue(viewModel.prompts.allSatisfy { !$0.template.contains("{{") })
     }
 }

@@ -1,7 +1,6 @@
 import type { AgentMessage } from "../runtime/AgentMessage.ts";
 import type {
   PersistedThread,
-  ThreadActionBinding,
   ThreadAuditEvent,
   ThreadMetadata,
 } from "./ThreadRecord.ts";
@@ -16,7 +15,6 @@ export type CreateThreadInput = {
   preview?: string | null;
   createdAt?: string;
   workspaceId?: string | null;
-  actionBinding?: ThreadActionBinding;
 };
 
 export interface ThreadStore {

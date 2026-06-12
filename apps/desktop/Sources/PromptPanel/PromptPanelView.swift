@@ -109,12 +109,56 @@ struct PromptPanelView: View {
 
     private var firstRow: some View {
         HStack(spacing: theme.spacing.md) {
-            inputField
+            inputComposer
             if !inputShouldExpand {
                 Spacer(minLength: theme.spacing.lg)
             }
             settingsButton
         }
+    }
+
+    private var inputComposer: some View {
+        HStack(spacing: theme.spacing.sm) {
+            ForEach(viewModel.skillItems) { item in
+                skillChip(item)
+            }
+            inputField
+        }
+        .frame(maxWidth: inputShouldExpand ? .infinity : nil, alignment: .leading)
+    }
+
+    private func skillChip(_ item: PromptPanelSkillInputItem) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "text.badge.plus")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(theme.colors.accent)
+            Text(item.title)
+                .font(theme.typography.captionFont)
+                .foregroundStyle(theme.colors.textPrimary)
+                .lineLimit(1)
+            Button {
+                viewModel.removeInputItem(id: item.id)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .frame(width: 18, height: 18)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("移除")
+            .accessibilityLabel("移除 Skill")
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 4)
+        .padding(.vertical, 5)
+        .borderedCard(
+            fill: theme.colors.surfaceSoft,
+            border: theme.colors.accentRing,
+            cornerRadius: theme.radius.sm,
+            borderWidth: 0.8
+        )
+        .help(item.prompt)
     }
 
     private var inputField: some View {
@@ -128,7 +172,8 @@ struct PromptPanelView: View {
             maxVisibleLines: 5,
             onSubmit: { viewModel.submit() },
             onMoveSelection: { viewModel.moveSelectedAction($0) },
-            onSubmitSelectedAction: { viewModel.submitSelectedAction() }
+            onSubmitSelectedAction: { viewModel.submitSelectedAction() },
+            onDeletePreviousInputItem: { viewModel.deleteChipBeforeText() }
         )
         .frame(height: inputHeight)
         .frame(width: PromptPanelInputLayout.inputWidth(for: viewModel.draft))
@@ -139,11 +184,11 @@ struct PromptPanelView: View {
     }
 
     private var inputShouldExpand: Bool {
-        PromptPanelInputLayout.shouldExpandInput(for: viewModel.draft)
+        !viewModel.skillItems.isEmpty || PromptPanelInputLayout.shouldExpandInput(for: viewModel.draft)
     }
 
     private func submissionDisabledBanner(_ message: String) -> some View {
-        let isActionError = message.hasPrefix("缺少必填参数") || message.contains("Action 渲染失败")
+        let isActionError = message.contains("Action")
         let semanticColor = isActionError ? theme.colors.error : theme.colors.warning
         let iconName = isActionError ? "exclamationmark.triangle" : "wifi.exclamationmark"
         let displayMessage = isActionError ? message : "\(message)，草稿已保留"

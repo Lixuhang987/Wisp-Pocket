@@ -1,18 +1,18 @@
 # HandAgent
 
-HandAgent 是一个 macOS 优先的桌面 Agent Runtime MVP。当前桌面壳使用 `AppKit + SwiftUI` 承载宿主入口、PromptPanel 和 Settings；Electron shell 承载 React ThreadWindow 与 React StatusBubble，并监督本地 agent-server。Agent Core 负责 thread 与工具编排，LLM 按需调用 builtin tools；PromptPanel 会把本地 manifest prompts 构建为 `ActionDefinition`，其中 plugin action 可把 prompt 模板绑定到 thread-scoped MCP tools。
+HandAgent 是一个 macOS 优先的桌面 Agent Runtime MVP。当前桌面壳使用 `AppKit + SwiftUI` 承载宿主入口、PromptPanel 和 Settings；Electron shell 承载 React ThreadWindow 与 React StatusBubble，并监督本地 agent-server。Agent Core 负责 thread 与工具编排，LLM 按需调用 builtin tools；PromptPanel 会把本地 manifest prompts 构建为 `ActionDefinition`，Tab、点击或快捷键触发后追加为输入框内的 skill chip。
 
 ## 当前能力
 
 - 全局热键唤起 `PromptPanel`
 - `PromptPanel` 右上角按钮和 `Command+,` 打开快捷键设置页
-- 设置页支持配置模型、builtin tools、Plugin、Append Prompt、MCP server、权限规则、快捷键和 workspace
-- PromptPanel 会读取 `~/.spotAgent/plugins/*/plugin.json` 中的 prompts，构建 `ActionDefinition`，按 trigger 渲染 template 并创建新 thread
+- 设置页支持配置模型、builtin tools、Append Prompt、MCP server、权限规则、快捷键和 workspace
+- PromptPanel 会读取 `~/.spotAgent/plugins/*/plugin.json` 中的 prompts，构建 `ActionDefinition`，并把选中的 prompt action 作为 skill chip 放入本次 `UserInput.items`
 - 文本选区与区域截图可作为 PromptPanel attachment chip 附加到用户输入
 - 提交 prompt 后由 Swift 发送 Electron command 创建或聚焦 `ThreadWindow`，Electron preload 负责 initial prompt 与宿主主题注入
 - React `ThreadWindow` 通过 `/api/thread` 发送 `ThreadCommand`，展示 user / assistant / tool 消息、历史侧栏、连接状态、权限审批气泡和 workspace 选择气泡，并维护后台 thread 状态缓存；React 和 app-server 之间不做断线恢复，非主动断开后不自动重连
 - 主题 token 以 `design/tokens.json` 为源，启动和 Web build 前生成 Swift / Tailwind v4 适配层；主题偏好由 Swift Settings 保存为 `light` / `dark` / `system` 并同步到 Electron/React
-- `agent-server` 驱动 `AgentRuntime`、builtin tool 注册、workspace 沙箱文件工具、权限策略、thread 持久化和 Action thread 的 MCP tool 绑定
+- `agent-server` 驱动 `AgentRuntime`、builtin tool 注册、全局 MCP tool 注入、workspace 沙箱文件工具、权限策略和 thread 持久化
 - React StatusBubble 订阅 `/api/activity` 并提供当前 thread 回跳入口；没有可聚焦 ThreadWindow 时不会唤起 PromptPanel
 
 ## 目录
@@ -59,11 +59,11 @@ bash ./scripts/swiftw run HandAgentDesktop
 
 ## ActionDefinition 与 MCP
 
-Action manifest 位于 `~/.spotAgent/plugins/<plugin-id>/plugin.json`，声明 `prompts[]`、`kind`、`template`、参数、可选全局快捷键和 `mcpServerIds`。Desktop 负责构建 `ActionDefinition`、trigger 解析、`[name: value]` 参数填充和 template 渲染；skill action 只提交普通 prompt，plugin action 额外发送 `actionBinding`。agent-server 会重新校验 plugin action 的 `actionBinding`，并把 manifest 中的 `mcpServerIds` 持久化到新 thread metadata。
+Action manifest 位于 `~/.spotAgent/plugins/<manifest-id>/plugin.json`。这里的 `plugins` 是历史路径名，当前 manifest 只声明 `prompts[]`、`template`、trigger、标题、描述和可选全局快捷键，不再声明 action 参数、`kind: "plugin"` 或 `mcpServerIds`。Desktop 负责构建 `ActionDefinition`；PromptPanel 选中 action 后追加 skill chip，提交时发送完整 `UserInput.items`，模型可见文本由 agent-server 在进入 runtime 前统一组合。
 
-MCP server 配置位于 `~/.spotAgent/mcp.json`，支持 `stdio` 与 `streamableHttp`。真实 LLM 模式下，新 thread 初始只暴露 `use_tools` 激活入口；激活后会把 builtin tools 与全局 MCP server tools 注入当前 thread。plugin action 的 `mcpServerIds` 会作为该 thread 的绑定范围参与激活后的工具组合。stdio server 可按需配置 `elicitation.autoAcceptEmptyForm: true`，用于 Computer Use 这类只要求空表单确认的本地授权握手。
+MCP server 配置位于 `~/.spotAgent/mcp.json`，支持 `stdio` 与 `streamableHttp`。真实 LLM 模式下，新 thread 初始只暴露 `use_tools` 激活入口；激活后会把 builtin tools 与全局 MCP server tools 注入当前 thread。stdio server 可按需配置 `elicitation.autoAcceptEmptyForm: true`，用于 Computer Use 这类只要求空表单确认的本地授权握手。
 
-Settings 中的 `Plugin`、`追加` 与 `MCP` 页面可以直接编辑这些本地文件，并提供与 `examples/` 目录一致的示例配置。MCP 配置由 agent-server 启动时读取，保存后需要重启桌面 App 才会进入当前运行中的 server。
+Settings 中的 `追加` 与 `MCP` 页面可以直接编辑这些本地文件，并提供与 `examples/` 目录一致的示例配置。MCP 配置由 agent-server 启动时读取，保存后需要重启桌面 App 才会进入当前运行中的 server。
 
 ## 说明
 

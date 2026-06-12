@@ -98,7 +98,6 @@ describe("ThreadWindowPrewarmer", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     });
 
     expect(window.executedJavaScript[0]).toContain("window.handAgentReceiveInitialPrompt");
@@ -119,7 +118,6 @@ describe("ThreadWindowPrewarmer", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     });
     window.webContents.emit("did-finish-load");
     await opened;
@@ -158,7 +156,6 @@ describe("ThreadWindowPrewarmer", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     });
     firstWindow.webContents.emit("did-finish-load");
     await flushMicrotasks();
@@ -299,7 +296,6 @@ describe("ThreadWindowPrewarmer", () => {
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
-      actionBinding: null,
     });
     secondWindow.webContents.emit("did-finish-load");
     await reopened;

@@ -43,7 +43,6 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
         settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
-        pluginSettingsViewModel: PluginSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
@@ -56,7 +55,6 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
             settingsViewModel: settingsViewModel,
             appearanceViewModel: appearanceViewModel,
             toolSettingsViewModel: toolSettingsViewModel,
-            pluginSettingsViewModel: pluginSettingsViewModel,
             appendPromptSettingsViewModel: appendPromptSettingsViewModel,
             mcpSettingsViewModel: mcpSettingsViewModel,
             permissionRulesViewModel: permissionRulesViewModel,
@@ -117,7 +115,6 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
                 settingsViewModel: presentation.settingsViewModel,
                 appearanceViewModel: presentation.appearanceViewModel,
                 toolSettingsViewModel: presentation.toolSettingsViewModel,
-                pluginSettingsViewModel: presentation.pluginSettingsViewModel,
                 appendPromptSettingsViewModel: presentation.appendPromptSettingsViewModel,
                 mcpSettingsViewModel: presentation.mcpSettingsViewModel,
                 permissionRulesViewModel: presentation.permissionRulesViewModel,
@@ -161,7 +158,6 @@ private struct SettingsPresentation {
     let settingsViewModel: AgentSettingsViewModel
     let appearanceViewModel: AppearanceSettingsViewModel
     let toolSettingsViewModel: ToolSettingsViewModel
-    let pluginSettingsViewModel: PluginSettingsViewModel
     let appendPromptSettingsViewModel: AppendPromptSettingsViewModel
     let mcpSettingsViewModel: MCPSettingsViewModel
     let permissionRulesViewModel: PermissionRulesViewModel

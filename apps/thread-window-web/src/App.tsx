@@ -8,7 +8,7 @@ import {
   encodeThreadDelete,
   encodeThreadStart,
   encodeWorkspaceAnswer,
-  createUserInputFromText,
+  type UserInput,
 } from "./protocol/threadProtocol.ts";
 import { createThreadWindowStore } from "./store/threadWindowStore.ts";
 import { ThreadSocketClient } from "./thread/threadSocketClient.ts";
@@ -104,7 +104,6 @@ export function App() {
         commandId,
         timestamp,
         workspaceId: null,  // 默认 workspace
-        actionBinding: null,
       })
     );
   };
@@ -134,7 +133,7 @@ export function App() {
           threadId={activeThreadId}
           connectionState={state.connectionState}
           windowErrorMessage={state.windowErrorMessage}
-          onSubmit={(threadId, text) => {
+          onSubmit={(threadId, userInput) => {
             const latestThread = createThreadWindowStore.getState().threadsById[threadId];
             if (!latestThread) {
               return;
@@ -148,7 +147,7 @@ export function App() {
                 type: "user_input",
                 opId: id("op"),
                 timestamp: now(),
-                payload: createUserInputFromText(text),
+                payload: cloneUserInput(userInput),
               });
               return;
             }
@@ -157,7 +156,7 @@ export function App() {
               type: "user_input",
               opId: id("op"),
               timestamp: now(),
-              payload: createUserInputFromText(text),
+              payload: cloneUserInput(userInput),
             });
           }}
           onRemoveQueuedInput={(threadId, index) => {
@@ -232,4 +231,21 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function cloneUserInput(input: UserInput): UserInput {
+  return {
+    items: input.items.map((item) => {
+      switch (item.type) {
+        case "text":
+          return { type: "text", id: item.id, text: item.text };
+        case "text_selection":
+          return { type: "text_selection", id: item.id, text: item.text };
+        case "skill":
+          return { type: "skill", id: item.id, actionId: item.actionId, title: item.title, prompt: item.prompt };
+        case "image":
+          return { type: "image", id: item.id, mimeType: item.mimeType, base64: item.base64 };
+      }
+    }),
+  };
 }

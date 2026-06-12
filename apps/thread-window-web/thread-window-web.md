@@ -52,7 +52,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 首轮消息流程先建 thread，再提交首轮输入：
 
 1. `App` 收到 `InitialPromptPayload` 后先写入 store 的 `pendingInitialPrompts`。
-2. `ThreadSocketClient.startInitialPrompt` 发送 `thread.start`，`commandId` 使用 `clientRequestId`，并携带 `actionBinding`。
+2. `ThreadSocketClient.startInitialPrompt` 发送 `thread.start`，`commandId` 使用 `clientRequestId`；action/skill 信息已经在后续首轮 `op.submit(UserInput)` 的 `items` 中。
 3. 收到匹配 `commandId` 的 `thread.started` 后，store 创建对应 `ThreadState`，`App` 把该 `threadId` 设为右侧当前展示 thread；socket client 发送 `thread.resume` 拉取初始 snapshot，再发送首轮 `op.submit(UserInput)`。
 4. 若收到匹配 `commandId` 的 `thread.error`，socket client 清理 pending prompt，store 暴露窗口级错误，不再补发 `op.submit`。
 
@@ -82,7 +82,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 窗口错误提示行由常驻 slot 占位，错误为空时高度为 0，避免 active content 与 Composer 因 grid 自动放置而前移。
 - 页面级横向滚动必须保持关闭；右侧不再有 tab 横向滚动容器，消息区、Composer、请求面板均使用 `min-w-0` / `overflow-x-hidden` 或换行布局避免撑宽窗口。
 - `WorkspaceGroup` 使用 Radix `Accordion.Item/Header/Trigger/Content`，父级 `HistorySidebar` 的滚动列表必须由 `Accordion.Root type="multiple"` 包裹，并以 `expandedWorkspaceIds` 作为受控 `value`，否则 workspace 分组渲染时会因缺少 Radix 上下文导致 React 挂载失败。
-- `Composer` 只负责提交文本、展示/删除前端 queued input、停止当前 running turn；running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
+- `Composer` 以 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
 
 ## 样式前提
 

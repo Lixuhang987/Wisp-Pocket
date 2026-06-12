@@ -65,7 +65,7 @@ flowchart TD
   G --> L["thread/ThreadPersistence"]
 ```
 
-`op.submit` 是公开运行期输入入口，payload 内的 `op` 只能是 `UserInput` 或 `Interrupt`。`thread.start` 只负责创建 thread、解析 action binding 并注册持久 Agent；后续普通输入和停止请求都经 `AgentManager.submit(threadId, op)` 进入对应 Agent 的 `tx_sub`。React 回传的 `ClientResponse` 不直接触碰 request broker，server 会将其包装为 `client_response` Op 再投递到同一个 Agent `tx_sub`。router 不再因为 thread running 拒绝用户 follow-up；是否排队由 Agent / 内部 turn 执行器处理。
+`op.submit` 是公开运行期输入入口，payload 内的 `op` 只能是 `UserInput` 或 `Interrupt`。`thread.start` 只负责创建 thread 并注册持久 Agent；PromptPanel/Composer 的 action 信息已经作为 `UserInput.items` 中的 `skill` item 随首轮或后续 `op.submit` 进入 server。React 回传的 `ClientResponse` 不直接触碰 request broker，server 会将其包装为 `client_response` Op 再投递到同一个 Agent `tx_sub`。router 不再因为 thread running 拒绝用户 follow-up；是否排队由 Agent / 内部 turn 执行器处理。
 
 ## 协议主干
 
@@ -90,7 +90,6 @@ flowchart TD
 | `~/.spotAgent/log/` | `FileNetworkLogger` | 人工排查 | LLM 请求/响应 JSONL |
 | `~/.spotAgent/workspaces.json` | desktop settings + core registry | agent-server / desktop | workspace 注册表 |
 | `~/.spotAgent/permissions.json` | core `FilePermissionPolicy` | agent-server | 永久权限规则 |
-| `~/.spotAgent/plugins/<plugin-id>/plugin.json` | 用户/安装流程 | desktop / `actions/ActionBindingResolver` | plugin action manifest |
 | `~/.spotAgent/mcp.json` | 用户/安装流程 | `server/readMCPConfig` | 全局 MCP server 配置 |
 
 ## LLM 模式

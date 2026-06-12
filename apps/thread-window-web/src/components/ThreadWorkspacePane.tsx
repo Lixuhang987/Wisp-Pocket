@@ -1,13 +1,14 @@
 import { Composer } from "./Composer.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { RequestPanels } from "./RequestPanels.tsx";
+import type { UserInput } from "../protocol/threadProtocol.ts";
 import { createThreadWindowStore, type ConnectionState } from "../store/threadWindowStore.ts";
 
 type ThreadWorkspacePaneProps = {
   threadId: string | null;
   connectionState: ConnectionState;
   windowErrorMessage: string | null;
-  onSubmit(threadId: string, text: string): void;
+  onSubmit(threadId: string, input: UserInput): void;
   onStop(threadId: string): void;
   onRemoveQueuedInput(threadId: string, index: number): void;
   onAnswerPermission(requestId: string, decision: "allow" | "deny"): void;
@@ -62,7 +63,7 @@ export function ThreadWorkspacePane({
             disabled={connectionState !== "connected"}
             stopDisabled={connectionState !== "connected" || thread.status !== "running"}
             queuedInputs={thread.queuedComposerInputs}
-            onSubmit={(text) => onSubmit(thread.threadId, text)}
+            onSubmit={(input) => onSubmit(thread.threadId, input)}
             onRemoveQueuedInput={(index) => onRemoveQueuedInput(thread.threadId, index)}
             onStop={() => onStop(thread.threadId)}
           />

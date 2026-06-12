@@ -5,25 +5,68 @@ enum PromptPanelActionSelectionDirection {
     case next
 }
 
+struct PromptPanelSkillInputItem: Equatable, Identifiable {
+    let id: String
+    let actionId: String
+    let title: String
+    let prompt: String
+}
+
+struct PromptPanelTextInputItem: Equatable, Identifiable {
+    let id: String
+    var text: String
+}
+
+enum PromptPanelComposerItem: Equatable, Identifiable {
+    case skill(PromptPanelSkillInputItem)
+    case text(PromptPanelTextInputItem)
+
+    var id: String {
+        switch self {
+        case .skill(let item): return item.id
+        case .text(let item): return item.id
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class PromptPanelViewModel {
-    var draft = "" {
-        didSet { normalizeSelectedAction() }
-    }
+    var inputItems: [PromptPanelComposerItem]
     var focusSeed = 0
     var attachments: [PromptAttachmentResult] = []
     var selectedActionId: String?
     private(set) var submissionDisabledMessage: String?
     private(set) var isSubmissionInputDisabled = false
 
-    var onSubmit: ((String, [PromptAttachmentResult]) -> Void)?
-    var onSubmitAction: ((String, ActionBindingPayload, [PromptAttachmentResult]) -> Void)?
+    var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)?
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onPreviewImage: ((PromptAttachmentResult) -> Void)?
 
     @ObservationIgnored private var actions: [ActionDefinition]
+    @ObservationIgnored private let editableTextItemId: String
+
+    var draft: String {
+        get { editableTextItem.text }
+        set {
+            replaceEditableText(newValue)
+            normalizeSelectedAction()
+        }
+    }
+
+    var skillItems: [PromptPanelSkillInputItem] {
+        inputItems.compactMap {
+            if case .skill(let item) = $0 { return item }
+            return nil
+        }
+    }
+
+    var hasVisibleInput: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !skillItems.isEmpty
+            || validAttachments().isEmpty == false
+    }
 
     var filteredActions: [ActionDefinition] {
         ActionDefinition.filter(actions, query: draft)
@@ -41,6 +84,9 @@ final class PromptPanelViewModel {
 
     init(actions: [ActionDefinition]) {
         self.actions = actions
+        let textId = UUID().uuidString
+        self.editableTextItemId = textId
+        self.inputItems = [.text(.init(id: textId, text: ""))]
         normalizeSelectedAction()
     }
 
@@ -68,7 +114,7 @@ final class PromptPanelViewModel {
     }
 
     func resetForNewThread() {
-        draft = ""
+        inputItems = [.text(.init(id: editableTextItemId, text: ""))]
         attachments = []
         normalizeSelectedAction()
     }
@@ -79,29 +125,52 @@ final class PromptPanelViewModel {
     }
 
     func submit() {
-        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard hasVisibleInput else { return }
         guard !isSubmissionInputDisabled else { return }
         submissionDisabledMessage = nil
 
-        switch ActionInvocation.parse(draft: draft, actions: actions) {
-        case .action(let parsed):
-            submit(parsed)
-            return
-        case .plain:
-            break
-        }
-
-        onSubmit?(trimmed, validAttachments())
+        onSubmit?(inputItems, validAttachments())
         resetForNewThread()
     }
 
     func selectAction(_ action: ActionDefinition) {
-        let argumentTemplate = action.arguments
-            .map { "[\($0.name): ]" }
-            .joined(separator: " ")
-        draft = argumentTemplate.isEmpty ? action.trigger : "\(action.trigger) \(argumentTemplate)"
-        selectedActionId = action.id
+        appendSkill(action)
+    }
+
+    func appendSkill(_ action: ActionDefinition) {
+        let skill = ParsedActionInvocation(action: action).skillItem()
+        let text = editableTextItem
+        let chips = inputItems.compactMap { item -> PromptPanelComposerItem? in
+            if case .skill = item { return item }
+            return nil
+        }
+        inputItems = chips + [.skill(skill), .text(.init(id: text.id, text: ""))]
+        submissionDisabledMessage = nil
+        normalizeSelectedAction()
+    }
+
+    @discardableResult
+    func deleteChipBeforeText() -> Bool {
+        guard draft.isEmpty else { return false }
+        guard let index = inputItems.lastIndex(where: {
+            if case .skill = $0 { return true }
+            return false
+        }) else {
+            return false
+        }
+        inputItems.remove(at: index)
+        normalizeSelectedAction()
+        return true
+    }
+
+    func removeInputItem(id: String) {
+        inputItems.removeAll { item in
+            guard item.id == id else { return false }
+            if case .text = item { return false }
+            return true
+        }
+        ensureEditableTextItem()
+        normalizeSelectedAction()
     }
 
     func moveSelectedAction(_ direction: PromptPanelActionSelectionDirection) {
@@ -129,20 +198,7 @@ final class PromptPanelViewModel {
             submit()
             return
         }
-
-        switch ActionInvocation.parse(draft: draft, actions: [action]) {
-        case .action(let parsed):
-            submissionDisabledMessage = nil
-            submit(parsed)
-        case .plain:
-            if action.arguments.isEmpty {
-                submissionDisabledMessage = nil
-                submit(ParsedActionInvocation(action: action, values: [:]))
-            } else {
-                selectAction(action)
-                submit()
-            }
-        }
+        appendSkill(action)
     }
 
     private func normalizeSelectedAction() {
@@ -172,27 +228,35 @@ final class PromptPanelViewModel {
         }
     }
 
-    private func submit(_ parsed: ParsedActionInvocation) {
-        switch parsed.action.submission {
-        case .appendPrompt:
-            do {
-                onSubmit?(try parsed.renderedPrompt(), validAttachments())
-                resetForNewThread()
-            } catch ActionInvocationError.missingRequiredArgument(let name) {
-                submissionDisabledMessage = "缺少必填参数：\(name)"
-            } catch {
-                submissionDisabledMessage = "Action 渲染失败"
-            }
-        case .plugin(let binding):
-            do {
-                let payload = ActionBindingPayload(pluginId: binding.pluginId, promptName: binding.promptName)
-                onSubmitAction?(try parsed.renderedPrompt(), payload, validAttachments())
-                resetForNewThread()
-            } catch ActionInvocationError.missingRequiredArgument(let name) {
-                submissionDisabledMessage = "缺少必填参数：\(name)"
-            } catch {
-                submissionDisabledMessage = "Action 渲染失败"
-            }
+    private var editableTextItem: PromptPanelTextInputItem {
+        inputItems.compactMap {
+            if case .text(let item) = $0 { return item }
+            return nil
+        }.first ?? .init(id: editableTextItemId, text: "")
+    }
+
+    private func replaceEditableText(_ text: String) {
+        var nextItems = inputItems.filter {
+            if case .text = $0 { return false }
+            return true
         }
+        nextItems.append(.text(.init(id: editableTextItemId, text: text)))
+        inputItems = nextItems
+    }
+
+    private func ensureEditableTextItem() {
+        guard inputItems.contains(where: {
+            if case .text = $0 { return true }
+            return false
+        }) else {
+            inputItems.append(.text(.init(id: editableTextItemId, text: "")))
+            return
+        }
+
+        let text = editableTextItem
+        inputItems = inputItems.filter {
+            if case .text = $0 { return false }
+            return true
+        } + [.text(text)]
     }
 }

@@ -24,7 +24,6 @@ describe("ThreadCommandRouter", () => {
       publisher,
       () => "2026-06-04T00:00:00.000Z",
       undefined,
-      undefined,
       {},
       undefined,
       createAgent,
@@ -55,7 +54,6 @@ describe("ThreadCommandRouter", () => {
         timestamp: "2026-06-04T00:00:00.000Z",
         payload: {
           workspaceId: "workspace-123",
-          actionBinding: null,
         },
       },
       "c1",
@@ -276,7 +274,6 @@ function makeRouter({
     persistence,
     publisher,
     () => "2026-06-04T00:00:00.000Z",
-    undefined,
     onThreadDeleted,
     {},
     undefined,
@@ -304,7 +301,6 @@ function createCommand(): ThreadStartCommand {
     timestamp: "2026-06-04T00:00:00.000Z",
     payload: {
       workspaceId: null,
-      actionBinding: null,
     },
   };
 }

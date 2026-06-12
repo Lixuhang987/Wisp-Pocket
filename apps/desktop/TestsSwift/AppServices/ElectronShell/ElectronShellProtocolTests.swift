@@ -8,8 +8,7 @@ final class ElectronShellProtocolTests: XCTestCase {
             clientRequestId: "prompt-1",
             userInput: PromptUserInput(items: [
                 .text(id: "text-1", text: "hello")
-            ]),
-            actionBinding: nil
+            ])
         )
         let command = ElectronShellCommand.openInitialPrompt(commandId: "cmd-1", payload: payload)
 
@@ -21,7 +20,7 @@ final class ElectronShellProtocolTests: XCTestCase {
         XCTAssertEqual(object["commandId"] as? String, "cmd-1")
         let encodedPayload = try XCTUnwrap(object["payload"] as? [String: Any])
         XCTAssertTrue(encodedPayload["userInput"] is [String: Any])
-        XCTAssertTrue(encodedPayload["actionBinding"] is NSNull)
+        XCTAssertNil(encodedPayload["actionBinding"])
     }
 
     func testEncodesThemeChangedCommand() throws {

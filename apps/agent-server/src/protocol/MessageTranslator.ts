@@ -8,6 +8,7 @@ import type {
   ThreadErrorNotification,
 } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { ThreadAttachment, ImageAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
+import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import type { ConversationMessage } from "@handagent/core/conversation/ConversationMessage.ts";
 import type { ThreadAuditEvent } from "@handagent/core/storage/index.ts";
 import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
@@ -223,6 +224,57 @@ export async function composeUserContent(
       }));
     }
   }
+  return parts.join("\n\n");
+}
+
+export async function composeUserInputContent(
+  userInput: UserInput,
+  blobStore: BlobStore,
+): Promise<string> {
+  const parts: string[] = [];
+  for (const item of userInput.items) {
+    switch (item.type) {
+      case "text":
+        if (item.text.length > 0) parts.push(item.text);
+        break;
+      case "skill":
+        if (item.prompt.length > 0) parts.push(item.prompt);
+        break;
+      case "text_selection":
+        if (item.text.length > 0) parts.push(`[选区]\n${item.text}`);
+        break;
+      case "image": {
+        const record = await blobStore.put({
+          kind: "image",
+          bytes: Buffer.from(item.base64, "base64"),
+          extension: imageExtension(item.mimeType),
+        });
+        parts.push(renderStub({
+          id: record.id,
+          kind: record.kind,
+          size: record.size,
+          path: record.path,
+        }));
+        break;
+      }
+    }
+  }
+  return parts.join("\n\n");
+}
+
+export function summarizeUserInput(userInput: UserInput): string {
+  const parts = userInput.items.map((item) => {
+    switch (item.type) {
+      case "text":
+        return item.text;
+      case "skill":
+        return item.prompt;
+      case "text_selection":
+        return `[选区]\n${item.text}`;
+      case "image":
+        return "图片附件";
+    }
+  }).filter((part) => part.trim().length > 0);
   return parts.join("\n\n");
 }
 

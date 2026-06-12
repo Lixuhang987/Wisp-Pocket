@@ -1,10 +1,5 @@
 import Foundation
 
-struct ActionBindingPayload: Encodable, Equatable {
-    let pluginId: String
-    let promptName: String
-}
-
 struct PromptUserInput: Encodable, Equatable {
     let items: [PromptInputItem]
 }
@@ -48,22 +43,6 @@ enum PromptInputItem: Encodable, Equatable {
 struct PromptSubmission {
     let userInput: PromptUserInput
     let summary: String
-    let actionBinding: ActionBindingPayload?
-
-    var composed: String {
-        userInput.items.compactMap { item in
-            switch item {
-            case .text(_, let text):
-                return text
-            case .textSelection(_, let text):
-                return text
-            case .image:
-                return nil
-            case .skill(_, _, _, let prompt):
-                return prompt
-            }
-        }.joined(separator: "\n\n")
-    }
 
     var socketAttachments: [UserMessageAttachmentPayload] {
         userInput.items.compactMap { item in
@@ -79,35 +58,70 @@ struct PromptSubmission {
     }
 
     static func compose(
-        draft: String,
-        attachments: [PromptAttachmentResult],
-        actionBinding: ActionBindingPayload? = nil
+        inputItems: [PromptPanelComposerItem],
+        attachments: [PromptAttachmentResult]
     ) -> PromptSubmission? {
-        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        var items: [PromptInputItem] = [.text(id: UUID().uuidString, text: trimmed)]
-        for attachment in attachments {
-            switch attachment {
-            case .textSelection(let id, let text):
-                items.append(.textSelection(id: id, text: text))
-            case .imageRegion(let id, let mimeType, let base64):
-                items.append(.image(id: id, mimeType: mimeType, base64: base64))
-            case .textToken(let token):
-                items.append(.text(id: UUID().uuidString, text: token))
-            case .selectionError, .noAttachment:
-                continue
-            }
-        }
-
-        let summary = items.count > 1
-            ? trimmed + "\n\n[附件 ×\(items.count - 1)]"
-            : trimmed
+        let composerItems = inputItems.compactMap(promptInputItem)
+        let attachmentItems = attachments.compactMap(promptInputItem)
+        let items = composerItems + attachmentItems
+        guard !items.isEmpty else { return nil }
 
         return PromptSubmission(
             userInput: PromptUserInput(items: items),
-            summary: summary,
-            actionBinding: actionBinding
+            summary: summarize(items: items)
         )
+    }
+
+    static func compose(
+        draft: String,
+        attachments: [PromptAttachmentResult]
+    ) -> PromptSubmission? {
+        let text = PromptPanelComposerItem.text(.init(id: UUID().uuidString, text: draft))
+        return compose(inputItems: [text], attachments: attachments)
+    }
+
+    private static func promptInputItem(_ item: PromptPanelComposerItem) -> PromptInputItem? {
+        switch item {
+        case .skill(let skill):
+            return .skill(id: skill.id, actionId: skill.actionId, title: skill.title, prompt: skill.prompt)
+        case .text(let text):
+            let trimmed = text.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            return .text(id: text.id, text: trimmed)
+        }
+    }
+
+    private static func promptInputItem(_ attachment: PromptAttachmentResult) -> PromptInputItem? {
+        switch attachment {
+        case .textSelection(let id, let text):
+            return .textSelection(id: id, text: text)
+        case .imageRegion(let id, let mimeType, let base64):
+            return .image(id: id, mimeType: mimeType, base64: base64)
+        case .textToken(let token):
+            let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            return .text(id: UUID().uuidString, text: trimmed)
+        case .selectionError, .noAttachment:
+            return nil
+        }
+    }
+
+    private static func summarize(items: [PromptInputItem]) -> String {
+        let primary = items.compactMap { item -> String? in
+            switch item {
+            case .text(_, let text):
+                return text
+            case .skill(_, _, let title, _):
+                return title
+            case .textSelection(_, let text):
+                return text
+            case .image:
+                return nil
+            }
+        }.first ?? "[图片]"
+
+        return items.count > 1
+            ? primary + "\n\n[输入项 ×\(items.count - 1)]"
+            : primary
     }
 }

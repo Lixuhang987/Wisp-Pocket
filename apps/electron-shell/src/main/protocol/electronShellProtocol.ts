@@ -1,12 +1,8 @@
-import type {
-  ActionBindingPayload,
-} from "@handagent/core/protocol/ThreadProtocolShared.ts";
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
 
 export type InitialPromptPayload = {
   clientRequestId: string;
   userInput: UserInput;
-  actionBinding: ActionBindingPayload | null;
 };
 
 export type ThemePreference = "light" | "dark" | "system";
@@ -136,8 +132,7 @@ export function isSwiftToElectronCommand(value: unknown): value is SwiftToElectr
     case "thread_window.open_initial_prompt":
       return isRecord(value.payload)
         && typeof value.payload.clientRequestId === "string"
-        && isUserInput(value.payload.userInput)
-        && (value.payload.actionBinding === null || isActionBinding(value.payload.actionBinding));
+        && isUserInput(value.payload.userInput);
     case "thread_window.open_history":
     case "activity_window.show":
     case "shutdown":
@@ -155,12 +150,6 @@ function isHostTheme(value: unknown): value is HostTheme {
   return isRecord(value)
     && (value.preference === "light" || value.preference === "dark" || value.preference === "system")
     && (value.resolved === "light" || value.resolved === "dark");
-}
-
-function isActionBinding(value: unknown): value is ActionBindingPayload {
-  return isRecord(value)
-    && typeof value.pluginId === "string"
-    && typeof value.promptName === "string";
 }
 
 function isUserInput(value: unknown): value is UserInput {

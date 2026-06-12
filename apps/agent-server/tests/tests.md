@@ -14,7 +14,7 @@
 | `thread/` | `ThreadCommandRouter`、`ThreadNotificationPublisher`、`ThreadRuntimeOrchestrator`、`ThreadPersistence`、thread 级工具激活状态 |
 | `protocol/` | `MessageTranslator` 的 `ThreadNotification`、审计事件、用户附件和 image STUB 翻译 |
 | `settings/` | `SettingsBackedLLMClient` 与 `SettingsBackedToolRegistry` 的 stamp 缓存和热加载 |
-| `actions/` | `ActionBindingResolver`、`MCPServerRegistry`、`ComputerUseMCPClient`、`ThreadScopedToolRegistry` |
+| `actions/` | `MCPServerRegistry`、`ComputerUseMCPClient`、`ThreadScopedToolRegistry` |
 | `bridges/` | platform bridge 的 token fencing、超时和断线语义 |
 | `support/` | 测试辅助实现，目前包含内存 BlobStore |
 | `path-alias.test.ts` | 扫描测试目录内跨包 import，验证 `@handagent/core/*` path alias 能覆盖测试引用 |

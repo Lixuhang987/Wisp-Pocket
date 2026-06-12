@@ -4,6 +4,7 @@ import {
   agentMessagesToRuntimeMessages,
   agentMessagesToConversation,
   composeUserContent,
+  composeUserInputContent,
   deriveTitle,
   toAuditEvent,
   toErrorMessage,
@@ -218,6 +219,38 @@ describe("MessageTranslator", () => {
     await expect(blobStore.readContent("blob-1")).resolves.toEqual(Buffer.from("png-bytes"));
     expect(deriveTitle("  第一行标题\n第二行不要进入标题")).toBe("第一行标题");
     expect(deriveTitle("x".repeat(60))).toBe(`${"x".repeat(47)}...`);
+  });
+
+  it("composes structured user input items in order before persistence", async () => {
+    const blobStore = new MemoryBlobStore();
+
+    expect(
+      await composeUserInputContent(
+        {
+          items: [
+            {
+              type: "skill",
+              id: "skill-1",
+              actionId: "review",
+              title: "Review",
+              prompt: "Review this",
+            },
+            { type: "text_selection", id: "sel-1", text: "selected code" },
+            {
+              type: "image",
+              id: "img-1",
+              mimeType: "image/png",
+              base64: Buffer.from("png-bytes").toString("base64"),
+            },
+            { type: "text", id: "text-1", text: "focus on regressions" },
+          ],
+        },
+        blobStore,
+      ),
+    ).toBe(
+      'Review this\n\n[选区]\nselected code\n\n[STUB id=blob-1 kind=image size=9 path="/tmp/blob-1.png"]\n[/STUB]\n\nfocus on regressions',
+    );
+    await expect(blobStore.readContent("blob-1")).resolves.toEqual(Buffer.from("png-bytes"));
   });
 
   it("expands persisted image stubs into runtime multimodal user content", async () => {
