@@ -54,15 +54,15 @@ bash ./scripts/swiftw run HandAgentDesktop
 
 ## 调试方式
 
-### TypeScript 侧
+### TypeScript / Web 侧
 
-- 修改 `apps/agent-server/` 或 `packages/core/` 后，先跑：
+- 修改 `apps/thread-window-web/`、`apps/agent-server/`、`packages/core/` 或跨端协议后，先跑：
 
 ```bash
 bash ./scripts/test.sh
 ```
 
-- 新 worktree 初始化后的默认基线先跑这一项即可。只有任务涉及 Swift desktop、`Package.swift`、Swift 相关脚本、打包脚本或桌面启动链路时，才在开始阶段追加 Swift build。
+- 新 worktree 初始化后的默认基线先跑这一项即可。该脚本会真实执行 ThreadWindow Web test/build、Electron shell test 和 agent-server/core vitest；其中 ThreadWindow Web build 会跑 `tsc -p tsconfig.json`。只有任务涉及 Swift desktop、`Package.swift`、Swift 相关脚本、打包脚本或桌面启动链路时，才在开始阶段追加 Swift build。
 - `bash ./scripts/test.sh` 成功时只输出 `success`；任一子步骤失败时输出该失败步骤的 stdout/stderr 并返回原始退出码。
 
 ### Swift 宿主
@@ -124,7 +124,7 @@ bash ./scripts/swiftw build
 ## 常用命令
 
 ```bash
-# Agent-server + Core 测试
+# TypeScript / Web 检查
 bash ./scripts/test.sh
 
 # 桌面宿主测试与构建

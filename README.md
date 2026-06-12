@@ -26,13 +26,13 @@ HandAgent 是一个 macOS 优先的桌面 Agent Runtime MVP。当前桌面壳使
 
 ## 本地验证
 
-- Agent-server + Core tests：`bash ./scripts/test.sh`
+- TypeScript / Web checks：`bash ./scripts/test.sh`
 - Swift tests：`bash ./scripts/swiftw test`
 - Swift build：`bash ./scripts/swiftw build`
 
 这些脚本成功时只输出 `success`；失败时回放失败步骤的 stdout/stderr 并返回原始退出码。
 
-`swiftw` 默认复用主 checkout 的 `.cache/swiftpm/` 作为 SwiftPM 依赖缓存。新 worktree 的默认基线可先跑 `bash ./scripts/test.sh`；涉及桌面宿主、Swift 包或打包链路时再追加 Swift build。
+`swiftw` 默认复用主 checkout 的 `.cache/swiftpm/` 作为 SwiftPM 依赖缓存。新 worktree 的默认基线可先跑 `bash ./scripts/test.sh`；该脚本会真实执行 ThreadWindow Web test/build、Electron shell test 和 agent-server/core vitest。涉及桌面宿主、Swift 包或打包链路时再追加 Swift build。
 
 ## 模型配置
 

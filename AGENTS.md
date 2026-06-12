@@ -43,7 +43,7 @@
 
 ### 常用命令
 
-- TypeScript 测试（agent-server + core，vitest）：`bash ./scripts/test.sh`
+- TypeScript / Web 检查（ThreadWindow Web test/build、Electron shell test、agent-server + core vitest）：`bash ./scripts/test.sh`
 - Swift 测试与构建（桌面 App）：`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`
 - 运行桌面 App：`bash ./scripts/swiftw run HandAgentDesktop`
 

@@ -20,9 +20,9 @@
 ### Bash 构建脚本成功静默输出
 
 - 完成日期：待实机 QA
-- 实现位置：`scripts/test.sh`、`scripts/test.test.sh`、`scripts/swiftw`、`scripts/swiftw.test.sh`、`scripts/package-app.sh`、`scripts/package-app.test.sh`、`README.md`、`docs/dev.md`
-- 修复结论：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 `bash ./scripts/package-app.sh [--mock-llm]` 成功时只输出 `success`，避免 Vitest、pnpm、Swift build 和 codesign 的正常日志污染上下文；失败时回放失败步骤 stdout/stderr，并保留原始退出码。`swiftw run HandAgentDesktop` 仍透出最终 Swift run 输出，但会隐藏前置 `pnpm install`、theme token、ThreadWindow Web 和 Electron shell 构建的成功日志。
-- 自动化验证：需执行 `bash ./scripts/test.test.sh`、`bash ./scripts/swiftw.test.sh`、`bash ./scripts/package-app.test.sh`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw build`。
+- 实现位置：`scripts/test.sh`、`scripts/test.test.sh`、`scripts/swiftw`、`scripts/swiftw.test.sh`、`scripts/package-app.sh`、`scripts/package-app.test.sh`、`README.md`、`AGENTS.md`、`docs/dev.md`
+- 修复结论：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 `bash ./scripts/package-app.sh [--mock-llm]` 成功时只输出 `success`，避免 Vitest、pnpm、Swift build 和 codesign 的正常日志污染上下文；失败时回放失败步骤 stdout/stderr，并保留原始退出码。`bash ./scripts/test.sh` 真实执行 ThreadWindow Web test/build，其中 build 覆盖 `tsc -p tsconfig.json`；`swiftw run HandAgentDesktop` 仍透出最终 Swift run 输出，但会隐藏前置 `pnpm install`、theme token、ThreadWindow Web 和 Electron shell 构建的成功日志。
+- 自动化验证：需执行 `bash ./scripts/test.test.sh`、`bash ./scripts/swiftw.test.sh`、`bash ./scripts/package-app.test.sh`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw build`。
 - 手工回归步骤：
   1. 执行 `bash ./scripts/test.sh`，确认成功输出只有 `success`。
   2. 执行 `bash ./scripts/swiftw build`，确认成功输出只有 `success`。
