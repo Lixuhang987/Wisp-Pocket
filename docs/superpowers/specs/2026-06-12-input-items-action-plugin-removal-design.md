@@ -162,7 +162,9 @@ sequenceDiagram
 
 ### React ThreadWindow
 
-- `Composer.tsx`：状态从 `text: string` 改为 item array；渲染 prefix chips + 唯一 textarea。
+- `Composer.tsx`：输入框自身抽象为 item array，而不是保留 `text: string` 再在提交前临时转换；组件直接渲染 prefix chips + 唯一 textarea。
+- React Composer 的增删改都操作 item array：Tab/后续 action 追加 `skill` item，文本编辑只更新唯一 `text` item，chip 删除直接移除对应非 text item。
+- Composer UI 必须和数组结构一致：非 text item 以 chip 显示在输入框内部、唯一 textarea 排在所有 chip 后面，提交时原样发送当前 item array。
 - `threadProtocol.ts`：删除 `InitialPromptPayload.actionBinding` 和 `encodeThreadStart` 的 actionBinding 参数。
 - `threadSocketClient.ts`：`thread.start` 只发 workspaceId；首轮 `op.submit` 仍发送 initial `userInput`。
 - `threadWindowStore.ts`：queued composer input 继续保存 `RuntimeOp`，预览逻辑按 item array 展示 chip/text 摘要。
