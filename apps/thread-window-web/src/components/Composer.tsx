@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import type { InputItem, UserInput } from '../protocol/threadProtocol.ts';
+import type { InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
 import type { QueuedComposerInput } from '../store/threadWindowStore.ts';
 
 interface ComposerProps {
@@ -218,20 +218,20 @@ export function Composer({
   );
 }
 
-export function inputItemsPreview(input: QueuedComposerInput | UserInput | InputItem[] | { type: string; payload?: UserInput }): string {
-  const items = Array.isArray(input)
-    ? input
-    : "op" in input
-      ? input.op.type === "user_input" ? input.op.payload.items : []
-      : "items" in input
-        ? input.items
-        : input.type === "user_input" && input.payload
-          ? input.payload.items
-          : [];
+export function inputItemsPreview(input: QueuedComposerInput | UserInput | InputItem[] | RuntimeOp): string {
+  if (!Array.isArray(input) && "op" in input) {
+    return inputItemsPreview(input.op);
+  }
 
-  if (!Array.isArray(input) && "op" in input && input.op.type === "interrupt") {
+  if (!Array.isArray(input) && "type" in input && input.type === "interrupt") {
     return "停止当前运行";
   }
+
+  const items = Array.isArray(input)
+    ? input
+    : "items" in input
+      ? input.items
+      : input.payload.items;
 
   const parts = items.map((item) => {
     switch (item.type) {

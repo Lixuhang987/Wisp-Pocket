@@ -59,7 +59,7 @@
 - 完成日期：待实机 QA
 - 实现位置：`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelGrowingTextView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelInputCommand.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelViewModel.swift`、`apps/desktop/Sources/Coordinator/PromptSubmission.swift`、`apps/thread-window-web/src/components/Composer.tsx`
 - 修复结论：PromptPanel 与 React Composer 都以输入 item 数组作为提交模型。Action Tab/点击/快捷键不再提交或预填参数，而是追加内嵌 skill chip；数组中始终只有一个 editable text item，chip 位于 text 前面。提交统一发送 `UserInput.items`，core/server 再组合成模型输入。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanel`、`pnpm --filter handagent-thread-window-web test`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanel`、`pnpm --filter handagent-thread-window-web exec vitest run tests/composerInputItems.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：
   1. 打开 PromptPanel，输入能过滤 action 的文本，按 Down/Up 在过滤结果中循环高亮。
   2. 选中 action 后按 Tab，确认输入行内出现 skill chip，原过滤文本清空，光标仍在同一个输入框中，可继续输入后续文本。
@@ -67,6 +67,7 @@
   4. 只保留 skill chip 不输入文本，按 Return 提交，确认 Electron ThreadWindow 打开并记录首轮用户输入。
   5. 输入普通 prompt 并按 Return，确认仍按普通 text item 提交；Shift/Option + Return 仍插入换行。
   6. 用包含 `skill` item 的 initial prompt 或测试入口打开 React ThreadWindow，确认 Composer 的 chip 内嵌在输入框内，删除 chip 不影响后续输入，提交 payload 中包含 `skill` 与唯一 `text` item。
+  7. 运行中出现 queued composer 面板时，确认 `user_input` 预览仍按 skill title 与 text 组合显示；若 `interrupt` op 进入同一预览路径，应显示 `停止当前运行`，不要求存在 `UserInput.items`。
 
 ### 全局快捷键只唤起 PromptPanel
 

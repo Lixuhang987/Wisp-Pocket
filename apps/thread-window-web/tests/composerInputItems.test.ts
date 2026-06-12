@@ -10,7 +10,7 @@ import {
   removeInputItem,
   toUserInput,
 } from "../src/components/Composer.tsx";
-import type { InputItem } from "../src/protocol/threadProtocol.ts";
+import type { InputItem, RuntimeOp } from "../src/protocol/threadProtocol.ts";
 
 const skill: InputItem = {
   type: "skill",
@@ -93,5 +93,19 @@ describe("Composer input items", () => {
         },
       },
     })).toBe("Review with edge cases");
+  });
+
+  it("previews queued interrupt ops without requiring UserInput payload items", () => {
+    const interruptOp: RuntimeOp = {
+      type: "interrupt",
+      opId: "op-stop",
+      timestamp: "2026-06-12T00:00:01.000Z",
+      payload: {
+        reason: "user",
+      },
+    };
+
+    expect(inputItemsPreview(interruptOp)).toBe("停止当前运行");
+    expect(inputItemsPreview({ op: interruptOp })).toBe("停止当前运行");
   });
 });
