@@ -10,8 +10,8 @@ struct PromptPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.lg) {
-            if !viewModel.attachments.isEmpty {
-                attachmentRow
+            if !viewModel.chipItems.isEmpty {
+                chipRow
             }
             firstRow
             if let message = viewModel.submissionDisabledMessage {
@@ -26,22 +26,22 @@ struct PromptPanelView: View {
         .onChange(of: viewModel.focusSeed) { isQueryFocused = true }
     }
 
-    private var attachmentRow: some View {
+    private var chipRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: theme.spacing.sm) {
-                ForEach(viewModel.attachments) { attachment in
-                    attachmentChip(attachment)
+                ForEach(viewModel.chipItems) { chip in
+                    chipView(chip)
                 }
             }
         }
     }
 
-    private func attachmentChip(_ attachment: PromptAttachmentResult) -> some View {
-        let style = attachmentStyle(for: attachment)
+    private func chipView(_ chip: PromptPanelChipItem) -> some View {
+        let style = chipStyle(for: chip)
         return HStack(spacing: 6) {
-            chipLabel(for: attachment, foreground: style.foreground)
+            chipLabel(for: chip, foreground: style.foreground)
             Button {
-                viewModel.removeAttachment(id: attachment.id)
+                viewModel.removeChip(id: chip.id)
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .semibold))
@@ -50,45 +50,44 @@ struct PromptPanelView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .help("移除附件")
-            .accessibilityLabel("移除附件")
+            .help("移除")
+            .accessibilityLabel("移除 \(chip.displayLabel)")
         }
         .padding(.leading, 10)
         .padding(.trailing, 4)
         .padding(.vertical, 5)
         .borderedCard(fill: style.background, border: style.border, cornerRadius: theme.radius.sm, borderWidth: 0.8)
-        .help(tooltip(for: attachment))
+        .help(chip.tooltip)
     }
 
-    private func attachmentStyle(for attachment: PromptAttachmentResult) -> (
+    private func chipStyle(for chip: PromptPanelChipItem) -> (
         foreground: Color,
         background: Color,
         border: Color
     ) {
-        if attachment.isError {
+        if chip.isError {
             return (theme.colors.error, theme.colors.surfaceSoft, theme.colors.error.opacity(0.55))
         }
-        if attachment.isImage {
+        if chip.isImage || chip.isSkill {
             return (theme.colors.textPrimary, theme.colors.surfaceSoft, theme.colors.accentRing)
         }
         return (theme.colors.textPrimary, theme.colors.surfaceSoft, theme.colors.hairline)
     }
 
     @ViewBuilder
-    private func chipLabel(for attachment: PromptAttachmentResult,
-                           foreground: Color) -> some View {
+    private func chipLabel(for chip: PromptPanelChipItem, foreground: Color) -> some View {
         let content = HStack(spacing: 6) {
-            Image(systemName: attachment.iconSystemName)
-                .font(.system(size: 11, weight: attachment.isImage ? .semibold : .regular))
-                .foregroundStyle(attachment.isImage ? theme.colors.accent : foreground)
-            Text(attachment.displayLabel)
+            Image(systemName: chip.iconSystemName)
+                .font(.system(size: 11, weight: (chip.isImage || chip.isSkill) ? .semibold : .regular))
+                .foregroundStyle((chip.isImage || chip.isSkill) ? theme.colors.accent : foreground)
+            Text(chip.displayLabel)
                 .font(theme.typography.captionFont)
                 .foregroundStyle(foreground)
                 .lineLimit(1)
         }
-        if attachment.isImage {
+        if chip.canPreview {
             Button {
-                viewModel.previewAttachment(attachment)
+                viewModel.previewChip(id: chip.id)
             } label: {
                 content.contentShape(Rectangle())
             }
@@ -96,14 +95,6 @@ struct PromptPanelView: View {
             .help("点击预览（空格键）")
         } else {
             content
-        }
-    }
-
-    private func tooltip(for attachment: PromptAttachmentResult) -> String {
-        switch attachment {
-        case .selectionError(_, let message): return message
-        case .textSelection(_, let text): return text
-        default: return ""
         }
     }
 
@@ -118,47 +109,8 @@ struct PromptPanelView: View {
     }
 
     private var inputComposer: some View {
-        HStack(spacing: theme.spacing.sm) {
-            ForEach(viewModel.skillItems) { item in
-                skillChip(item)
-            }
-            inputField
-        }
+        inputField
         .frame(maxWidth: inputShouldExpand ? .infinity : nil, alignment: .leading)
-    }
-
-    private func skillChip(_ item: PromptPanelSkillInputItem) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "text.badge.plus")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(theme.colors.accent)
-            Text(item.title)
-                .font(theme.typography.captionFont)
-                .foregroundStyle(theme.colors.textPrimary)
-                .lineLimit(1)
-            Button {
-                viewModel.removeInputItem(id: item.id)
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(theme.colors.textSecondary)
-                    .frame(width: 18, height: 18)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help("移除")
-            .accessibilityLabel("移除 Skill")
-        }
-        .padding(.leading, 10)
-        .padding(.trailing, 4)
-        .padding(.vertical, 5)
-        .borderedCard(
-            fill: theme.colors.surfaceSoft,
-            border: theme.colors.accentRing,
-            cornerRadius: theme.radius.sm,
-            borderWidth: 0.8
-        )
-        .help(item.prompt)
     }
 
     private var inputField: some View {
@@ -172,8 +124,7 @@ struct PromptPanelView: View {
             maxVisibleLines: 5,
             onSubmit: { viewModel.submit() },
             onMoveSelection: { viewModel.moveSelectedAction($0) },
-            onSubmitSelectedAction: { viewModel.submitSelectedAction() },
-            onDeletePreviousInputItem: { viewModel.deleteChipBeforeText() }
+            onSubmitSelectedAction: { viewModel.submitSelectedAction() }
         )
         .frame(height: inputHeight)
         .frame(width: PromptPanelInputLayout.inputWidth(for: viewModel.draft))
@@ -184,7 +135,7 @@ struct PromptPanelView: View {
     }
 
     private var inputShouldExpand: Bool {
-        !viewModel.skillItems.isEmpty || PromptPanelInputLayout.shouldExpandInput(for: viewModel.draft)
+        PromptPanelInputLayout.shouldExpandInput(for: viewModel.draft)
     }
 
     private func submissionDisabledBanner(_ message: String) -> some View {

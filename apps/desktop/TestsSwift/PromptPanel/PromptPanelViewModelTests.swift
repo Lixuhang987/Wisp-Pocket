@@ -117,28 +117,6 @@ final class PromptPanelViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testDeleteChipBeforeTextRemovesLastSkillWhenTextIsEmpty() {
-        let vm = PromptPanelViewModel(actions: makeTestActions())
-
-        vm.appendSkill(makeTestActions()[0])
-        vm.appendSkill(makeTestActions()[1])
-
-        XCTAssertTrue(vm.deleteChipBeforeText())
-        XCTAssertEqual(vm.skillItems.map(\.title), ["新建Thread"])
-    }
-
-    @MainActor
-    func testDeleteChipBeforeTextDoesNotRemoveWhenTextHasContent() {
-        let vm = PromptPanelViewModel(actions: makeTestActions())
-
-        vm.appendSkill(makeTestActions()[0])
-        vm.draft = "hello"
-
-        XCTAssertFalse(vm.deleteChipBeforeText())
-        XCTAssertEqual(vm.skillItems.count, 1)
-    }
-
-    @MainActor
     func testMoveSelectedActionCyclesThroughFilteredActions() {
         let vm = PromptPanelViewModel(actions: makeTestActions())
 
@@ -167,6 +145,63 @@ final class PromptPanelViewModelTests: XCTestCase {
         let vm = PromptPanelViewModel(actions: [])
         vm.appendAttachment(.noAttachment)
         XCTAssertEqual(vm.attachments.count, 0)
+    }
+
+    @MainActor
+    func testChipItemsExposeSkillsAndAttachmentsForDisplay() {
+        let action = makeReviewAction()
+        let vm = PromptPanelViewModel(actions: [action])
+
+        vm.appendSkill(action)
+        vm.appendAttachment(.imageRegion(id: "image-1", mimeType: "image/png", base64: "png-data"))
+
+        XCTAssertEqual(vm.chipItems.map(\.displayLabel), ["Review", "区域截图"])
+        XCTAssertEqual(vm.chipItems.map(\.iconSystemName), ["text.badge.plus", "photo"])
+        XCTAssertEqual(vm.chipItems.map(\.tooltip), ["Review the user-provided code.", ""])
+        XCTAssertEqual(vm.chipItems.map(\.canPreview), [false, true])
+        XCTAssertEqual(vm.chipItems.map(\.id), ["skill:\(vm.skillItems[0].id)", "attachment:image-1"])
+    }
+
+    @MainActor
+    func testRemoveChipDeletesSkillOrAttachmentByDisplayChipId() {
+        let action = makeReviewAction()
+        let vm = PromptPanelViewModel(actions: [action])
+
+        vm.appendSkill(action)
+        vm.appendAttachment(.textSelection(id: "selection-1", text: "selected code"))
+        let skillChipId = vm.chipItems[0].id
+        let attachmentChipId = vm.chipItems[1].id
+
+        vm.removeChip(id: skillChipId)
+        XCTAssertEqual(vm.skillItems, [])
+        XCTAssertEqual(vm.attachments.map(\.id), ["selection-1"])
+
+        vm.removeChip(id: attachmentChipId)
+        XCTAssertEqual(vm.attachments, [])
+    }
+
+    @MainActor
+    func testPreviewChipForwardsOnlyImageAttachments() {
+        let action = makeReviewAction()
+        let vm = PromptPanelViewModel(actions: [action])
+        var previewedAttachment: PromptAttachmentResult?
+        vm.onPreviewImage = { previewedAttachment = $0 }
+
+        vm.appendSkill(action)
+        vm.appendAttachment(.textSelection(id: "selection-1", text: "selected code"))
+        vm.appendAttachment(.imageRegion(id: "image-1", mimeType: "image/png", base64: "png-data"))
+        let skillChipId = vm.chipItems[0].id
+        let selectionChipId = vm.chipItems[1].id
+        let imageChipId = vm.chipItems[2].id
+
+        vm.previewChip(id: skillChipId)
+        XCTAssertNil(previewedAttachment)
+
+        vm.previewChip(id: selectionChipId)
+        XCTAssertNil(previewedAttachment)
+
+        vm.previewChip(id: imageChipId)
+        XCTAssertEqual(previewedAttachment, .imageRegion(id: "image-1", mimeType: "image/png", base64: "png-data"))
     }
 
     @MainActor

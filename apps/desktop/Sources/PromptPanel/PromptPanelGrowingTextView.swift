@@ -14,7 +14,6 @@ struct PromptPanelGrowingTextView: NSViewRepresentable {
     let onSubmit: () -> Void
     let onMoveSelection: (PromptPanelActionSelectionDirection) -> Void
     let onSubmitSelectedAction: () -> Void
-    let onDeletePreviousInputItem: () -> Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -121,9 +120,6 @@ struct PromptPanelGrowingTextView: NSViewRepresentable {
                 parent.onMoveSelection(.next)
             case .submitSelectedAction:
                 parent.onSubmitSelectedAction()
-            case .deletePreviousInputItem:
-                guard textView.selectedRange().location == 0 else { return false }
-                return parent.onDeletePreviousInputItem()
             }
             return true
         }

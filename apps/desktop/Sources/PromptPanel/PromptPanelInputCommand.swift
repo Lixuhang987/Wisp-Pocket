@@ -6,7 +6,6 @@ enum PromptPanelInputCommand: Equatable {
     case selectPreviousAction
     case selectNextAction
     case submitSelectedAction
-    case deletePreviousInputItem
 
     static func resolve(
         commandSelector: Selector,
@@ -24,8 +23,6 @@ enum PromptPanelInputCommand: Equatable {
             return .selectNextAction
         case #selector(NSResponder.insertTab(_:)):
             return .submitSelectedAction
-        case #selector(NSResponder.deleteBackward(_:)):
-            return .deletePreviousInputItem
         default:
             return nil
         }

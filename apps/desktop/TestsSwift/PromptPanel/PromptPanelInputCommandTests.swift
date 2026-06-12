@@ -57,6 +57,15 @@ final class PromptPanelInputCommandTests: XCTestCase {
         )
     }
 
+    func testBackspaceFallsThroughToTextView() {
+        XCTAssertNil(
+            PromptPanelInputCommand.resolve(
+                commandSelector: #selector(NSResponder.deleteBackward(_:)),
+                modifierFlags: []
+            )
+        )
+    }
+
     func testUnknownCommandFallsThrough() {
         XCTAssertNil(
             PromptPanelInputCommand.resolve(

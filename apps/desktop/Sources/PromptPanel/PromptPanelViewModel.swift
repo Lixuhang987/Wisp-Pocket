@@ -29,6 +29,68 @@ enum PromptPanelComposerItem: Equatable, Identifiable {
     }
 }
 
+enum PromptPanelChipItem: Equatable, Identifiable {
+    case skill(PromptPanelSkillInputItem)
+    case attachment(PromptAttachmentResult)
+
+    var id: String {
+        switch self {
+        case .skill(let item): return "skill:\(item.id)"
+        case .attachment(let attachment): return "attachment:\(attachment.id)"
+        }
+    }
+
+    var displayLabel: String {
+        switch self {
+        case .skill(let item): return item.title
+        case .attachment(let attachment): return attachment.displayLabel
+        }
+    }
+
+    var iconSystemName: String {
+        switch self {
+        case .skill: return "text.badge.plus"
+        case .attachment(let attachment): return attachment.iconSystemName
+        }
+    }
+
+    var tooltip: String {
+        switch self {
+        case .skill(let item):
+            return item.prompt
+        case .attachment(.selectionError(_, let message)):
+            return message
+        case .attachment(.textSelection(_, let text)):
+            return text
+        case .attachment:
+            return ""
+        }
+    }
+
+    var isError: Bool {
+        if case .attachment(let attachment) = self {
+            return attachment.isError
+        }
+        return false
+    }
+
+    var isImage: Bool {
+        if case .attachment(let attachment) = self {
+            return attachment.isImage
+        }
+        return false
+    }
+
+    var isSkill: Bool {
+        if case .skill = self { return true }
+        return false
+    }
+
+    var canPreview: Bool {
+        isImage
+    }
+}
+
 @Observable
 @MainActor
 final class PromptPanelViewModel {
@@ -60,6 +122,11 @@ final class PromptPanelViewModel {
             if case .skill(let item) = $0 { return item }
             return nil
         }
+    }
+
+    var chipItems: [PromptPanelChipItem] {
+        skillItems.map(PromptPanelChipItem.skill)
+            + attachments.map(PromptPanelChipItem.attachment)
     }
 
     var hasVisibleInput: Bool {
@@ -108,8 +175,24 @@ final class PromptPanelViewModel {
         attachments.removeAll { $0.id == id }
     }
 
-    func previewAttachment(_ attachment: PromptAttachmentResult) {
-        guard attachment.isImage else { return }
+    func removeChip(id: String) {
+        guard let chip = chipItems.first(where: { $0.id == id }) else { return }
+        switch chip {
+        case .skill(let item):
+            removeInputItem(id: item.id)
+        case .attachment(let attachment):
+            removeAttachment(id: attachment.id)
+        }
+    }
+
+    func previewChip(id: String) {
+        guard
+            let chip = chipItems.first(where: { $0.id == id }),
+            case .attachment(let attachment) = chip,
+            attachment.isImage
+        else {
+            return
+        }
         onPreviewImage?(attachment)
     }
 
@@ -147,20 +230,6 @@ final class PromptPanelViewModel {
         inputItems = chips + [.skill(skill), .text(.init(id: text.id, text: ""))]
         submissionDisabledMessage = nil
         normalizeSelectedAction()
-    }
-
-    @discardableResult
-    func deleteChipBeforeText() -> Bool {
-        guard draft.isEmpty else { return false }
-        guard let index = inputItems.lastIndex(where: {
-            if case .skill = $0 { return true }
-            return false
-        }) else {
-            return false
-        }
-        inputItems.remove(at: index)
-        normalizeSelectedAction()
-        return true
     }
 
     func removeInputItem(id: String) {
