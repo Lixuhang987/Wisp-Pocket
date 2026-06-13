@@ -70,8 +70,8 @@
 ### PromptPanel 输入框 item 化与 Action chip
 
 - 完成日期：待实机 QA
-- 实现位置：`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelGrowingTextView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelInputCommand.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelViewModel.swift`、`apps/desktop/Sources/Coordinator/PromptSubmission.swift`、`apps/thread-window-web/src/components/Composer.tsx`
-- 修复结论：PromptPanel 与 React Composer 都以输入 item 数组作为提交模型。Action Tab/点击/快捷键不再提交或预填参数，而是追加 skill item；PromptPanel 展示层用统一 chip row 同时渲染 skill、图片和选区附件，删除统一走 chip 的 `X` 按钮，Backspace 只编辑文本。提交统一发送 `UserInput.items`，core/server 再组合成模型输入。
+- 实现位置：`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelGrowingTextView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelInputCommand.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelViewModel.swift`、`apps/desktop/Sources/Coordinator/PromptSubmission.swift`、`apps/thread-window-web/src/components/ThreadWorkspacePane.tsx`、`apps/thread-window-web/src/components/Composer.tsx`
+- 修复结论：PromptPanel 与 React Composer 都以输入 item 数组作为提交模型。React 侧由 `ThreadWorkspacePane` 按 thread 持有受控 `InputItem[]`，`Composer` 只负责渲染 chips、唯一 editable text item 和变化回调。Action Tab/点击/快捷键不再提交或预填参数，而是追加 skill item；PromptPanel 展示层用统一 chip row 同时渲染 skill、图片和选区附件，删除统一走 chip 的 `X` 按钮，Backspace 只编辑文本。提交统一发送 `UserInput.items`，core/server 再组合成模型输入。
 - 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanel`、`pnpm --filter handagent-thread-window-web exec vitest run tests/composerInputItems.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：
   1. 打开 PromptPanel，输入能过滤 action 的文本，按 Down/Up 在过滤结果中循环高亮。

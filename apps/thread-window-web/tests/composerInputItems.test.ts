@@ -21,16 +21,17 @@ const skill: InputItem = {
 };
 
 describe("Composer input items", () => {
-  it("renders prefix chips inside the input box before the editable text item", () => {
+  it("renders controlled prefix chips inside the input box before the editable text item", () => {
     const html = renderToStaticMarkup(
       React.createElement(Composer, {
         disabled: false,
         stopDisabled: true,
-        initialInputItems: [
+        inputItems: [
           skill,
           { type: "image", id: "image-1", mimeType: "image/png", base64: "abc" },
           { type: "text", id: "text-1", text: "focus on regressions" },
         ],
+        onInputItemsChange: () => {},
         onSubmit: () => {},
         onStop: () => {},
       }),

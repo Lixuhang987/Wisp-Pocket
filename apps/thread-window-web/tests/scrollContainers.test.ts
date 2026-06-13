@@ -107,6 +107,8 @@ describe("ThreadWindow scroll containers", () => {
       React.createElement(Composer, {
         disabled: false,
         stopDisabled: false,
+        inputItems: [{ type: "text", id: "text-1", text: "" }],
+        onInputItemsChange: vi.fn(),
         queuedInputs: [
           { op: { type: "user_input", opId: "queued-1", timestamp: "2026-06-11T00:00:00.000Z", payload: { items: [{ type: "text", id: "queued-text-1", text: "排队的后续问题 1" }] } } },
           { op: { type: "user_input", opId: "queued-2", timestamp: "2026-06-11T00:00:01.000Z", payload: { items: [{ type: "text", id: "queued-text-2", text: "排队的后续问题 2" }] } } },

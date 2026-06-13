@@ -66,7 +66,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 历史：`history` 来自 `thread.listed`。
 - thread 状态缓存：`threadsById` 中每个 `ThreadState` 持有 `threadId`、title、run status、messages、pending initial prompt、权限请求、workspace 请求、composer 队列和 thread 级错误。右侧当前展示的 `activeThreadId` 是 `App` 本地 React state，不进入 store。
 - 请求面板：`permission.requested` / `workspace.requested` 按 `threadId` 放到对应 `ThreadState`；用户回答后根组件发送 response 并调用显式 resolve action 移除请求。
-- composer running 输入：目标 thread running 或已有 queued input 派发中时，`App` 不立即发送下一条 `op.submit(UserInput)`，而是写入对应 `ThreadState` 的 `queuedComposerInputs` 并在 Composer 上方展示队列；等对应 thread 离开 running 且连接可用后，每个 thread 一次只取一条 queued input 发送，防止多个 user message 连续插到当前 assistant 回复前。停止按钮发送 `op.submit(Interrupt)`。
+- composer 输入：`ThreadWorkspacePane` 按 thread 持有受控 `InputItem[]`，`Composer` 只通过 `inputItems` / `onInputItemsChange` 渲染和回写变化；提交后发送完整 `UserInput.items` 并重置为唯一空 text item。目标 thread running 或已有 queued input 派发中时，`App` 不立即发送下一条 `op.submit(UserInput)`，而是写入对应 `ThreadState` 的 `queuedComposerInputs` 并在 Composer 上方展示队列；等对应 thread 离开 running 且连接可用后，每个 thread 一次只取一条 queued input 发送，防止多个 user message 连续插到当前 assistant 回复前。停止按钮发送 `op.submit(Interrupt)`。
 - workspace：`workspaces` 来自 `workspace.listed`，`expandedWorkspaceIds` 和 `searchQuery` 驱动历史侧栏；`expandedWorkspaceIds` 会用 `localStorage` 做轻量持久化，刷新或重开同一 ThreadWindow 前端后保留展开状态。
 - 去重：`processedNotificationIds` 防止重复处理同一 notification，特别是 streaming delta。
 
@@ -82,7 +82,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 窗口错误提示行由常驻 slot 占位，错误为空时高度为 0，避免 active content 与 Composer 因 grid 自动放置而前移。
 - 页面级横向滚动必须保持关闭；右侧不再有 tab 横向滚动容器，消息区、Composer、请求面板均使用 `min-w-0` / `overflow-x-hidden` 或换行布局避免撑宽窗口。
 - `WorkspaceGroup` 使用 Radix `Accordion.Item/Header/Trigger/Content`，父级 `HistorySidebar` 的滚动列表必须由 `Accordion.Root type="multiple"` 包裹，并以 `expandedWorkspaceIds` 作为受控 `value`，否则 workspace 分组渲染时会因缺少 Radix 上下文导致 React 挂载失败。
-- `Composer` 以 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
+- `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
 
 ## 样式前提
 

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import type { InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
 import type { QueuedComposerInput } from '../store/threadWindowStore.ts';
 
@@ -6,7 +6,8 @@ interface ComposerProps {
   disabled: boolean;
   stopDisabled: boolean;
   queuedInputs?: QueuedComposerInput[];
-  initialInputItems?: InputItem[];
+  inputItems: InputItem[];
+  onInputItemsChange: (items: InputItem[]) => void;
   onSubmit: (input: UserInput) => void;
   onStop: () => void;
   onRemoveQueuedInput?: (index: number) => void;
@@ -19,19 +20,20 @@ export function Composer({
   disabled,
   stopDisabled,
   queuedInputs = [],
-  initialInputItems,
+  inputItems,
+  onInputItemsChange,
   onSubmit,
   onStop,
   onRemoveQueuedInput,
 }: ComposerProps) {
-  const [items, setItems] = useState<InputItem[]>(() => normalizeComposerItems(initialInputItems));
+  const items = useMemo(() => normalizeComposerItems(inputItems), [inputItems]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textItem = useMemo(() => getEditableTextItem(items), [items]);
   const chipItems = items.filter((item) => item.type !== "text");
 
   const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
     const target = e.currentTarget;
-    setItems((current) => updateEditableText(current, target.value));
+    onInputItemsChange(updateEditableText(items, target.value));
 
     // 自动调整高度
     target.style.height = 'auto';
@@ -43,7 +45,7 @@ export function Composer({
     if (!isComposerInputSubmittable(items) || disabled) return;
 
     onSubmit(toUserInput(items));
-    setItems(createEmptyComposerItems());
+    onInputItemsChange(createEmptyComposerItems());
 
     // 重置高度
     if (textareaRef.current) {
@@ -67,7 +69,7 @@ export function Composer({
       const nextItems = removeChipBeforeText(items);
       if (nextItems !== items) {
         e.preventDefault();
-        setItems(nextItems);
+        onInputItemsChange(nextItems);
       }
     }
   };
@@ -136,7 +138,7 @@ export function Composer({
                   <button
                     type="button"
                     aria-label={`移除 ${label}`}
-                    onClick={() => setItems((current) => removeInputItem(current, item.id))}
+                    onClick={() => onInputItemsChange(removeInputItem(items, item.id))}
                     className="flex h-5 w-5 items-center justify-center rounded-full text-app-text-muted transition-colors hover:bg-app-surface-soft hover:text-app-text-primary focus:outline-none focus:ring-2 focus:ring-app-accent-ring"
                   >
                     ×

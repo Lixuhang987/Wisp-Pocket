@@ -4,7 +4,6 @@ import {
   encodePermissionAnswer,
   encodeThreadList,
   encodeThreadStart,
-  createUserInputFromText,
   isServerRequest,
   isThreadNotification,
 } from "../src/protocol/threadProtocol.ts";
@@ -56,12 +55,6 @@ describe("thread protocol helpers", () => {
         },
       },
     });
-  });
-
-  it("creates user input from plain text", () => {
-    expect(createUserInputFromText("hello").items).toEqual([
-      expect.objectContaining({ type: "text", text: "hello" }),
-    ]);
   });
 
   it("encodes thread.list and permission answer", () => {

@@ -1,8 +1,10 @@
+import { useRef, useState } from "react";
 import { Composer } from "./Composer.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { RequestPanels } from "./RequestPanels.tsx";
-import type { UserInput } from "../protocol/threadProtocol.ts";
+import type { InputItem, UserInput } from "../protocol/threadProtocol.ts";
 import { createThreadWindowStore, type ConnectionState } from "../store/threadWindowStore.ts";
+import { createEmptyComposerItems } from "./Composer.tsx";
 
 type ThreadWorkspacePaneProps = {
   threadId: string | null;
@@ -25,11 +27,35 @@ export function ThreadWorkspacePane({
   onAnswerPermission,
   onAnswerWorkspace,
 }: ThreadWorkspacePaneProps) {
+  const defaultComposerItemsRef = useRef<Record<string, InputItem[]>>({});
+  const [composerItemsByThread, setComposerItemsByThread] = useState<Record<string, InputItem[]>>({});
   const state = createThreadWindowStore();
   const liveState = createThreadWindowStore.getState();
   const thread = threadId
     ? state.threadsById[threadId] ?? liveState.threadsById[threadId] ?? null
     : null;
+  const composerInputItems = thread
+    ? composerItemsByThread[thread.threadId] ?? defaultComposerItemsFor(defaultComposerItemsRef.current, thread.threadId)
+    : createEmptyComposerItems();
+
+  const updateComposerInputItems = (nextItems: InputItem[]) => {
+    if (!thread) return;
+    setComposerItemsByThread((current) => ({
+      ...current,
+      [thread.threadId]: nextItems,
+    }));
+  };
+
+  const submitComposerInput = (input: UserInput) => {
+    if (!thread) return;
+    onSubmit(thread.threadId, input);
+    const emptyItems = createEmptyComposerItems();
+    defaultComposerItemsRef.current[thread.threadId] = emptyItems;
+    setComposerItemsByThread((current) => ({
+      ...current,
+      [thread.threadId]: emptyItems,
+    }));
+  };
 
   return (
     <section
@@ -63,7 +89,9 @@ export function ThreadWorkspacePane({
             disabled={connectionState !== "connected"}
             stopDisabled={connectionState !== "connected" || thread.status !== "running"}
             queuedInputs={thread.queuedComposerInputs}
-            onSubmit={(input) => onSubmit(thread.threadId, input)}
+            inputItems={composerInputItems}
+            onInputItemsChange={updateComposerInputItems}
+            onSubmit={submitComposerInput}
             onRemoveQueuedInput={(index) => onRemoveQueuedInput(thread.threadId, index)}
             onStop={() => onStop(thread.threadId)}
           />
@@ -78,4 +106,9 @@ export function ThreadWorkspacePane({
       )}
     </section>
   );
+}
+
+function defaultComposerItemsFor(store: Record<string, InputItem[]>, threadId: string): InputItem[] {
+  store[threadId] ??= createEmptyComposerItems();
+  return store[threadId];
 }

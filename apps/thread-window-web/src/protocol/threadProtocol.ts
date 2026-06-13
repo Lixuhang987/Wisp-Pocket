@@ -104,18 +104,6 @@ export function encodeOpSubmit(input: {
   });
 }
 
-export function createUserInputFromText(text: string): UserInput {
-  return {
-    items: [
-      {
-        type: "text",
-        id: crypto.randomUUID(),
-        text,
-      },
-    ],
-  };
-}
-
 export function encodePermissionAnswer(input: {
   requestId: string;
   timestamp: string;
