@@ -15,7 +15,6 @@
 | `tools/` | [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md) | AgentTool 协议 + 11 个 builtin tool + 注册组合根 |
 | `platform/` | [platform/platform.md](/Users/mu9/proj/handAgent/packages/core/src/platform/platform.md) | PlatformAdapter / PlatformBridge / Remote+Offline 实现 |
 | `permission/` | [permission/permission.md](/Users/mu9/proj/handAgent/packages/core/src/permission/permission.md) | 权限策略接口 + 三档记忆持久化 |
-| `storage/` | [storage/storage.md](/Users/mu9/proj/handAgent/packages/core/src/storage/storage.md) | PersistedThread 模型 + 内存 / 文件实现 |
 | `workspace/` | [workspace/workspace.md](/Users/mu9/proj/handAgent/packages/core/src/workspace/workspace.md) | 显式 workspace 沙箱 + 默认播种 |
 | `config/` | [config/config.md](/Users/mu9/proj/handAgent/packages/core/src/config/config.md) | settings.json 模型与 tool 设置解析 |
 | `logging/` | [logging/logging.md](/Users/mu9/proj/handAgent/packages/core/src/logging/logging.md) | LLM 网络日志 JSONL 落盘 |
@@ -65,8 +64,8 @@
 
 ### 6. 持久化阶段
 
-- `ThreadStore`（生产 `FileThreadStore`）目标按 `~/.spotAgent/threads/<id>.json` 写每个 thread 一份 `PersistedThread`：metadata / messages / events。
-- `events` 是审计视图（tool_call / tool_result / permission_request / error），与 `messages` 解耦。
+- Thread 持久化不在 core 内实现；生产路径由 agent-server 注入 `@handagent/thread-store`。
+- `packages/thread-store` 按 `~/.spotAgent/threads.sqlite` 保存 append-only rollout items，并派生当前 UI 所需的 messages、events 和 history list。
 
 ### 7. 跨进程协议
 
@@ -90,5 +89,6 @@
 ## 编辑此目录的约束
 
 - core 不允许 `import` 任何 macOS / DOM 模块；只能依赖 Node 标准库 + `ai` + `@ai-sdk/openai`。
+- core 不反向依赖 `@handagent/thread-store`；持久化包可以依赖 core 的 DTO。
 - 跨子模块依赖必须按图层流动：runtime → {llm, tools, permission}；tools → {platform, workspace}；llm → {config, logging, runtime/AgentMessage}；不要在 platform / config / logging 中反向引用 runtime。
 - 每个子目录新增文件时，同步更新对应的 `<module>.md` 文件清单与索引表。

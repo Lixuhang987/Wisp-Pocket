@@ -3,7 +3,7 @@ import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { AgentRuntimeEvent } from "@handagent/core/runtime/AgentRuntime.ts";
 import type { ThreadNotification, AssistantDeltaNotification } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
-import { InMemoryThreadStore } from "@handagent/core/storage/index.ts";
+import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { MemoryBlobStore } from "../support/MemoryBlobStore.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
 import { ThreadRuntimeOrchestrator } from "../../src/thread/ThreadRuntimeOrchestrator.ts";
@@ -63,7 +63,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const runSignals: AbortSignal[] = [];
     const firstRunGate = createDeferred();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-06-07T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -143,7 +143,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const beforeRunGate = createDeferred();
     let beforeRunCount = 0;
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-06-07T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -210,7 +210,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const secondBeforeRunGate = createDeferred();
     let beforeRunCount = 0;
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-06-07T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -281,7 +281,7 @@ describe("ThreadRuntimeOrchestrator", () => {
   it("pushes assistant events and persists final user + assistant messages", async () => {
     const pushed: ThreadNotification[] = [];
     const runtimeCalls: AgentMessage[][] = [];
-    const store = new InMemoryThreadStore();
+    const store = testStore();
     const persistence = new ThreadPersistence(
       store,
       () => "2026-05-11T00:00:00.000Z",
@@ -384,11 +384,35 @@ describe("ThreadRuntimeOrchestrator", () => {
         content: "你好，我收到了。",
       },
     ]);
+    const history = await store.loadHistory({ threadId: "Thread-1" });
+    expect(history).toMatchObject({ ok: true });
+    if (!history.ok) return;
+    expect(history.value.rolloutItems.map((item) => item.kind)).toEqual([
+      "session_meta",
+      "response_item",
+      "event_msg",
+      "event_msg",
+      "event_msg",
+      "response_item",
+      "event_msg",
+      "event_msg",
+    ]);
+    expect(
+      history.value.rolloutItems
+        .filter((item) => item.kind === "event_msg")
+        .map((item) => item.payload.type),
+    ).toEqual([
+      "user.message.recorded",
+      "turn.started",
+      "assistant.delta",
+      "turn.completed",
+      "thread.status.changed",
+    ]);
   });
 
   it("emits unique notification ids for multiple assistant text deltas in the same turn", async () => {
     const pushed: ThreadNotification[] = [];
-    const store = new InMemoryThreadStore();
+    const store = testStore();
     const persistence = new ThreadPersistence(
       store,
       () => "2026-06-09T00:00:00.000Z",
@@ -488,7 +512,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const seenRunOptions: Array<Record<string, unknown> | undefined> = [];
     const replies = ["第一轮回复", "第二轮回复"];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-11T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -561,7 +585,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const runtimeCalls: AgentMessage[][] = [];
     const order: string[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-11T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -602,7 +626,7 @@ describe("ThreadRuntimeOrchestrator", () => {
   it("pushes and records a failed turn when summary preparation fails", async () => {
     const pushed: ThreadNotification[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-06-07T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -653,7 +677,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const runtimeCalls: AgentMessage[][] = [];
     const blobStore = new MemoryBlobStore();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-11T00:00:00.000Z",
       blobStore,
     );
@@ -710,7 +734,7 @@ describe("ThreadRuntimeOrchestrator", () => {
 
   it("translates tool events into tool frames and records audit events", async () => {
     const pushed: ThreadNotification[] = [];
-    const store = new InMemoryThreadStore();
+    const store = testStore();
     const persistence = new ThreadPersistence(
       store,
       () => "2026-05-17T00:00:00.000Z",
@@ -815,7 +839,7 @@ describe("ThreadRuntimeOrchestrator", () => {
 
   it("keeps assistant turn completion separate from later tool running frames", async () => {
     const pushed: ThreadNotification[] = [];
-    const store = new InMemoryThreadStore();
+    const store = testStore();
     const persistence = new ThreadPersistence(
       store,
       () => "2026-05-22T00:00:00.000Z",
@@ -930,7 +954,7 @@ describe("ThreadRuntimeOrchestrator", () => {
 
   it("aborts the active run and ignores later assistant/tool output", async () => {
     const pushed: ThreadNotification[] = [];
-    const store = new InMemoryThreadStore();
+    const store = testStore();
     const persistence = new ThreadPersistence(
       store,
       () => "2026-05-17T00:00:00.000Z",
@@ -983,6 +1007,7 @@ describe("ThreadRuntimeOrchestrator", () => {
       ],
     });
     await runPromise;
+    await orchestrator.waitForThreadIdle("Thread-interrupt");
 
     expect(runtimeSignal?.aborted).toBe(true);
     expectTypes(pushed, [
@@ -1018,7 +1043,7 @@ describe("ThreadRuntimeOrchestrator", () => {
   it("reports running threads and waits for interrupt cleanup", async () => {
     const pushed: ThreadNotification[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-20T00:00:00.000Z",
     );
     let finishRun: ((result: { messages: AgentMessage[] }) => void) | undefined;
@@ -1090,7 +1115,7 @@ describe("ThreadRuntimeOrchestrator", () => {
   it("times out interrupt cleanup when the runtime ignores abort", async () => {
     const pushed: ThreadNotification[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-22T00:00:00.000Z",
     );
     const runStarted = Promise.withResolvers<void>();
@@ -1174,7 +1199,7 @@ describe("ThreadRuntimeOrchestrator", () => {
 
   it("resolves idle waiters when interrupt cleanup times out", async () => {
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-06-07T00:00:00.000Z",
     );
     const runStarted = Promise.withResolvers<void>();
@@ -1210,7 +1235,7 @@ describe("ThreadRuntimeOrchestrator", () => {
   it("replays input queued while interrupted runtime is waiting for timeout cleanup", async () => {
     const pushed: ThreadNotification[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-06-07T00:00:00.000Z",
     );
     const runStarted = createDeferred();
@@ -1272,7 +1297,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const pushed: ThreadNotification[] = [];
     const runtimeCalls: AgentMessage[][] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-06-07T00:00:00.000Z",
     );
     let firstRunFinish: (() => void) | undefined;
@@ -1338,7 +1363,7 @@ describe("ThreadRuntimeOrchestrator", () => {
   it("records interrupted instead of runtime error when an aborted run rejects without AbortError", async () => {
     const pushed: ThreadNotification[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-22T00:00:00.000Z",
     );
     const runStarted = Promise.withResolvers<void>();
@@ -1405,7 +1430,7 @@ describe("ThreadRuntimeOrchestrator", () => {
 
     const pushed: ThreadNotification[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-11T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -1462,11 +1487,15 @@ describe("ThreadRuntimeOrchestrator", () => {
   });
 });
 
+function testStore(): ThreadStore {
+  return new ThreadStore({ dbPath: ":memory:" });
+}
+
 describe("ThreadRuntimeOrchestrator activation hook", () => {
   it("invokes beforeRun with the thread id before runtime.runWithMessages", async () => {
     const calls: string[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-23T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(
@@ -1499,7 +1528,7 @@ describe("ThreadRuntimeOrchestrator activation hook", () => {
   it("resolves an isolated runtime for each thread run", async () => {
     const calls: string[] = [];
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-24T00:00:00.000Z",
     );
     const orchestrator = new ThreadRuntimeOrchestrator(

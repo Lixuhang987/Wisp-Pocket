@@ -10,14 +10,14 @@
 - `ThreadStore` 是具体 class，不是 interface。
 - `CurrentThread.create(threadStore, params)` 接收具体 `ThreadStore` 实例；不使用 `Arc<dyn ThreadStore>` 等抽象接口形态。
 - `node:sqlite` 在本机 Node `v24.16.0` 可导入。实现使用 `DatabaseSync`，但对外保持 async API。
-- `create_thread -> void` 与“错误只用 `ThreadStoreResult` 表示”有冲突。计划采用所有 public 方法返回 `Promise<ThreadStoreResult<T>>`，其中 create 返回 `ThreadStoreResult<void>`。
+- `create_thread` 返回 `ThreadStoreResult<void>`：成功时没有 payload，失败时通过 `ThreadStoreResult` 携带错误；TypeScript 实现为 `Promise<ThreadStoreResult<void>>`。
 
 本轮不实现 `parent_thread_id`、`dynamic_tools`、`CompactedItem` 的业务语义，只持久化字段和占位 union。`flush_thread` 保留 public 方法并返回 `not_implemented`，`shutdown_thread` 仍通过 `persist_thread` 保证已排队 item 落盘后关闭 writer。
 
 ## 修改范围与职责
 
 - `packages/thread-store/`：新增 workspace 包，承载 SQLite schema、`ThreadStore` 具体实现、`CurrentThread` 语义层、rollout item 类型、包级测试与文档。
-- `packages/core/`：保留 runtime / protocol / tool / workspace 等跨平台核心；移除或停止导出旧 `ThreadStore` interface、`FileThreadStore`、`InMemoryThreadStore`。`AgentMessage`、`ThreadNotification`、`ThreadAuditEvent`、`DynamicToolSpec` 等现有类型仍从 core 复用。
+- `packages/core/`：保留 runtime / protocol / tool / workspace 等跨平台核心；移除或停止导出旧 `ThreadStore` interface、`FileThreadStore`、`InMemoryThreadStore`。`AgentMessage`、`ThreadNotification` 等协议/runtime DTO 仍从 core 复用；`ThreadAuditEvent`、`DynamicToolSpec` 由 `@handagent/thread-store` 承载，避免 core 继续拥有 thread 持久化类型。
 - `apps/agent-server/src/thread/`：改造 `ThreadPersistence`，让它通过 `CurrentThread` 写入 canonical rollout items，再从 `load_history` 派生现有 `AgentMessage[]`、history list、snapshot 和 incomplete-turn 恢复语义。
 - `apps/agent-server/src/server/`：组合根从 `new FileThreadStore(paths.threadsDir)` 改为 `new ThreadStore({ dbPath: paths.threadsDbPath })`，并注入 `ThreadPersistence`。
 - `apps/agent-server/tests/`：把现有 thread persistence / router / orchestrator 测试切到新 store harness，增加 SQLite lazy-create、resume、shutdown/discard 语义覆盖。
@@ -494,4 +494,3 @@ test("startDefaultServer wires the sqlite ThreadStore package", async () => {
 - 没有设计旧 JSON 文件迁移。项目尚未上线且 AGENTS 明确无需兼容；旧 `~/.spotAgent/threads/<id>.json` 数据会被新 store 忽略。
 - `ThreadStore` 不做 interface；测试使用真实 SQLite 临时文件，不通过 mock interface 证明行为。
 - `flush_thread` 只留出 public 方法，不成为当前产品路径依赖。
-

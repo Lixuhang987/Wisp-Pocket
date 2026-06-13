@@ -16,7 +16,7 @@
 - `apps/desktop/`：PromptPanel action、Settings、Swift 到 Electron 的 initial prompt payload。这里负责删除 action 参数、删除 Plugin 页，并让 action Tab/快捷键追加 skill item。
 - `apps/electron-shell/`：Swift command bridge 的 initial prompt payload guard。这里只做字段删除和类型守卫同步。
 - `apps/agent-server/`：thread.start 路由、thread persistence、tool scope、用户输入内容组合。这里负责删除 actionBinding 和 plugin-scoped MCP，并把 `UserInput.items` 转成持久化/runtime content。
-- `packages/core/`：跨进程协议、storage metadata、action manifest 解析。这里负责删除 plugin/actionBinding 类型，保留 `SkillInputItem` 作为输入 item。
+- `packages/core/`：跨进程协议与 action manifest 解析。这里负责删除 plugin/actionBinding 类型，保留 `SkillInputItem` 作为输入 item；thread 持久化 metadata 清理落在 `@handagent/thread-store`。
 - `examples/`、`docs/`、各级 `<dir>.md`：删除 plugin 文档，更新 append prompt/skill prompt schema 与手工 QA。
 
 ## 现有流盘点
@@ -256,7 +256,7 @@ test("activated registry uses builtin and global MCP tools only", async () => {
 
 - 删除 `ActionBindingResolver` 注入、源码和测试。
 - `ThreadPersistence.createThread(id?, workspaceId?)` 不再接收 binding。
-- core storage 删除 `ThreadActionBinding`、metadata 字段、create input 字段。
+- `@handagent/thread-store` 删除 `ThreadActionBinding`、metadata 字段、create input 字段。
 - `ThreadScopedToolRegistry.refreshForThread(threadId)` 不再接收 binding。
 - server 组合根删除 plugin directory / action binding resolver 接线。
 
@@ -325,7 +325,7 @@ func testCreateAppendPromptDoesNotWriteArguments() throws {
 
 ## 执行顺序
 
-1. 协议与 storage 清理：core `ThreadCommand`、`ThreadProtocolShared`、`ThreadRecord`、`ThreadStore` 删除 actionBinding。
+1. 协议与持久化清理：core `ThreadCommand`、`ThreadProtocolShared` 与 `@handagent/thread-store` 的 `SessionMeta` / 兼容派生类型确认不再包含 actionBinding。
 2. agent-server 清理：ThreadCommandRouter、ThreadPersistence、ThreadScopedToolRegistry、server 组合根删除 plugin binding。
 3. server 输入组合：把 `UserInput.items` 到模型文本的转换集中到 MessageTranslator/ThreadPersistence。
 4. React 输入模型：Composer 改为 item array 状态，App/ThreadWorkspacePane/store/socket 同步 UserInput 提交。
@@ -351,9 +351,9 @@ func testCreateAppendPromptDoesNotWriteArguments() throws {
 - `apps/agent-server/src/actions/actions.md`
 - `apps/agent-server/src/thread/thread.md`
 - `packages/core/src/src.md`
-- `packages/core/src/actions/actions.md`
+- `packages/core/src/tools/tools.md`
 - `packages/core/src/protocol/protocol.md`
-- `packages/core/src/storage/storage.md`
+- `packages/thread-store/thread-store.md`
 - `examples/examples.md`
 - `docs/manual-qa.md`
 

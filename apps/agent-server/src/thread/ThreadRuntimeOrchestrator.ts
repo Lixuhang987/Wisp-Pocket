@@ -6,7 +6,7 @@ import type {
 } from "@handagent/core/runtime/AgentRuntime.ts";
 import type { ThreadNotification as ProtocolThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
-import type { ThreadAuditEvent } from "@handagent/core/storage/index.ts";
+import type { ThreadAuditEvent } from "@handagent/thread-store/index.ts";
 import type { ThreadPersistence } from "./ThreadPersistence.ts";
 import { RUN_INTERRUPTED_CODE, RUN_INTERRUPTED_MESSAGE } from "./ThreadPersistence.ts";
 import { ThreadInputQueue, type ThreadUserInputItem } from "./ThreadInputQueue.ts";
@@ -201,7 +201,7 @@ export class ThreadRuntimeOrchestrator {
     const summary = summarizeUserInput(item.payload);
     await this.persistence.persistUserInput(item.threadId, item.payload);
     await this.persistence.autoTitle(item.threadId, summary);
-    push({
+    const notification: ProtocolThreadNotification = {
       type: "user.message.recorded",
       threadId: item.threadId,
       notificationId: `${item.threadId}-${item.messageId}-user-recorded`,
@@ -210,7 +210,9 @@ export class ThreadRuntimeOrchestrator {
         messageId: item.messageId,
         text: summary,
       },
-    });
+    };
+    push(notification);
+    await this.persistence.persistNotifications(item.threadId, [notification]);
     return {
       ...item,
       persistedMessageCount: (await this.persistence.getMessages(item.threadId)).length,
@@ -335,7 +337,11 @@ export class ThreadRuntimeOrchestrator {
       const activeRun = this.createActiveRun(recordedFirstUserInput.messageId);
       session.activeRun = activeRun;
       this.activeRuns.set(session.threadId, activeRun);
-      this.emitTurnStarted(session.threadId, recordedFirstUserInput.messageId, session.push);
+      await this.pushAndPersist(
+        session.threadId,
+        session.push,
+        this.turnStarted(session.threadId, recordedFirstUserInput.messageId),
+      );
 
       try {
         await this.runActiveTurnUntilDrained(session, activeRun, recordedFirstUserInput);
@@ -365,15 +371,15 @@ export class ThreadRuntimeOrchestrator {
     return activeRun;
   }
 
-  private emitTurnStarted(threadId: string, turnId: string, push: PushMessage): void {
-    push({
+  private turnStarted(threadId: string, turnId: string): ProtocolThreadNotification {
+    return {
       type: "turn.started",
       threadId,
       notificationId: `${threadId}-${turnId}-turn-started`,
       turnId,
       timestamp: this.now(),
       payload: {},
-    });
+    };
   }
 
   private async runActiveTurnUntilDrained(
@@ -392,6 +398,7 @@ export class ThreadRuntimeOrchestrator {
         const runtimeHistory = agentMessagesToRuntimeMessages(history);
         const runtimeBaseMessageCount = runtimeHistory.length;
         const events: ThreadAuditEvent[] = [];
+        const notifications: ProtocolThreadNotification[] = [];
         const result = await runtime.runWithMessages(
           runtimeHistory,
           (event) => {
@@ -408,6 +415,7 @@ export class ThreadRuntimeOrchestrator {
             );
             if (outgoing) {
               session.push(outgoing);
+              notifications.push(outgoing);
             }
 
             const auditEvent = toAuditEvent(event, timestamp);
@@ -433,14 +441,23 @@ export class ThreadRuntimeOrchestrator {
               runtimeBaseMessageCount,
               result.messages,
               events,
+              notifications,
             );
             const queuedItems = await this.recordQueuedUserInputs(
               session.queue.takeAll(),
               session.push,
             );
             if (queuedItems.length === 0) {
-              this.emitCompleted(session.threadId, session.push, activeRun, "completed");
-              this.emitThreadStatus(session.threadId, session.push, activeRun.turnId, "idle");
+              await this.pushAndPersist(
+                session.threadId,
+                session.push,
+                this.turnCompleted(session.threadId, activeRun, "completed"),
+              );
+              await this.pushAndPersist(
+                session.threadId,
+                session.push,
+                this.threadStatus(session.threadId, activeRun.turnId, "idle"),
+              );
             }
             return queuedItems;
           },
@@ -462,35 +479,33 @@ export class ThreadRuntimeOrchestrator {
     }
   }
 
-  private emitCompleted(
+  private turnCompleted(
     threadId: string,
-    push: PushMessage,
     activeRun: ActiveRun,
     status: "completed" | "failed" | "interrupted",
-  ): void {
-    push({
+  ): ProtocolThreadNotification {
+    return {
       type: "turn.completed",
       threadId,
       notificationId: `${threadId}-${activeRun.turnId}-turn-${status}`,
       turnId: activeRun.turnId,
       timestamp: this.now(),
       payload: { status },
-    });
+    };
   }
 
-  private emitThreadStatus(
+  private threadStatus(
     threadId: string,
-    push: PushMessage,
     turnId: string,
     value: "idle" | "failed" | "interrupted",
-  ): void {
-    push({
+  ): ProtocolThreadNotification {
+    return {
       type: "thread.status.changed",
       threadId,
       notificationId: `${threadId}-${turnId}-status-${value}`,
       timestamp: this.now(),
       payload: { value },
-    });
+    };
   }
 
   private async handleActiveRunError(
@@ -517,15 +532,23 @@ export class ThreadRuntimeOrchestrator {
       return;
     }
     const errorMessage = toErrorMessage(error);
-    session.push({
+    const errorNotification: ProtocolThreadNotification = {
       type: "thread.error",
       threadId: session.threadId,
       notificationId: `${session.threadId}-${activeRun.turnId}-error`,
       timestamp: this.now(),
       payload: { message: errorMessage },
-    });
-    this.emitCompleted(session.threadId, session.push, activeRun, "failed");
-    this.emitThreadStatus(session.threadId, session.push, activeRun.turnId, "failed");
+    };
+    const completed = this.turnCompleted(session.threadId, activeRun, "failed");
+    const status = this.threadStatus(session.threadId, activeRun.turnId, "failed");
+    session.push(errorNotification);
+    session.push(completed);
+    session.push(status);
+    await this.persistence.persistNotifications(session.threadId, [
+      errorNotification,
+      completed,
+      status,
+    ]);
     await this.persistence.persistError(session.threadId, errorMessage);
   }
 
@@ -551,31 +574,31 @@ export class ThreadRuntimeOrchestrator {
 
   private emitInterrupted(threadId: string, push: PushMessage, activeRun: ActiveRun): void {
     activeRun.interrupted = true;
-    push({
-      type: "turn.completed",
-      threadId,
-      notificationId: `${threadId}-turn-interrupted`,
-      turnId: activeRun.turnId,
-      timestamp: this.now(),
-      payload: { status: "interrupted" },
-    });
-    push({
-      type: "thread.status.changed",
-      threadId,
-      notificationId: `${threadId}-status-interrupted`,
-      timestamp: this.now(),
-      payload: { value: "interrupted" },
-    });
+    push(this.turnCompleted(threadId, activeRun, "interrupted"));
+    push(this.threadStatus(threadId, activeRun.turnId, "interrupted"));
   }
 
   private async persistInterrupted(threadId: string, activeRun: ActiveRun): Promise<void> {
     if (!activeRun.interrupted || activeRun.interruptionPersisted) return;
     activeRun.interruptionPersisted = true;
+    await this.persistence.persistNotifications(threadId, [
+      this.turnCompleted(threadId, activeRun, "interrupted"),
+      this.threadStatus(threadId, activeRun.turnId, "interrupted"),
+    ]);
     await this.persistence.persistError(
       threadId,
       RUN_INTERRUPTED_MESSAGE,
       RUN_INTERRUPTED_CODE,
     );
+  }
+
+  private async pushAndPersist(
+    threadId: string,
+    push: PushMessage,
+    notification: ProtocolThreadNotification,
+  ): Promise<void> {
+    push(notification);
+    await this.persistence.persistNotifications(threadId, [notification]);
   }
 
   private isActive(threadId: string, activeRun: ActiveRun): boolean {

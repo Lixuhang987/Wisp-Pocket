@@ -13,7 +13,7 @@ import type {
   WorkspaceAnsweredResponse,
 } from "@handagent/core/protocol/ClientResponse.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type { ThreadSummary } from "@handagent/core/storage/index.ts";
+import type { ThreadSummary } from "@handagent/thread-store/index.ts";
 import type { WorkspaceRegistry } from "@handagent/core/workspace/Workspace.ts";
 import type { Agent, AgentManager } from "../agent/AgentManager.ts";
 import { threadIdFromRequestId } from "../agent/AgentRequestBroker.ts";

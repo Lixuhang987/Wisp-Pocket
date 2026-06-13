@@ -32,7 +32,7 @@
 ## 边界规则
 
 - 跨进程协议类型只从 `@handagent/core/protocol/*` 引用，不在 `agent-server` 内复制 DTO。
-- core 的 runtime、tool、storage、permission、workspace 通过 `@handagent/core/<subpath>` package alias 引用，不使用跨包相对路径。
+- core 的 runtime、tool、permission、workspace 通过 `@handagent/core/<subpath>` package alias 引用，不使用跨包相对路径；thread 持久化通过 `@handagent/thread-store/<subpath>` 引用。
 - `server/` 是组合根；新增长驻服务要先在这里注入，再通过构造函数传给下游目录。
 - `thread/` 不直接创建 LLM client、MCP client 或 platform adapter；它只消费构造好的 runtime 与 persistence。
 - `bridges/` 只负责 platform bridge 接口映射到 desktop socket，不执行 tool 业务逻辑。

@@ -1,47 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
-import { InMemoryThreadStore } from "@handagent/core/storage/index.ts";
+import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { MemoryBlobStore } from "../support/MemoryBlobStore.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
-
-class InterleavingThreadStore extends InMemoryThreadStore {
-  private interleavedMessage: AgentMessage | null = null;
-
-  armInterleavedAppend(message: AgentMessage): void {
-    this.interleavedMessage = message;
-  }
-
-  override async appendMessages(
-    threadId: string,
-    messages: AgentMessage[],
-    updatedAt: string,
-  ): Promise<void> {
-    await this.appendInterleavedIfArmed(threadId, updatedAt);
-    await super.appendMessages(threadId, messages, updatedAt);
-  }
-
-  override async setMessages(
-    threadId: string,
-    messages: AgentMessage[],
-    updatedAt: string,
-  ): Promise<void> {
-    await this.appendInterleavedIfArmed(threadId, updatedAt);
-    await super.setMessages(threadId, messages, updatedAt);
-  }
-
-  private async appendInterleavedIfArmed(threadId: string, updatedAt: string): Promise<void> {
-    if (!this.interleavedMessage) return;
-
-    const message = this.interleavedMessage;
-    this.interleavedMessage = null;
-    await super.appendMessages(threadId, [message], updatedAt);
-  }
-}
 
 describe("ThreadPersistence", () => {
   it("wraps Thread CRUD operations", async () => {
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-05-17T00:00:00.000Z"),
       () => "2026-05-17T00:00:00.000Z",
     );
 
@@ -51,6 +17,9 @@ describe("ThreadPersistence", () => {
     await persistence.renameThread(Thread.metadata.id, "新预览");
     const updated = await persistence.getThread(Thread.metadata.id);
     expect(updated?.metadata.preview).toBe("新预览");
+    expect(await persistence.listThreads()).toEqual([]);
+
+    await persistence.persistUserMessage(Thread.metadata.id, "hello");
 
     const Threads = await persistence.listThreads();
     expect(Threads).toEqual([
@@ -59,7 +28,7 @@ describe("ThreadPersistence", () => {
         preview: "新预览",
         createdAt: "2026-05-17T00:00:00.000Z",
         updatedAt: "2026-05-17T00:00:00.000Z",
-        messageCount: 0,
+        messageCount: 1,
         workspaceId: null,
       },
     ]);
@@ -69,7 +38,7 @@ describe("ThreadPersistence", () => {
   });
 
   it("persists user content with attachments and derives the first preview", async () => {
-    const store = new InMemoryThreadStore();
+    const store = testStore(() => "2026-05-17T00:00:00.000Z");
     const persistence = new ThreadPersistence(
       store,
       () => "2026-05-17T00:00:00.000Z",
@@ -93,7 +62,7 @@ describe("ThreadPersistence", () => {
 
   it("leaves an existing preview unchanged on later messages", async () => {
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-05-17T00:00:00.000Z"),
       () => "2026-05-17T00:00:00.000Z",
     );
 
@@ -114,7 +83,7 @@ describe("ThreadPersistence", () => {
   it("stores image attachments as blobs and inserts image stubs into user content", async () => {
     const blobStore = new MemoryBlobStore();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-05-18T00:00:00.000Z"),
       () => "2026-05-18T00:00:00.000Z",
       blobStore,
     );
@@ -149,7 +118,7 @@ describe("ThreadPersistence", () => {
 
   it("returns conversation messages without exposing store shape", async () => {
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-05-17T00:00:00.000Z"),
       () => "2026-05-17T00:00:00.000Z",
     );
     const finalMessages: AgentMessage[] = [
@@ -196,7 +165,7 @@ describe("ThreadPersistence", () => {
   });
 
   it("persists final runtime messages and audit events", async () => {
-    const store = new InMemoryThreadStore();
+    const store = testStore(() => "2026-05-17T00:00:00.000Z");
     const persistence = new ThreadPersistence(
       store,
       () => "2026-05-17T00:00:00.000Z",
@@ -231,7 +200,7 @@ describe("ThreadPersistence", () => {
   });
 
   it("appends runtime output without dropping user input recorded during the run", async () => {
-    const store = new InterleavingThreadStore();
+    const store = testStore(() => "2026-06-07T00:00:00.000Z");
     const persistence = new ThreadPersistence(
       store,
       () => "2026-06-07T00:00:00.000Z",
@@ -244,7 +213,6 @@ describe("ThreadPersistence", () => {
     const baseMessageCount = baseMessagesSnapshot.length;
 
     await persistence.persistUserMessage("thread-delta", "steered while running");
-    store.armInterleavedAppend({ role: "user", content: "queued before runtime append" });
     await persistence.persistRunDelta(
       "thread-delta",
       baseMessageCount,
@@ -267,7 +235,6 @@ describe("ThreadPersistence", () => {
     expect(thread?.messages).toEqual([
       { role: "user", content: "first" },
       { role: "user", content: "steered while running" },
-      { role: "user", content: "queued before runtime append" },
       { role: "assistant", content: "reply to first" },
     ]);
     expect(thread?.events).toEqual([
@@ -283,7 +250,7 @@ describe("ThreadPersistence", () => {
 
   it("appends runtime delta events even when no messages were generated", async () => {
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-07T00:00:00.000Z"),
       () => "2026-06-07T00:00:00.000Z",
     );
     await persistence.ensureThread("thread-delta-events");
@@ -324,7 +291,7 @@ describe("ThreadPersistence", () => {
 
   it("persists runtime errors as audit events", async () => {
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-05-17T00:00:00.000Z"),
       () => "2026-05-17T00:00:00.000Z",
     );
 
@@ -342,3 +309,7 @@ describe("ThreadPersistence", () => {
     expect("code" in Thread!.events[0]).toBe(false);
   });
 });
+
+function testStore(now: () => string): ThreadStore {
+  return new ThreadStore({ dbPath: ":memory:", now });
+}

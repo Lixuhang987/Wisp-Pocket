@@ -42,6 +42,9 @@ importers:
       '@handagent/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@handagent/thread-store':
+        specifier: workspace:*
+        version: link:../../packages/thread-store
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.1
@@ -151,6 +154,12 @@ importers:
         version: 3.2.4(@types/node@24.13.1)(jiti@2.7.0)(lightningcss@1.32.0)
 
   packages/core: {}
+
+  packages/thread-store:
+    dependencies:
+      '@handagent/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

@@ -14,7 +14,7 @@
 | `ThreadInputQueue.ts` | thread-local FIFO input item 队列；当前生产路径承载 idle user input 的 session 唤醒，类型上为后续 response item / 子 agent 通信预留 |
 | `ThreadNotificationPublisher.ts` | 维护 `connection -> subscribed threadIds` 的分发表；thread 级消息按 `threadId` 定向，非 thread 级 notification 广播 |
 | `ThreadRuntimeOrchestrator.ts` | Agent 内部 ReAct turn 执行器：记录输入、唤醒 runtime、drain queued input、转译通知、处理中断与错误 |
-| `ThreadPersistence.ts` | `ThreadStore` 的唯一直接封装：创建 / 删除 / 读取 / 列出 thread，追加用户消息、runtime delta、审计事件，恢复重启前未完成的 turn |
+| `ThreadPersistence.ts` | `@handagent/thread-store` 的唯一直接封装：创建 / 删除 / 读取 / 列出 thread，把用户消息、runtime delta、审计事件和 runtime notification 写成 rollout items，并恢复重启前未完成的 turn |
 
 ## 运行期输入
 
@@ -78,7 +78,7 @@ sequenceDiagram
 ### active turn 与 append-only 写回
 
 - runtime 回调落通知或持久化前都要检查当前 generation；被中断或超时清理的旧 run 的晚到 delta / tool result / error 不得污染当前状态。
-- runtime 结果通过 `persistRunDelta` 追加 generated messages 和 events，避免覆盖运行期间已有消息。
+- runtime 结果通过 `persistRunDelta` 追加 generated messages、`turn_context` 审计和已推送的 `event_msg` notification，避免覆盖运行期间已有消息。
 - 每轮 runtime 使用稳定输入快照；后续若接入内部 response item / 子 agent 通信，active run 准备阶段收到的内部队列项只进入后续 follow-up，不会被当前 runtime 和 follow-up 重复处理。
 
 ### 中断与重启恢复
@@ -92,7 +92,7 @@ sequenceDiagram
 - `ThreadCommandRouter`：只处理命令路由、thread 是否存在校验、Agent 注册 / 转发、删除前关闭 Agent。
 - `ThreadRuntimeOrchestrator`：只管理 Agent 内部 active run，不直接掌握 socket，也不作为公开输入入口。
 - `ThreadInputQueue`：只负责队列和等待者，不做持久化、不判断运行状态。
-- `ThreadPersistence`：本目录唯一直接持有 `ThreadStore` 的类；同时负责 user attachment 入库、conversation snapshot 转换和残缺 turn 恢复。
+- `ThreadPersistence`：本目录唯一直接持有 `@handagent/thread-store` 的类；同时负责 user attachment 入库、rollout item 写入、conversation snapshot 转换和残缺 turn 恢复。
 - `ThreadNotificationPublisher`：只负责连接与 thread 维度的消息分发，不做业务判断。
 
 ## 编辑约束

@@ -17,6 +17,19 @@
 
 ## 开发验证记录
 
+### SQLite ThreadStore rollout 持久化回归
+
+- 完成日期：待实机 QA
+- 实现位置：`packages/thread-store/`、`apps/agent-server/src/thread/ThreadPersistence.ts`、`apps/agent-server/src/thread/ThreadRuntimeOrchestrator.ts`、`apps/agent-server/src/server/server.ts`
+- 修复结论：thread 持久化从 core 内的每 thread JSON 文件迁移到 `@handagent/thread-store` 的 SQLite rollout item 模型；`thread.start` 只打开 live writer，首次用户输入持久化后才 materialize 到 `~/.spotAgent/threads.sqlite`。runtime 推送给 ThreadWindow 的 `assistant.delta`、`tool.started`、`tool.finished`、`turn.completed`、`thread.status.changed` 等通知会写为 `event_msg`，审计事件写入 `turn_context.auditEvents`。
+- 自动化验证：需执行 `pnpm exec vitest run packages/thread-store/tests/thread-store-lifecycle.test.ts packages/thread-store/tests/thread-store-live-writer.test.ts packages/thread-store/tests/current-thread.test.ts packages/thread-store/tests/package-exports.test.ts apps/agent-server/tests/thread/ThreadPersistence.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/thread/ThreadRuntimeOrchestrator.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App 并提交一个普通 prompt，确认 ThreadWindow 显示 user message、assistant streaming 和 completed/idle 状态。
+  2. 确认 `~/.spotAgent/threads.sqlite` 被创建，`threads` 表有对应 thread，`thread_items` 中按 sequence 出现 `session_meta`、`response_item`、`event_msg` 和必要的 `turn_context`。
+  3. 关闭并重启桌面 App，打开历史 thread，确认 snapshot 可恢复已持久化消息，左侧历史列表预览和 messageCount 正常。
+  4. 提交一个会触发 tool 或 permission 的 prompt，确认 tool 通知仍正常显示，重启后审计事件仍能保留在 thread history 派生视图中。
+  5. 在运行中点击停止，确认 UI 收到 interrupted 状态，重启后该 thread 不会恢复成仍在 running 的半截 turn。
+
 ### Bash 构建脚本成功静默输出
 
 - 完成日期：待实机 QA

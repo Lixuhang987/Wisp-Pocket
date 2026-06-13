@@ -10,7 +10,7 @@ import type {
 import type { ThreadAttachment, ImageAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import type { ConversationMessage } from "@handagent/core/conversation/ConversationMessage.ts";
-import type { ThreadAuditEvent } from "@handagent/core/storage/index.ts";
+import type { ThreadAuditEvent } from "@handagent/thread-store/index.ts";
 import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
 import { parseStub, renderStub } from "@handagent/core/runtime/Stub.ts";
 

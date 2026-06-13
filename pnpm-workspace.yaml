@@ -3,3 +3,4 @@ packages:
   - apps/thread-window-web
   - apps/electron-shell
   - packages/core
+  - packages/thread-store

@@ -1,0 +1,11 @@
+{
+  "name": "@handagent/thread-store",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "@handagent/core": "workspace:*"
+  }
+}

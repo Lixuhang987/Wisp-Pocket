@@ -30,7 +30,7 @@ node --experimental-transform-types --experimental-specifier-resolution=node app
 
 启动后 `src/server/server.ts` 是组合根，负责把 core 和本目录模块接起来：
 
-1. 构造 `FileThreadStore`、`FilesystemBlobStore`、`FileNetworkLogger`、`FileWorkspaceRegistry`。
+1. 构造 `ThreadStore({ dbPath: ~/.spotAgent/threads.sqlite })`、`FilesystemBlobStore`、`FileNetworkLogger`、`FileWorkspaceRegistry`。
 2. 读取 `~/.spotAgent/mcp.json` 并创建 `MCPServerRegistry`。
 3. 创建 `WebSocketPlatformBridge` 与 `AgentRequestBroker`；permission/workspace ask 先进入 Agent `rx_event`。
 4. 通过 `SettingsBackedToolRegistry` 注册 builtin tools。
@@ -85,7 +85,7 @@ flowchart TD
 | 路径 | 写入方 | 读取方 | 说明 |
 |------|--------|--------|------|
 | `~/.spotAgent/settings.json` | desktop settings | `settings/` | LLM provider/model/API 与 builtin tool 开关；按文件 stamp 热加载 |
-| `~/.spotAgent/threads/<id>.json` | `thread/ThreadPersistence` | agent-server / React ThreadWindow 历史列表 | `PersistedThread`，包含 messages 与 events |
+| `~/.spotAgent/threads.sqlite` | `@handagent/thread-store` / `thread/ThreadPersistence` | agent-server / React ThreadWindow 历史列表 | SQLite thread rollout items，派生 messages、events 与 history summary |
 | `~/.spotAgent/blobs/` | `protocol/composeUserContent`、core runtime summary | LLM adapter / 后续 tool | 图片附件、大段 tool 输出与 summary 元数据 |
 | `~/.spotAgent/log/` | `FileNetworkLogger` | 人工排查 | LLM 请求/响应 JSONL |
 | `~/.spotAgent/workspaces.json` | desktop settings + core registry | agent-server / desktop | workspace 注册表 |
@@ -115,6 +115,6 @@ open dist/HandAgentDesktop.app
 
 ## 调试入口
 
-- thread / notification 问题先看 `~/.spotAgent/threads/<id>.json`。
+- thread / notification 问题先看 `~/.spotAgent/threads.sqlite` 中的 `threads` / `thread_items`。
 - LLM provider 或 tool calling 问题先看 `~/.spotAgent/log/<YYYY-MM-DD>/network-NNN.jsonl`。
 - 平台能力无响应先看 `bridges/` 是否有 active desktop bridge，再看 desktop `PlatformBridgeService`。

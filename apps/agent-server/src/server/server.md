@@ -92,7 +92,7 @@ const runtimeForThread = (threadId: string) => {
 
 `resolveServerPaths()` 集中生成以下路径：
 
-- `~/.spotAgent/threads/`：thread JSON。
+- `~/.spotAgent/threads.sqlite`：thread SQLite rollout 数据库。
 - `~/.spotAgent/blobs/`：图片附件和大段 tool 输出。
 - `~/.spotAgent/log/`：LLM 网络日志。
 - `~/.spotAgent/plugins/`：Append Prompt manifest 历史目录名，供 desktop 构建 `ActionDefinition`；agent-server 不读取该目录。

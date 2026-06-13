@@ -14,7 +14,7 @@ import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
 import type { AgentActivityEvent } from "@handagent/core/protocol/AgentActivity.ts";
 import type { FilePermissionPolicy } from "@handagent/core/permission/FilePermissionPolicy.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
-import { InMemoryThreadStore } from "@handagent/core/storage/index.ts";
+import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { AgentActivityPublisher } from "../../src/activity/AgentActivityPublisher.ts";
 import {
   AgentManager,
@@ -197,7 +197,7 @@ describe("attachThreadSocketHandlers", () => {
   it("interrupts the active run owned by a socket when that socket closes", async () => {
     const socket = new FakeSocket();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(),
       () => "2026-05-20T00:00:00.000Z",
     );
     let runtimeSignal: AbortSignal | undefined;
@@ -666,4 +666,8 @@ function makeNoopMCPClient(name: string): MCPClient {
     },
     async close() {},
   };
+}
+
+function testStore(): ThreadStore {
+  return new ThreadStore({ dbPath: ":memory:" });
 }

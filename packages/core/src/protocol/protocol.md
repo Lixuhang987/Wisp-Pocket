@@ -206,7 +206,7 @@ React ThreadWindow 回复：
 ## 编辑此目录的约束
 
 - 协议是合约，desktop（Swift）与 agent-server（TS）必须严格对齐字段。
-- 新增 type 时考虑：是否同时影响 `ThreadStore` 持久化、`ConversationMessage` UI、`ThreadAuditEvent` 审计三处。
+- 新增 type 时考虑：是否同时影响 `@handagent/thread-store` 持久化、`ConversationMessage` UI、`ThreadAuditEvent` 审计三处。
 - 协议字段保持平铺，不要嵌套 anyJson 黑洞，让两边 codec 都能强类型化。
 - 平台 RPC 不带 `threadId`；server 只通过 `channel: "platform"` 分派平台帧。
 

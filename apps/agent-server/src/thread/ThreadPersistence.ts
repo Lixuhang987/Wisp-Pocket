@@ -2,12 +2,17 @@ import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
 import { FilesystemBlobStore } from "@handagent/core/blob/FilesystemBlobStore.ts";
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
-import type {
-  PersistedThread,
-  ThreadAuditEvent,
+import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+import {
+  CurrentThread,
   ThreadStore,
-  ThreadSummary,
-} from "@handagent/core/storage/index.ts";
+  type PersistedThread,
+  type RolloutItem,
+  type ThreadAuditEvent,
+  type ThreadStoreResult,
+  type ThreadSummary,
+} from "@handagent/thread-store/index.ts";
+import type { CreateThreadParams } from "@handagent/thread-store/index.ts";
 import {
   agentMessagesToConversation,
   composeUserContent,
@@ -16,6 +21,8 @@ import {
 } from "../protocol/MessageTranslator.ts";
 
 export class ThreadPersistence {
+  private readonly currentThreads = new Map<string, CurrentThread>();
+
   constructor(
     private readonly store: ThreadStore,
     private readonly now: () => string = () => new Date().toISOString(),
@@ -27,33 +34,37 @@ export class ThreadPersistence {
     workspaceId?: string | null,
   ): Promise<PersistedThread> {
     const id = generateThreadId();
-    return this.store.create({ id, preview, createdAt: this.now(), workspaceId });
+    const current = await this.createCurrentThread({
+      threadId: id,
+      preview,
+      workspaceId,
+      timestamp: this.now(),
+      threadSource: "user",
+      originator: "user",
+    });
+    this.currentThreads.set(id, current);
+    return await this.requireThread(id);
   }
 
   async deleteThread(threadId: string): Promise<void> {
-    return this.store.delete(threadId);
+    this.currentThreads.delete(threadId);
+    unwrap(await this.store.deleteThread(threadId));
   }
 
   async renameThread(threadId: string, preview: string): Promise<void> {
-    return this.store.updatePreview(threadId, preview, this.now());
+    unwrap(await this.store.updatePreview(threadId, preview, this.now()));
   }
 
   async listThreads(): Promise<ThreadSummary[]> {
-    return this.store.list();
+    return unwrap(await this.store.listThreads());
   }
 
   async getThread(threadId: string): Promise<PersistedThread | null> {
-    return this.store.get(threadId);
+    return unwrap(await this.store.getPersistedThread(threadId));
   }
 
   async ensureThread(threadId: string): Promise<void> {
-    const existing = await this.store.get(threadId);
-    if (existing) return;
-
-    await this.store.create({
-      id: threadId,
-      createdAt: this.now(),
-    });
+    await this.ensureCurrentThread(threadId);
   }
 
   async persistUserMessage(
@@ -65,7 +76,9 @@ export class ThreadPersistence {
       role: "user",
       content: await composeUserContent(text, attachments, this.blobStore),
     };
-    await this.store.appendMessages(threadId, [userMessage], this.now());
+    await this.appendAndPersist(threadId, [
+      { kind: "response_item", payload: userMessage },
+    ]);
   }
 
   async persistUserInput(threadId: string, userInput: UserInput): Promise<void> {
@@ -73,19 +86,21 @@ export class ThreadPersistence {
       role: "user",
       content: await composeUserInputContent(userInput, this.blobStore),
     };
-    await this.store.appendMessages(threadId, [userMessage], this.now());
+    await this.appendAndPersist(threadId, [
+      { kind: "response_item", payload: userMessage },
+    ]);
   }
 
   async autoTitle(threadId: string, text: string): Promise<void> {
-    const thread = await this.store.get(threadId);
+    const thread = await this.getThread(threadId);
     if (!thread) return;
     if (thread.metadata.preview || thread.messages.length !== 1) return;
 
-    await this.store.updatePreview(threadId, deriveTitle(text), this.now());
+    unwrap(await this.store.updatePreview(threadId, deriveTitle(text), this.now()));
   }
 
   async getMessages(threadId: string): Promise<AgentMessage[]> {
-    const Thread = await this.store.get(threadId);
+    const Thread = await this.getThread(threadId);
     return Thread?.messages ?? [];
   }
 
@@ -98,7 +113,7 @@ export class ThreadPersistence {
     threadId: string,
     timestamp = this.now(),
   ): Promise<"failed" | "interrupted" | null> {
-    const thread = await this.store.get(threadId);
+    const thread = await this.getThread(threadId);
     if (!thread || !isIncompleteTurn(thread.messages)) {
       return null;
     }
@@ -109,12 +124,12 @@ export class ThreadPersistence {
         (event) =>
           event.type === "error" &&
           event.timestamp.localeCompare(thread.metadata.updatedAt) >= 0,
-      );
+    );
     if (lastError?.code === RUN_INTERRUPTED_CODE) {
       return "interrupted";
     }
     if (lastError) {
-      await this.store.setMessages(
+      unwrap(await this.store.replaceResponseItems(
         threadId,
         [
           ...thread.messages,
@@ -124,11 +139,11 @@ export class ThreadPersistence {
           },
         ],
         timestamp,
-      );
+      ));
       return "failed";
     }
 
-    await this.store.setMessages(
+    unwrap(await this.store.replaceResponseItems(
       threadId,
       [
         ...thread.messages,
@@ -138,14 +153,24 @@ export class ThreadPersistence {
         },
       ],
       timestamp,
-    );
+    ));
 
-    await this.store.appendEvents(threadId, [
+    await this.appendAndPersist(threadId, [
       {
-        type: "error",
-        timestamp,
-        message: RUN_LOST_AFTER_RESTART_MESSAGE,
-        code: RUN_LOST_AFTER_RESTART_CODE,
+        kind: "turn_context",
+        payload: {
+          turnId: `${threadId}-recovery`,
+          status: "failed",
+          timestamp,
+          auditEvents: [
+            {
+              type: "error",
+              timestamp,
+              message: RUN_LOST_AFTER_RESTART_MESSAGE,
+              code: RUN_LOST_AFTER_RESTART_CODE,
+            },
+          ],
+        },
       },
     ]);
 
@@ -157,10 +182,19 @@ export class ThreadPersistence {
     messages: AgentMessage[],
     events: ThreadAuditEvent[],
   ): Promise<void> {
-    await this.store.setMessages(threadId, messages, this.now());
-    if (events.length > 0) {
-      await this.store.appendEvents(threadId, events);
+    const history = unwrap(await this.store.loadHistory({ threadId }));
+    if (history.persisted) {
+      unwrap(await this.store.replaceResponseItems(threadId, messages, this.now()));
+      if (events.length > 0) {
+        await this.appendAndPersist(threadId, [this.turnContextItem(threadId, events, "completed")]);
+      }
+      return;
     }
+
+    await this.appendAndPersist(threadId, [
+      ...messages.map((message): RolloutItem => ({ kind: "response_item", payload: message })),
+      ...(events.length > 0 ? [this.turnContextItem(threadId, events, "completed")] : []),
+    ]);
   }
 
   async persistRunDelta(
@@ -168,14 +202,30 @@ export class ThreadPersistence {
     baseMessageCount: number,
     runtimeMessages: AgentMessage[],
     events: ThreadAuditEvent[],
+    notifications: ThreadNotification[] = [],
   ): Promise<void> {
     const generatedMessages = runtimeMessages.slice(baseMessageCount);
-    if (generatedMessages.length > 0) {
-      await this.store.appendMessages(threadId, generatedMessages, this.now());
-    }
-    if (events.length > 0) {
-      await this.store.appendEvents(threadId, events);
-    }
+    await this.appendAndPersist(threadId, [
+      ...notifications.map((notification): RolloutItem => ({
+        kind: "event_msg",
+        payload: notification,
+      })),
+      ...generatedMessages.map((message): RolloutItem => ({
+        kind: "response_item",
+        payload: message,
+      })),
+      ...(events.length > 0 ? [this.turnContextItem(threadId, events, "completed")] : []),
+    ]);
+  }
+
+  async persistNotifications(
+    threadId: string,
+    notifications: ThreadNotification[],
+  ): Promise<void> {
+    await this.appendAndPersist(threadId, notifications.map((notification) => ({
+      kind: "event_msg",
+      payload: notification,
+    })));
   }
 
   async persistError(threadId: string, errorMessage: string, code?: string): Promise<void> {
@@ -185,9 +235,66 @@ export class ThreadPersistence {
       message: errorMessage,
       ...(code ? { code } : {}),
     };
-    await this.store.appendEvents(threadId, [
-      event,
+    await this.appendAndPersist(threadId, [
+      this.turnContextItem(threadId, [event], "failed"),
     ]);
+  }
+
+  private async appendAndPersist(threadId: string, items: RolloutItem[]): Promise<void> {
+    if (items.length === 0) return;
+
+    const current = await this.ensureCurrentThread(threadId);
+    unwrap(await current.appendItems(items));
+    unwrap(await current.persist());
+  }
+
+  private async ensureCurrentThread(threadId: string): Promise<CurrentThread> {
+    const current = this.currentThreads.get(threadId);
+    if (current) return current;
+
+    const existing = await this.getThread(threadId);
+    if (existing) {
+      const resumed = unwrap(await CurrentThread.resume(this.store, { threadId }));
+      this.currentThreads.set(threadId, resumed);
+      return resumed;
+    }
+
+    const created = await this.createCurrentThread({
+      threadId,
+      timestamp: this.now(),
+      threadSource: "user",
+      originator: "user",
+    });
+    this.currentThreads.set(threadId, created);
+    return created;
+  }
+
+  private async createCurrentThread(params: CreateThreadParams): Promise<CurrentThread> {
+    return unwrap(await CurrentThread.create(this.store, params));
+  }
+
+  private async requireThread(threadId: string): Promise<PersistedThread> {
+    const thread = await this.getThread(threadId);
+    if (!thread) {
+      throw new Error(`Thread not found after create: ${threadId}`);
+    }
+    return thread;
+  }
+
+  private turnContextItem(
+    threadId: string,
+    auditEvents: ThreadAuditEvent[],
+    status: "completed" | "failed" | "interrupted",
+  ): RolloutItem {
+    return {
+      kind: "turn_context",
+      payload: {
+        turnId: `${threadId}-${this.now()}`,
+        status,
+        timestamp: this.now(),
+        auditEvents,
+      },
+    };
   }
 }
 
@@ -202,4 +309,11 @@ function generateThreadId(): string {
 
 function isIncompleteTurn(messages: AgentMessage[]): boolean {
   return messages.at(-1)?.role === "user";
+}
+
+function unwrap<T>(result: ThreadStoreResult<T>): T {
+  if (!result.ok) {
+    throw new Error(`${result.error.code}: ${result.error.message}`);
+  }
+  return result.value;
 }

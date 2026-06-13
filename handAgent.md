@@ -12,6 +12,7 @@ flowchart TD
   S -->|/api/activity WebSocket| B
   A -->|/api/platform WebSocket| B
   B --> C[packages/core<br/>thread、turn、消息、LLM/tool 循环]
+  B --> T[packages/thread-store<br/>SQLite thread rollout 持久化]
 ```
 
 Electron UI shell 是桌面端唯一 UI shell。Swift 启动 Electron，Electron 监督 agent-server，在 agent-server ready 后主动预热隐藏 ThreadWindow，并在 PromptPanel submit、openHistory 和 focus 时展示或聚焦 Electron `BrowserWindow` ThreadWindow；Electron ActivityWindow 承载 React StatusBubble，renderer 直接订阅 `/api/activity`。Swift 不启动 agent-server，不创建 `WKWebView` ThreadWindow，不显示 Swift StatusBubble，也不 mirror Electron activity 状态。平台能力仍只通过 Swift `/api/platform` 执行。
@@ -58,7 +59,7 @@ flowchart TD
 - 平台 RPC 只跑在 `/api/platform`：Swift desktop 发送 `platform_bridge_hello`，处理 `channel: "platform"` 的 `platform_request`，并回写 `platform_response`。
 - `thread.snapshot` 是用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口；React 和 app-server 之间不做断线恢复，非主动断开后不重连、不恢复订阅、不拉取 snapshot、不发送恢复命令。`workspace.listed` 是 `workspace.list` 的连接级响应，不带 `threadId`。
 - `permission.requested` / `workspace.requested` 是 server 向 React 提问、等待 UI 回执的少量交互；不要把它们混入普通 notification 或 platform RPC。
-- 持久化主目录是 `~/.spotAgent/threads/`；workspace、permission、blob、log、Append Prompt manifest 和 MCP 配置分别由对应模块文档说明。
+- Thread 持久化主文件是 `~/.spotAgent/threads.sqlite`；workspace、permission、blob、log、Append Prompt manifest 和 MCP 配置分别由对应模块文档说明。
 - 图片 attachment 先落 Blob/STUB；agent-server 在 runtime 前展开为多模态 image part，最终能否理解图片取决于当前 provider capability。
 
 协议字段详见 [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)。desktop 内部提交模型见 [PromptPanel](/Users/mu9/proj/handAgent/apps/desktop/Sources/PromptPanel/prompt-panel.md)，React UI 状态见 [thread-window-web](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)，agent-server 编排见 [agent-server](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)。
@@ -69,7 +70,7 @@ flowchart TD
 - Swift 不发送 `thread_window.prepare`；Electron main 是 hidden ThreadWindow 预热的唯一 owner。agent-server 是唯一承载 core runtime 的后台进程，关闭 Electron UI 窗口不停止该进程。
 - React ThreadWindow 是历史、后台 thread 状态缓存、消息、运行态、permission/workspace 请求面板和 composer 的 UI 状态源；右侧当前展示的 thread 由 React `App` 本地 state 编排，不进入 store。
 - agent-server 是组合根和本地桥：负责 socket 路径拆分、thread 生命周期路由、持久 Agent owner、runtime 驱动、持久化封装、Agent request broker 和 platform bridge 转发；外部运行期输入统一是 `op.submit(UserInput | Interrupt)`，UI 回执在 server 内部抽象为 `client_response` Op。
-- packages/core 只定义跨平台 runtime、tool、platform、protocol、storage、workspace 和 permission 抽象，不实现 UI 或 macOS 原生能力。
+- packages/core 只定义跨平台 runtime、tool、platform、protocol、workspace 和 permission 抽象，不实现 UI、持久化后端或 macOS 原生能力；thread rollout 持久化由 `packages/thread-store` 承担。
 
 ## 阅读顺序建议
 

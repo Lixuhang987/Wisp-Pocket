@@ -26,7 +26,7 @@ import { AgentActivityPublisher } from "../activity/AgentActivityPublisher.ts";
 import { ThreadCommandRouter } from "../thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../thread/ThreadNotificationPublisher.ts";
 import { ThreadRuntimeOrchestrator } from "../thread/ThreadRuntimeOrchestrator.ts";
-import { FileThreadStore } from "@handagent/core/storage/index.ts";
+import { ThreadStore } from "@handagent/thread-store/index.ts";
 import {
   WebSocketPlatformBridge,
   type BridgeToken,
@@ -309,7 +309,7 @@ export async function startDefaultServer(port = 4317) {
   ]);
 
   const paths = resolveServerPaths();
-  const store = new FileThreadStore(paths.threadsDir);
+  const store = new ThreadStore({ dbPath: paths.threadsDbPath });
   const networkLogger = new FileNetworkLogger({ baseDir: paths.logDir });
   const blobStore = new FilesystemBlobStore({ rootPath: paths.blobsDir });
   const mcpConfig = await readMCPConfig(paths.mcpConfigPath);
@@ -536,7 +536,7 @@ function observeAgentStatus(
 
 interface ServerPaths {
   spotDir: string;
-  threadsDir: string;
+  threadsDbPath: string;
   logDir: string;
   blobsDir: string;
   workspacesPath: string;
@@ -549,7 +549,7 @@ function resolveServerPaths(): ServerPaths {
   const spotDir = join(homedir(), ".spotAgent");
   return {
     spotDir,
-    threadsDir: join(spotDir, "threads"),
+    threadsDbPath: join(spotDir, "threads.sqlite"),
     logDir: join(spotDir, "log"),
     blobsDir: join(spotDir, "blobs"),
     workspacesPath: join(spotDir, "workspaces.json"),

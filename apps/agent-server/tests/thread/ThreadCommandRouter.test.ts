@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { InMemoryThreadStore } from "@handagent/core/storage/index.ts";
 import type { ThreadCommand, ThreadStartCommand, OpSubmitCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { AgentManager, createSharedAgentStatus, type Agent } from "../../src/agent/AgentManager.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
@@ -10,11 +10,11 @@ import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 describe("ThreadCommandRouter", () => {
   it("creates a thread, registers an agent, and emits thread.started", async () => {
     const publisher = new ThreadNotificationPublisher();
-    const sent: string[] = [];
-    publisher.attachConnection("c1", (event) => sent.push(event.type));
+    const sent: ThreadNotification[] = [];
+    publisher.attachConnection("c1", (event) => sent.push(event as ThreadNotification));
     const manager = new AgentManager();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-04T00:00:00.000Z"),
       () => "2026-06-04T00:00:00.000Z",
     );
     const createAgent = vi.fn((threadId: string) => makeAgent(threadId));
@@ -31,16 +31,17 @@ describe("ThreadCommandRouter", () => {
 
     await router.receive(createCommand(), "c1");
 
-    const threads = await persistence.listThreads();
-    expect(createAgent).toHaveBeenCalledWith(threads[0].id);
-    expect(manager.has(threads[0].id)).toBe(true);
-    expect(sent).toEqual(["thread.started"]);
+    const threadId = sent[0].threadId;
+    expect(createAgent).toHaveBeenCalledWith(threadId);
+    expect(manager.has(threadId)).toBe(true);
+    expect(sent.map((event) => event.type)).toEqual(["thread.started"]);
   });
 
   it("persists workspaceId when creating a thread with workspace", async () => {
-    const store = new InMemoryThreadStore();
+    const store = testStore(() => "2026-06-04T00:00:00.000Z");
     const publisher = new ThreadNotificationPublisher();
-    publisher.attachConnection("c1", () => {});
+    const sent: ThreadNotification[] = [];
+    publisher.attachConnection("c1", (event) => sent.push(event as ThreadNotification));
     const persistence = new ThreadPersistence(
       store,
       () => "2026-06-04T00:00:00.000Z",
@@ -59,9 +60,8 @@ describe("ThreadCommandRouter", () => {
       "c1",
     );
 
-    const threads = await store.list();
-    expect(threads).toHaveLength(1);
-    expect(threads[0].workspaceId).toBe("workspace-123");
+    const thread = await persistence.getThread(sent[0].threadId);
+    expect(thread?.metadata.workspaceId).toBe("workspace-123");
   });
 
   it("resumes and immediately emits a thread snapshot without submitting runtime input", async () => {
@@ -70,7 +70,7 @@ describe("ThreadCommandRouter", () => {
     publisher.attachConnection("c1", (event) => sent.push(event as ThreadNotification));
     const manager = new AgentManager();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-04T00:00:00.000Z"),
       () => "2026-06-04T00:00:00.000Z",
     );
     const thread = await persistence.createThread();
@@ -102,7 +102,7 @@ describe("ThreadCommandRouter", () => {
     const publisher = new ThreadNotificationPublisher();
     const manager = new AgentManager();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-04T00:00:00.000Z"),
       () => "2026-06-04T00:00:00.000Z",
     );
     const thread = await persistence.createThread();
@@ -120,7 +120,7 @@ describe("ThreadCommandRouter", () => {
   it("forwards op.submit interrupt to the registered agent", async () => {
     const manager = new AgentManager();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-07T00:00:00.000Z"),
       () => "2026-06-07T00:00:00.000Z",
     );
     const thread = await persistence.createThread();
@@ -155,7 +155,7 @@ describe("ThreadCommandRouter", () => {
   it("wraps client responses as ops and forwards them to the registered agent", async () => {
     const manager = new AgentManager();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-11T00:00:00.000Z"),
       () => "2026-06-11T00:00:00.000Z",
     );
     const thread = await persistence.createThread();
@@ -204,7 +204,7 @@ describe("ThreadCommandRouter", () => {
     publisher.attachConnection("c1", (event) => first.push(event.type));
     publisher.attachConnection("c2", (event) => second.push(event.type));
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-04T00:00:00.000Z"),
       () => "2026-06-04T00:00:00.000Z",
     );
     await persistence.createThread();
@@ -229,7 +229,7 @@ describe("ThreadCommandRouter", () => {
     publisher.attachConnection("c1", (event) => seen.push(event.type));
     const manager = new AgentManager();
     const persistence = new ThreadPersistence(
-      new InMemoryThreadStore(),
+      testStore(() => "2026-06-04T00:00:00.000Z"),
       () => "2026-06-04T00:00:00.000Z",
     );
     const thread = await persistence.createThread();
@@ -258,7 +258,7 @@ describe("ThreadCommandRouter", () => {
 function makeRouter({
   manager = new AgentManager(),
   persistence = new ThreadPersistence(
-    new InMemoryThreadStore(),
+    testStore(() => "2026-06-04T00:00:00.000Z"),
     () => "2026-06-04T00:00:00.000Z",
   ),
   publisher = new ThreadNotificationPublisher(),
@@ -322,4 +322,8 @@ function userInputCommand(threadId: string): OpSubmitCommand {
       },
     },
   };
+}
+
+function testStore(now: () => string): ThreadStore {
+  return new ThreadStore({ dbPath: ":memory:", now });
 }
