@@ -1,5 +1,6 @@
 import { BrowserWindow, app, ipcMain, screen, utilityProcess } from "electron";
 import { dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { ElectronShellRuntime, errorMessage } from "./electronShellRuntime.js";
 import { handleActivityWindowFocusThreadIpc } from "./activityWindowIpc.js";
@@ -14,9 +15,11 @@ import { CommandSocketServer } from "./swiftBridge/commandSocketServer.js";
 import { ActivityWindowController } from "./windows/activityWindowController.js";
 import { ThreadWindowPrewarmer } from "./windows/threadWindowPrewarmer.js";
 import { configureMacOSBackgroundApp } from "./macosBackgroundApp.js";
+import { readAvailableSkillsFromPluginsDirectory } from "./availableSkills.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = process.env.HANDAGENT_REPO_ROOT ?? resolve(currentDir, "../../../..");
+const pluginsDirectory = process.env.HANDAGENT_PLUGINS_DIR ?? join(homedir(), ".spotAgent/plugins");
 const nodePath = process.env.HANDAGENT_NODE_PATH ?? "node";
 const threadWindowURL =
   process.env.HANDAGENT_THREAD_WINDOW_WEB_URL ?? "http://127.0.0.1:4317/thread-window/index.html";
@@ -41,6 +44,7 @@ const supervisor = createAgentServerSupervisor({
 const prewarmer = new ThreadWindowPrewarmer({
   threadWindowURL,
   preloadPath: threadPreloadPath,
+  availableSkills: readAvailableSkillsFromPluginsDirectory(pluginsDirectory),
   onClosed: (event) => {
     if (hasStoppedSupervisor) {
       return;

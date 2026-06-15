@@ -12,6 +12,7 @@ import { RUN_INTERRUPTED_CODE, RUN_INTERRUPTED_MESSAGE } from "./ThreadPersisten
 import { ThreadInputQueue, type ThreadUserInputItem } from "./ThreadInputQueue.ts";
 import {
   agentMessagesToRuntimeMessages,
+  cloneInputItems,
   summarizeUserInput,
   toAuditEvent,
   toErrorMessage,
@@ -209,6 +210,7 @@ export class ThreadRuntimeOrchestrator {
       payload: {
         messageId: item.messageId,
         text: summary,
+        items: cloneInputItems(item.payload.items),
       },
     };
     push(notification);

@@ -57,6 +57,7 @@ export class AgentRunner {
       payload: {
         messageId: op.opId,
         text: renderUserInputText(op),
+        items: op.payload.items.map((item) => ({ ...item })),
       },
     } as never);
 

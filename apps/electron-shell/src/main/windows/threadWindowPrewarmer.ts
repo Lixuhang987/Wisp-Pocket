@@ -1,5 +1,6 @@
 import type { BrowserWindowConstructorOptions } from "electron";
 import type { HostTheme, InitialPromptPayload } from "../protocol/electronShellProtocol.js";
+import type { AvailableSkill } from "../availableSkills.js";
 
 type ThreadWindowClosedEvent = {
   wasPrepared: boolean;
@@ -21,6 +22,7 @@ type BrowserWindowLike = {
 type Options = {
   threadWindowURL: string;
   preloadPath: string;
+  availableSkills: AvailableSkill[];
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
   onClosed?: (event: ThreadWindowClosedEvent) => void;
 };
@@ -52,7 +54,10 @@ export class ThreadWindowPrewarmer {
           preload: this.options.preloadPath,
           contextIsolation: true,
           nodeIntegration: false,
-          additionalArguments: [`--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`],
+          additionalArguments: [
+            `--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`,
+            `--handagent-available-skills=${encodeURIComponent(JSON.stringify(this.options.availableSkills))}`,
+          ],
         },
       });
       this.window.on("closed", () => this.handleClosed());

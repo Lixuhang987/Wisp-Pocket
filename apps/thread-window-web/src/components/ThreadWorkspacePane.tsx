@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Composer } from "./Composer.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { RequestPanels } from "./RequestPanels.tsx";
-import type { InputItem, UserInput } from "../protocol/threadProtocol.ts";
+import type { AvailableSkill, InputItem, UserInput } from "../protocol/threadProtocol.ts";
 import { createThreadWindowStore, type ConnectionState } from "../store/threadWindowStore.ts";
 import { createEmptyComposerItems } from "./Composer.tsx";
 
@@ -10,6 +10,7 @@ type ThreadWorkspacePaneProps = {
   threadId: string | null;
   connectionState: ConnectionState;
   windowErrorMessage: string | null;
+  availableSkills: AvailableSkill[];
   onSubmit(threadId: string, input: UserInput): void;
   onStop(threadId: string): void;
   onRemoveQueuedInput(threadId: string, index: number): void;
@@ -21,6 +22,7 @@ export function ThreadWorkspacePane({
   threadId,
   connectionState,
   windowErrorMessage,
+  availableSkills,
   onSubmit,
   onStop,
   onRemoveQueuedInput,
@@ -89,6 +91,7 @@ export function ThreadWorkspacePane({
             disabled={connectionState !== "connected"}
             stopDisabled={connectionState !== "connected" || thread.status !== "running"}
             queuedInputs={thread.queuedComposerInputs}
+            availableSkills={availableSkills}
             inputItems={composerInputItems}
             onInputItemsChange={updateComposerInputItems}
             onSubmit={submitComposerInput}

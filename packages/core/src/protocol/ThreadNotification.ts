@@ -1,3 +1,4 @@
+import type { InputItem } from "./Op.ts";
 import type {
   RunStatus,
   ThreadListEntry,
@@ -32,6 +33,7 @@ export type UserMessageRecordedNotification = {
   payload: {
     messageId: string;
     text: string;
+    items?: InputItem[];
   };
 };
 

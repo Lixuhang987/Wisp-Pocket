@@ -85,6 +85,7 @@ export class ThreadPersistence {
     const userMessage: AgentMessage = {
       role: "user",
       content: await composeUserInputContent(userInput, this.blobStore),
+      inputItems: userInput.items.map((item) => ({ ...item })),
     };
     await this.appendAndPersist(threadId, [
       { kind: "response_item", payload: userMessage },

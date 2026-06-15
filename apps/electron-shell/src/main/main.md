@@ -25,6 +25,7 @@
 
 - `agent_server.health available=true` 到达后，runtime 才主动调用 `prewarmer.prepare()`；Swift 不发送 `thread_window.prepare`。
 - `theme.changed` command 必须同时调用 ThreadWindow prewarmer 和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。
+- ThreadWindow 预热时还要把当前只读 `availableSkills` 一并传给 prewarmer；这些技能由宿主本地 skill manifest 根目录（默认 `HANDAGENT_PLUGINS_DIR ?? ~/.spotAgent/plugins`）读取并保持只读，不经 agent-server 下发。
 - `prewarmAfterServerReadyPromise` 用来合并并发预热；改动预热流程时必须保持只发一次对应的 prepared / prepare_failed 结果。
 - visible ThreadWindow 关闭会先无缝替换 ActivityWindow 的 native window identity，再发 `thread_window.closed wasVisible=true`；如果窗口曾 prepared 且 agent-server 仍 available，runtime 会再次主动预热。
 - ActivityWindow 点击只尝试聚焦 visible ThreadWindow。没有可聚焦 ThreadWindow 时，main 不创建 PromptPanel，也不回告 Swift 打开 PromptPanel；native focus / native mouse down 兜底同样只做聚焦尝试。

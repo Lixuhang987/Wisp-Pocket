@@ -1,9 +1,10 @@
-import type { InitialPromptPayload } from "../protocol/threadProtocol.ts";
+import type { AvailableSkill, InitialPromptPayload } from "../protocol/threadProtocol.ts";
 
 declare global {
   interface Window {
     handAgentThreadWindowConfig?: {
       threadWebSocketURL?: string;
+      availableSkills?: AvailableSkill[];
     };
     handAgentReceiveInitialPrompt?: (payload: InitialPromptPayload) => void;
     handAgentPendingInitialPrompts?: InitialPromptPayload[];
@@ -12,6 +13,23 @@ declare global {
 
 export function getThreadWebSocketURL(): string {
   return window.handAgentThreadWindowConfig?.threadWebSocketURL ?? "ws://127.0.0.1:4317/api/thread";
+}
+
+export function getAvailableSkills(): AvailableSkill[] {
+  const skills = window.handAgentThreadWindowConfig?.availableSkills;
+  if (!Array.isArray(skills)) {
+    return [];
+  }
+  return skills
+    .filter((skill): skill is AvailableSkill => (
+      typeof skill === "object"
+      && skill !== null
+      && typeof skill.actionId === "string"
+      && typeof skill.title === "string"
+      && typeof skill.prompt === "string"
+      && (skill.description === undefined || typeof skill.description === "string")
+    ))
+    .map((skill) => ({ ...skill }));
 }
 
 export function installInitialPromptReceiver(handler: (payload: InitialPromptPayload) => void): () => void {

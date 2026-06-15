@@ -5,9 +5,19 @@ type HostTheme = {
   resolved: "light" | "dark";
 };
 
+type AvailableSkill = {
+  actionId: string;
+  title: string;
+  prompt: string;
+  description?: string;
+};
+
 declare global {
   interface Window {
-    handAgentThreadWindowConfig?: { threadWebSocketURL?: string };
+    handAgentThreadWindowConfig?: {
+      threadWebSocketURL?: string;
+      availableSkills?: AvailableSkill[];
+    };
     handAgentTheme?: HostTheme;
     handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
     handAgentPendingInitialPrompts?: unknown[];
@@ -18,6 +28,7 @@ declare global {
 const threadWebSocketURL = "ws://127.0.0.1:4317/api/thread";
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 let latestTheme = readInitialTheme();
+const availableSkills = readAvailableSkills();
 const themeHandlers = new Set<(theme: HostTheme) => void>();
 
 ipcRenderer.on("handagent:theme-changed", (_event: unknown, theme: HostTheme) => {
@@ -31,8 +42,8 @@ ipcRenderer.on("handagent:theme-changed", (_event: unknown, theme: HostTheme) =>
 });
 
 contextBridge.executeInMainWorld({
-  func: (url: string, theme: HostTheme) => {
-    window.handAgentThreadWindowConfig = { threadWebSocketURL: url };
+  func: (url: string, theme: HostTheme, skills: AvailableSkill[]) => {
+    window.handAgentThreadWindowConfig = { threadWebSocketURL: url, availableSkills: skills };
     window.handAgentTheme = theme;
     window.handAgentPendingInitialPrompts = Array.isArray(window.handAgentPendingInitialPrompts)
       ? window.handAgentPendingInitialPrompts
@@ -43,7 +54,7 @@ contextBridge.executeInMainWorld({
       };
     }
   },
-  args: [threadWebSocketURL, latestTheme],
+  args: [threadWebSocketURL, latestTheme, availableSkills],
 });
 
 contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (theme: HostTheme) => void) => {
@@ -72,9 +83,32 @@ function readInitialTheme(): HostTheme {
   }
 }
 
+function readAvailableSkills(): AvailableSkill[] {
+  const raw = process.argv.find((arg) => arg.startsWith("--handagent-available-skills="));
+  if (!raw) {
+    return [];
+  }
+  try {
+    const decoded = decodeURIComponent(raw.slice("--handagent-available-skills=".length));
+    const parsed = JSON.parse(decoded) as unknown;
+    return Array.isArray(parsed) ? parsed.filter(isAvailableSkill) : [];
+  } catch {
+    return [];
+  }
+}
+
 function isHostTheme(value: unknown): value is HostTheme {
   return typeof value === "object"
     && value !== null
     && ["light", "dark", "system"].includes((value as HostTheme).preference)
     && ["light", "dark"].includes((value as HostTheme).resolved);
+}
+
+function isAvailableSkill(value: unknown): value is AvailableSkill {
+  return typeof value === "object"
+    && value !== null
+    && typeof (value as AvailableSkill).actionId === "string"
+    && typeof (value as AvailableSkill).title === "string"
+    && typeof (value as AvailableSkill).prompt === "string"
+    && ((value as AvailableSkill).description === undefined || typeof (value as AvailableSkill).description === "string");
 }

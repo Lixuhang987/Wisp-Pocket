@@ -141,6 +141,7 @@ describe("ThreadWindow scroll containers", () => {
         threadId: "thread-1",
         connectionState: "connected",
         windowErrorMessage: null,
+        availableSkills: [],
         onSubmit: vi.fn(),
         onStop: vi.fn(),
         onRemoveQueuedInput: vi.fn(),

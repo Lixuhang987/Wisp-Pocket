@@ -176,6 +176,7 @@ export function agentMessagesToConversation(messages: AgentMessage[]): Conversat
       id,
       role: msg.role,
       text: typeof msg.content === "string" ? msg.content : "",
+      ...(msg.role === "user" && msg.inputItems ? { inputItems: msg.inputItems } : {}),
       status: "completed",
       createdAt: now,
       updatedAt: now,
@@ -276,6 +277,27 @@ export function summarizeUserInput(userInput: UserInput): string {
     }
   }).filter((part) => part.trim().length > 0);
   return parts.join("\n\n");
+}
+
+export function cloneInputItems(items: UserInput["items"]): UserInput["items"] {
+  return items.map((item) => {
+    switch (item.type) {
+      case "text":
+        return { type: "text", id: item.id, text: item.text };
+      case "image":
+        return { type: "image", id: item.id, mimeType: item.mimeType, base64: item.base64 };
+      case "skill":
+        return {
+          type: "skill",
+          id: item.id,
+          actionId: item.actionId,
+          title: item.title,
+          prompt: item.prompt,
+        };
+      case "text_selection":
+        return { type: "text_selection", id: item.id, text: item.text };
+    }
+  });
 }
 
 export function deriveTitle(text: string): string {

@@ -67,6 +67,7 @@ export type ThreadMessage = {
   id: string;
   role: "user" | "assistant" | "tool" | "system";
   text: string;
+  userInputItems?: InputItem[];
   pending?: boolean;
   toolName?: string;
   status?: string;
@@ -281,6 +282,7 @@ export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
             id: message.id,
             role: message.role,
             text: message.text,
+            ...(message.role === "user" && message.inputItems ? { userInputItems: message.inputItems.map(cloneInputItem) } : {}),
             status: message.status,
             toolName: message.toolCall?.name,
           }));
@@ -307,6 +309,7 @@ export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
             id: notification.payload.messageId,
             role: "user",
             text: notification.payload.text,
+            ...(notification.payload.items ? { userInputItems: notification.payload.items.map(cloneInputItem) } : {}),
           });
           break;
         }
