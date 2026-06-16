@@ -12,19 +12,20 @@
 | `windows/` | [windows/windows.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/windows/windows.md) | ThreadWindow hidden prewarm 与 ActivityWindow 控制器 |
 | `main.ts` | 无独立文档 | Electron process 入口，组装 bridge、runtime、supervisor、window controllers 和 IPC |
 | `electronShellRuntime.ts` | 无独立文档 | 可测试的 command / health / prewarm 状态机 |
+| `initialHostTheme.ts` | 无独立文档 | 解析 `HANDAGENT_INITIAL_THEME`，为 Electron window controllers 提供启动期 host theme 初值 |
 | `activityWindowIpc.ts` | 无独立文档 | 只接收 ActivityWindow renderer 发出的 `focusThread` IPC |
 | `macosBackgroundApp.ts` | 无独立文档 | macOS accessory activation policy 与 Dock 隐藏 |
 
 ## 运行时分层
 
-- `main.ts` 是组合根：读取 env、创建 `JsonLineBridge`、`AgentServerSupervisor`、`ThreadWindowPrewarmer`、`ActivityWindowController`，在 `app.whenReady()` 后应用 macOS 后台 activation policy，再把进程和窗口对象交给 `ElectronShellRuntime`。
+- `main.ts` 是组合根：读取 env、创建 `JsonLineBridge`、`AgentServerSupervisor`、`ThreadWindowPrewarmer`、`ActivityWindowController`，在 `app.whenReady()` 后应用 macOS 后台 activation policy，再把进程和窗口对象交给 `ElectronShellRuntime`。`HANDAGENT_INITIAL_THEME` 只作为启动期初值，必须经过 `initialHostTheme.ts` 校验后传给 window controllers。
 - `ElectronShellRuntime` 不直接 import Electron API；它只依赖 `prewarmer`、`activityWindow`、`send`、`stopSupervisor`、`quit` 这组接口，便于测试 command ack、health gate、ActivityWindow native focus 释放 / 点击兜底、host theme fan-out 和预热重入。
 - `activityWindowIpc.ts` 必须校验 IPC sender 等于当前 ActivityWindow `webContents`，并只接受 `string | null` thread id；不要让其他 renderer 能通过该 IPC 操作 main。
 
 ## 状态机前提
 
 - `agent_server.health available=true` 到达后，runtime 才主动调用 `prewarmer.prepare()`；Swift 不发送 `thread_window.prepare`。
-- `theme.changed` command 必须同时调用 ThreadWindow prewarmer 和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。
+- `theme.changed` command 必须同时调用 ThreadWindow prewarmer 和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。启动期同样使用 Swift 传入的 `{ preference, resolved }`，不要在 Electron main 固定 dark/light 或自行解析系统外观。
 - ThreadWindow 预热时还要把当前只读 `availableSkills` 一并传给 prewarmer；这些技能由宿主本地 skill manifest 根目录（默认 `HANDAGENT_PLUGINS_DIR ?? ~/.spotAgent/plugins`）读取并保持只读，不经 agent-server 下发。
 - `prewarmAfterServerReadyPromise` 用来合并并发预热；改动预热流程时必须保持只发一次对应的 prepared / prepare_failed 结果。
 - visible ThreadWindow 关闭会先无缝替换 ActivityWindow 的 native window identity，再发 `thread_window.closed wasVisible=true`；如果窗口曾 prepared 且 agent-server 仍 available，runtime 会再次主动预热。

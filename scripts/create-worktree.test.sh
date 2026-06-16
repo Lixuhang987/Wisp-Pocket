@@ -120,6 +120,7 @@ worktree_path="$REPO_ROOT/.worktrees/codegraph-flow"
 expected_log=$'git check-ignore -q .worktrees\n'
 expected_log+="git worktree add $worktree_path -b codex/codegraph-flow"$'\n'
 expected_log+="pnpm install cwd=$worktree_path"$'\n'
+expected_log+="pnpm --filter handagent-electron-shell exec electron --version cwd=$worktree_path"$'\n'
 expected_log+="codegraph init -i $worktree_path cwd=$worktree_path"$'\n'
 expected_log+="codegraph status $worktree_path cwd=$worktree_path"
 

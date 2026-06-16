@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+#
+# Maintenance rule:
+# To reduce useless context, successful build/setup checks in this script must
+# stay quiet and the final successful output must remain a single line. Future
+# changes should print captured logs only when a command fails.
 
 set -euo pipefail
 
@@ -103,6 +108,7 @@ run_quiet git -C "$repo_root" worktree add "$worktree_path" -b "$branch_name"
 cd "$worktree_path"
 
 run_quiet pnpm install
+run_quiet pnpm --filter handagent-electron-shell exec electron --version
 run_quiet codegraph init -i "$worktree_path"
 
 codegraph_status_log="$(mktemp -t "create-worktree-codegraph-status.XXXXXX")"

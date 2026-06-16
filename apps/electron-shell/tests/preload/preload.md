@@ -11,7 +11,8 @@
 
 ## 测试前提
 
-- 使用 `vi.doMock("electron", ...)` mock `contextBridge` / `ipcRenderer`，不加载真实 Electron。
+- preload 单测加载 `dist/preload/*.cjs` 产物，先运行 `pnpm --filter handagent-electron-shell build`。
+- 使用 Node module load mock 拦截 CJS `require("electron")`，注入 fake `contextBridge` / `ipcRenderer`，不加载真实 Electron。
 - ThreadWindow preload 测试要在 fake main world 中执行 `executeInMainWorld` 的 `func`，确认 globals 写入结果。
 - ThreadWindow 和 ActivityWindow preload 测试要覆盖 `additionalArguments` 里的初始 host theme fallback / parse、`handagent:theme-changed` payload 过滤、订阅前 latest theme 回放和 unsubscribe。
 - 新增 preload API 时，必须测试它没有暴露原始 `ipcRenderer` 或 Node/Electron 对象。

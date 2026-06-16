@@ -146,7 +146,7 @@ export function isSwiftToElectronCommand(value: unknown): value is SwiftToElectr
   }
 }
 
-function isHostTheme(value: unknown): value is HostTheme {
+export function isHostTheme(value: unknown): value is HostTheme {
   return isRecord(value)
     && (value.preference === "light" || value.preference === "dark" || value.preference === "system")
     && (value.resolved === "light" || value.resolved === "dark");

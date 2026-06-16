@@ -23,20 +23,25 @@ type Options = {
   threadWindowURL: string;
   preloadPath: string;
   availableSkills: AvailableSkill[];
+  initialTheme?: HostTheme;
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
   onClosed?: (event: ThreadWindowClosedEvent) => void;
 };
+
+const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 
 export class ThreadWindowPrewarmer {
   private window: BrowserWindowLike | null = null;
   private prepared = false;
   private visible = false;
-  private theme: HostTheme = { preference: "system", resolved: "light" };
+  private theme: HostTheme;
   private preparePromise: Promise<void> | null = null;
   private rejectPrepare: ((error: Error) => void) | null = null;
   private pendingThemeBroadcast = false;
 
-  constructor(private readonly options: Options) {}
+  constructor(private readonly options: Options) {
+    this.theme = options.initialTheme ?? fallbackTheme;
+  }
 
   async prepare(): Promise<void> {
     if (this.prepared) {

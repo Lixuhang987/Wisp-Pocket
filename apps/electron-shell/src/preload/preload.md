@@ -2,12 +2,14 @@
 
 `preload/` 是 Electron renderer 的能力边界。ThreadWindow 和 ActivityWindow 都在 `contextIsolation: true`、`nodeIntegration: false` 下运行，只能使用这里显式暴露的 globals。
 
+preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`。Electron main 必须把 `BrowserWindow.webPreferences.preload` 指向 `.cjs` 产物，避免 sandboxed renderer 不能加载 ESM `.js` preload 时丢失 `handAgentTheme` 和 theme subscription。
+
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `threadWindowPreload.ts` | 向 ThreadWindow main world 注入 `/api/thread` URL、`availableSkills`、host theme、theme change subscription、pending initial prompt 队列和临时 receiver |
-| `activityWindowPreload.ts` | 向 ActivityWindow main world 注入 `/api/activity` URL 和 host theme，并暴露 theme change subscription 与 `focusThread(threadId)` IPC |
+| `threadWindowPreload.cts` | 向 ThreadWindow main world 注入 `/api/thread` URL、`availableSkills`、host theme、theme change subscription、pending initial prompt 队列和临时 receiver |
+| `activityWindowPreload.cts` | 向 ActivityWindow main world 注入 `/api/activity` URL 和 host theme，并暴露 theme change subscription 与 `focusThread(threadId)` IPC |
 
 ## ThreadWindow preload
 
@@ -30,3 +32,4 @@
 - 不暴露 `ipcRenderer`、`require`、文件系统、process env 或任意 Node/Electron 对象。
 - 新增 renderer 能力必须是最小函数或只读 config，并在 main 侧做 sender / payload 校验。
 - 改 window global 名称时，必须同步更新对应 React renderer、`apps/thread-window-web` native config 测试，以及 `tests/preload/*`。
+- 改 preload 文件类型、输出路径或打包路径时，必须同时验证 `dist/preload/*.cjs` 和 packaged app 内 `Contents/Resources/ElectronShell/dist/preload/*.cjs`。

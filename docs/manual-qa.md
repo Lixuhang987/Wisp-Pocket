@@ -142,7 +142,7 @@
 ### ThreadWindow 与 StatusBubble 主题视觉重构
 
 - 完成日期：待实机 QA
-- 实现位置：`apps/thread-window-web/src/App.tsx`、`apps/thread-window-web/src/components/`、`apps/thread-window-web/src/styles/tailwind.css`、`apps/electron-shell/src/activity-window/`、`apps/electron-shell/src/preload/activityWindowPreload.ts`、`apps/electron-shell/src/main/electronShellRuntime.ts`、`apps/electron-shell/src/main/windows/activityWindowController.ts`
+- 实现位置：`apps/thread-window-web/src/App.tsx`、`apps/thread-window-web/src/components/`、`apps/thread-window-web/src/styles/tailwind.css`、`apps/electron-shell/src/activity-window/`、`apps/electron-shell/src/preload/activityWindowPreload.cts`、`apps/electron-shell/src/main/electronShellRuntime.ts`、`apps/electron-shell/src/main/windows/activityWindowController.ts`
 - 修复结论：ThreadWindow 保留左侧历史、右侧 workspace、消息列表、请求面板和 Composer 的现有布局与交互入口，视觉层改为 theme token 驱动的 surface、shadow、focus 和 reduced-motion 规则；StatusBubble 从固定深色改为接收 Electron host theme，初始创建和 `theme.changed` 都能同步到 ActivityWindow renderer。
 - 自动化验证：需执行 `pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`pnpm --filter handagent-electron-shell test`、`pnpm --filter handagent-electron-shell build`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
 - 手工回归步骤：
@@ -218,9 +218,9 @@
 ### 跨端主题 token 与 light/dark/system 同步验收
 
 - 完成日期：待实机 QA
-- 实现位置：`design/tokens.json`、`scripts/generate-theme-tokens.mjs`、`apps/desktop/Sources/AppServices/Appearance/`、`apps/desktop/Sources/Settings/AppearanceSettingsView.swift`、`apps/electron-shell/src/main/windows/threadWindowPrewarmer.ts`、`apps/electron-shell/src/main/windows/activityWindowController.ts`、`apps/electron-shell/src/preload/threadWindowPreload.ts`、`apps/electron-shell/src/preload/activityWindowPreload.ts`、`apps/thread-window-web/src/native/themeConfig.ts`、`apps/thread-window-web/src/styles/generated-theme.css`
-- 链路证明：本次失败边界定位为 Electron `BrowserWindow` 已创建但 renderer 尚未完成加载时收到 `theme.changed`；main 侧只更新内存 theme，没有在 `did-finish-load` / `loadFile` 完成后补发，preload 侧也没有缓存订阅前收到的 latest theme，导致 ThreadWindow 和 StatusBubble 可能停留在窗口创建时的旧 `additionalArguments` 主题。
-- 自动化前提：已执行 `pnpm test:theme-tokens`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`pnpm --filter handagent-electron-shell test`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 实现位置：`design/tokens.json`、`scripts/generate-theme-tokens.mjs`、`apps/desktop/Sources/AppServices/Appearance/`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/desktop/Sources/Settings/AppearanceSettingsView.swift`、`apps/electron-shell/src/main/main.ts`、`apps/electron-shell/src/main/initialHostTheme.ts`、`apps/electron-shell/src/main/windows/threadWindowPrewarmer.ts`、`apps/electron-shell/src/main/windows/activityWindowController.ts`、`apps/electron-shell/src/preload/threadWindowPreload.cts`、`apps/electron-shell/src/preload/activityWindowPreload.cts`、`apps/thread-window-web/src/native/themeConfig.ts`、`apps/thread-window-web/src/styles/generated-theme.css`
+- 链路证明：运行时失败边界曾定位为 ThreadWindow renderer preload 未生效：Swift `theme.changed` 回调触发且发送成功，Electron main 收到并调用 `threadWindow.updateTheme`，但 renderer snapshot 中 `window.handAgentTheme === null`、`handAgentSubscribeThemeChange === undefined`、`data-theme` 仍为 `light`。根因是 electron-shell 包为 ESM，preload 以 `.ts` 编译成 ESM `.js` 后，sandboxed Electron renderer 未可靠加载；修复为 `.cts` 源文件输出 CommonJS `.cjs`，Electron main 和 packaged app 均指向 `.cjs` preload。启动期主题还要求 Swift 通过 `HANDAGENT_INITIAL_THEME` 传当前真实 `{ preference, resolved }`，避免 Electron controller 在首个 `theme.changed` 前固定为浅色；该初值不能固定写 dark 后再同步纠偏。
+- 自动化前提：已执行 `pnpm test:theme-tokens`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`pnpm --filter handagent-electron-shell test`、`pnpm --filter handagent-electron-shell build`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`；打包验收前必须执行 `bash ./scripts/package-app.sh` 并确认 `dist/HandAgentDesktop.app/Contents/Resources/ElectronShell/dist/preload/*.cjs` 存在，`dist/.../main/main.js` 指向 `.cjs`。
 - 手工回归步骤：
   1. 执行 `bash ./scripts/swiftw run HandAgentDesktop`，确认启动前会运行 `pnpm generate:theme-tokens`，且生成文件无 diff。
   2. 打开 Swift Settings → 外观，依次选择 `浅色`、`深色`、`跟随系统`。
@@ -228,6 +228,8 @@
   4. 退出并重新启动桌面 App，确认 `~/.spotAgent/settings.json` 中的 `appearance.themePreference` 被保留，Electron ThreadWindow 首次创建时使用同一偏好解析后的主题。
   5. 切换回 `跟随系统` 后修改 macOS 系统外观，确认 Swift 重新解析并下发 `light` / `dark`，已打开的 ThreadWindow 跟随变化。
   6. 启动后立刻连续切换浅色 / 深色，同时观察正在创建或刚出现的 ThreadWindow 与 StatusBubble；确认两者最终都落到最后一次选择的 resolved theme，不需要关闭重开。
+  7. 退出并从当前 worktree 的 `dist/HandAgentDesktop.app` 重新启动，确认 Electron 首次创建 ThreadWindow 时已注入当前持久化主题，不再固定回到浅色。
+  8. 切到浅色主题后再次退出并重启，确认 Electron 首次创建 ThreadWindow 和 StatusBubble 时保持浅色，不出现固定 dark 后再同步回浅色的闪烁。
 - 边界确认：React 不写主题偏好，不使用 `localStorage` 持久化主题；`tailwind.config.js` 不存在；Swift Theme 不再维护手写 color literal token 源。
 
 ### SwiftUI 启动阶段外观监听不崩溃

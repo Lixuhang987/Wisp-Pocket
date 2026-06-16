@@ -14,11 +14,11 @@
 
 - `main/` 可以使用 Electron main API、Node API 和 stdio，但不直接 import 或 new `AgentRuntime`、`ToolRegistry`、`LLMClient` 等 core runtime 对象。
 - `main/` 除窗口和 supervisor 编排外，还负责从本地 skill manifest 根目录（默认 `HANDAGENT_PLUGINS_DIR ?? ~/.spotAgent/plugins`）读取配置，把启用项汇总为只读 `availableSkills` 并随 ThreadWindow preload 注入 renderer。
-- `preload/` 是 renderer 能力边界，只能通过 `contextBridge` 暴露显式字段或 IPC 方法；不要开启 `nodeIntegration`，不要把 `ipcRenderer` 原样暴露出去。
+- `preload/` 是 renderer 能力边界，只能通过 `contextBridge` 暴露显式字段或 IPC 方法；源文件使用 `.cts`，构建产物是 Electron sandbox renderer 可加载的 CommonJS `.cjs`；不要开启 `nodeIntegration`，不要把 `ipcRenderer` 原样暴露出去。
 - `activity-window/` 是 browser/React 代码，只消费 `AgentActivityEvent`；不要在这里连接 `/api/thread`、解析完整 thread 消息或调用 Electron API。
 - ThreadWindow renderer 复用 `apps/thread-window-web`，不在本目录复制 ThreadWindow React UI。
 
 ## 验证
 
 - 改 main、preload、ActivityWindow renderer 任一目录后，至少运行 `pnpm --filter handagent-electron-shell test`。
-- 改 main/preload 或 package 路径后，还要运行 `pnpm --filter handagent-electron-shell build`，确认 `dist/main/main.js` 与 preload 输出存在。
+- 改 main/preload 或 package 路径后，还要运行 `pnpm --filter handagent-electron-shell build`，确认 `dist/main/main.js` 与 `dist/preload/*.cjs` 输出存在。

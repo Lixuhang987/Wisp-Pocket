@@ -7,7 +7,7 @@ describe("ThreadWindowPrewarmer", () => {
     const window = new FakeBrowserWindow();
     const prewarmer = new ThreadWindowPrewarmer({
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
-      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.js",
+      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
       availableSkills: [],
       createWindow: (options) => {
         expect(options.show).toBe(false);
@@ -30,7 +30,7 @@ describe("ThreadWindowPrewarmer", () => {
     const window = new FakeBrowserWindow();
     const prewarmer = new ThreadWindowPrewarmer({
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
-      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.js",
+      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
       availableSkills: [],
       createWindow: (options) => {
         expect(options.webPreferences?.additionalArguments).toContain(
@@ -41,6 +41,26 @@ describe("ThreadWindowPrewarmer", () => {
     });
 
     await prewarmer.updateTheme({ preference: "system", resolved: "dark" });
+    const prepared = prewarmer.prepare();
+    window.webContents.emit("did-finish-load");
+    await prepared;
+  });
+
+  it("passes the initial theme to the first created window", async () => {
+    const window = new FakeBrowserWindow();
+    const prewarmer = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
+      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
+      availableSkills: [],
+      initialTheme: { preference: "light", resolved: "light" },
+      createWindow: (options) => {
+        expect(options.webPreferences?.additionalArguments).toContain(
+          `--handagent-theme=${encodeURIComponent(JSON.stringify({ preference: "light", resolved: "light" }))}`,
+        );
+        return window;
+      },
+    });
+
     const prepared = prewarmer.prepare();
     window.webContents.emit("did-finish-load");
     await prepared;

@@ -16,6 +16,7 @@ import { ActivityWindowController } from "./windows/activityWindowController.js"
 import { ThreadWindowPrewarmer } from "./windows/threadWindowPrewarmer.js";
 import { configureMacOSBackgroundApp } from "./macosBackgroundApp.js";
 import { readAvailableSkillsFromPluginsDirectory } from "./availableSkills.js";
+import { readInitialHostTheme } from "./initialHostTheme.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = process.env.HANDAGENT_REPO_ROOT ?? resolve(currentDir, "../../../..");
@@ -23,10 +24,11 @@ const pluginsDirectory = process.env.HANDAGENT_PLUGINS_DIR ?? join(homedir(), ".
 const nodePath = process.env.HANDAGENT_NODE_PATH ?? "node";
 const threadWindowURL =
   process.env.HANDAGENT_THREAD_WINDOW_WEB_URL ?? "http://127.0.0.1:4317/thread-window/index.html";
-const threadPreloadPath = join(currentDir, "../preload/threadWindowPreload.js");
+const threadPreloadPath = join(currentDir, "../preload/threadWindowPreload.cjs");
 const activityWindowHTMLPath = join(currentDir, "../activity-window/index.html");
-const activityPreloadPath = join(currentDir, "../preload/activityWindowPreload.js");
+const activityPreloadPath = join(currentDir, "../preload/activityWindowPreload.cjs");
 const commandSocketPath = process.env.HANDAGENT_ELECTRON_COMMAND_SOCKET;
+const initialTheme = readInitialHostTheme(process.env.HANDAGENT_INITIAL_THEME);
 
 const bridge = new JsonLineBridge({ input: process.stdin, output: process.stdout });
 let commandSocketServer: CommandSocketServer | null = null;
@@ -45,6 +47,7 @@ const prewarmer = new ThreadWindowPrewarmer({
   threadWindowURL,
   preloadPath: threadPreloadPath,
   availableSkills: readAvailableSkillsFromPluginsDirectory(pluginsDirectory),
+  initialTheme,
   onClosed: (event) => {
     if (hasStoppedSupervisor) {
       return;
@@ -71,6 +74,7 @@ const prewarmer = new ThreadWindowPrewarmer({
 const activityWindow = new ActivityWindowController({
   activityWindowHTMLPath,
   preloadPath: activityPreloadPath,
+  initialTheme,
   createWindow: (options) => new BrowserWindow(options),
   screenProvider: {
     getPrimaryWorkArea: () => screen.getPrimaryDisplay().workArea,

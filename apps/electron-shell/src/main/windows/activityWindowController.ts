@@ -21,6 +21,7 @@ type ScreenProvider = {
 type Options = {
   activityWindowHTMLPath: string;
   preloadPath: string;
+  initialTheme?: HostTheme;
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
   screenProvider: ScreenProvider;
   onRendererCrashed?: (reason: string) => void;
@@ -31,15 +32,18 @@ type Options = {
 const ACTIVITY_WINDOW_WIDTH = 272;
 const ACTIVITY_WINDOW_HEIGHT = 76;
 const ACTIVITY_WINDOW_MARGIN = 24;
+const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 
 export class ActivityWindowController {
   private window: BrowserWindowLike | null = null;
   private hasLoaded = false;
-  private theme: HostTheme = { preference: "system", resolved: "light" };
+  private theme: HostTheme;
   private replacementPromise: Promise<void> | null = null;
   private pendingThemeBroadcast = false;
 
-  constructor(private readonly options: Options) {}
+  constructor(private readonly options: Options) {
+    this.theme = options.initialTheme ?? fallbackTheme;
+  }
 
   async show(): Promise<void> {
     if (this.replacementPromise) {

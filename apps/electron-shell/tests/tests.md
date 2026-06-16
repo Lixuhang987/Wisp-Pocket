@@ -1,6 +1,6 @@
 # tests
 
-`apps/electron-shell/tests` 是 Electron shell 的 Vitest 测试集合。测试按源码职责分组，运行在 Node test environment；Electron API 通过 fake objects 或 `vi.doMock("electron", ...)` 注入。
+`apps/electron-shell/tests` 是 Electron shell 的 Vitest 测试集合。测试按源码职责分组，运行在 Node test environment；Electron API 通过 fake objects、`vi.doMock("electron", ...)` 或 Node CJS module load mock 注入。
 
 ## 直接子节点
 
@@ -32,6 +32,6 @@ pnpm --filter handagent-electron-shell exec vitest run tests/windows/threadWindo
 
 - 新增 `src/main/*` 行为时，优先把 Electron API 抽成 fakeable interface，避免启动真实 Electron。
 - 新增 Swift bridge command/event 时，必须同时覆盖 protocol parser/encoder 和 runtime ack 语义。
-- 新增 preload global 时，使用 `vi.doMock("electron", ...)` 验证 `contextBridge` 调用，不依赖真实 renderer。
+- 新增 preload global 时，验证 `contextBridge` 调用，不依赖真实 renderer；测试 `.cjs` preload 产物时要在 Node module load 层 mock `require("electron")`，因为 `vi.doMock("electron", ...)` 不会拦截 CJS `require`。
 - 新增 supervisor 行为时，覆盖用户主动 stop、readiness late resolve、非零退出 restart、最大重启次数四类边界。
 - ActivityWindow renderer 测试只验证 `/api/activity` 和 UI state，不引入 `/api/thread` fixture。

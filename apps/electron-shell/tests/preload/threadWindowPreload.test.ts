@@ -1,4 +1,8 @@
+import { createRequire } from "node:module";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const nodeRequire = createRequire(import.meta.url);
+const preloadPath = nodeRequire.resolve("../../dist/preload/threadWindowPreload.cjs");
 
 type MainWorldScript = {
   func: (url: string, theme: HostTheme, skills: Array<{ actionId: string; title: string; prompt: string; description?: string }>) => void;
@@ -24,6 +28,7 @@ type ThreadWindowGlobals = {
 describe("threadWindowPreload", () => {
   beforeEach(() => {
     vi.resetModules();
+    delete nodeRequire.cache[preloadPath];
     delete (globalThis as { window?: ThreadWindowGlobals }).window;
     process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-theme="));
   });
@@ -33,9 +38,9 @@ describe("threadWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer: createIpcRendererMock() }));
-
-    await import("../../src/preload/threadWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => {
+      nodeRequire(preloadPath);
+    });
 
     expect(contextBridge.executeInMainWorld).toHaveBeenCalledTimes(1);
     const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
@@ -60,9 +65,9 @@ describe("threadWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer: createIpcRendererMock() }));
-
-    await import("../../src/preload/threadWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => {
+      nodeRequire(preloadPath);
+    });
 
     const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
     const receiver = vi.fn();
@@ -85,10 +90,10 @@ describe("threadWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer: createIpcRendererMock() }));
     process.argv.push(`--handagent-theme=${encodeURIComponent(JSON.stringify({ preference: "dark", resolved: "dark" }))}`);
-
-    await import("../../src/preload/threadWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => {
+      nodeRequire(preloadPath);
+    });
 
     const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
     const mainWorld: ThreadWindowGlobals = {};
@@ -104,12 +109,12 @@ describe("threadWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer: createIpcRendererMock() }));
     process.argv.push(`--handagent-available-skills=${encodeURIComponent(JSON.stringify([
       { actionId: "review/code", title: "Review", prompt: "Review this code" },
     ]))}`);
-
-    await import("../../src/preload/threadWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => {
+      nodeRequire(preloadPath);
+    });
 
     const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
     const mainWorld: ThreadWindowGlobals = {};
@@ -128,9 +133,9 @@ describe("threadWindowPreload", () => {
       exposeInMainWorld: vi.fn(),
     };
     const ipcRenderer = createIpcRendererMock();
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
-
-    await import("../../src/preload/threadWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer }, () => {
+      nodeRequire(preloadPath);
+    });
 
     const exposed = contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === "handAgentSubscribeThemeChange")?.[1] as
       | ((handler: (theme: HostTheme) => void) => () => void)
@@ -155,9 +160,9 @@ describe("threadWindowPreload", () => {
       exposeInMainWorld: vi.fn(),
     };
     const ipcRenderer = createIpcRendererMock();
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
-
-    await import("../../src/preload/threadWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer }, () => {
+      nodeRequire(preloadPath);
+    });
     ipcRenderer.emit("handagent:theme-changed", {}, { preference: "dark", resolved: "dark" });
 
     const exposed = contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === "handAgentSubscribeThemeChange")?.[1] as
@@ -186,4 +191,20 @@ function createIpcRendererMock() {
       }
     },
   };
+}
+
+function withElectronMock(mock: unknown, run: () => void): void {
+  const moduleAny = nodeRequire("node:module") as { _load: typeof nodeRequire };
+  const originalLoad = moduleAny._load;
+  moduleAny._load = ((request: string, parent: unknown, isMain: boolean) => {
+    if (request === "electron") {
+      return mock;
+    }
+    return originalLoad(request, parent, isMain);
+  }) as typeof originalLoad;
+  try {
+    run();
+  } finally {
+    moduleAny._load = originalLoad;
+  }
 }
