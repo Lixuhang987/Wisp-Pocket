@@ -1,8 +1,7 @@
 // apps/thread-window-web/src/components/WorkspaceGroup.tsx
 import * as Accordion from '@radix-ui/react-accordion';
 import type { ThreadListEntry } from '../protocol/threadProtocol.ts';
-import { cn } from '../utils/cn.ts';
-import { createThreadWindowStore } from '../store/threadWindowStore.ts';
+import { ThreadItem } from './ThreadItem.tsx';
 
 interface WorkspaceGroupProps {
   workspace: { id: string; name: string; rootPath: string };
@@ -28,32 +27,9 @@ export function WorkspaceGroup({
       <Accordion.Header>
         <Accordion.Trigger
           onClick={onToggle}
-          className="group flex w-full items-center gap-2 rounded-lg px-sm py-1.5 text-left text-xs text-app-text-primary transition-colors duration-200 hover:bg-app-surface-soft focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
+          className="group flex w-full items-center gap-2 rounded-lg px-sm py-1.5 text-left text-xs text-app-text-primary transition-colors duration-200 hover:text-app-text-primary focus:outline-none"
         >
-          {/* 文件夹图标 */}
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            className="flex-shrink-0 text-app-text-secondary"
-            aria-hidden="true"
-          >
-            {isExpanded ? (
-              <path
-                d="M2 3.5C2 2.67157 2.67157 2 3.5 2H5.5L6.5 3.5H10.5C11.3284 3.5 12 4.17157 12 5V10C12 10.8284 11.3284 11.5 10.5 11.5H3.5C2.67157 11.5 2 10.8284 2 10V3.5Z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-            ) : (
-              <path
-                d="M2 3.5C2 2.67157 2.67157 2 3.5 2H5.5L6.5 3.5H10.5C11.3284 3.5 12 4.17157 12 5V10C12 10.8284 11.3284 11.5 10.5 11.5H3.5C2.67157 11.5 2 10.8284 2 10V3.5Z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-            )}
-          </svg>
+          <FolderIcon isExpanded={isExpanded} />
 
           <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
 
@@ -119,101 +95,33 @@ export function WorkspaceGroup({
   );
 }
 
-// ThreadItem 组件
-interface ThreadItemProps {
-  thread: ThreadListEntry;
-  isActive: boolean;
-  onOpen: () => void;
-  onDelete: () => void;
-}
-
-function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemProps) {
-  const threadsById = createThreadWindowStore((state) => state.threadsById);
-  const threadState = threadsById[thread.id];
-  const isRunning = threadState?.status === 'running';
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onOpen();
-    }
-  };
-
-  const formatRelativeTime = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffHours < 1) return '刚刚';
-    if (diffHours < 24) return `${diffHours}小时`;
-    if (diffDays < 7) return `${diffDays}天`;
-    return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
-  };
-
+function FolderIcon({ isExpanded }: { isExpanded: boolean }) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={handleKeyDown}
-      className={cn(
-        'group flex items-center gap-xs rounded-lg px-sm py-1.5 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-app-accent-ring',
-        isActive
-          ? 'bg-app-canvas'
-          : 'hover:bg-app-surface-soft/80'
-      )}
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 15 15"
+      className="flex-shrink-0 text-app-text-secondary"
+      aria-hidden="true"
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-1.5">
-          <span className="truncate text-[13px] font-medium text-app-text-primary">
-            {thread.preview || '新对话'}
-          </span>
-          <span className="flex-shrink-0 text-[10px] text-app-text-secondary">
-            {formatRelativeTime(new Date(thread.updatedAt))}
-          </span>
-        </div>
-      </div>
-
-      {/* 运行状态指示器 */}
-      {isRunning && (
-        <div
-          className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
-          aria-label="运行中"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" className="animate-spin text-app-accent">
-            <circle
-              cx="6"
-              cy="6"
-              r="4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              fill="none"
-              strokeDasharray="6 18"
-              strokeLinecap="round"
-            />
-          </svg>
-        </div>
+      {isExpanded ? (
+        <path
+          d="M1.75 6.25H4.8C5.25 6.25 5.66 5.99 5.85 5.59L6.25 4.75H12.5C13 4.75 13.36 5.23 13.22 5.71L11.82 10.71C11.64 11.34 11.07 11.78 10.42 11.78H3.44C2.78 11.78 2.2 11.33 2.03 10.69L1.35 8.16C1.1 7.2 1.82 6.25 2.81 6.25H4.8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : (
+        <path
+          d="M1.75 4.25C1.75 3.56 2.31 3 3 3H5.2L6.3 4.35H12C12.69 4.35 13.25 4.91 13.25 5.6V10.5C13.25 11.19 12.69 11.75 12 11.75H3C2.31 11.75 1.75 11.19 1.75 10.5V4.25Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinejoin="round"
+        />
       )}
-
-      {/* 删除按钮 */}
-      <button
-        onClick={(event) => {
-          event.stopPropagation();
-          onDelete();
-        }}
-        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-app-text-secondary opacity-0 transition-all duration-200 group-hover:opacity-70 hover:!opacity-100 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-2 focus:ring-app-accent-ring"
-        aria-label="删除对话"
-      >
-        <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true">
-          <path
-            d="M3 3L11 11M11 3L3 11"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
-    </div>
+    </svg>
   );
 }
