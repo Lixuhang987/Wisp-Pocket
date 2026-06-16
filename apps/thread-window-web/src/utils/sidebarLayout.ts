@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export type ThreadWindowSidebarLayout = {
   isSidebarVisible: boolean;
   sidebarWidth: number;
@@ -29,4 +31,17 @@ export function getThreadWindowSidebarLayout(windowWidth: number): ThreadWindowS
     sidebarWidth,
     gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)`,
   };
+}
+
+export function useSidebarLayout(): ThreadWindowSidebarLayout {
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return getThreadWindowSidebarLayout(windowWidth);
 }

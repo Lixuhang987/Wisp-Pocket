@@ -3,14 +3,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ThreadWindowState } from "../src/store/threadWindowStore.ts";
-import type { ThreadListEntry } from "../src/protocol/threadProtocol.ts";
 
 const timestamp = "2026-06-09T00:00:00.000Z";
 
 const mockState: Pick<
   ThreadWindowState,
-  "workspaces" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded" | "threadsById"
+  "history" | "workspaces" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded" | "threadsById"
 > = {
+  history: [],
   workspaces: [
     {
       id: "workspace-1",
@@ -33,6 +33,7 @@ const { HistorySidebar } = await import("../src/components/HistorySidebar.tsx");
 
 describe("HistorySidebar", () => {
   beforeEach(() => {
+    mockState.history = [];
     mockState.workspaces = [
       {
         id: "workspace-1",
@@ -50,7 +51,6 @@ describe("HistorySidebar", () => {
   it("provides Radix Accordion context for workspace groups", () => {
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        history: [],
         activeThreadId: null,
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
@@ -70,7 +70,7 @@ describe("HistorySidebar", () => {
       { id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
     ];
     mockState.expandedWorkspaceIds = new Set(["tmp", "qa-workspace", "handagent-test"]);
-    const history: ThreadListEntry[] = [
+    mockState.history = [
       {
         id: "thread-default",
         preview: "default conversation",
@@ -83,7 +83,6 @@ describe("HistorySidebar", () => {
 
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        history,
         activeThreadId: null,
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
@@ -105,7 +104,7 @@ describe("HistorySidebar", () => {
   });
 
   it("marks the active thread without selected border or background styling", () => {
-    const history: ThreadListEntry[] = [
+    mockState.history = [
       {
         id: "thread-default",
         preview: "default conversation",
@@ -118,7 +117,6 @@ describe("HistorySidebar", () => {
 
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        history,
         activeThreadId: "thread-default",
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
@@ -159,7 +157,7 @@ describe("HistorySidebar", () => {
         errorMessage: null,
       },
     };
-    const history: ThreadListEntry[] = [
+    mockState.history = [
       {
         id: "thread-workspace",
         preview: "workspace conversation",
@@ -180,7 +178,6 @@ describe("HistorySidebar", () => {
 
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        history,
         activeThreadId: null,
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
@@ -193,7 +190,7 @@ describe("HistorySidebar", () => {
   });
 
   it("switches folder icon shapes between collapsed and expanded workspace states", () => {
-    const history: ThreadListEntry[] = [
+    mockState.history = [
       {
         id: "thread-workspace",
         preview: "workspace conversation",
@@ -207,7 +204,6 @@ describe("HistorySidebar", () => {
     mockState.expandedWorkspaceIds = new Set(["workspace-1"]);
     const expandedHtml = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        history,
         activeThreadId: null,
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
@@ -218,7 +214,6 @@ describe("HistorySidebar", () => {
     mockState.expandedWorkspaceIds = new Set();
     const collapsedHtml = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        history,
         activeThreadId: null,
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),

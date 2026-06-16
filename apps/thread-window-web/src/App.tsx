@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HistorySidebar } from "./components/HistorySidebar.tsx";
 import { ThreadWorkspacePane } from "./components/ThreadWorkspacePane.tsx";
-import { getAvailableSkills, getThreadWebSocketURL, installInitialPromptReceiver } from "./native/nativeConfig.ts";
+import { getThreadWebSocketURL, installInitialPromptReceiver } from "./native/nativeConfig.ts";
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "./native/themeConfig.ts";
 import {
   encodePermissionAnswer,
@@ -12,7 +12,7 @@ import {
 } from "./protocol/threadProtocol.ts";
 import { createThreadWindowStore } from "./store/threadWindowStore.ts";
 import { ThreadSocketClient } from "./thread/threadSocketClient.ts";
-import { getThreadWindowSidebarLayout } from "./utils/sidebarLayout.ts";
+import { useSidebarLayout } from "./utils/sidebarLayout.ts";
 
 function now() {
   return new Date().toISOString();
@@ -24,13 +24,11 @@ function id(prefix: string) {
 
 export function App() {
   const state = createThreadWindowStore();
-  const availableSkills = getAvailableSkills();
   const threads = Object.values(state.threadsById);
   const clientRef = useRef<ThreadSocketClient | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [deleteTargetThreadId, setDeleteTargetThreadId] = useState<string | null>(null);
-  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
-  const sidebarLayout = getThreadWindowSidebarLayout(windowWidth);
+  const sidebarLayout = useSidebarLayout();
   const queuedDispatchKey = threads
     .map((thread) => [
       thread.threadId,
@@ -76,13 +74,6 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
     if (state.connectionState !== "connected") {
       return;
     }
@@ -116,7 +107,6 @@ export function App() {
     >
       {sidebarLayout.isSidebarVisible ? (
         <HistorySidebar
-          history={state.history}
           activeThreadId={activeThreadId}
           onOpenThread={(threadId) => {
             createThreadWindowStore.getState().ensureThreadState(threadId);
@@ -132,9 +122,6 @@ export function App() {
       <section className="relative min-h-0 min-w-0 overflow-hidden">
         <ThreadWorkspacePane
           threadId={activeThreadId}
-          connectionState={state.connectionState}
-          windowErrorMessage={state.windowErrorMessage}
-          availableSkills={availableSkills}
           onSubmit={(threadId, userInput) => {
             const latestThread = createThreadWindowStore.getState().threadsById[threadId];
             if (!latestThread) {
@@ -166,7 +153,7 @@ export function App() {
           }}
           onStop={(threadId) => {
             const latestThread = createThreadWindowStore.getState().threadsById[threadId];
-            if (state.connectionState !== "connected" || latestThread?.status !== "running") {
+            if (createThreadWindowStore.getState().connectionState !== "connected" || latestThread?.status !== "running") {
               return;
             }
             clientRef.current?.submitOp(threadId, {
