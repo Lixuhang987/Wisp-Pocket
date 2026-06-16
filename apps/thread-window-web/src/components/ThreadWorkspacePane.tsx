@@ -2,15 +2,13 @@ import { useRef, useState } from "react";
 import { Composer } from "./Composer.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { RequestPanels } from "./RequestPanels.tsx";
-import type { AvailableSkill, InputItem, UserInput } from "../protocol/threadProtocol.ts";
-import { createThreadWindowStore, type ConnectionState } from "../store/threadWindowStore.ts";
+import type { InputItem, UserInput } from "../protocol/threadProtocol.ts";
+import { createThreadWindowStore } from "../store/threadWindowStore.ts";
 import { createEmptyComposerItems } from "./Composer.tsx";
+import { getAvailableSkills } from "../native/nativeConfig.ts";
 
 type ThreadWorkspacePaneProps = {
   threadId: string | null;
-  connectionState: ConnectionState;
-  windowErrorMessage: string | null;
-  availableSkills: AvailableSkill[];
   onSubmit(threadId: string, input: UserInput): void;
   onStop(threadId: string): void;
   onRemoveQueuedInput(threadId: string, index: number): void;
@@ -20,9 +18,6 @@ type ThreadWorkspacePaneProps = {
 
 export function ThreadWorkspacePane({
   threadId,
-  connectionState,
-  windowErrorMessage,
-  availableSkills,
   onSubmit,
   onStop,
   onRemoveQueuedInput,
@@ -31,6 +26,9 @@ export function ThreadWorkspacePane({
 }: ThreadWorkspacePaneProps) {
   const defaultComposerItemsRef = useRef<Record<string, InputItem[]>>({});
   const [composerItemsByThread, setComposerItemsByThread] = useState<Record<string, InputItem[]>>({});
+  const connectionState = createThreadWindowStore((s) => s.connectionState);
+  const windowErrorMessage = createThreadWindowStore((s) => s.windowErrorMessage);
+  const availableSkills = getAvailableSkills();
   const state = createThreadWindowStore();
   const liveState = createThreadWindowStore.getState();
   const thread = threadId

@@ -2,12 +2,10 @@ import { useMemo } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { createThreadWindowStore } from '../store/threadWindowStore.ts';
 import { groupThreadsByWorkspace } from '../utils/groupThreads.ts';
-import type { ThreadListEntry } from '../protocol/threadProtocol.ts';
 import { ThreadItem } from './ThreadItem.tsx';
 import { WorkspaceGroup } from './WorkspaceGroup.tsx';
 
 interface HistorySidebarProps {
-  history: ThreadListEntry[];
   activeThreadId: string | null;
   onOpenThread: (threadId: string) => void;
   onDeleteThread: (threadId: string) => void;
@@ -15,12 +13,12 @@ interface HistorySidebarProps {
 }
 
 export function HistorySidebar({
-  history,
   activeThreadId,
   onOpenThread,
   onDeleteThread,
   onNewThread,
 }: HistorySidebarProps) {
+  const history = createThreadWindowStore((state) => state.history);
   const workspaces = createThreadWindowStore((state) => state.workspaces);
   const searchQuery = createThreadWindowStore((state) => state.searchQuery);
   const expandedWorkspaceIds = createThreadWindowStore((state) => state.expandedWorkspaceIds);

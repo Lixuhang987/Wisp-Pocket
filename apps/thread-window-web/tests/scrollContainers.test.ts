@@ -72,7 +72,6 @@ describe("ThreadWindow scroll containers", () => {
   it("keeps the history chrome fixed while only the thread list scrolls", () => {
     const html = render(
       React.createElement(HistorySidebar, {
-        history: [],
         activeThreadId: null,
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
@@ -139,9 +138,6 @@ describe("ThreadWindow scroll containers", () => {
     const html = render(
       React.createElement(ThreadWorkspacePane, {
         threadId: "thread-1",
-        connectionState: "connected",
-        windowErrorMessage: null,
-        availableSkills: [],
         onSubmit: vi.fn(),
         onStop: vi.fn(),
         onRemoveQueuedInput: vi.fn(),
