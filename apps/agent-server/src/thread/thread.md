@@ -35,7 +35,7 @@ sequenceDiagram
   Manager->>Agent: tx_sub.send(op)
   Agent->>Orchestrator: submitInput(UserInput) / interruptAndWait(Interrupt)
   Orchestrator->>Orchestrator: persist user message
-  Orchestrator-->>Publisher: user.message.recorded
+  Orchestrator-->>Publisher: user.message.recorded (text + items?)
   Orchestrator-->>Publisher: turn.started
   Orchestrator->>Runtime: runWithMessages(history)
   Runtime-->>Orchestrator: AgentRuntimeEvent / result
@@ -65,6 +65,7 @@ sequenceDiagram
 
 - 用户打开历史 thread，或初始 prompt 建立 thread 后需要拉取初始状态时，React 发送 `thread.resume(threadId)`。
 - `thread.resume` 的结果是 `thread.snapshot`，携带当前 `messages` 与 `status`。
+- `thread.snapshot` 里的 user message 现在还会保留可选 `inputItems`，让 ThreadWindow 在恢复历史 thread 时继续按 image / skill / text_selection / text 的结构渲染用户输入。
 - 如果 thread 当前未运行，router 会在返回 snapshot 前尝试恢复重启前的半截 turn，避免历史只停在 user message。
 
 ### 连接与通知分发
@@ -79,6 +80,7 @@ sequenceDiagram
 
 - runtime 回调落通知或持久化前都要检查当前 generation；被中断或超时清理的旧 run 的晚到 delta / tool result / error 不得污染当前状态。
 - runtime 结果通过 `persistRunDelta` 追加 generated messages、`turn_context` 审计和已推送的 `event_msg` notification，避免覆盖运行期间已有消息。
+- `persistUserInput()` 在保存用户输入时同时落盘扁平 `content` 与结构化 `inputItems`；`user.message.recorded` live 通知也带同一份 `items?`，保证 live UI 与 snapshot round-trip 一致。
 - 每轮 runtime 使用稳定输入快照；后续若接入内部 response item / 子 agent 通信，active run 准备阶段收到的内部队列项只进入后续 follow-up，不会被当前 runtime 和 follow-up 重复处理。
 
 ### 中断与重启恢复

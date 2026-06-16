@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { HistorySidebar } from "./components/HistorySidebar.tsx";
 import { ThreadWorkspacePane } from "./components/ThreadWorkspacePane.tsx";
-import { getThreadWebSocketURL, installInitialPromptReceiver } from "./native/nativeConfig.ts";
+import { getAvailableSkills, getThreadWebSocketURL, installInitialPromptReceiver } from "./native/nativeConfig.ts";
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "./native/themeConfig.ts";
 import {
   encodePermissionAnswer,
@@ -24,6 +24,7 @@ function id(prefix: string) {
 
 export function App() {
   const state = createThreadWindowStore();
+  const availableSkills = getAvailableSkills();
   const threads = Object.values(state.threadsById);
   const clientRef = useRef<ThreadSocketClient | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -133,6 +134,7 @@ export function App() {
           threadId={activeThreadId}
           connectionState={state.connectionState}
           windowErrorMessage={state.windowErrorMessage}
+          availableSkills={availableSkills}
           onSubmit={(threadId, userInput) => {
             const latestThread = createThreadWindowStore.getState().threadsById[threadId];
             if (!latestThread) {

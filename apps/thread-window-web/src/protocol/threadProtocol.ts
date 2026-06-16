@@ -23,6 +23,13 @@ export type InitialPromptPayload = {
   userInput: UserInput;
 };
 
+export type AvailableSkill = {
+  actionId: string;
+  title: string;
+  prompt: string;
+  description?: string;
+};
+
 export function encodeThreadStart(input: {
   commandId: string;
   timestamp: string;
@@ -165,7 +172,8 @@ export function isThreadNotification(value: unknown): value is ThreadNotificatio
         && hasThreadId(value)
         && isRecord(value.payload)
         && typeof value.payload.messageId === "string"
-        && typeof value.payload.text === "string";
+        && typeof value.payload.text === "string"
+        && isOptionalInputItems(value.payload.items);
     case "turn.started":
       return hasNotificationBase(value)
         && hasThreadId(value)
@@ -293,6 +301,7 @@ function isConversationMessage(value: unknown): boolean {
     && typeof value.id === "string"
     && isConversationMessageRole(value.role)
     && typeof value.text === "string"
+    && isOptionalInputItems(value.inputItems)
     && isConversationMessageStatus(value.status)
     && typeof value.createdAt === "string"
     && typeof value.updatedAt === "string"
@@ -317,6 +326,32 @@ function isConversationMessageStatus(value: unknown): boolean {
 function isOptionalToolCall(value: unknown): boolean {
   return value === undefined
     || (isRecord(value) && !Array.isArray(value) && typeof value.name === "string");
+}
+
+function isOptionalInputItems(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.every(isInputItem));
+}
+
+function isInputItem(value: unknown): value is InputItem {
+  if (!isRecord(value) || typeof value.id !== "string") {
+    return false;
+  }
+
+  switch (value.type) {
+    case "text":
+      return typeof value.text === "string";
+    case "text_selection":
+      return typeof value.text === "string";
+    case "image":
+      return (value.mimeType === "image/png" || value.mimeType === "image/jpeg" || value.mimeType === "image/webp")
+        && typeof value.base64 === "string";
+    case "skill":
+      return typeof value.actionId === "string"
+        && typeof value.title === "string"
+        && typeof value.prompt === "string";
+    default:
+      return false;
+  }
 }
 
 function isWorkspaceListEntry(value: unknown): boolean {

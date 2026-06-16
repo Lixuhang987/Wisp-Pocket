@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installInitialPromptReceiver } from "../src/native/nativeConfig.ts";
+import { getAvailableSkills, installInitialPromptReceiver } from "../src/native/nativeConfig.ts";
 
 describe("nativeConfig", () => {
   beforeEach(() => {
@@ -12,6 +12,15 @@ describe("nativeConfig", () => {
 
   function nativeWindow() {
     return window as typeof window & {
+      handAgentThreadWindowConfig?: {
+        threadWebSocketURL?: string;
+        availableSkills?: Array<{
+          actionId: string;
+          title: string;
+          prompt: string;
+          description?: string;
+        }>;
+      };
       handAgentPendingInitialPrompts?: Array<{
         clientRequestId: string;
         userInput: {
@@ -36,5 +45,19 @@ describe("nativeConfig", () => {
 
     expect(received).toEqual(["hello"]);
     expect(nativeWindow().handAgentPendingInitialPrompts).toEqual([]);
+  });
+
+  it("reads available skills from host config", () => {
+    const original = [
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+      { actionId: "bad", title: "Bad", prompt: 123 as never },
+    ];
+    nativeWindow().handAgentThreadWindowConfig = { availableSkills: original };
+
+    const skills = getAvailableSkills();
+    expect(skills).toEqual([
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+    ]);
+    expect(skills).not.toBe(original);
   });
 });

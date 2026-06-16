@@ -6,14 +6,14 @@ UI / 持久化用的消息模型，**不是** LLM 面向的消息。LLM 视角�
 
 | 文件 | 职责 |
 |------|------|
-| `ConversationMessage.ts` | `ConversationMessage`（id / role / text / status / createdAt / updatedAt / toolCall? / error?）+ `ConversationMessageStatus`（`streaming \| running \| completed \| failed`）+ `ToolMessageStatus` |
+| `ConversationMessage.ts` | `ConversationMessage`（id / role / text / inputItems? / status / createdAt / updatedAt / toolCall? / error?）+ `ConversationMessageStatus`（`streaming \| running \| completed \| failed`）+ `ToolMessageStatus` |
 
 ## 与 AgentMessage 的关系
 
 | 维度 | `AgentMessage`（runtime） | `ConversationMessage`（UI） |
 |------|---------------------------|------------------------------|
 | 受众 | LLM | React ThreadWindow UI |
-| 字段 | role / content / toolCalls? / toolCallId / name | id / role / text / status / 时间戳 / toolCall? / error? |
+| 字段 | role / content / toolCalls? / toolCallId / name / inputItems? | id / role / text / inputItems? / status / 时间戳 / toolCall? / error? |
 | 状态 | 隐式（一次完整文本） | 显式（`streaming → completed`） |
 | 序列 | 严格按 LLM 调用顺序 | UI 列表顺序，可能合并 / 重排 |
 
@@ -31,6 +31,7 @@ system → 立即 completed
 ## 编辑此目录的约束
 
 - 不要把 LLM 内部字段（如 `toolCalls` 列表）平铺到 `ConversationMessage`；UI 只关心一段文本 + 一个 toolCall 元信息。
+- `inputItems` 只用于 user role 的 UI / snapshot 回显，不改变 `text` 仍是可搜索、可预览的扁平文本语义。
 - 新增 status 时要同时考虑：runtime 事件 → MessageTranslator 翻译 → React ThreadWindow 渲染三处。
 - `toolCall.name` 是 UI 显示用，不是 ID；如需要联动 audit 审计请通过 `ThreadAuditEvent.toolCallId`。
 - `ConversationMessage` 是协议字段（被 `thread.snapshot` 引用），改动时务必同步 [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)。

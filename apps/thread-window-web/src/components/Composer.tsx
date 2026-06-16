@@ -1,11 +1,12 @@
 import { useMemo, useRef } from 'react';
-import type { InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
+import type { AvailableSkill, InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
 import type { QueuedComposerInput } from '../store/threadWindowStore.ts';
 
 interface ComposerProps {
   disabled: boolean;
   stopDisabled: boolean;
   queuedInputs?: QueuedComposerInput[];
+  availableSkills?: AvailableSkill[];
   inputItems: InputItem[];
   onInputItemsChange: (items: InputItem[]) => void;
   onSubmit: (input: UserInput) => void;
@@ -20,6 +21,7 @@ export function Composer({
   disabled,
   stopDisabled,
   queuedInputs = [],
+  availableSkills = [],
   inputItems,
   onInputItemsChange,
   onSubmit,
@@ -30,6 +32,7 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textItem = useMemo(() => getEditableTextItem(items), [items]);
   const chipItems = items.filter((item) => item.type !== "text");
+  const slashState = useMemo(() => getSlashMenuState(textItem.text, availableSkills), [textItem.text, availableSkills]);
 
   const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
     const target = e.currentTarget;
@@ -54,6 +57,11 @@ export function Composer({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Tab" && slashState.visible && slashState.highlightedSkill) {
+      e.preventDefault();
+      onInputItemsChange(selectSlashSkill(items, slashState.highlightedSkill));
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -156,6 +164,19 @@ export function Composer({
               className="min-h-[52px] min-w-[180px] flex-1 resize-none overflow-y-auto overflow-x-hidden bg-transparent px-xs py-xs text-[16px] leading-[1.5] text-app-text-primary placeholder:text-app-text-muted outline-none disabled:cursor-not-allowed disabled:text-app-text-muted/50"
               style={{ minHeight: '52px', maxHeight: `${MAX_ROWS * LINE_HEIGHT}px` }}
             />
+            {slashState.visible ? (
+              <div data-slash-menu="true" className="w-full min-w-[220px] rounded-xl border border-app-hairline bg-app-surface px-xs py-xs text-sm text-app-text-primary shadow-soft">
+                {slashState.filteredSkills.map((skill) => (
+                  <div
+                    key={skill.actionId}
+                    data-slash-skill={skill.actionId}
+                    className="rounded-lg px-xs py-1"
+                  >
+                    {skill.title}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {/* 右侧按钮区域 */}
@@ -294,6 +315,52 @@ export function isComposerInputSubmittable(inputItems: InputItem[]): boolean {
 
 export function toUserInput(inputItems: InputItem[]): UserInput {
   return { items: normalizeComposerItems(inputItems).map(cloneInputItem) };
+}
+
+export function getSlashMenuState(text: string, availableSkills: AvailableSkill[]): {
+  visible: boolean;
+  query: string;
+  filteredSkills: AvailableSkill[];
+  highlightedSkill: AvailableSkill | null;
+} {
+  if (!text.startsWith("/")) {
+    return { visible: false, query: "", filteredSkills: [], highlightedSkill: null };
+  }
+
+  const query = text.slice(1).trim().toLowerCase();
+  const filteredSkills = availableSkills.filter((skill) => {
+    if (query.length === 0) {
+      return true;
+    }
+    return skill.title.toLowerCase().includes(query)
+      || skill.actionId.toLowerCase().includes(query)
+      || skill.prompt.toLowerCase().includes(query)
+      || (skill.description?.toLowerCase().includes(query) ?? false);
+  });
+
+  return {
+    visible: true,
+    query,
+    filteredSkills,
+    highlightedSkill: filteredSkills[0] ?? null,
+  };
+}
+
+export function selectSlashSkill(inputItems: InputItem[], skill: AvailableSkill): InputItem[] {
+  const normalized = normalizeComposerItems(inputItems);
+  const textItem = getEditableTextItem(normalized);
+  const chips = normalized.filter((item) => item.type !== "text");
+  return [
+    ...chips,
+    {
+      type: "skill",
+      id: newId("skill"),
+      actionId: skill.actionId,
+      title: skill.title,
+      prompt: skill.prompt,
+    },
+    { ...textItem, text: "" },
+  ];
 }
 
 function getEditableTextItem(inputItems: InputItem[]): Extract<InputItem, { type: "text" }> {

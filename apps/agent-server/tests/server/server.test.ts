@@ -110,6 +110,24 @@ function makeHandlerDependencies(options: {
   };
 }
 
+function stripUserInputItems<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUserInputItems(item)) as T;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const next: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(record)) {
+      if (key === "inputItems") {
+        continue;
+      }
+      next[key] = stripUserInputItems(item);
+    }
+    return next as T;
+  }
+  return value;
+}
+
 function lastSent<T>(socket: FakeSocket): T {
   return JSON.parse(socket.sent.at(-1) ?? "null") as T;
 }
@@ -281,7 +299,7 @@ describe("attachThreadSocketHandlers", () => {
 
     expect(runtimeSignal?.aborted).toBe(true);
     expect(orchestrator.isThreadRunning("Thread-A")).toBe(false);
-    expect(await persistence.getMessages("Thread-A")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-A"))).toEqual([
       { role: "user", content: "close me" },
     ]);
   });

@@ -13,6 +13,7 @@
 ## 进程边界
 
 - `main/` 可以使用 Electron main API、Node API 和 stdio，但不直接 import 或 new `AgentRuntime`、`ToolRegistry`、`LLMClient` 等 core runtime 对象。
+- `main/` 除窗口和 supervisor 编排外，还负责从本地 skill manifest 根目录（默认 `HANDAGENT_PLUGINS_DIR ?? ~/.spotAgent/plugins`）读取配置，把启用项汇总为只读 `availableSkills` 并随 ThreadWindow preload 注入 renderer。
 - `preload/` 是 renderer 能力边界，只能通过 `contextBridge` 暴露显式字段或 IPC 方法；不要开启 `nodeIntegration`，不要把 `ipcRenderer` 原样暴露出去。
 - `activity-window/` 是 browser/React 代码，只消费 `AgentActivityEvent`；不要在这里连接 `/api/thread`、解析完整 thread 消息或调用 Electron API。
 - ThreadWindow renderer 复用 `apps/thread-window-web`，不在本目录复制 ThreadWindow React UI。

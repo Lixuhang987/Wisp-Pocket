@@ -75,6 +75,56 @@ describe("threadWindowStore", () => {
     ]);
   });
 
+  it("keeps structured user input items from snapshot and live recorded notifications", () => {
+    const store = createThreadWindowStore;
+    store.getState().ensureThreadState("thread-1");
+
+    store.getState().handleNotification({
+      type: "thread.snapshot",
+      threadId: "thread-1",
+      notificationId: "snapshot-1",
+      timestamp,
+      payload: {
+        status: "idle",
+        messages: [{
+          id: "msg-1",
+          role: "user",
+          text: "focus on regressions",
+          inputItems: [
+            { type: "skill", id: "skill-1", actionId: "review/code", title: "Review", prompt: "Review this code" },
+            { type: "text", id: "text-1", text: "focus on regressions" },
+          ],
+          status: "completed",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }],
+      },
+    });
+
+    expect(store.getState().threadsById["thread-1"].messages[0].userInputItems).toEqual([
+      { type: "skill", id: "skill-1", actionId: "review/code", title: "Review", prompt: "Review this code" },
+      { type: "text", id: "text-1", text: "focus on regressions" },
+    ]);
+
+    store.getState().handleNotification({
+      type: "user.message.recorded",
+      threadId: "thread-1",
+      notificationId: "recorded-1",
+      timestamp,
+      payload: {
+        messageId: "msg-2",
+        text: "selected code",
+        items: [
+          { type: "text_selection", id: "selection-1", text: "selected code" },
+        ],
+      },
+    });
+
+    expect(store.getState().threadsById["thread-1"].messages.at(-1)?.userInputItems).toEqual([
+      { type: "text_selection", id: "selection-1", text: "selected code" },
+    ]);
+  });
+
   it("appends assistant delta and tool events", () => {
     const store = createThreadWindowStore;
     store.getState().ensureThreadState("thread-1");

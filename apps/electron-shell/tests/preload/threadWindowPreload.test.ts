@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type MainWorldScript = {
-  func: (url: string, theme: HostTheme) => void;
-  args: [string, HostTheme];
+  func: (url: string, theme: HostTheme, skills: Array<{ actionId: string; title: string; prompt: string; description?: string }>) => void;
+  args: [string, HostTheme, Array<{ actionId: string; title: string; prompt: string; description?: string }>];
 };
 
 type HostTheme = {
@@ -11,7 +11,10 @@ type HostTheme = {
 };
 
 type ThreadWindowGlobals = {
-  handAgentThreadWindowConfig?: { threadWebSocketURL?: string };
+  handAgentThreadWindowConfig?: {
+    threadWebSocketURL?: string;
+    availableSkills?: Array<{ actionId: string; title: string; prompt: string; description?: string }>;
+  };
   handAgentTheme?: HostTheme;
   handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
   handAgentPendingInitialPrompts?: unknown[];
@@ -94,6 +97,29 @@ describe("threadWindowPreload", () => {
     script.func(...script.args);
 
     expect(mainWorld.handAgentTheme).toEqual({ preference: "dark", resolved: "dark" });
+  });
+
+  it("reads available skills from preload arguments", async () => {
+    const contextBridge = {
+      executeInMainWorld: vi.fn(),
+      exposeInMainWorld: vi.fn(),
+    };
+    vi.doMock("electron", () => ({ contextBridge, ipcRenderer: createIpcRendererMock() }));
+    process.argv.push(`--handagent-available-skills=${encodeURIComponent(JSON.stringify([
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+    ]))}`);
+
+    await import("../../src/preload/threadWindowPreload.js");
+
+    const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
+    const mainWorld: ThreadWindowGlobals = {};
+    (globalThis as { window?: ThreadWindowGlobals }).window = mainWorld;
+
+    script.func(...script.args);
+
+    expect(mainWorld.handAgentThreadWindowConfig?.availableSkills).toEqual([
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+    ]);
   });
 
   it("exposes a validated theme change subscription", async () => {

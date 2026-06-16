@@ -3,9 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   Composer,
+  getSlashMenuState,
   inputItemsPreview,
   isComposerInputSubmittable,
   normalizeComposerItems,
+  selectSlashSkill,
   removeChipBeforeText,
   removeInputItem,
   toUserInput,
@@ -108,5 +110,26 @@ describe("Composer input items", () => {
 
     expect(inputItemsPreview(interruptOp)).toBe("停止当前运行");
     expect(inputItemsPreview({ op: interruptOp })).toBe("停止当前运行");
+  });
+
+  it("filters slash skills and selects the first match", () => {
+    const state = getSlashMenuState("/rev", [
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+      { actionId: "explain/code", title: "Explain", prompt: "Explain this code" },
+    ]);
+
+    expect(state.visible).toBe(true);
+    expect(state.filteredSkills.map((skill) => skill.title)).toEqual(["Review"]);
+    expect(state.highlightedSkill?.actionId).toBe("review/code");
+  });
+
+  it("appends a selected slash skill as a structured chip and clears the text item", () => {
+    const items = selectSlashSkill(
+      normalizeComposerItems([{ type: "text", id: "text-1", text: "/rev" }]),
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+    );
+
+    expect(items.some((item) => item.type === "skill" && item.actionId === "review/code")).toBe(true);
+    expect(items.find((item) => item.type === "text")?.text).toBe("");
   });
 });

@@ -6,15 +6,16 @@
 
 | 文件 | 职责 |
 |------|------|
-| `threadWindowPreload.ts` | 向 ThreadWindow main world 注入 `/api/thread` URL、host theme、theme change subscription、pending initial prompt 队列和临时 receiver |
+| `threadWindowPreload.ts` | 向 ThreadWindow main world 注入 `/api/thread` URL、`availableSkills`、host theme、theme change subscription、pending initial prompt 队列和临时 receiver |
 | `activityWindowPreload.ts` | 向 ActivityWindow main world 注入 `/api/activity` URL 和 host theme，并暴露 theme change subscription 与 `focusThread(threadId)` IPC |
 
 ## ThreadWindow preload
 
-- 通过 `contextBridge.executeInMainWorld()` 写入 `window.handAgentThreadWindowConfig.threadWebSocketURL` 和 `window.handAgentTheme`。
+- 通过 `contextBridge.executeInMainWorld()` 写入 `window.handAgentThreadWindowConfig.threadWebSocketURL`、`window.handAgentThreadWindowConfig.availableSkills` 和 `window.handAgentTheme`。
 - preload 自身持续监听 `handagent:theme-changed`，只接受已校验的 `HostTheme` payload，并保存 latest theme；`handAgentSubscribeThemeChange(handler)` 订阅时会先回放 latest theme，再接收后续变化，不暴露原始 `ipcRenderer`。
 - 初始化 `window.handAgentPendingInitialPrompts`，并在 React receiver 尚未安装时提供临时 `window.handAgentReceiveInitialPrompt(payload)`。
 - 如果 React 已经安装正式 receiver，preload 必须保留它，不覆盖。
+- `availableSkills` 只接受 `actionId/title/prompt/description?` 这组只读字段；preload 负责从 `--handagent-available-skills=...` 参数解码并做最小校验，renderer 不得直接拿到 Node 文件系统或宿主 skill 源目录访问能力。
 - `handAgentElectron` 只暴露轻量 feature marker，不提供 Electron 或 Node 能力。
 
 ## ActivityWindow preload

@@ -6,7 +6,7 @@ Thread turn 循环、消息模型、tool call 编排。是整个 Agent 的"主�
 
 | 文件 | 职责 |
 |------|------|
-| `AgentMessage.ts` | LLM 面向的消息判别联合：`user / assistant(+toolCalls?) / tool / system`；user content 支持字符串或 `text/image` 多模态 parts |
+| `AgentMessage.ts` | LLM 面向的消息判别联合：`user / assistant(+toolCalls?) / tool / system`；user content 支持字符串或 `text/image` 多模态 parts，并可带 `inputItems?` 供 UI / 持久化 round-trip |
 | `ToolCallEnvelope.ts` | `{ id, name, arguments }` 三元组，连接 LLM 输出与 ToolRegistry |
 | `AgentThread.ts` | 把 `AgentThreadInput`（prompt + 可选选区）归一化为首轮 user message；当前未在 agent-server 主链路使用，仅作为脚本入口 |
 | `AgentRuntime.ts` | 单次 ReAct 主循环：消费 `LLMClient.stream` → 按 delta 发 assistant runtime 事件 → 收集 toolCalls → 逐个交给 `handleToolCall` 处理权限、执行、结果回灌；同一次用户输入内最多循环 `maxTimes` 次；支持 `AbortSignal` 中断 |
@@ -82,6 +82,7 @@ flowchart TD
 - runtime 不解析持久化 image STUB；agent-server 会在调用 runtime 前把用户主动提交的 image STUB 转成多模态 image part，runtime 只负责把注入的 `BlobStore` 继续透传给 `LLMClient`。
 - `cached=turn` 的 tool message 在本 turn 内保留完整 body；turn 自然结束后 `TurnSummarizer` 异步压缩，下一次 LLM 调用前 `waitForPendingSummaries()` 会等待并应用 summary。
 - `AgentRunner` 通过 thread port 先持久化 `user_input`，然后由 thread port 负责发 `user.message.recorded`；如果该输入唤醒 idle thread，再发 `turn.started`。run 结束后补 `turn.completed` 和 `thread.status.changed`。`client_response` Op 属于 app-server request broker 的内部输入，不进入 LLM message history。
+- `UserAgentMessage.inputItems?` 只是 user 输入的结构化旁路，不参与 runtime 推理顺序；真正喂给模型的仍是 `content`（纯文本或已展开的多模态 parts）。
 - 单个 tool call 的处理拆在 `handleToolCall` / `resolveToolPermission` / `callTool` / `appendDeniedToolResult` 内：主循环只负责 turn 推进与消息顺序，权限记忆、拒绝回灌、执行计时和错误序列化各自独立。
 - `truncateOutput` 按 UTF-8 字节判长度，但截断时按 JS 字符索引切片（已知潜在 bug，见架构改进）。
 - `runOptions.signal` 被 abort 后，runtime 抛 `AbortError`，停止后续 assistant / tool 事件与消息追加；无法硬取消的 tool 返回后也不会再写入本 run。

@@ -56,6 +56,24 @@ function createDeferred(): { promise: Promise<void>; resolve: () => void } {
   return { promise, resolve };
 }
 
+function stripUserInputItems<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUserInputItems(item)) as T;
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const next: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(record)) {
+      if (key === "inputItems") {
+        continue;
+      }
+      next[key] = stripUserInputItems(item);
+    }
+    return next as T;
+  }
+  return value;
+}
+
 describe("ThreadRuntimeOrchestrator", () => {
   it("steers new user input into the active turn without aborting the running request", async () => {
     const pushed: ThreadNotification[] = [];
@@ -69,7 +87,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const orchestrator = new ThreadRuntimeOrchestrator(
       {
         async runWithMessages(messages, _onEvent, runOptions) {
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           if (runOptions?.signal) {
             runSignals.push(runOptions.signal);
           }
@@ -115,7 +133,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     await waitUntil(() => runtimeCalls.length === 2, "follow-up runtime call");
     await orchestrator.waitForThreadIdle("thread-steer");
 
-    expect(runtimeCalls).toEqual([
+    expect(stripUserInputItems(runtimeCalls)).toEqual([
       [{ role: "user", content: "first" }],
       [
         { role: "user", content: "first" },
@@ -123,7 +141,7 @@ describe("ThreadRuntimeOrchestrator", () => {
         { role: "user", content: "second" },
       ],
     ]);
-    expect(await persistence.getMessages("thread-steer")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("thread-steer"))).toEqual([
       { role: "user", content: "first" },
       { role: "assistant", content: "first reply" },
       { role: "user", content: "second" },
@@ -149,7 +167,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const orchestrator = new ThreadRuntimeOrchestrator(
       {
         async runWithMessages(messages) {
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           return {
             messages: [
               ...messages,
@@ -192,7 +210,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     beforeRunGate.resolve();
     await orchestrator.waitForThreadIdle("thread-prepare-steer");
 
-    expect(runtimeCalls).toEqual([
+    expect(stripUserInputItems(runtimeCalls)).toEqual([
       [{ role: "user", content: "first" }],
       [
         { role: "user", content: "first" },
@@ -216,7 +234,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const orchestrator = new ThreadRuntimeOrchestrator(
       {
         async runWithMessages(messages) {
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           if (runtimeCalls.length === 1) {
             await firstRunGate.promise;
           }
@@ -261,7 +279,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     secondBeforeRunGate.resolve();
     await orchestrator.waitForThreadIdle("thread-follow-up-steer");
 
-    expect(runtimeCalls).toEqual([
+    expect(stripUserInputItems(runtimeCalls)).toEqual([
       [{ role: "user", content: "first" }],
       [
         { role: "user", content: "first" },
@@ -292,7 +310,7 @@ describe("ThreadRuntimeOrchestrator", () => {
           messages: AgentMessage[],
           onEvent: (event: AgentRuntimeEvent) => void,
         ) {
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           onEvent({
             type: "assistant_message_start",
             messageId: "assistant-1",
@@ -331,7 +349,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     );
     await orchestrator.waitForThreadIdle("Thread-1");
 
-    expect(runtimeCalls).toEqual([
+    expect(stripUserInputItems(runtimeCalls)).toEqual([
       [
         {
           role: "user",
@@ -374,7 +392,7 @@ describe("ThreadRuntimeOrchestrator", () => {
       threadId: "Thread-1",
       payload: { value: "idle" },
     });
-    expect(await persistence.getMessages("Thread-1")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-1"))).toEqual([
       {
         role: "user",
         content: "第一句",
@@ -522,7 +540,7 @@ describe("ThreadRuntimeOrchestrator", () => {
           _onEvent,
           runOptions?: Record<string, unknown>,
         ) {
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           seenRunOptions.push(runOptions);
           const reply = replies[runtimeCalls.length - 1];
           return {
@@ -552,7 +570,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     );
     await orchestrator.waitForThreadIdle("Thread-2");
 
-    expect(runtimeCalls).toEqual([
+    expect(stripUserInputItems(runtimeCalls)).toEqual([
       [
         {
           role: "user",
@@ -596,7 +614,7 @@ describe("ThreadRuntimeOrchestrator", () => {
         },
         async runWithMessages(messages: AgentMessage[]) {
           order.push("runtime");
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           return { messages };
         },
       },
@@ -614,7 +632,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     );
     await orchestrator.waitForThreadIdle("Thread-summary");
 
-    expect(runtimeCalls).toEqual([
+    expect(stripUserInputItems(runtimeCalls)).toEqual([
       [
         { role: "user", content: "第一句" },
         { role: "system", content: "summary ready" },
@@ -684,7 +702,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const orchestrator = new ThreadRuntimeOrchestrator(
       {
         async runWithMessages(messages: AgentMessage[]) {
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           return { messages };
         },
       },
@@ -712,7 +730,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     );
     await orchestrator.waitForThreadIdle("Thread-image");
 
-    expect(runtimeCalls).toEqual([
+    expect(stripUserInputItems(runtimeCalls)).toEqual([
       [
         {
           role: "user",
@@ -723,7 +741,7 @@ describe("ThreadRuntimeOrchestrator", () => {
         },
       ],
     ]);
-    expect(await persistence.getMessages("Thread-image")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-image"))).toEqual([
       {
         role: "user",
         content:
@@ -1027,7 +1045,7 @@ describe("ThreadRuntimeOrchestrator", () => {
       threadId: "Thread-interrupt",
       payload: { value: "interrupted" },
     });
-    expect(await persistence.getMessages("Thread-interrupt")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-interrupt"))).toEqual([
       { role: "user", content: "停止这轮" },
     ]);
     expect((await persistence.getThread("Thread-interrupt"))?.events).toEqual([
@@ -1082,7 +1100,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     await runPromise;
 
     expect(orchestrator.isThreadRunning("Thread-delete-running")).toBe(false);
-    expect(await persistence.getMessages("Thread-delete-running")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-delete-running"))).toEqual([
       { role: "user", content: "删除中" },
     ]);
     expect((await persistence.getThread("Thread-delete-running"))?.events).toEqual([
@@ -1190,7 +1208,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     );
     await orchestrator.waitForThreadIdle("Thread-stubborn-runtime");
 
-    expect(await persistence.getMessages("Thread-stubborn-runtime")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-stubborn-runtime"))).toEqual([
       { role: "user", content: "删除中" },
       { role: "user", content: "继续" },
       { role: "assistant", content: "after timeout" },
@@ -1286,7 +1304,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     await orchestrator.waitForThreadIdle("Thread-timeout-replay");
 
     expect(runtimeCallCount).toBe(2);
-    expect(await persistence.getMessages("Thread-timeout-replay")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-timeout-replay"))).toEqual([
       { role: "user", content: "first" },
       { role: "user", content: "second" },
       { role: "assistant", content: "after interrupted timeout" },
@@ -1305,7 +1323,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const orchestrator = new ThreadRuntimeOrchestrator(
       {
         runWithMessages(messages, _onEvent, runOptions) {
-          runtimeCalls.push(messages.map((message) => ({ ...message })));
+          runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
           if (runtimeCalls.length === 1) {
             runOptions?.signal.addEventListener("abort", () => {
               firstRunFinish?.();
@@ -1348,7 +1366,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(runtimeCalls).toHaveLength(1);
-    expect(await persistence.getMessages("Thread-interrupt-enqueue")).toEqual([
+    expect(stripUserInputItems(await persistence.getMessages("Thread-interrupt-enqueue"))).toEqual([
       { role: "user", content: "first" },
     ]);
     expect(eventTypes(pushed).filter((type) => type === "user.message.recorded")).toHaveLength(1);
@@ -1476,7 +1494,7 @@ describe("ThreadRuntimeOrchestrator", () => {
       payload: { value: "failed" },
     });
     const Thread = await persistence.getThread("Thread-4");
-    expect(Thread?.messages).toEqual([{ role: "user", content: "你好" }]);
+    expect(stripUserInputItems(Thread?.messages)).toEqual([{ role: "user", content: "你好" }]);
     expect(Thread?.events).toEqual([
       {
         type: "error",

@@ -8,7 +8,7 @@
 
 | 文件 | 职责 |
 |------|------|
-| `MessageTranslator.ts` | `AgentRuntimeEvent -> ThreadNotification / 审计 ThreadAuditEvent` 翻译；`AgentMessage` ↔ `ConversationMessage` 映射；user attachment 入库；image STUB 进入 runtime 前展开为多模态 image part |
+| `MessageTranslator.ts` | `AgentRuntimeEvent -> ThreadNotification / 审计 ThreadAuditEvent` 翻译；`AgentMessage` ↔ `ConversationMessage` 映射；user attachment 入库；`UserInput.items` 结构化 round-trip；image STUB 进入 runtime 前展开为多模态 image part |
 
 ## 运行位置
 
@@ -86,6 +86,12 @@ parts.push(renderStub({
 ```
 
 用户主动提交的图片不会直接塞入 thread JSON。`composeUserContent()` 先把 bytes 写入 BlobStore，再把可恢复的 STUB 文本写入 user message。进入下一轮 runtime 前，`agentMessagesToRuntimeMessages()` 会解析 STUB 并转成 `{ type: "image", blobId, mimeType }`。
+
+### user message 保留结构化 items
+
+- `composeUserInputContent()` 仍负责把 `UserInput.items` 组合成持久化 / LLM 可消费的扁平 `content`。
+- 同时 `agentMessagesToConversation()` 会在 user role 上透传 `inputItems`，让 `thread.snapshot` 保留 skill、image、text_selection、text 的原始结构。
+- `user.message.recorded` 也会携带 `payload.items?`，这样 React 可以在首轮 live 通知和后续 snapshot 恢复时得到同一份结构化 user 输入。
 
 ## 数据边界
 

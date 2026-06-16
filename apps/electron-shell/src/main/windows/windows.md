@@ -6,12 +6,13 @@
 
 | 文件 | 职责 |
 |------|------|
-| `threadWindowPrewarmer.ts` | 全局唯一 ThreadWindow `BrowserWindow` 的 hidden prewarm、initial prompt 注入、show/focus、close 状态和 host theme 下发 |
+| `threadWindowPrewarmer.ts` | 全局唯一 ThreadWindow `BrowserWindow` 的 hidden prewarm、initial prompt 注入、show/focus、close 状态、host theme 下发与只读 `availableSkills` 注入 |
 | `activityWindowController.ts` | React StatusBubble ActivityWindow 的创建、定位、非激活展示、host theme 下发和 renderer crash 回调 |
 
 ## ThreadWindow 前提
 
 - `prepare()` 创建 `show: false` 的 `BrowserWindow`，启用 `contextIsolation: true`、`nodeIntegration: false`，并加载 `/thread-window/index.html`。
+- 新建 ThreadWindow 时，prewarmer 还会通过 preload `additionalArguments` 传入当前 `availableSkills`；这些技能由宿主读取本地 skill manifest 后提供给 renderer，不让 renderer 直接访问宿主目录。
 - `prepare()` 必须等待 `did-finish-load` 或 `loadURL` promise 成功后才把 `prepared` 置 true；加载失败或窗口关闭必须 reject。
 - `openInitialPrompt()` 会先确保 prepared，再通过 `executeJavaScript("window.handAgentReceiveInitialPrompt(...)")` 注入 initial prompt，最后才 show/focus。
 - initial prompt JSON 注入前会把 `<` 转义为 `\u003c`，避免脚本上下文中出现 HTML 结束标签风险。

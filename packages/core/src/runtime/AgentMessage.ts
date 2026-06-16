@@ -1,3 +1,4 @@
+import type { InputItem } from "../protocol/Op.ts";
 import type { ToolCallEnvelope } from "./ToolCallEnvelope.ts";
 
 export type AgentTextContentPart = {
@@ -16,6 +17,7 @@ export type AgentUserContent = string | Array<AgentTextContentPart | AgentImageC
 export type UserAgentMessage = {
   role: "user";
   content: AgentUserContent;
+  inputItems?: InputItem[];
 };
 
 export type AssistantAgentMessage = {

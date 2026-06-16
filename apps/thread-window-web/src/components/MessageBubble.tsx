@@ -18,6 +18,7 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isTool = message.role === 'tool';
+  const userSections = isUser ? splitUserMessageSections(message.userInputItems ?? []) : null;
 
   return (
     <article
@@ -48,17 +49,49 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
               [{message.toolName}]
             </div>
           )}
-          <p
-            className={cn(
-              'm-0 whitespace-pre-wrap break-words leading-[1.6]',
-              isTool ? 'font-code text-[13px]' : 'text-[15px]',
-              isAssistant && 'text-app-text-primary',
-              isUser && 'text-app-text-primary',
-              isTool && 'text-app-text-muted'
-            )}
-          >
-            {message.text}
-          </p>
+          {isUser && userSections ? (
+            <div className="space-y-xs">
+              {userSections.images.length > 0 ? (
+                <div data-testid="user-message-images" className="grid gap-xs">
+                  {userSections.images.map((image) => (
+                    <div key={image.id} className="rounded-lg border border-app-hairline bg-app-surface-muted p-xs text-xs text-app-text-muted">
+                      {image.previewUrl}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {userSections.chips.length > 0 ? (
+                <div data-testid="user-message-chips" className="flex flex-wrap gap-xs">
+                  {userSections.chips.map((chip) => (
+                    <span key={chip.id} className="inline-flex rounded-full border border-app-hairline bg-app-surface-muted px-xs py-1 text-sm text-app-text-primary">
+                      {chip.type === "skill" ? `Skill · ${chip.label}` : `选区 · ${chip.label}`}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {userSections.text ? (
+                <p
+                  className={cn(
+                    'm-0 whitespace-pre-wrap break-words leading-[1.6] text-[15px] text-app-text-primary',
+                  )}
+                >
+                  {userSections.text}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p
+              className={cn(
+                'm-0 whitespace-pre-wrap break-words leading-[1.6]',
+                isTool ? 'font-code text-[13px]' : 'text-[15px]',
+                isAssistant && 'text-app-text-primary',
+                isUser && 'text-app-text-primary',
+                isTool && 'text-app-text-muted'
+              )}
+            >
+              {message.text}
+            </p>
+          )}
           {message.pending && (
             <small
               className={cn(
@@ -124,4 +157,36 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
       </div>
     </article>
   );
+}
+
+function splitUserMessageSections(items: ThreadMessage["userInputItems"]): {
+  images: Array<{ id: string; previewUrl: string }>;
+  chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }>;
+  text: string | null;
+} | null {
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  const images: Array<{ id: string; previewUrl: string }> = [];
+  const chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }> = [];
+  const textParts: string[] = [];
+
+  for (const item of items) {
+    if (item.type === "image") {
+      images.push({ id: item.id, previewUrl: item.base64 });
+    } else if (item.type === "skill") {
+      chips.push({ id: item.id, type: "skill", label: item.title });
+    } else if (item.type === "text_selection") {
+      chips.push({ id: item.id, type: "text_selection", label: item.text.slice(0, 24) });
+    } else if (item.type === "text" && item.text.trim().length > 0) {
+      textParts.push(item.text);
+    }
+  }
+
+  return {
+    images,
+    chips,
+    text: textParts.length > 0 ? textParts.join("\n\n") : null,
+  };
 }

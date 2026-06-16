@@ -10,18 +10,18 @@
 | `src/protocol/threadProtocol.ts` | Web 侧协议编码、类型导出和入站类型守卫；类型来源是 `@handagent/core/protocol/*`。 |
 | `src/thread/threadSocketClient.ts` | `/api/thread` WebSocket client，负责连接、发送队列、初始 prompt 首轮流程和入站消息分派；非主动断开只上报 `disconnected`，不做任何断线恢复。 |
 | `src/store/threadWindowStore.ts` | `zustand + immer` store，是 `threadsById`、历史、消息、请求、workspace 列表和窗口错误的状态源；不保存当前右侧展示的 thread。 |
-| `src/native/nativeConfig.ts` | 读取 host 注入的 thread WebSocket URL，安装 `window.handAgentReceiveInitialPrompt`。 |
+| `src/native/nativeConfig.ts` | 读取 host 注入的 thread WebSocket URL / `availableSkills`，安装 `window.handAgentReceiveInitialPrompt`。 |
 | `src/native/themeConfig.ts` | 读取 host 注入的初始 theme，设置 `documentElement.dataset.theme`，订阅 `handAgentSubscribeThemeChange`。 |
 | `src/components/` | ThreadWindow UI 组件：历史侧栏、固定右侧 thread 工作区、消息列表、composer、权限与 workspace 请求面板。 |
 | `src/utils/` | 纯函数工具：workspace 分组、侧栏响应式布局、className 合并。 |
-| `tests/` | Vitest 测试，覆盖协议守卫、socket client、store、native config、侧栏布局、滚动容器和设计 token。 |
+| `tests/` | Vitest 测试，覆盖协议守卫、socket client、store、native config、slash skill 纯函数、用户消息渲染、侧栏布局、滚动容器和设计 token。 |
 
 `dist/` 与 `node_modules/` 是生成或安装产物，不作为文档索引维护对象。
 
 ## 运行边界
 
 - React 直接持有 `/api/thread` WebSocket；Swift 不解析 `ThreadNotification`，也不发送 `ThreadCommand`。
-- Electron preload 注入 `window.handAgentThreadWindowConfig`、`window.handAgentTheme`、`window.handAgentSubscribeThemeChange` 和 `window.handAgentReceiveInitialPrompt`。React 不持久化主题，只把宿主 resolved theme 写到 `data-theme`；thread 数据仍直接连接 `/api/thread`。平台 tool 走独立 `/api/platform`。
+- Electron preload 注入 `window.handAgentThreadWindowConfig`、`window.handAgentTheme`、`window.handAgentSubscribeThemeChange` 和 `window.handAgentReceiveInitialPrompt`。其中 `handAgentThreadWindowConfig` 同时提供 `/api/thread` URL 与宿主只读 `availableSkills`；React 不持久化主题，只把宿主 resolved theme 写到 `data-theme`；thread 数据仍直接连接 `/api/thread`。平台 tool 走独立 `/api/platform`。
 - `ThreadSocketClient` 只处理收发、发送队列和通知副作用，不直接写 UI；UI 状态由 store action 更新。React 和 app-server 之间本次视为稳定长连接，非主动断开后只把连接状态置为 `disconnected`，不重连、不恢复订阅、不拉取 snapshot、不发送任何恢复命令。
 - 组件只通过明确 props、store action 或根组件 callback 触发行为，不应绕过根组件直接操作 WebSocket。
 - 当前不把 ThreadWindow thread 缓存、消息或历史同步给 Swift；StatusBubble 状态由 Electron ActivityWindow renderer 订阅 `/api/activity`。
@@ -52,7 +52,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 首轮消息流程先建 thread，再提交首轮输入：
 
 1. `App` 收到 `InitialPromptPayload` 后先写入 store 的 `pendingInitialPrompts`。
-2. `ThreadSocketClient.startInitialPrompt` 发送 `thread.start`，`commandId` 使用 `clientRequestId`；action/skill 信息已经在后续首轮 `op.submit(UserInput)` 的 `items` 中。
+2. `ThreadSocketClient.startInitialPrompt` 发送 `thread.start`，`commandId` 使用 `clientRequestId`；action/skill 信息已经在后续首轮 `op.submit(UserInput)` 的 `items` 中。ThreadWindow composer 自己的 slash skill 候选只来自 preload 注入的 `availableSkills`，不通过 `/api/thread` 单独请求。
 3. 收到匹配 `commandId` 的 `thread.started` 后，store 创建对应 `ThreadState`，`App` 把该 `threadId` 设为右侧当前展示 thread；socket client 发送 `thread.resume` 拉取初始 snapshot，再发送首轮 `op.submit(UserInput)`。
 4. 若收到匹配 `commandId` 的 `thread.error`，socket client 清理 pending prompt，store 暴露窗口级错误，不再补发 `op.submit`。
 
@@ -64,7 +64,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 
 - 连接状态：`disconnected`、`connecting`、`connected`。
 - 历史：`history` 来自 `thread.listed`。
-- thread 状态缓存：`threadsById` 中每个 `ThreadState` 持有 `threadId`、title、run status、messages、pending initial prompt、权限请求、workspace 请求、composer 队列和 thread 级错误。右侧当前展示的 `activeThreadId` 是 `App` 本地 React state，不进入 store。
+- thread 状态缓存：`threadsById` 中每个 `ThreadState` 持有 `threadId`、title、run status、messages、pending initial prompt、权限请求、workspace 请求、composer 队列和 thread 级错误。`thread.snapshot.messages[].inputItems` 与 `user.message.recorded.payload.items` 会落到 `ThreadMessage.userInputItems`，供用户消息结构化回显。右侧当前展示的 `activeThreadId` 是 `App` 本地 React state，不进入 store。
 - 请求面板：`permission.requested` / `workspace.requested` 按 `threadId` 放到对应 `ThreadState`；用户回答后根组件发送 response 并调用显式 resolve action 移除请求。
 - composer 输入：`ThreadWorkspacePane` 按 thread 持有受控 `InputItem[]`，`Composer` 只通过 `inputItems` / `onInputItemsChange` 渲染和回写变化；提交后发送完整 `UserInput.items` 并重置为唯一空 text item。目标 thread running 或已有 queued input 派发中时，`App` 不立即发送下一条 `op.submit(UserInput)`，而是写入对应 `ThreadState` 的 `queuedComposerInputs` 并在 Composer 上方展示队列；等对应 thread 离开 running 且连接可用后，每个 thread 一次只取一条 queued input 发送，防止多个 user message 连续插到当前 assistant 回复前。停止按钮发送 `op.submit(Interrupt)`。
 - workspace：`workspaces` 来自 `workspace.listed`，`expandedWorkspaceIds` 和 `searchQuery` 驱动历史侧栏；`expandedWorkspaceIds` 会用 `localStorage` 做轻量持久化，刷新或重开同一 ThreadWindow 前端后保留展开状态。
@@ -82,7 +82,8 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 窗口错误提示行由常驻 slot 占位，错误为空时高度为 0，避免 active content 与 Composer 因 grid 自动放置而前移。
 - 页面级横向滚动必须保持关闭；右侧不再有 tab 横向滚动容器，消息区、Composer、请求面板均使用 `min-w-0` / `overflow-x-hidden` 或换行布局避免撑宽窗口。
 - `WorkspaceGroup` 使用 Radix `Accordion.Item/Header/Trigger/Content`，父级 `HistorySidebar` 的滚动列表必须由 `Accordion.Root type="multiple"` 包裹，并以 `expandedWorkspaceIds` 作为受控 `value`，否则 workspace 分组渲染时会因缺少 Radix 上下文导致 React 挂载失败。
-- `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
+- `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。开头输入 `/` 时会基于宿主注入的 `availableSkills` 显示 slash 菜单，`Tab` 只选择当前高亮 skill：追加一个 `skill` item、清空唯一 text item，并保持焦点留在 textarea。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
+- `MessageBubble` 对 user role 不再只显示扁平 `text`：若存在 `userInputItems`，按 image strip、chip row（`skill` / `text_selection`）和 text block 三段式渲染；旧快照或旧通知没有 `userInputItems` 时，继续回退到纯文本气泡。
 
 ## 样式前提
 

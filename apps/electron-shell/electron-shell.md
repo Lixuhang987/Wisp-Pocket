@@ -13,7 +13,7 @@
 - 处理 `activity_window.show`，创建并展示 React StatusBubble ActivityWindow。
 - visible ThreadWindow 关闭后回报 `thread_window.closed wasVisible=true`，并在 agent-server 仍可用时重新预热隐藏窗口。
 - 向 Swift 回报 `electron.ready`、`agent_server.health`、`thread_window.prepared`、`thread_window.prepare_failed`、`thread_window.closed`、`renderer.crashed` 和 `command.ack`。
-- 使用 `contextIsolation: true` 与 preload，把 React 需要的 `handAgentThreadWindowConfig`、`handAgentTheme`、theme change subscription 和初始 prompt receiver 安装到 renderer main world。
+- 使用 `contextIsolation: true` 与 preload，把 React 需要的 `handAgentThreadWindowConfig`、`handAgentTheme`、theme change subscription 和初始 prompt receiver 安装到 renderer main world。`handAgentThreadWindowConfig` 现在同时承载 `/api/thread` URL 与只读 `availableSkills`。
 - macOS 下 Electron main 以 accessory activation policy 运行并隐藏 Dock 图标；Electron 只作为后台 UI shell 预热，不应在 Dock / app switcher 中作为独立前台 app 出现。
 
 ## Supervisor
@@ -25,6 +25,7 @@
 - 关闭 ThreadWindow 或 ActivityWindow 不停止 agent-server；只有 Electron shutdown 会停止后台服务。
 - hidden ThreadWindow 预热由 Electron main 在 agent-server ready 后主动执行。
 - ThreadWindow 创建时通过 preload `additionalArguments` 获得当前 host theme；后续 `theme.changed` 通过 `handagent:theme-changed` IPC 推送给同一个 renderer。
+- Electron main 启动时还会读取本地 skill manifest 根目录（默认 `HANDAGENT_PLUGINS_DIR ?? ~/.spotAgent/plugins`）下的配置，把启用项整理成只读 `availableSkills`，随 ThreadWindow preload 一起注入 renderer；ThreadWindow renderer 不再向 agent-server 额外请求 skill 列表。
 
 ## StatusBubble
 

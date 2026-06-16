@@ -6,7 +6,7 @@
 
 | 文件 | 覆盖对象 |
 |------|------|
-| `threadWindowPreload.test.ts` | ThreadWindow preload 的 `/api/thread` config、host theme 注入与回放、pending initial prompt receiver 和既有 receiver 保留 |
+| `threadWindowPreload.test.ts` | ThreadWindow preload 的 `/api/thread` config、`availableSkills` 注入、host theme 注入与回放、pending initial prompt receiver 和既有 receiver 保留 |
 | `activityWindowPreload.test.ts` | ActivityWindow preload 的 `/api/activity` config、host theme 注入、theme change subscription 与 `focusThread` IPC wrapper |
 
 ## 测试前提

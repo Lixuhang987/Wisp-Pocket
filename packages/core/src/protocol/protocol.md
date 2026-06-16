@@ -110,6 +110,12 @@ flowchart LR
 
 agent-server 在进入 runtime 前统一解析这些 item，并组合成持久化 user message 与 LLM 输入。Prompt/action 不再通过 `thread.start.payload.actionBinding` 或 thread metadata 改变工具 scope。
 
+## 结构化 user message 回显
+
+- `user.message.recorded.payload.items?` 会把本次 `UserInput.items` 原样带回 ThreadWindow，供 UI 回显结构化附件。
+- `thread.snapshot.messages[].inputItems?` 会把持久化 user message 的结构化 item 一并下发给 UI；没有该字段时，旧消息继续按纯文本回退。
+- `ConversationMessage` 只在 user role 上透传 `inputItems`，不改动 assistant/tool 的 UI 视角。
+
 ## Turn 中断
 
 - 主路径下，ThreadWindow 运行态 Stop 控件发送 `op.submit(Interrupt)`，不会断开 socket。
