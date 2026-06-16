@@ -23,6 +23,9 @@ describe("MessageBubble", () => {
     );
 
     expect(html).toContain('data-testid="user-message-images"');
+    expect(html).toContain('data-testid="user-message-bubble"');
+    expect(html).toContain('src="data:image/png;base64,abc"');
+    expect(html.indexOf('data-testid="user-message-images"')).toBeLessThan(html.indexOf('data-testid="user-message-bubble"'));
     expect(html).toContain("Skill · Review");
     expect(html).toContain("选区 · selected code");
     expect(html).toContain("focus on regressions");
