@@ -472,23 +472,24 @@
 ### ThreadWindow 左侧历史侧栏 UI 增强
 
 - 完成日期：待实机 QA
-- 实现位置：`apps/thread-window-web/src/components/HistorySidebar.tsx`、`apps/thread-window-web/src/components/WorkspaceGroup.tsx`、`apps/thread-window-web/tests/historySidebar.test.ts`
+- 实现位置：`apps/thread-window-web/src/components/HistorySidebar.tsx`、`apps/thread-window-web/src/components/WorkspaceGroup.tsx`、`apps/thread-window-web/src/components/ThreadItem.tsx`、`apps/thread-window-web/tests/historySidebar.test.ts`
 - 修复结论：历史侧栏 UI 增强，包含视觉重构与运行状态指示器。
-  - **选中样式简化**：`ThreadItem` 选中状态移除了 `border-app-hairline` 和 `shadow-soft`，改为只用 `bg-app-canvas` 标识。
-  - **WorkspaceGroup 头部增强**：增加文件夹图标（展开/收起两种视觉状态，14x14 SVG folder outline），增加操作按钮组（更多选项 `...` + 删除 `×`），按钮组默认 `opacity-0`，`group-hover` 时显示。
+  - **选中样式简化**：`ThreadItem` 选中状态只保留 `aria-current="page"` 语义标记，不再显示选中态 border、shadow 或背景色块。
+  - **ThreadItem 合并**：默认分组和 workspace 分组共用 `ThreadItem` 组件，避免运行态、选中态和删除按钮行为漂移。
+  - **WorkspaceGroup 头部增强**：增加文件夹图标（展开/收起两种不同 SVG 形态），增加操作按钮组（更多选项 `...` + 删除 `×`），按钮组默认 `opacity-0`，`group-hover` 时显示。
   - **子项缩进对齐**：workspace 下的 thread 列表增加 `pl-6` 左侧缩进，与文件夹图标右侧对齐。
-  - **运行状态指示器**：`ThreadItem` 从 `threadsById[thread.id]?.status` 读取状态，当 `status === 'running'` 时在删除按钮之前显示 spinning circle（12x12，coral accent 色，`animate-spin`）。
+  - **运行状态指示器**：`ThreadItem` 从 `threadsById[thread.id]?.status` 读取状态，当 `status === 'running'` 时在删除按钮之前显示 accent 脉冲圆点。
   - **单行布局**：`ThreadItem` 在同一行显示 preview 与相对时间（刚刚/N小时/N天/M月D日），preview 使用 `truncate` 截断，时间使用 `flex-shrink-0` 保持可见。
   - **删除按钮**：默认 `opacity-0`，hover 时显示为 `opacity-70`，hover 删除按钮时为 `opacity-100`。
 - 自动化验证：需执行 `pnpm --filter handagent-thread-window-web exec vitest run tests/historySidebar.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：
   1. 启动桌面 App 并打开 ThreadWindow，确认左侧历史侧栏每个 thread item 在单行显示 preview 和相对时间。
-  2. 确认选中的 thread item 只有 `bg-app-canvas` 背景色，无 border 和 shadow。
-  3. 确认 workspace 分组标题显示文件夹图标（展开时 open folder，收起时 closed folder 视觉效果）、workspace 名称。
-  4. hover workspace 分组标题时，确认右侧出现更多选项 `...` 和删除 `×` 按钮，移开后按钮消失。
+  2. 确认选中的 thread item 不出现独立背景色块、border 或 shadow。
+  3. 确认 workspace 分组标题显示文件夹图标（展开时 open folder，收起时 closed folder）、workspace 名称。
+  4. hover workspace 分组标题时，确认右侧出现更多选项 `...` 和删除 `×` 按钮，移开后按钮消失，标题本身不出现选中态背景块。
   5. 确认 workspace 下的 thread 列表有左侧缩进，与文件夹图标右侧对齐。
-  6. 提交一个会持续运行的 prompt（如 `[mock:slow-focus]`），确认该 thread item 在运行期间显示 spinning circle（coral 色，在删除按钮之前）。
-  7. 运行结束后确认 spinning circle 消失，删除按钮恢复正常 hover 行为。
+  6. 提交一个会持续运行的 prompt（如 `[mock:slow-focus]`），确认该 thread item 在运行期间显示脉冲运行指示器（accent 色，在删除按钮之前）。
+  7. 运行结束后确认脉冲运行指示器消失，删除按钮恢复正常 hover 行为。
   8. hover thread item 时，确认右侧删除按钮从透明变为可见，hover 删除按钮时变为完全不透明。
   9. 点击 thread item 的正文区域，确认可以正常打开对应 thread。
   10. 点击删除按钮，确认只触发删除确认，不同时触发打开 thread。

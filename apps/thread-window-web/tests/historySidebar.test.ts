@@ -103,4 +103,130 @@ describe("HistorySidebar", () => {
     expect(tmpIndex).toBeGreaterThan(qaIndex);
     expect(defaultIndex).toBeGreaterThan(tmpIndex);
   });
+
+  it("marks the active thread without selected border or background styling", () => {
+    const history: ThreadListEntry[] = [
+      {
+        id: "thread-default",
+        preview: "default conversation",
+        workspaceId: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        messageCount: 1,
+      },
+    ];
+
+    const html = renderToStaticMarkup(
+      React.createElement(HistorySidebar, {
+        history,
+        activeThreadId: "thread-default",
+        onOpenThread: vi.fn(),
+        onDeleteThread: vi.fn(),
+        onNewThread: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('aria-current="page"');
+    const activeThreadRow = html.match(/<div role="button"[^>]*aria-current="page"[^>]*>/)?.[0] ?? "";
+    expect(activeThreadRow).not.toContain("bg-app-canvas");
+    expect(activeThreadRow).not.toContain("border-app-accent");
+  });
+
+  it("renders the shared running thread indicator in workspace and default groups", () => {
+    mockState.threadsById = {
+      "thread-workspace": {
+        threadId: "thread-workspace",
+        title: null,
+        status: "running",
+        messages: [],
+        pendingInitialPrompt: null,
+        queuedComposerInputs: [],
+        queuedInputDispatchPending: false,
+        permissionRequests: [],
+        workspaceRequests: [],
+        errorMessage: null,
+      },
+      "thread-default": {
+        threadId: "thread-default",
+        title: null,
+        status: "running",
+        messages: [],
+        pendingInitialPrompt: null,
+        queuedComposerInputs: [],
+        queuedInputDispatchPending: false,
+        permissionRequests: [],
+        workspaceRequests: [],
+        errorMessage: null,
+      },
+    };
+    const history: ThreadListEntry[] = [
+      {
+        id: "thread-workspace",
+        preview: "workspace conversation",
+        workspaceId: "workspace-1",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        messageCount: 1,
+      },
+      {
+        id: "thread-default",
+        preview: "default conversation",
+        workspaceId: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        messageCount: 1,
+      },
+    ];
+
+    const html = renderToStaticMarkup(
+      React.createElement(HistorySidebar, {
+        history,
+        activeThreadId: null,
+        onOpenThread: vi.fn(),
+        onDeleteThread: vi.fn(),
+        onNewThread: vi.fn(),
+      }),
+    );
+
+    expect(html.match(/aria-label="运行中"/g)).toHaveLength(2);
+    expect(html).toContain("animate-ping");
+  });
+
+  it("switches folder icon shapes between collapsed and expanded workspace states", () => {
+    const history: ThreadListEntry[] = [
+      {
+        id: "thread-workspace",
+        preview: "workspace conversation",
+        workspaceId: "workspace-1",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        messageCount: 1,
+      },
+    ];
+
+    mockState.expandedWorkspaceIds = new Set(["workspace-1"]);
+    const expandedHtml = renderToStaticMarkup(
+      React.createElement(HistorySidebar, {
+        history,
+        activeThreadId: null,
+        onOpenThread: vi.fn(),
+        onDeleteThread: vi.fn(),
+        onNewThread: vi.fn(),
+      }),
+    );
+
+    mockState.expandedWorkspaceIds = new Set();
+    const collapsedHtml = renderToStaticMarkup(
+      React.createElement(HistorySidebar, {
+        history,
+        activeThreadId: null,
+        onOpenThread: vi.fn(),
+        onDeleteThread: vi.fn(),
+        onNewThread: vi.fn(),
+      }),
+    );
+
+    expect(expandedHtml).toContain("C5.25 6.25");
+    expect(collapsedHtml).toContain("L6.3 4.35");
+  });
 });
