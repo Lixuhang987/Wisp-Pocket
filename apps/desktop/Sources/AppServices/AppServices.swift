@@ -55,6 +55,8 @@ struct AppServicesRuntime {
 
 @MainActor
 final class AppServices {
+    static let initialThemeEnvironmentKey = "HANDAGENT_INITIAL_THEME"
+
     let appServer: any AppServerManaging
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
@@ -93,9 +95,11 @@ final class AppServices {
         showsFatalAlert: Bool = true,
         promptPanelPresentationMode: PromptPanelPresentationMode = .visible
     ) {
+        let resolvedAppearanceThemeService = appearanceThemeService ?? AppearanceThemeService(store: settingsStore)
         let runtime = appServer == nil
             ? AppServices.defaultRuntime(
                 environment: environment,
+                initialTheme: resolvedAppearanceThemeService.currentTheme,
                 platformServerURL: platformServerURL
             )
             : nil
@@ -103,7 +107,7 @@ final class AppServices {
         self.threadWindowCommandClient = threadWindowCommandClient ?? runtime?.threadWindowCommandClient ?? NopThreadWindowCommandClient()
         self.activityWindowCommandClient = activityWindowCommandClient ?? runtime?.activityWindowCommandClient
         self.settingsStore = settingsStore
-        self.appearanceThemeService = appearanceThemeService ?? AppearanceThemeService(store: settingsStore)
+        self.appearanceThemeService = resolvedAppearanceThemeService
         self.appearanceChangeObserver = appearanceChangeObserver ?? SystemAppearanceChangeObserver()
         self.actionManifestStore = actionManifestStore
         self.platformServerURL = platformServerURL
@@ -149,6 +153,7 @@ final class AppServices {
 
     static func defaultRuntime(
         environment: [String: String] = ProcessInfo.processInfo.environment,
+        initialTheme: HostThemePayload? = nil,
         platformServerURL: URL
     ) -> AppServicesRuntime {
         let platformClient = PlatformBridgeConnectionClient(
@@ -156,7 +161,10 @@ final class AppServices {
             platformBridge: PlatformBridgeService()
         )
 
-        let configuration = defaultElectronShellLaunchConfiguration(environment: environment)
+        let configuration = defaultElectronShellLaunchConfiguration(
+            environment: environment,
+            initialTheme: initialTheme
+        )
         let shell = ElectronShellProcess(
             launchPath: configuration.launchPath,
             arguments: configuration.arguments,
@@ -173,6 +181,7 @@ final class AppServices {
 
     static func defaultElectronShellLaunchConfiguration(
         environment: [String: String] = ProcessInfo.processInfo.environment,
+        initialTheme: HostThemePayload? = nil,
         currentDirectoryURL: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
         bundleExecutableURL: URL? = Bundle.main.executableURL,
         bundleResourceURL: URL? = Bundle.main.resourceURL,
@@ -206,6 +215,10 @@ final class AppServices {
             launchEnvironment["HANDAGENT_REPO_ROOT"] = repoRoot.path
         }
         AgentServerRuntimeMode.apply(to: &launchEnvironment, resourcesURL: bundleResourceURL)
+        if let initialThemeData = initialTheme.flatMap({ try? JSONEncoder().encode($0) }),
+           let initialThemeJSON = String(data: initialThemeData, encoding: .utf8) {
+            launchEnvironment[initialThemeEnvironmentKey] = initialThemeJSON
+        }
 
         if let electronBinary = environment["HANDAGENT_ELECTRON_BINARY"].flatMap({ $0.isEmpty ? nil : $0 }) {
             return ElectronShellLaunchConfiguration(

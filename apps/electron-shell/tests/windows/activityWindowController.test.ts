@@ -61,6 +61,26 @@ describe("ActivityWindowController", () => {
     expect(window.bounds).toEqual({ x: 1164, y: 810, width: 272, height: 76 });
   });
 
+  it("passes the initial theme to the first created activity window", async () => {
+    const window = new FakeBrowserWindow();
+    const controller = new ActivityWindowController({
+      activityWindowHTMLPath: "/dist/activity-window/index.html",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
+      initialTheme: { preference: "system", resolved: "dark" },
+      createWindow: (options) => {
+        expect(options.webPreferences?.additionalArguments).toContain(
+          `--handagent-theme=${encodeURIComponent(JSON.stringify({ preference: "system", resolved: "dark" }))}`,
+        );
+        return window;
+      },
+      screenProvider: {
+        getPrimaryWorkArea: () => ({ x: 20, y: 10, width: 1440, height: 900 }),
+      },
+    });
+
+    await controller.show();
+  });
+
   it("broadcasts an in-flight theme change after the existing activity window loads", async () => {
     const window = new FakeBrowserWindow();
     const loaded = createDeferred<void>();

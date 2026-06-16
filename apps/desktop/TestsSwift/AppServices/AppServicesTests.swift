@@ -8,6 +8,7 @@ final class AppServicesTests: XCTestCase {
             environment: [
                 "HANDAGENT_ELECTRON_MAIN": "apps/electron-shell/dist/main/main.js",
             ],
+            initialTheme: HostThemePayload(preference: .system, resolved: .dark),
             platformServerURL: URL(string: "ws://127.0.0.1:4317/api/platform")!
         )
 
@@ -58,6 +59,72 @@ final class AppServicesTests: XCTestCase {
             ])
         XCTAssertEqual(configuration.currentDirectoryURL?.path, repoRoot.path)
         XCTAssertEqual(configuration.environment["HANDAGENT_REPO_ROOT"], repoRoot.path)
+    }
+
+    @MainActor
+    func testDefaultElectronShellLaunchPassesInitialDarkThemeThroughEnvironment() throws {
+        let repoRoot = URL(fileURLWithPath: "/repo/worktree", isDirectory: true)
+        let configuration = AppServices.defaultElectronShellLaunchConfiguration(
+            environment: [:],
+            initialTheme: HostThemePayload(preference: .dark, resolved: .dark),
+            currentDirectoryURL: repoRoot,
+            bundleExecutableURL: nil,
+            bundleResourceURL: nil,
+            bundleURL: nil,
+            fileExists: { path in
+                path == repoRoot.appendingPathComponent("Package.swift").path ||
+                    path == repoRoot.appendingPathComponent("apps/electron-shell/package.json").path
+            }
+        )
+
+        XCTAssertEqual(
+            try decodeInitialTheme(from: configuration),
+            HostThemePayload(preference: .dark, resolved: .dark)
+        )
+    }
+
+    @MainActor
+    func testDefaultElectronShellLaunchPassesInitialSystemDarkThemeWithoutFlatteningPreference() throws {
+        let repoRoot = URL(fileURLWithPath: "/repo/worktree", isDirectory: true)
+        let configuration = AppServices.defaultElectronShellLaunchConfiguration(
+            environment: [:],
+            initialTheme: HostThemePayload(preference: .system, resolved: .dark),
+            currentDirectoryURL: repoRoot,
+            bundleExecutableURL: nil,
+            bundleResourceURL: nil,
+            bundleURL: nil,
+            fileExists: { path in
+                path == repoRoot.appendingPathComponent("Package.swift").path ||
+                    path == repoRoot.appendingPathComponent("apps/electron-shell/package.json").path
+            }
+        )
+
+        XCTAssertEqual(
+            try decodeInitialTheme(from: configuration),
+            HostThemePayload(preference: .system, resolved: .dark)
+        )
+    }
+
+    @MainActor
+    func testDefaultElectronShellLaunchPassesInitialLightThemeInsteadOfFixedDark() throws {
+        let repoRoot = URL(fileURLWithPath: "/repo/worktree", isDirectory: true)
+        let configuration = AppServices.defaultElectronShellLaunchConfiguration(
+            environment: [:],
+            initialTheme: HostThemePayload(preference: .light, resolved: .light),
+            currentDirectoryURL: repoRoot,
+            bundleExecutableURL: nil,
+            bundleResourceURL: nil,
+            bundleURL: nil,
+            fileExists: { path in
+                path == repoRoot.appendingPathComponent("Package.swift").path ||
+                    path == repoRoot.appendingPathComponent("apps/electron-shell/package.json").path
+            }
+        )
+
+        XCTAssertEqual(
+            try decodeInitialTheme(from: configuration),
+            HostThemePayload(preference: .light, resolved: .light)
+        )
     }
 
     @MainActor
@@ -129,5 +196,15 @@ final class AppServicesTests: XCTestCase {
 
         XCTAssertEqual(configuration.launchPath, "/custom/electron")
         XCTAssertEqual(configuration.arguments, ["/custom/main.js"])
+    }
+
+    @MainActor
+    private func decodeInitialTheme(from configuration: ElectronShellLaunchConfiguration) throws -> HostThemePayload {
+        let initialThemeEnvironmentKey = AppServices.initialThemeEnvironmentKey
+        let rawValue = configuration.environment[initialThemeEnvironmentKey]
+        let raw = try XCTUnwrap(rawValue)
+        let dataValue = raw.data(using: .utf8)
+        let data = try XCTUnwrap(dataValue)
+        return try JSONDecoder().decode(HostThemePayload.self, from: data)
     }
 }
