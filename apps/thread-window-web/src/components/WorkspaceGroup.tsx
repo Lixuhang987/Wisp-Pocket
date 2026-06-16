@@ -27,12 +27,9 @@ export function WorkspaceGroup({
       <Accordion.Header>
         <Accordion.Trigger
           onClick={onToggle}
-          className="flex w-full items-center justify-between rounded-lg px-sm py-xs text-left text-sm text-app-text-primary transition-colors duration-200 hover:bg-app-surface-soft focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
+          className="flex w-full items-center justify-between rounded-lg px-sm py-1.5 text-left text-xs text-app-text-primary transition-colors duration-200 hover:bg-app-surface-soft focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
         >
-          <span className="min-w-0">
-            <span className="block truncate font-medium">{workspace.name}</span>
-            <span className="block truncate text-[11px] text-app-text-secondary">{workspace.rootPath}</span>
-          </span>
+          <span className="min-w-0 truncate font-medium">{workspace.name}</span>
           <svg
             width="12"
             height="12"
@@ -92,6 +89,18 @@ function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemProps) {
     }
   };
 
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffHours < 1) return '刚刚';
+    if (diffHours < 24) return `${diffHours}小时`;
+    if (diffDays < 7) return `${diffDays}天`;
+    return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+  };
+
   return (
     <div
       role="button"
@@ -99,29 +108,31 @@ function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemProps) {
       onClick={onOpen}
       onKeyDown={handleKeyDown}
       className={cn(
-        'group grid grid-cols-[1fr_32px] items-stretch gap-xs rounded-lg border transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-app-accent-ring',
+        'group flex items-center gap-xs rounded-lg border px-sm py-1.5 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-app-accent-ring',
         isActive
           ? 'border-app-hairline bg-app-canvas shadow-soft'
           : 'border-transparent hover:bg-app-surface-soft/80'
       )}
     >
-      <div className="min-w-0 rounded-lg px-sm py-xs text-left">
-        <span className="block truncate text-[13px] font-medium text-app-text-primary">
-          {thread.preview || '新对话'}
-        </span>
-        <small className="block text-[11px] text-app-text-secondary">
-          {new Date(thread.updatedAt).toLocaleDateString('zh-CN')}
-        </small>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-1.5">
+          <span className="truncate text-[13px] font-medium text-app-text-primary">
+            {thread.preview || '新对话'}
+          </span>
+          <span className="flex-shrink-0 text-[10px] text-app-text-secondary">
+            {formatRelativeTime(new Date(thread.updatedAt))}
+          </span>
+        </div>
       </div>
       <button
         onClick={(event) => {
           event.stopPropagation();
           onDelete();
         }}
-        className="my-auto flex h-8 w-8 items-center justify-center rounded-md text-app-text-secondary opacity-70 transition-colors duration-200 hover:bg-app-surface-muted hover:text-app-text-primary hover:opacity-100 focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
+        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-app-text-secondary opacity-0 transition-all duration-200 group-hover:opacity-70 hover:!opacity-100 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-2 focus:ring-app-accent-ring"
         aria-label="删除对话"
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true">
           <path
             d="M3 3L11 11M11 3L3 11"
             stroke="currentColor"
