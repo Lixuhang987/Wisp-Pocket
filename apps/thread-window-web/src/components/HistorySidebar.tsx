@@ -124,6 +124,10 @@ interface ThreadItemProps {
 }
 
 function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemProps) {
+  const threadsById = createThreadWindowStore((state) => state.threadsById);
+  const threadState = threadsById[thread.id];
+  const isRunning = threadState?.status === 'running';
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -150,10 +154,10 @@ function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemProps) {
       onClick={onOpen}
       onKeyDown={handleKeyDown}
       className={cn(
-        'group flex items-center gap-xs rounded-lg border px-sm py-1.5 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-app-accent-ring',
+        'group flex items-center gap-xs rounded-lg px-sm py-1.5 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-app-accent-ring',
         isActive
-          ? 'border-app-hairline bg-app-canvas shadow-soft'
-          : 'border-transparent hover:bg-app-surface-soft/80'
+          ? 'bg-app-canvas'
+          : 'hover:bg-app-surface-soft/80'
       )}
     >
       <div className="min-w-0 flex-1">
@@ -166,6 +170,29 @@ function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemProps) {
           </span>
         </div>
       </div>
+
+      {/* 运行状态指示器 */}
+      {isRunning && (
+        <div
+          className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
+          aria-label="运行中"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" className="animate-spin text-app-accent">
+            <circle
+              cx="6"
+              cy="6"
+              r="4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+              strokeDasharray="6 18"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+      )}
+
+      {/* 删除按钮 */}
       <button
         onClick={(event) => {
           event.stopPropagation();
