@@ -32,7 +32,7 @@ export function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemPro
       className={cn(
         "group flex items-center gap-xs rounded-lg px-sm py-1.5 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-app-accent-ring",
         isActive
-          ? "text-app-text-primary"
+          ? "bg-app-accent-subtle text-app-text-primary"
           : "hover:bg-app-surface-soft/80",
       )}
     >
