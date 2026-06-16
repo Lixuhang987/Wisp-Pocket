@@ -82,8 +82,8 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 窗口错误提示行由常驻 slot 占位，错误为空时高度为 0，避免 active content 与 Composer 因 grid 自动放置而前移。
 - 页面级横向滚动必须保持关闭；右侧不再有 tab 横向滚动容器，消息区、Composer、请求面板均使用 `min-w-0` / `overflow-x-hidden` 或换行布局避免撑宽窗口。
 - `WorkspaceGroup` 使用 Radix `Accordion.Item/Header/Trigger/Content`，父级 `HistorySidebar` 的滚动列表必须由 `Accordion.Root type="multiple"` 包裹，并以 `expandedWorkspaceIds` 作为受控 `value`，否则 workspace 分组渲染时会因缺少 Radix 上下文导致 React 挂载失败。
-- `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。开头输入 `/` 时会基于宿主注入的 `availableSkills` 显示 slash 菜单，`Tab` 只选择当前高亮 skill：追加一个 `skill` item、清空唯一 text item，并保持焦点留在 textarea。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
-- `MessageBubble` 对 user role 不再只显示扁平 `text`：若存在 `userInputItems`，按 image strip、chip row（`skill` / `text_selection`）和 text block 三段式渲染；旧快照或旧通知没有 `userInputItems` 时，继续回退到纯文本气泡。
+- `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。开头输入 `/` 时会基于宿主注入的 `availableSkills` 在输入框上方显示 popover 形式的 slash 菜单，`Tab` 只选择当前高亮 skill：追加一个 `skill` item、清空唯一 text item，并保持焦点留在 textarea。没有匹配 skill 时必须显示可见空态，不能留下无内容的空白菜单。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
+- `MessageBubble` 对 user role 不再只显示扁平 `text`：若存在 `userInputItems`，图片作为独立 strip 显示在 user 气泡上方，`skill` / `text_selection` chip row 和 text block 显示在气泡内；旧快照或旧通知没有 `userInputItems` 时，继续回退到纯文本气泡。
 
 ## 样式前提
 

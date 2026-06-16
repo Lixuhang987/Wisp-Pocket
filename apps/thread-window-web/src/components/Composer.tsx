@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import type { AvailableSkill, InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
 import type { QueuedComposerInput } from '../store/threadWindowStore.ts';
+import { cn } from '../utils/cn.ts';
 
 interface ComposerProps {
   disabled: boolean;
@@ -131,7 +132,47 @@ export function Composer({
         </div>
       ) : null}
 
-      <div className="relative mx-auto min-w-0 w-full max-w-[720pt] rounded-3xl border border-app-hairline bg-app-surface-elevated/98 px-md py-xs shadow-[var(--thread-window-floating-shadow),var(--thread-window-inset-line)] transition-shadow duration-200 focus-within:border-app-accent focus-within:ring-4 focus-within:ring-app-accent-ring">
+      <div className="relative mx-auto min-w-0 w-full max-w-[720pt]">
+        {slashState.visible ? (
+          <div
+            data-slash-menu-popover="true"
+            data-slash-menu="true"
+            role="listbox"
+            aria-label="技能"
+            className="absolute bottom-full left-0 right-0 z-20 mb-xs max-h-[320px] min-w-0 overflow-y-auto rounded-2xl border border-app-hairline bg-app-surface-elevated/98 p-xs text-sm text-app-text-primary shadow-[var(--thread-window-floating-shadow)]"
+          >
+            <div className="mb-1 px-xs text-xs font-medium text-app-text-muted">技能</div>
+            {slashState.filteredSkills.length > 0 ? (
+              <div className="space-y-1">
+                {slashState.filteredSkills.map((skill, index) => (
+                  <div
+                    key={skill.actionId}
+                    data-slash-skill={skill.actionId}
+                    role="option"
+                    aria-selected={index === 0}
+                    className={cn(
+                      "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-xs rounded-xl px-sm py-xs",
+                      index === 0 ? "bg-app-surface-muted text-app-text-primary" : "text-app-text-secondary",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-[15px] font-medium">{skill.title}</div>
+                      <div className="truncate text-xs text-app-text-muted">{skill.description ?? skill.prompt}</div>
+                    </div>
+                    <span className="text-xs text-app-text-muted">Tab</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl px-sm py-xs text-sm text-app-text-muted">没有匹配的技能</div>
+            )}
+          </div>
+        ) : null}
+
+        <div
+          data-composer-input-box="true"
+          className="rounded-3xl border border-app-hairline bg-app-surface-elevated/98 px-md py-xs shadow-[var(--thread-window-floating-shadow),var(--thread-window-inset-line)] transition-shadow duration-200 focus-within:border-app-accent focus-within:ring-4 focus-within:ring-app-accent-ring"
+        >
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-xs">
           <div className="flex min-w-0 flex-wrap items-center gap-xs py-xs">
             {chipItems.map((item) => {
@@ -164,19 +205,6 @@ export function Composer({
               className="min-h-[52px] min-w-[180px] flex-1 resize-none overflow-y-auto overflow-x-hidden bg-transparent px-xs py-xs text-[16px] leading-[1.5] text-app-text-primary placeholder:text-app-text-muted outline-none disabled:cursor-not-allowed disabled:text-app-text-muted/50"
               style={{ minHeight: '52px', maxHeight: `${MAX_ROWS * LINE_HEIGHT}px` }}
             />
-            {slashState.visible ? (
-              <div data-slash-menu="true" className="w-full min-w-[220px] rounded-xl border border-app-hairline bg-app-surface px-xs py-xs text-sm text-app-text-primary shadow-soft">
-                {slashState.filteredSkills.map((skill) => (
-                  <div
-                    key={skill.actionId}
-                    data-slash-skill={skill.actionId}
-                    className="rounded-lg px-xs py-1"
-                  >
-                    {skill.title}
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </div>
 
           {/* 右侧按钮区域 */}
@@ -235,6 +263,7 @@ export function Composer({
               </svg>
             </button>
           </div>
+        </div>
         </div>
       </div>
     </form>

@@ -31,7 +31,21 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
         'w-full',
         isUser && 'max-w-[85%]'
       )}>
+        {isUser && userSections?.images.length ? (
+          <div data-testid="user-message-images" className="mb-xs grid justify-items-end gap-xs">
+            {userSections.images.map((image) => (
+              <img
+                key={image.id}
+                src={image.previewUrl}
+                alt="用户上传的图片"
+                className="max-h-[240px] max-w-full rounded-2xl border border-app-hairline bg-app-surface-muted object-contain shadow-soft"
+              />
+            ))}
+          </div>
+        ) : null}
+
         <div
+          data-testid={isUser ? "user-message-bubble" : undefined}
           className={cn(
             'px-lg py-md',
             isUser && 'rounded-2xl border border-app-hairline/70 bg-app-user-bubble text-app-text-primary shadow-soft',
@@ -51,15 +65,6 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
           )}
           {isUser && userSections ? (
             <div className="space-y-xs">
-              {userSections.images.length > 0 ? (
-                <div data-testid="user-message-images" className="grid gap-xs">
-                  {userSections.images.map((image) => (
-                    <div key={image.id} className="rounded-lg border border-app-hairline bg-app-surface-muted p-xs text-xs text-app-text-muted">
-                      {image.previewUrl}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
               {userSections.chips.length > 0 ? (
                 <div data-testid="user-message-chips" className="flex flex-wrap gap-xs">
                   {userSections.chips.map((chip) => (
@@ -174,7 +179,7 @@ function splitUserMessageSections(items: ThreadMessage["userInputItems"]): {
 
   for (const item of items) {
     if (item.type === "image") {
-      images.push({ id: item.id, previewUrl: item.base64 });
+      images.push({ id: item.id, previewUrl: `data:${item.mimeType};base64,${item.base64}` });
     } else if (item.type === "skill") {
       chips.push({ id: item.id, type: "skill", label: item.title });
     } else if (item.type === "text_selection") {
