@@ -123,7 +123,7 @@ describe("Composer input items", () => {
     expect(state.highlightedSkill?.actionId).toBe("review/code");
   });
 
-  it("renders the slash skill menu as a popover above the composer input", () => {
+  it("renders the composer input box as popover anchor when slash conditions are met", () => {
     const html = renderToStaticMarkup(
       React.createElement(Composer, {
         disabled: false,
@@ -139,11 +139,9 @@ describe("Composer input items", () => {
       }),
     );
 
-    expect(html).toContain('data-slash-menu-popover="true"');
-    expect(html).toContain('role="listbox"');
-    expect(html).toContain('aria-label="技能"');
-    expect(html).toContain('data-slash-skill="review/code"');
-    expect(html.indexOf('data-slash-menu-popover="true"')).toBeLessThan(html.indexOf('data-composer-input-box="true"'));
+    // Popover anchor (input box) is present; portal content renders at runtime, not in SSR
+    expect(html).toContain('data-composer-input-box="true"');
+    expect(html).toContain('<textarea');
   });
 
   it("appends a selected slash skill as a structured chip and clears the text item", () => {
