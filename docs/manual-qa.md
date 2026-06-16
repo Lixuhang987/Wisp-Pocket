@@ -468,3 +468,17 @@
 - 所有错误路径均有明确文案，不出现静默失败。
 - 每个通过的条目都已从本文件删除，并在 [archive.md](./archive.md) 保留完整验证记录。
 - 2026-06-11 这轮重构已完成协议、runtime 骨架与 agent-server Agent owner 接线验证：`packages/core/src/protocol/Op.ts` 新增 `Op` / `UserInput` / `InputItem`，`ThreadCommand` 运行期输入只保留 `op.submit`；React ThreadWindow、Electron shell、Swift `ElectronInitialPromptPayload` 均已切到 `userInput` 载荷。`packages/core/src/runtime/AgentRunner.ts`、`AgentSession.ts`、`AgentThreadPort.ts` 已补最小实现；`apps/agent-server/src/agent/AgentManager.ts` 新增持久 Agent owner，`thread.start` 注册 Agent，`op.submit(UserInput | Interrupt)` 通过 `tx_sub` 进入对应 Agent，`input.submit` / `turn.interrupt` 已从公开 server 路径移除。独立文档审核子 agent 已核对 spec、代码和相关 md，并补齐 Electron/Swift/core/selection/agent 文档。最终自动化验证覆盖 `pnpm exec vitest run apps/agent-server/tests/agent/AgentManager.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。仍需补实机 QA：PromptPanel plain text、text selection、image region、skill action、ThreadWindow composer follow-up、running stop。
+
+### ThreadWindow 左侧历史侧栏 UI 重构
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/thread-window-web/src/components/HistorySidebar.tsx`、`apps/thread-window-web/src/components/WorkspaceGroup.tsx`、`apps/thread-window-web/tests/historySidebar.test.ts`
+- 修复结论：历史侧栏 UI 重构为更紧凑的单行布局。`ThreadItem` 改为在同一行显示 preview 与相对时间（刚刚/N小时/N天/M月D日），preview 使用 `truncate` 截断，时间使用 `flex-shrink-0` 保持可见。`WorkspaceGroup` 标题行显示 workspace 名称与展开/收起箭头。删除按钮默认 `opacity-0`，hover 时显示为 `opacity-70`，hover 删除按钮时为 `opacity-100`。此次改动是纯视觉重构，不改变功能逻辑、workspace 分组、搜索过滤或 Accordion 交互。
+- 自动化验证：需执行 `pnpm --filter handagent-thread-window-web exec vitest run tests/historySidebar.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 启动桌面 App 并打开 ThreadWindow，确认左侧历史侧栏每个 thread item 在单行显示 preview 和相对时间。
+  2. hover thread item 时，确认右侧删除按钮从透明变为可见，hover 删除按钮时变为完全不透明。
+  3. 点击 thread item 的正文区域，确认可以正常打开对应 thread。
+  4. 点击删除按钮，确认只触发删除确认，不同时触发打开 thread。
+  5. 确认 workspace 分组标题行显示名称和箭头，展开/收起功能正常。
+  6. 确认搜索框、新建对话按钮、workspace 分组排序与原有行为一致。
