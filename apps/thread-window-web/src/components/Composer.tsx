@@ -343,7 +343,7 @@ export function isComposerInputSubmittable(inputItems: InputItem[]): boolean {
 }
 
 export function toUserInput(inputItems: InputItem[]): UserInput {
-  return { items: normalizeComposerItems(inputItems).map(cloneInputItem) };
+  return { items: structuredClone(normalizeComposerItems(inputItems)) };
 }
 
 export function getSlashMenuState(text: string, availableSkills: AvailableSkill[]): {
@@ -394,19 +394,6 @@ export function selectSlashSkill(inputItems: InputItem[], skill: AvailableSkill)
 
 function getEditableTextItem(inputItems: InputItem[]): Extract<InputItem, { type: "text" }> {
   return normalizeComposerItems(inputItems).find((item): item is Extract<InputItem, { type: "text" }> => item.type === "text")!;
-}
-
-function cloneInputItem(item: InputItem): InputItem {
-  switch (item.type) {
-    case "text":
-      return { type: "text", id: item.id, text: item.text };
-    case "text_selection":
-      return { type: "text_selection", id: item.id, text: item.text };
-    case "skill":
-      return { type: "skill", id: item.id, actionId: item.actionId, title: item.title, prompt: item.prompt };
-    case "image":
-      return { type: "image", id: item.id, mimeType: item.mimeType, base64: item.base64 };
-  }
 }
 
 function chipLabel(item: Exclude<InputItem, { type: "text" }>): string {

@@ -236,18 +236,5 @@ export function App() {
 }
 
 function cloneUserInput(input: UserInput): UserInput {
-  return {
-    items: input.items.map((item) => {
-      switch (item.type) {
-        case "text":
-          return { type: "text", id: item.id, text: item.text };
-        case "text_selection":
-          return { type: "text_selection", id: item.id, text: item.text };
-        case "skill":
-          return { type: "skill", id: item.id, actionId: item.actionId, title: item.title, prompt: item.prompt };
-        case "image":
-          return { type: "image", id: item.id, mimeType: item.mimeType, base64: item.base64 };
-      }
-    }),
-  };
+  return structuredClone(input);
 }

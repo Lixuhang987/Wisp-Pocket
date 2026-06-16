@@ -1,4 +1,5 @@
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
+import { z } from "zod";
 
 export type InitialPromptPayload = {
   clientRequestId: string;
@@ -125,67 +126,76 @@ export function encodeEvent(event: ElectronToSwiftEvent): string {
 }
 
 export function isSwiftToElectronCommand(value: unknown): value is SwiftToElectronCommand {
-  if (!isRecord(value) || value.channel !== "electron_shell" || typeof value.commandId !== "string") {
-    return false;
-  }
-  switch (value.type) {
-    case "thread_window.open_initial_prompt":
-      return isRecord(value.payload)
-        && typeof value.payload.clientRequestId === "string"
-        && isUserInput(value.payload.userInput);
-    case "thread_window.open_history":
-    case "activity_window.show":
-    case "shutdown":
-      return true;
-    case "thread_window.focus":
-      return value.threadId === undefined || value.threadId === null || typeof value.threadId === "string";
-    case "theme.changed":
-      return isHostTheme(value.theme);
-    default:
-      return false;
-  }
+  return SwiftToElectronCommandSchema.safeParse(value).success;
 }
 
 export function isHostTheme(value: unknown): value is HostTheme {
-  return isRecord(value)
-    && (value.preference === "light" || value.preference === "dark" || value.preference === "system")
-    && (value.resolved === "light" || value.resolved === "dark");
+  return HostThemeSchema.safeParse(value).success;
 }
 
-function isUserInput(value: unknown): value is UserInput {
-  return isRecord(value)
-    && Array.isArray(value.items)
-    && value.items.length > 0
-    && value.items.every(isInputItem);
-}
+const HostThemeSchema = z.object({
+  preference: z.enum(["light", "dark", "system"]),
+  resolved: z.enum(["light", "dark"]),
+});
 
-function isInputItem(value: unknown): boolean {
-  if (!isRecord(value) || typeof value.id !== "string") {
-    return false;
-  }
+const InputItemSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("text"),
+    id: z.string(),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal("text_selection"),
+    id: z.string(),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal("image"),
+    id: z.string(),
+    mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+    base64: z.string(),
+  }),
+  z.object({
+    type: z.literal("skill"),
+    id: z.string(),
+    actionId: z.string(),
+    title: z.string(),
+    prompt: z.string(),
+  }),
+]);
 
-  if (value.type === "text") {
-    return typeof value.text === "string";
-  }
+const UserInputSchema = z.object({
+  items: z.array(InputItemSchema).min(1),
+}) satisfies z.ZodType<UserInput>;
 
-  if (value.type === "text_selection") {
-    return typeof value.text === "string";
-  }
+const BaseCommandSchema = z.object({
+  channel: z.literal("electron_shell"),
+  commandId: z.string(),
+});
 
-  if (value.type === "image") {
-    return (value.mimeType === "image/png" || value.mimeType === "image/jpeg" || value.mimeType === "image/webp")
-      && typeof value.base64 === "string";
-  }
-
-  if (value.type === "skill") {
-    return typeof value.actionId === "string"
-      && typeof value.title === "string"
-      && typeof value.prompt === "string";
-  }
-
-  return false;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+const SwiftToElectronCommandSchema = z.discriminatedUnion("type", [
+  BaseCommandSchema.extend({
+    type: z.literal("thread_window.open_initial_prompt"),
+    payload: z.object({
+      clientRequestId: z.string(),
+      userInput: UserInputSchema,
+    }),
+  }),
+  BaseCommandSchema.extend({
+    type: z.literal("thread_window.open_history"),
+  }),
+  BaseCommandSchema.extend({
+    type: z.literal("thread_window.focus"),
+    threadId: z.string().nullable().optional(),
+  }),
+  BaseCommandSchema.extend({
+    type: z.literal("activity_window.show"),
+  }),
+  BaseCommandSchema.extend({
+    type: z.literal("theme.changed"),
+    theme: HostThemeSchema,
+  }),
+  BaseCommandSchema.extend({
+    type: z.literal("shutdown"),
+  }),
+]) satisfies z.ZodType<SwiftToElectronCommand>;

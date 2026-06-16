@@ -5,6 +5,7 @@ import type {
   AgentServerSupervisor,
   AgentServerSupervisorDescription,
 } from "./agentServerSupervisor.js";
+import { errorMessage, formatAgentServerOutput } from "./output.js";
 
 type OutputStreamLike = {
   on(event: "data", listener: (chunk: unknown) => void): unknown;
@@ -176,8 +177,8 @@ export class UtilityProcessAgentServerSupervisor implements AgentServerSuperviso
   }
 
   private drainOutput(utilityProcess: UtilityProcessLike): void {
-    utilityProcess.stdout?.on("data", (chunk) => this.writeLog(formatOutput("stdout", chunk)));
-    utilityProcess.stderr?.on("data", (chunk) => this.writeLog(formatOutput("stderr", chunk)));
+    utilityProcess.stdout?.on("data", (chunk) => this.writeLog(formatAgentServerOutput("stdout", chunk)));
+    utilityProcess.stderr?.on("data", (chunk) => this.writeLog(formatAgentServerOutput("stderr", chunk)));
   }
 
   private writeLog(line: string): void {
@@ -187,13 +188,4 @@ export class UtilityProcessAgentServerSupervisor implements AgentServerSuperviso
     }
     process.stderr.write(line);
   }
-}
-
-function formatOutput(streamName: "stdout" | "stderr", chunk: unknown): string {
-  const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
-  return `[agent-server ${streamName}] ${text}`;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "unknown error";
 }

@@ -7,6 +7,7 @@ import {
   toolSettingsFilePath,
   type ToolSettings,
 } from "@handagent/core/config/ToolSettings.ts";
+import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
 import { registerTools } from "@handagent/core/tools/registerTools.ts";
 import type { RegisterBuiltinToolsResult } from "@handagent/core/tools/registerBuiltins.ts";
 import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
@@ -81,13 +82,4 @@ function readSingleFileStamp(filePath: string): string {
     }
     throw error;
   }
-}
-
-function isNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ENOENT"
-  );
 }

@@ -342,6 +342,25 @@ describe("attachThreadSocketHandlers", () => {
     expect(commandRouter.receive).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores thread commands with missing payload shape", async () => {
+    const socket = new FakeSocket();
+    const { commandRouter, eventPublisher } = makeHandlerDependencies();
+
+    attachThreadSocketHandlers(socket as never, {
+      commandRouter,
+      eventPublisher,
+    });
+
+    await emitRawMessage(socket, JSON.stringify({
+      type: "op.submit",
+      threadId: "Thread-A",
+      commandId: "bad-op",
+      timestamp: new Date().toISOString(),
+    }));
+
+    expect(commandRouter.receive).not.toHaveBeenCalled();
+  });
+
   it("detaches platform sockets without interrupting thread runs", async () => {
     const socket = new FakeSocket();
     const bridge = {
@@ -404,6 +423,30 @@ describe("attachThreadSocketHandlers", () => {
     await emitMessage(socket, platformHello("bridge-1"));
 
     expect(bridge.attach).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores platform responses with missing response payload shape", async () => {
+    const socket = new FakeSocket();
+    const bridge = {
+      attach: vi.fn().mockReturnValue(501),
+      detach: vi.fn(),
+      handleResponse: vi.fn(),
+    };
+
+    attachPlatformSocketHandlers(socket as never, {
+      bridge: bridge as never,
+    });
+
+    await emitMessage(socket, platformHello("bridge-1"));
+    await emitRawMessage(socket, JSON.stringify({
+      channel: "platform",
+      type: "platform_response",
+      messageId: "response-1",
+      timestamp: new Date().toISOString(),
+      payload: { status: "ok" },
+    }));
+
+    expect(bridge.handleResponse).not.toHaveBeenCalled();
   });
 });
 
@@ -526,7 +569,7 @@ describe("startServer", () => {
 
       const assetResponse = await fetch(`http://127.0.0.1:${address.port}/thread-window/app.js`);
       expect(assetResponse.status).toBe(200);
-      expect(assetResponse.headers.get("content-type")).toContain("text/javascript");
+      expect(assetResponse.headers.get("content-type")).toContain("javascript");
       expect(await assetResponse.text()).toContain("console.log");
 
       const missingResponse = await fetch(`http://127.0.0.1:${address.port}/thread-window/missing.js`);

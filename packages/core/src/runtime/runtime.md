@@ -15,7 +15,7 @@ Thread turn 循环、消息模型、tool call 编排。是整个 Agent 的"主�
 | `AgentThreadPort.ts` | thread 端口：记录用户输入、发事件、等待 summary |
 | `SystemPrompt.ts` | system prompt 分段组装器：以 `SystemPromptSection[]` 表达默认策略，按 LLM 请求临时解析成 `system` messages，不写回 thread 历史 |
 | `Stub.ts` | 统一渲染 / 解析 `[STUB ...]...[/STUB]` 文本，占位引用 Blob 内容 |
-| `TurnSummarizer.ts` | turn 结束后压缩 `cached=turn` 的 tool message，写回 Blob summary 并重渲染消息 |
+| `TurnSummarizer.ts` | turn 结束后用固定并发 worker pool 压缩 `cached=turn` 的 tool message，写回 Blob summary 并重渲染消息 |
 
 ## 主循环
 

@@ -7,7 +7,7 @@ Tool 调用前的权限策略。runtime 默认 `AllowAllPermissionPolicy`；生�
 | 文件 | 职责 |
 |------|------|
 | `PermissionPolicy.ts` | `PermissionPolicy` 接口（`check / resolveAsk / remember`）+ 输入输出类型 + `AllowAllPermissionPolicy` + `DENY_TOOL_RESULT_TEXT = "用户拒绝执行该 tool"` |
-| `FilePermissionPolicy.ts` | 三层策略：`threadRules`（内存 Map，按 `${threadId}::${argHash}` 隔离）→ 持久化 `~/.spotAgent/permissions.json`（按 `argHash` 全局命中）→ fallback 调 `askResolver`；`argHash = sha256(toolName + stableJSON(args))`；持久化规则缓存按文件状态戳失效 |
+| `FilePermissionPolicy.ts` | 三层策略：`threadRules`（内存 Map，按 `${threadId}::${argHash}` 隔离）→ 持久化 `~/.spotAgent/permissions.json`（按 `argHash` 全局命中）→ fallback 调 `askResolver`；`argHash = sha256(toolName + fast-json-stable-stringify(args))`；持久化规则缓存按文件状态戳失效 |
 
 ## 决策三态 + 三档记忆
 
@@ -53,7 +53,7 @@ flowchart TD
 }
 ```
 
-`stableStringify` 保证字段顺序无关，使得相同语义的入参产生相同 hash；`arguments` 保存原始入参摘要，供 Settings UI 展示规则含义，旧规则缺少该字段时仍按 `argHash` 生效。
+`fast-json-stable-stringify` 保证字段顺序无关，使得相同语义的入参产生相同 hash；`arguments` 保存原始入参摘要，供 Settings UI 展示规则含义，旧规则缺少该字段时仍按 `argHash` 生效。
 
 ## 编辑此目录的约束
 

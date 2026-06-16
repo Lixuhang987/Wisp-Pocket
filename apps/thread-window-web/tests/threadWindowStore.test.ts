@@ -387,7 +387,10 @@ describe("threadWindowStore", () => {
 
     expect(setItem).toHaveBeenCalledWith(
       "handAgent.threadWindow.expandedWorkspaceIds",
-      JSON.stringify(["default"]),
+      JSON.stringify({
+        state: { expandedWorkspaceIds: ["default"] },
+        version: 0,
+      }),
     );
 
     vi.unstubAllGlobals();

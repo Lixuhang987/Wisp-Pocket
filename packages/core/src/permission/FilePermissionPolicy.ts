@@ -2,6 +2,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createHash } from "node:crypto";
+import stableStringify from "fast-json-stable-stringify";
+import { stampsEqual, type FileStamp } from "../utils/fileStamp.ts";
 import type {
   PermissionDecision,
   PermissionPolicy,
@@ -21,11 +23,6 @@ type PersistedRule = {
 type PersistedFile = {
   version: 1;
   rules: PersistedRule[];
-};
-
-type FileStamp = {
-  mtimeMs: number;
-  size: number;
 };
 
 export type AskResolver = (
@@ -112,7 +109,7 @@ export class FilePermissionPolicy implements PermissionPolicy {
   }
 
   private keyFor(request: PermissionRequest): string {
-    const stable = stableStringify(request.arguments);
+    const stable = stableStringify(request.arguments) ?? JSON.stringify(request.arguments);
     const hash = createHash("sha256")
       .update(`${request.toolName}::${stable}`)
       .digest("hex");
@@ -156,26 +153,6 @@ export class FilePermissionPolicy implements PermissionPolicy {
     const info = statSync(this.filePath);
     return { mtimeMs: info.mtimeMs, size: info.size };
   }
-}
-
-function stampsEqual(left: FileStamp | null, right: FileStamp | null): boolean {
-  if (!left || !right) return left === right;
-  return left.mtimeMs === right.mtimeMs && left.size === right.size;
-}
-
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) {
-    return "[" + value.map(stableStringify).join(",") + "]";
-  }
-  const entries = Object.entries(value as Record<string, unknown>).sort(
-    ([a], [b]) => a.localeCompare(b),
-  );
-  return (
-    "{" +
-    entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(",") +
-    "}"
-  );
 }
 
 export type { PersistedRule };

@@ -7,7 +7,7 @@
 | 文件 | 职责 |
 |------|------|
 | `AppConfig.ts` | `AppConfig` 类型 + `defaultAppConfig`；当前未在主链路使用，预留 |
-| `ModelSettings.ts` | `loadModelSettings()`：同步 `readFileSync` 读 `settings.json` 的 `llm.{provider, model, summarizerModel, apiKey, baseUrl, api}`；JSON 解析失败抛错（带文件路径），其它字段缺失走默认；调用方负责是否加缓存 |
+| `ModelSettings.ts` | `loadModelSettings()`：同步 `readFileSync` 读 `settings.json`，用 `zod` 归一化 `llm.{provider, model, summarizerModel, apiKey, baseUrl, api}`；JSON 解析失败抛错（带文件路径），其它字段缺失走默认；调用方负责是否加缓存 |
 | `ToolSettings.ts` | `loadToolSettings()` + `filterToolNames()`：解析 `tools.allowlist / tools.denylist`；`denylist` 优先；JSON 解析失败静默 fallback 到默认 |
 
 ## 配置文件结构
@@ -45,7 +45,7 @@
 
 - 不要把 settings 缓存到模块作用域。读盘优化必须是调用方实例级缓存，并引入 mtime / TTL 失效策略，同时保持模型设置"改完下次请求生效"的语义。
 - 新增配置组（例如 `permissions.cacheTtl`）请独立 `XxxSettings.ts` + `loadXxxSettings()`，不要塞回 `ModelSettings`。
-- 字段类型要在 `normalizeOptionalString` / `normalizeApiType` 等函数里做防御式校验，未识别值要走默认而非抛错（除了顶层 JSON 解析失败）。
+- 字段类型要通过 schema 做防御式校验和 trim 归一化，未识别值要走默认而非抛错（除了顶层 JSON 解析失败）。
 - 文件路径函数 `xxxSettingsFilePath(homeDir = homedir())` 必须保留 `homeDir` 参数，便于测试注入临时目录。
 
 ## 相关文档

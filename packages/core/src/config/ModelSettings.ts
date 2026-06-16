@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 
 export type OpenAIApiType = "responses" | "chat" | "completion";
 export type LLMProvider = "openai-compatible" | "anthropic";
@@ -24,6 +25,10 @@ type PersistedModelSettings = {
     provider?: unknown;
   };
 };
+
+const OpenAIApiTypeSchema = z.enum(["responses", "chat", "completion"]);
+const LLMProviderSchema = z.enum(["openai-compatible", "anthropic"]);
+const OptionalTrimmedStringSchema = z.string().transform((value) => value.trim()).pipe(z.string().min(1));
 
 export const defaultModelSettings: ModelSettings = {
   provider: "openai-compatible",
@@ -53,7 +58,7 @@ export function loadModelSettings(homeDir = homedir()): ModelSettings {
     );
   }
 
-  const llm = parsed.llm ?? {};
+  const llm = parsePersistedModelSettings(parsed).llm ?? {};
   return {
     provider: normalizeProvider(llm.provider),
     model: normalizeRequiredString(llm.model) ?? defaultModelSettings.model,
@@ -66,32 +71,32 @@ export function loadModelSettings(homeDir = homedir()): ModelSettings {
   };
 }
 
+function parsePersistedModelSettings(value: unknown): PersistedModelSettings {
+  return z.object({
+    llm: z.object({
+      model: z.unknown().optional(),
+      summarizerModel: z.unknown().optional(),
+      apiKey: z.unknown().optional(),
+      baseUrl: z.unknown().optional(),
+      api: z.unknown().optional(),
+      provider: z.unknown().optional(),
+    }).optional(),
+  }).catch({}).parse(value);
+}
+
 function normalizeRequiredString(value: unknown): string | undefined {
   const normalized = normalizeOptionalString(value);
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
+  return OptionalTrimmedStringSchema.safeParse(value).data;
 }
 
 function normalizeApiType(value: unknown): OpenAIApiType {
-  if (value === "chat" || value === "completion" || value === "responses") {
-    return value;
-  }
-
-  return defaultModelSettings.api;
+  return OpenAIApiTypeSchema.safeParse(value).data ?? defaultModelSettings.api;
 }
 
 function normalizeProvider(value: unknown): LLMProvider {
-  if (value === "anthropic" || value === "openai-compatible") {
-    return value;
-  }
-
-  return defaultModelSettings.provider;
+  return LLMProviderSchema.safeParse(value).data ?? defaultModelSettings.provider;
 }

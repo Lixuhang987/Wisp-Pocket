@@ -17,6 +17,7 @@ import {
   toVercelMessages,
   toVercelTools,
 } from "./VercelAdapters.ts";
+import { toError } from "../utils/errors.ts";
 
 type OpenAIProviderSettings = NonNullable<Parameters<typeof createOpenAI>[0]>;
 type VercelStreamRequest = Parameters<typeof streamText>[0];
@@ -138,12 +139,6 @@ export class VercelClient implements LLMClient {
       toolCalls,
     };
   }
-}
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) return error;
-  if (typeof error === "string") return new Error(error);
-  return new Error(JSON.stringify(error));
 }
 
 function selectLanguageModel(provider: OpenAIProvider, api: OpenAIApiType, model: string) {

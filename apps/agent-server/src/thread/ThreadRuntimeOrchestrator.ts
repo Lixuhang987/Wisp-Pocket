@@ -7,6 +7,7 @@ import type {
 import type { ThreadNotification as ProtocolThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import type { ThreadAuditEvent } from "@handagent/thread-store/index.ts";
+import { Mutex } from "async-mutex";
 import type { ThreadPersistence } from "./ThreadPersistence.ts";
 import { RUN_INTERRUPTED_CODE, RUN_INTERRUPTED_MESSAGE } from "./ThreadPersistence.ts";
 import { ThreadInputQueue, type ThreadUserInputItem } from "./ThreadInputQueue.ts";
@@ -33,7 +34,6 @@ type PushMessage = (message: ProtocolThreadNotification) => void;
 type BeforeRunHook = (threadId: string) => void | Promise<void>;
 type OrchestratorOptions = {
   interruptWaitTimeoutMs?: number;
-  interruptPollIntervalMs?: number;
 };
 
 type UserInputSubmission = {
@@ -68,15 +68,12 @@ type ThreadSession = {
 };
 
 const DEFAULT_INTERRUPT_WAIT_TIMEOUT_MS = 3000;
-const DEFAULT_INTERRUPT_POLL_INTERVAL_MS = 10;
-
 export class ThreadRuntimeOrchestrator {
   private readonly sessions = new Map<string, ThreadSession>();
   private readonly activeRuns = new Map<string, ActiveRun>();
-  private readonly inputLocks = new Map<string, Promise<void>>();
+  private readonly inputLocks = new Map<string, Mutex>();
   private nextGeneration = 0;
   private readonly interruptWaitTimeoutMs: number;
-  private readonly interruptPollIntervalMs: number;
 
   constructor(
     private readonly runtimeResolver: RuntimeResolver,
@@ -87,8 +84,6 @@ export class ThreadRuntimeOrchestrator {
   ) {
     this.interruptWaitTimeoutMs =
       options.interruptWaitTimeoutMs ?? DEFAULT_INTERRUPT_WAIT_TIMEOUT_MS;
-    this.interruptPollIntervalMs =
-      options.interruptPollIntervalMs ?? DEFAULT_INTERRUPT_POLL_INTERVAL_MS;
   }
 
   async submitInput(
@@ -142,27 +137,24 @@ export class ThreadRuntimeOrchestrator {
     });
     if (!activeRun) return;
 
-    const startedAt = Date.now();
-    while (this.isActive(threadId, activeRun)) {
-      if (Date.now() - startedAt >= this.interruptWaitTimeoutMs) {
-        await this.persistInterrupted(threadId, activeRun);
-        if (this.isActive(threadId, activeRun)) {
-          this.activeRuns.delete(threadId);
-          if (session?.activeRun === activeRun) {
-            session.activeRun = null;
-          }
-          if (session) {
-            const pendingItems = session.queue.takeAll();
-            session.processing = false;
-            session.closed = true;
-            this.resolveIdleWaiters(session);
-            this.sessions.delete(threadId);
-            this.replayPendingItems(threadId, session.push, pendingItems);
-          }
-        }
-        return;
+    if (await this.waitForInterruptedRunToSettle(session, activeRun)) {
+      return;
+    }
+
+    await this.persistInterrupted(threadId, activeRun);
+    if (this.isActive(threadId, activeRun)) {
+      this.activeRuns.delete(threadId);
+      if (session?.activeRun === activeRun) {
+        session.activeRun = null;
       }
-      await new Promise((resolve) => setTimeout(resolve, this.interruptPollIntervalMs));
+      if (session) {
+        const pendingItems = session.queue.takeAll();
+        session.processing = false;
+        session.closed = true;
+        this.resolveIdleWaiters(session);
+        this.sessions.delete(threadId);
+        this.replayPendingItems(threadId, session.push, pendingItems);
+      }
     }
   }
 
@@ -248,25 +240,30 @@ export class ThreadRuntimeOrchestrator {
     threadId: string,
     operation: () => Promise<T>,
   ): Promise<T> {
-    const previous = this.inputLocks.get(threadId) ?? Promise.resolve();
-    let release!: () => void;
-    const current = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const next = previous.catch(() => {}).then(() => current);
-    this.inputLocks.set(threadId, next);
-
-    await previous.catch(() => {});
-    try {
-      return await operation();
-    } finally {
-      release();
-      if (this.inputLocks.get(threadId) === next) {
-        this.inputLocks.delete(threadId);
-      }
+    const mutex = this.inputLocks.get(threadId) ?? new Mutex();
+    this.inputLocks.set(threadId, mutex);
+    const result = await mutex.runExclusive(operation);
+    if (!mutex.isLocked()) {
+      this.inputLocks.delete(threadId);
     }
+    return result;
   }
 
+  private async waitForInterruptedRunToSettle(
+    session: ThreadSession | undefined,
+    activeRun: ActiveRun,
+  ): Promise<boolean> {
+    if (!session || !this.isActive(session.threadId, activeRun)) {
+      return true;
+    }
+
+    return Promise.race([
+      this.waitForThreadIdle(session.threadId).then(() => true),
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), this.interruptWaitTimeoutMs);
+      }),
+    ]);
+  }
   private getOrCreateSession(threadId: string, push: PushMessage): ThreadSession {
     const existing = this.sessions.get(threadId);
     if (existing) {

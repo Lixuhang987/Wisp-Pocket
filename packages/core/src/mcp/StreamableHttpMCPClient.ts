@@ -1,3 +1,4 @@
+import { createParser } from "eventsource-parser";
 import type {
   MCPCallToolResult,
   MCPClient,
@@ -10,6 +11,11 @@ import type {
   MCPToolDescription,
 } from "./MCPClient.ts";
 import type { StreamableHttpMCPServerConfig } from "./MCPConfig.ts";
+import {
+  parsePromptDescription,
+  parseResourceDescription,
+  parseToolDescription,
+} from "./MCPDescriptions.ts";
 
 type HttpServerConfig = StreamableHttpMCPServerConfig;
 
@@ -164,48 +170,22 @@ export class StreamableHttpMCPClient implements MCPClient {
 }
 
 function parseEventStreamResponse(text: string, id: number): JsonRpcResponse {
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.startsWith("data:")) continue;
-    const parsed = JSON.parse(line.slice("data:".length).trim()) as JsonRpcResponse;
-    if (parsed.id === id) return parsed;
-  }
+  let matchedResponse: JsonRpcResponse | undefined;
+  const parser = createParser({
+    onEvent(event) {
+      const parsed = JSON.parse(event.data) as JsonRpcResponse;
+      if (parsed.id === id) {
+        matchedResponse = parsed;
+      }
+    },
+  });
+  parser.feed(ensureDispatchTerminator(text));
+  if (matchedResponse) return matchedResponse;
   throw new Error("MCP HTTP event stream did not contain response");
 }
 
-function parseToolDescription(value: unknown): MCPToolDescription {
-  if (!isRecord(value) || typeof value.name !== "string") {
-    throw new Error("Invalid MCP tool description");
-  }
-  return {
-    name: value.name,
-    description: typeof value.description === "string" ? value.description : undefined,
-    inputSchema: isRecord(value.inputSchema) ? value.inputSchema : undefined,
-  };
-}
-
-function parsePromptDescription(value: unknown): MCPPromptDescription {
-  if (!isRecord(value) || typeof value.name !== "string") {
-    throw new Error("Invalid MCP prompt description");
-  }
-  return {
-    name: value.name,
-    title: typeof value.title === "string" ? value.title : undefined,
-    description: typeof value.description === "string" ? value.description : undefined,
-    arguments: Array.isArray(value.arguments) ? value.arguments : undefined,
-  };
-}
-
-function parseResourceDescription(value: unknown): MCPResourceDescription {
-  if (!isRecord(value) || typeof value.uri !== "string" || typeof value.name !== "string") {
-    throw new Error("Invalid MCP resource description");
-  }
-  return {
-    uri: value.uri,
-    name: value.name,
-    title: typeof value.title === "string" ? value.title : undefined,
-    description: typeof value.description === "string" ? value.description : undefined,
-    mimeType: typeof value.mimeType === "string" ? value.mimeType : undefined,
-  };
+function ensureDispatchTerminator(text: string): string {
+  return /\r?\n\r?\n$/.test(text) ? text : `${text}\n\n`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

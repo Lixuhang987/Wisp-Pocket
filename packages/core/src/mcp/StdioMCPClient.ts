@@ -11,6 +11,11 @@ import type {
   MCPToolDescription,
 } from "./MCPClient.ts";
 import type { StdioMCPServerConfig } from "./MCPConfig.ts";
+import {
+  parsePromptDescription,
+  parseResourceDescription,
+  parseToolDescription,
+} from "./MCPDescriptions.ts";
 
 type StdioServerConfig = StdioMCPServerConfig;
 
@@ -235,42 +240,6 @@ export class StdioMCPClient implements MCPClient {
     }
     this.pending.clear();
   }
-}
-
-function parseToolDescription(value: unknown): MCPToolDescription {
-  if (!isRecord(value) || typeof value.name !== "string") {
-    throw new Error("Invalid MCP tool description");
-  }
-  return {
-    name: value.name,
-    description: typeof value.description === "string" ? value.description : undefined,
-    inputSchema: isRecord(value.inputSchema) ? value.inputSchema : undefined,
-  };
-}
-
-function parsePromptDescription(value: unknown): MCPPromptDescription {
-  if (!isRecord(value) || typeof value.name !== "string") {
-    throw new Error("Invalid MCP prompt description");
-  }
-  return {
-    name: value.name,
-    title: typeof value.title === "string" ? value.title : undefined,
-    description: typeof value.description === "string" ? value.description : undefined,
-    arguments: Array.isArray(value.arguments) ? value.arguments : undefined,
-  };
-}
-
-function parseResourceDescription(value: unknown): MCPResourceDescription {
-  if (!isRecord(value) || typeof value.uri !== "string" || typeof value.name !== "string") {
-    throw new Error("Invalid MCP resource description");
-  }
-  return {
-    uri: value.uri,
-    name: value.name,
-    title: typeof value.title === "string" ? value.title : undefined,
-    description: typeof value.description === "string" ? value.description : undefined,
-    mimeType: typeof value.mimeType === "string" ? value.mimeType : undefined,
-  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -2,6 +2,7 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, isAbsolute } from "node:path";
 import { randomUUID } from "node:crypto";
+import { stampsEqual, type FileStamp } from "../utils/fileStamp.ts";
 import type {
   Workspace,
   WorkspaceRegistration,
@@ -13,11 +14,6 @@ import type {
 type PersistedFile = {
   version: 1;
   workspaces: Workspace[];
-};
-
-type FileStamp = {
-  mtimeMs: number;
-  size: number;
 };
 
 export type FileWorkspaceRegistryOptions = {
@@ -202,9 +198,4 @@ export class FileWorkspaceRegistry implements WorkspaceRegistry {
     const info = await stat(this.options.filePath);
     return { mtimeMs: info.mtimeMs, size: info.size };
   }
-}
-
-function stampsEqual(left: FileStamp | null, right: FileStamp | null): boolean {
-  if (!left || !right) return left === right;
-  return left.mtimeMs === right.mtimeMs && left.size === right.size;
 }

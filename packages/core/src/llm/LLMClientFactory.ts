@@ -14,6 +14,7 @@ import type { AgentMessage } from "../runtime/AgentMessage.ts";
 import type { RegisteredTool } from "../tools/ToolRegistry.ts";
 import { hasImageContent, sanitizeToolName, toVercelMessages, toVercelTools } from "./VercelAdapters.ts";
 import { VercelClient } from "./VercelClient.ts";
+import { toError } from "../utils/errors.ts";
 
 export type LLMProviderCapabilities = {
   streaming: boolean;
@@ -266,10 +267,4 @@ class AISDKStreamingClient implements LLMClient {
       toolCalls,
     };
   }
-}
-
-function toError(error: unknown): Error {
-  if (error instanceof Error) return error;
-  if (typeof error === "string") return new Error(error);
-  return new Error(JSON.stringify(error));
 }

@@ -20,7 +20,7 @@ Electron main 会定位仓库根目录，然后执行：
 node --experimental-transform-types --experimental-specifier-resolution=node apps/agent-server/src/server/server.ts
 ```
 
-`server.ts` 末尾用 `import.meta.url === pathToFileURL(process.argv[1]).href` 判断当前文件是否作为进程入口运行。测试可以直接 import `startServer`、socket handler、MCP client helper 与 LLM 模式 helper，不会自动占用 4317 端口。
+`server.ts` 末尾用 `import.meta.url === pathToFileURL(process.argv[1]).href` 判断当前文件是否作为进程入口运行。测试可以直接 import `startServer`、socket handler、MCP client helper 与 LLM 模式 helper，不会自动占用 4317 端口。入站 `/api/thread`、`/api/platform` 和 `ClientResponse` 的运行时校验使用 `zod` schema，不能只靠 `type` 字符串判断。
 
 ## 关键机制
 
@@ -43,7 +43,7 @@ if (path === "/api/thread") {
 socket.close();
 ```
 
-`/api/thread`、`/api/activity` 和 `/api/platform` 是三条独立 WebSocket，不共享消息 union。`/thread-window/*` 由同一个 HTTP server 直接返回 React 静态资源，供 Electron ThreadWindow `BrowserWindow` 使用。未知 path 或缺失 path 会被关闭或返回 404，不默认为 thread socket。
+`/api/thread`、`/api/activity` 和 `/api/platform` 是三条独立 WebSocket，不共享消息 union。`/thread-window/*` 由同一个 HTTP server 直接返回 React 静态资源，供 Electron ThreadWindow `BrowserWindow` 使用；Content-Type 由 `mime-types` 根据扩展名推断。未知 path 或缺失 path 会被关闭或返回 404，不默认为 thread socket。
 
 按当前协议约束：
 

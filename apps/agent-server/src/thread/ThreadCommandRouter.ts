@@ -254,7 +254,7 @@ export class ThreadCommandRouter {
   }
 
   private makeNotificationId(): string {
-    return `notification-${Math.random().toString(36).slice(2, 10)}`;
+    return `notification-${crypto.randomUUID()}`;
   }
 
   private ensureAgent(threadId: string): void {

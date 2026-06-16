@@ -4,6 +4,7 @@ import type {
   LLMCompletion,
   LLMStreamEvent,
 } from "./LLMClient.ts";
+import { createAbortError, throwIfAborted } from "./LLMClient.ts";
 import type { AgentMessage, UserAgentMessage } from "../runtime/AgentMessage.ts";
 import type { RegisteredTool } from "../tools/ToolRegistry.ts";
 
@@ -527,17 +528,6 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 
 function chunkText(text: string): string[] {
   return text.match(/\S+\s*/g) ?? [];
-}
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (!signal?.aborted) return;
-  throw createAbortError();
-}
-
-function createAbortError(): Error {
-  const error = new Error("The agent run was interrupted.");
-  error.name = "AbortError";
-  return error;
 }
 
 function toolThenFinal(

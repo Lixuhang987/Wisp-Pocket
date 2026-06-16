@@ -6,7 +6,7 @@
 
 | 文件 | 职责 |
 |------|------|
-| `electronShellProtocol.ts` | `SwiftToElectronCommand`、`ElectronToSwiftEvent`、`parseCommand()`、`encodeEvent()` 和 command type guard |
+| `electronShellProtocol.ts` | `SwiftToElectronCommand`、`ElectronToSwiftEvent`、`parseCommand()`、`encodeEvent()` 和基于 `zod` 的 command / event 运行时 schema |
 
 ## Command 边界
 
@@ -26,4 +26,4 @@
 
 - 新增、删除或改名 command/event 时，必须同步更新 Swift [ElectronShellProtocol.swift](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/ElectronShell/ElectronShellProtocol.swift) 和双方测试。
 - 不在本目录复制 core DTO。Initial prompt 的 `UserInput` 类型从 `@handagent/core/protocol/*` 引用。
-- `parseCommand()` 需要拒绝未知命令，尤其要持续覆盖拒绝 `thread_window.prepare` 的测试。
+- `parseCommand()` 需要通过 schema 拒绝未知命令和缺失 payload 的命令，尤其要持续覆盖拒绝 `thread_window.prepare` 的测试。

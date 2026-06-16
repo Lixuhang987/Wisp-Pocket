@@ -9,6 +9,7 @@
 | `agentServerSupervisor.ts` | supervisor 抽象、health event、description 和日志 sink 类型 |
 | `agentServerEntry.ts` | 判断是否存在可供 `utilityProcess` 使用的构建后 JS entry，并给出 Node fallback blocker |
 | `agentServerSupervisorFactory.ts` | 根据 entry 判断创建 `UtilityProcessAgentServerSupervisor` 或 `NodeAgentServerSupervisor` |
+| `output.ts` | supervisor stdout/stderr 格式化与 unknown error message 归一化 |
 | `nodeAgentServerSupervisor.ts` | 当前开发态 fallback：用 Node child process 启动 TypeScript agent-server 源码入口 |
 | `utilityProcessAgentServerSupervisor.ts` | 构建后 JS entry 存在时的 Electron `utilityProcess` supervisor |
 
@@ -24,7 +25,8 @@
 - 非用户主动 stop 的非零退出、进程错误或 readiness 失败都先发 unavailable health，再指数退避重启。
 - 默认最多 5 次重启；超过后发最终 unavailable 诊断，不继续调度。
 - `stop()` 是用户主动停机：必须递增 generation、停止当前进程、发 `"agent-server stopped"`，并阻止旧 readiness / restart 回调复活进程。
-- stdout/stderr 必须被 drain 到 `logSink` 或 stderr，避免子进程缓冲堵塞。
+- Node fallback 的 readiness / restart 延迟等待使用 `node:timers/promises` 的 `setTimeout as sleep`，不要恢复手写 Promise sleep。
+- stdout/stderr 必须被 drain 到 `logSink` 或 stderr，避免子进程缓冲堵塞；两种 supervisor 的输出前缀和 unknown error 文案必须复用 `output.ts`。
 
 ## 修改约束
 

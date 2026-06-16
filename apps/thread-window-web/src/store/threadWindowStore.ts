@@ -1,5 +1,7 @@
-import { produce } from "immer";
+import { current, produce } from "immer";
 import { create } from "zustand";
+import type { PersistStorage, StorageValue } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import type {
   InitialPromptPayload,
   InputItem,
@@ -13,51 +15,19 @@ import type {
 
 const EXPANDED_WORKSPACE_IDS_STORAGE_KEY = "handAgent.threadWindow.expandedWorkspaceIds";
 
-function getLocalStorage(): Storage | null {
+type PersistedThreadWindowState = {
+  expandedWorkspaceIds: string[];
+};
+
+function getLocalStorage(): Storage | undefined {
   if (typeof window === "undefined") {
-    return null;
+    return undefined;
   }
 
   try {
     return window.localStorage;
   } catch {
-    return null;
-  }
-}
-
-function loadExpandedWorkspaceIds(): Set<string> {
-  const storage = getLocalStorage();
-  if (!storage) {
-    return new Set();
-  }
-
-  try {
-    const rawValue = storage.getItem(EXPANDED_WORKSPACE_IDS_STORAGE_KEY);
-    if (!rawValue) {
-      return new Set();
-    }
-
-    const parsed = JSON.parse(rawValue);
-    if (!Array.isArray(parsed)) {
-      return new Set();
-    }
-
-    return new Set(parsed.filter((value): value is string => typeof value === "string"));
-  } catch {
-    return new Set();
-  }
-}
-
-function persistExpandedWorkspaceIds(workspaceIds: Set<string>): void {
-  const storage = getLocalStorage();
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(EXPANDED_WORKSPACE_IDS_STORAGE_KEY, JSON.stringify(Array.from(workspaceIds)));
-  } catch {
-    // Persistence is best-effort; losing it must not block the UI toggle.
+    return undefined;
   }
 }
 
@@ -144,7 +114,7 @@ function emptyThreadState(threadId: string, title: string | null = null): Thread
   };
 }
 
-export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
+export const createThreadWindowStore = create<ThreadWindowState>()(persist((set) => ({
   connectionState: "disconnected",
   windowErrorMessage: null,
   history: [],
@@ -152,7 +122,7 @@ export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
   pendingInitialPrompts: {},
   processedNotificationIds: {},
   workspaces: [],
-  expandedWorkspaceIds: loadExpandedWorkspaceIds(),
+  expandedWorkspaceIds: new Set(),
   searchQuery: "",
 
   setConnectionState(state) {
@@ -173,7 +143,6 @@ export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
         nextExpandedWorkspaceIds.add(workspaceId);
       }
 
-      persistExpandedWorkspaceIds(nextExpandedWorkspaceIds);
       return { expandedWorkspaceIds: nextExpandedWorkspaceIds };
     });
   },
@@ -220,7 +189,7 @@ export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
       }
       const queuedInput = thread.queuedComposerInputs.shift() ?? null;
       if (queuedInput) {
-        nextInput = { op: cloneOp(queuedInput.op) };
+        nextInput = { op: cloneOp(current(queuedInput.op)) };
         thread.queuedInputDispatchPending = true;
       }
     }));
@@ -446,45 +415,76 @@ export const createThreadWindowStore = create<ThreadWindowState>((set) => ({
       }
     }));
   },
+}), {
+  name: EXPANDED_WORKSPACE_IDS_STORAGE_KEY,
+  storage: createExpandedWorkspaceIdsStorage(),
+  partialize: (state) => ({
+    expandedWorkspaceIds: Array.from(state.expandedWorkspaceIds),
+  }),
+  merge: (persistedState, currentState) => {
+    const persisted = persistedState as Partial<PersistedThreadWindowState> | undefined;
+    return {
+      ...currentState,
+      expandedWorkspaceIds: new Set(
+        persisted?.expandedWorkspaceIds?.filter((value): value is string => typeof value === "string") ?? [],
+      ),
+    };
+  },
 }));
 
-function cloneOp(op: RuntimeOp): RuntimeOp {
-  if (op.type === "interrupt") {
-    return {
-      type: "interrupt",
-      opId: op.opId,
-      timestamp: op.timestamp,
-      payload: { reason: op.payload.reason },
-    };
-  }
-
+function createExpandedWorkspaceIdsStorage(): PersistStorage<PersistedThreadWindowState> {
   return {
-    type: "user_input",
-    opId: op.opId,
-    timestamp: op.timestamp,
-    payload: {
-      items: op.payload.items.map((item) => cloneInputItem(item)),
+    getItem(name) {
+      const storage = getLocalStorage();
+      if (!storage) return null;
+      try {
+        const rawValue = storage.getItem(name);
+        if (!rawValue) return null;
+        const parsed = JSON.parse(rawValue) as unknown;
+        if (Array.isArray(parsed)) {
+          return {
+            state: {
+              expandedWorkspaceIds: parsed.filter((value): value is string => typeof value === "string"),
+            },
+          };
+        }
+        if (isStorageValue(parsed)) {
+          return parsed;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    },
+    setItem(name, value) {
+      const storage = getLocalStorage();
+      if (!storage) return;
+      try {
+        storage.setItem(name, JSON.stringify(value));
+      } catch {
+        // Persistence is best-effort; losing it must not block the UI toggle.
+      }
+    },
+    removeItem(name) {
+      getLocalStorage()?.removeItem(name);
     },
   };
 }
 
+function cloneOp(op: RuntimeOp): RuntimeOp {
+  return structuredClone(op);
+}
+
 function cloneInputItem(item: InputItem): InputItem {
-  switch (item.type) {
-    case "text":
-      return { type: "text", id: item.id, text: item.text };
-    case "image":
-      return { type: "image", id: item.id, mimeType: item.mimeType, base64: item.base64 };
-    case "skill":
-      return {
-        type: "skill",
-        id: item.id,
-        actionId: item.actionId,
-        title: item.title,
-        prompt: item.prompt,
-      };
-    case "text_selection":
-      return { type: "text_selection", id: item.id, text: item.text };
+  return structuredClone(item);
+}
+
+function isStorageValue(value: unknown): value is StorageValue<PersistedThreadWindowState> {
+  if (typeof value !== "object" || value === null || !("state" in value)) {
+    return false;
   }
+  const state = (value as { state?: unknown }).state;
+  return typeof state === "object" && state !== null && "expandedWorkspaceIds" in state;
 }
 
 function summarizeInputItems(items: InputItem[]): string {

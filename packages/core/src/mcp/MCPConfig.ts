@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type StdioMCPServerConfig = {
   id: string;
   title: string;
@@ -31,50 +33,70 @@ export type MCPElicitationConfig = {
   autoAcceptEmptyForm?: boolean;
 };
 
-export function parseMCPConfig(value: unknown): MCPConfig {
-  if (!isRecord(value)) throw new Error("mcp config must be an object");
-  if (value.version !== 1) throw new Error("mcp config version must be 1");
-  if (!Array.isArray(value.servers)) {
-    throw new Error("mcp config servers must be an array");
-  }
+const nonEmptyString = (message: string) =>
+  z.string(message).refine((value) => value.trim() !== "", { message });
 
+const optionalNonEmptyString = (message: string) => nonEmptyString(message).optional();
+
+const stringRecord = (message: string) =>
+  z.record(z.string(), z.string(message), { error: message });
+
+const ElicitationSchema = z.object({
+  autoAcceptEmptyForm: z.boolean("mcp elicitation autoAcceptEmptyForm must be a boolean").optional(),
+}, { error: "mcp elicitation must be an object" });
+
+const StdioServerSchema = z.object({
+  id: nonEmptyString("mcp id must be a non-empty string"),
+  title: nonEmptyString("mcp title must be a non-empty string"),
+  transport: z.literal("stdio"),
+  command: nonEmptyString("mcp command must be a non-empty string"),
+  args: z.array(z.string({ error: "mcp args must be a string array" }), { error: "mcp args must be a string array" }).optional(),
+  env: z.preprocess(
+    (value) => isPlainRecord(value) ? value : undefined,
+    stringRecord("mcp env must be a string record").optional(),
+  ),
+  cwd: optionalNonEmptyString("mcp cwd must be a non-empty string"),
+  requestTimeoutMs: z.number("mcp requestTimeoutMs must be a positive integer")
+    .int("mcp requestTimeoutMs must be a positive integer")
+    .positive("mcp requestTimeoutMs must be a positive integer")
+    .optional(),
+  elicitation: ElicitationSchema.optional(),
+});
+
+const StreamableHttpServerSchema = z.object({
+  id: nonEmptyString("mcp id must be a non-empty string"),
+  title: nonEmptyString("mcp title must be a non-empty string"),
+  transport: z.literal("streamableHttp"),
+  url: nonEmptyString("mcp url must be a non-empty string"),
+  headers: z.preprocess(
+    (value) => isPlainRecord(value) ? value : undefined,
+    stringRecord("mcp headers must be a string record").optional(),
+  ),
+});
+
+const MCPConfigSchema = z.object({
+  version: z.literal(1, { error: "mcp config version must be 1" }),
+  servers: z.array(
+    z.discriminatedUnion("transport", [StdioServerSchema, StreamableHttpServerSchema], {
+      error: "mcp server transport must be stdio or streamableHttp",
+    }),
+    { error: "mcp config servers must be an array" },
+  ),
+}, { error: "mcp config must be an object" });
+
+export function parseMCPConfig(value: unknown): MCPConfig {
+  const result = MCPConfigSchema.safeParse(value);
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? "invalid mcp config");
+  }
   return {
     version: 1,
-    servers: value.servers.map(parseServer),
+    servers: result.data.servers.map((server) =>
+      server.transport === "streamableHttp" && server.headers
+        ? { ...server, headers: interpolateHeaders(server.headers) }
+        : server,
+    ),
   };
-}
-
-function parseServer(value: unknown): MCPServerConfig {
-  if (!isRecord(value)) throw new Error("mcp server must be an object");
-
-  const id = requiredString(value, "id");
-  const title = requiredString(value, "title");
-  if (value.transport === "stdio") {
-    return {
-      id,
-      title,
-      transport: "stdio",
-      command: requiredString(value, "command"),
-      args: stringArray(value.args),
-      env: isRecord(value.env) ? stringRecord(value.env, "env") : undefined,
-      cwd: optionalString(value, "cwd"),
-      requestTimeoutMs: optionalPositiveInteger(value, "requestTimeoutMs"),
-      elicitation: parseElicitation(value.elicitation),
-    };
-  }
-  if (value.transport === "streamableHttp") {
-    return {
-      id,
-      title,
-      transport: "streamableHttp",
-      url: requiredString(value, "url"),
-      headers: isRecord(value.headers)
-        ? interpolateHeaders(stringRecord(value.headers, "headers"))
-        : undefined,
-    };
-  }
-
-  throw new Error("mcp server transport must be stdio or streamableHttp");
 }
 
 function interpolateHeaders(headers: Record<string, string>): Record<string, string> {
@@ -88,68 +110,6 @@ function interpolateHeaders(headers: Record<string, string>): Record<string, str
   return result;
 }
 
-function requiredString(record: Record<string, unknown>, key: string): string {
-  const value = record[key];
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`mcp ${key} must be a non-empty string`);
-  }
-  return value;
-}
-
-function optionalString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  if (value === undefined) return undefined;
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`mcp ${key} must be a non-empty string`);
-  }
-  return value;
-}
-
-function optionalPositiveInteger(
-  record: Record<string, unknown>,
-  key: string,
-): number | undefined {
-  const value = record[key];
-  if (value === undefined) return undefined;
-  if (!Number.isInteger(value) || typeof value !== "number" || value <= 0) {
-    throw new Error(`mcp ${key} must be a positive integer`);
-  }
-  return value;
-}
-
-function stringArray(value: unknown): string[] | undefined {
-  if (value === undefined) return undefined;
-  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
-    throw new Error("mcp args must be a string array");
-  }
-  return value;
-}
-
-function stringRecord(
-  value: Record<string, unknown>,
-  key: string,
-): Record<string, string> {
-  const entries = Object.entries(value);
-  if (!entries.every(([, item]) => typeof item === "string")) {
-    throw new Error(`mcp ${key} must be a string record`);
-  }
-  return Object.fromEntries(entries) as Record<string, string>;
-}
-
-function parseElicitation(value: unknown): MCPElicitationConfig | undefined {
-  if (value === undefined) return undefined;
-  if (!isRecord(value)) throw new Error("mcp elicitation must be an object");
-  if (
-    value.autoAcceptEmptyForm !== undefined &&
-    typeof value.autoAcceptEmptyForm !== "boolean"
-  ) {
-    throw new Error("mcp elicitation autoAcceptEmptyForm must be a boolean");
-  }
-  return {
-    autoAcceptEmptyForm: value.autoAcceptEmptyForm,
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,12 +1,14 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { createConnection } from "node:net";
+import { setTimeout as sleep } from "node:timers/promises";
 import type {
   AgentServerHealthEvent,
   AgentServerLogSink,
   AgentServerSupervisor,
   AgentServerSupervisorDescription,
 } from "./agentServerSupervisor.js";
+import { formatAgentServerOutput } from "./output.js";
 
 export type AgentServerChildProcess = EventEmitter & {
   stdout?: EventEmitter | null;
@@ -207,10 +209,10 @@ export class NodeAgentServerSupervisor implements AgentServerSupervisor {
 
   private drainChildOutput(child: AgentServerChildProcess): void {
     child.stdout?.on("data", (chunk: unknown) => {
-      this.writeLog(formatChildOutput("stdout", chunk));
+      this.writeLog(formatAgentServerOutput("stdout", chunk));
     });
     child.stderr?.on("data", (chunk: unknown) => {
-      this.writeLog(formatChildOutput("stderr", chunk));
+      this.writeLog(formatAgentServerOutput("stderr", chunk));
     });
   }
 
@@ -253,15 +255,4 @@ function canConnect(host: string, port: number): Promise<boolean> {
     socket.once("connect", () => finish(true));
     socket.once("error", () => finish(false));
   });
-}
-
-function sleep(delayMs: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, delayMs);
-  });
-}
-
-function formatChildOutput(streamName: "stdout" | "stderr", chunk: unknown): string {
-  const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
-  return `[agent-server ${streamName}] ${text}`;
 }

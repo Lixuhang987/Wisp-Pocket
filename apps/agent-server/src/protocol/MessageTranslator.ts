@@ -13,6 +13,7 @@ import type { ConversationMessage } from "@handagent/core/conversation/Conversat
 import type { ThreadAuditEvent } from "@handagent/thread-store/index.ts";
 import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
 import { parseStub, renderStub } from "@handagent/core/runtime/Stub.ts";
+import { extension, lookup } from "mime-types";
 
 export function toThreadNotification(
   threadId: string,
@@ -280,24 +281,7 @@ export function summarizeUserInput(userInput: UserInput): string {
 }
 
 export function cloneInputItems(items: UserInput["items"]): UserInput["items"] {
-  return items.map((item) => {
-    switch (item.type) {
-      case "text":
-        return { type: "text", id: item.id, text: item.text };
-      case "image":
-        return { type: "image", id: item.id, mimeType: item.mimeType, base64: item.base64 };
-      case "skill":
-        return {
-          type: "skill",
-          id: item.id,
-          actionId: item.actionId,
-          title: item.title,
-          prompt: item.prompt,
-        };
-      case "text_selection":
-        return { type: "text_selection", id: item.id, text: item.text };
-    }
-  });
+  return structuredClone(items);
 }
 
 export function deriveTitle(text: string): string {
@@ -357,20 +341,14 @@ function appendTextPart(
 }
 
 function mimeTypeForPath(path: string): "image/png" | "image/jpeg" | "image/webp" | undefined {
-  const lower = path.toLowerCase();
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".webp")) return "image/webp";
-  return undefined;
+  const mimeType = lookup(path);
+  return isSupportedImageMimeType(mimeType) ? mimeType : undefined;
 }
 
 function imageExtension(mimeType: ImageAttachment["mimeType"]): string {
-  switch (mimeType) {
-    case "image/jpeg":
-      return "jpg";
-    case "image/png":
-      return "png";
-    case "image/webp":
-      return "webp";
-  }
+  return extension(mimeType) || "bin";
+}
+
+function isSupportedImageMimeType(mimeType: string | false): mimeType is ImageAttachment["mimeType"] {
+  return mimeType === "image/png" || mimeType === "image/jpeg" || mimeType === "image/webp";
 }

@@ -136,4 +136,26 @@ describe("ModelSettings", () => {
       "Failed to parse settings at"
     );
   });
+
+  it("normalizes blank and invalid model settings back to defaults", () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "spot-agent-settings-"));
+    tempRoots.push(homeDir);
+    const settingsDir = join(homeDir, ".spotAgent");
+    mkdirSync(settingsDir, { recursive: true });
+    writeFileSync(
+      join(settingsDir, "settings.json"),
+      JSON.stringify({
+        llm: {
+          provider: "bad-provider",
+          model: "  ",
+          summarizerModel: "",
+          apiKey: "  ",
+          baseUrl: 123,
+          api: "bad-api",
+        },
+      }),
+    );
+
+    expect(loadModelSettings(homeDir)).toEqual(defaultModelSettings);
+  });
 });

@@ -305,7 +305,7 @@ export const RUN_LOST_AFTER_RESTART_CODE = "run_lost_after_restart";
 export const RUN_LOST_AFTER_RESTART_MESSAGE = "本轮运行因 agent-server 重启而中断，请重新发送请求。";
 
 function generateThreadId(): string {
-  return `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `thread-${crypto.randomUUID()}`;
 }
 
 function isIncompleteTurn(messages: AgentMessage[]): boolean {

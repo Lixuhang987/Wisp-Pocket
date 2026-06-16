@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { extname, join, resolve } from "node:path";
 import { homedir } from "node:os";
+import { z } from "zod";
+import { contentType } from "mime-types";
 import type { PlatformBridgeMessage } from "@handagent/core/protocol/PlatformBridgeMessage.ts";
 import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 import type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
@@ -16,6 +18,7 @@ import type { PlatformAdapter } from "@handagent/core/platform/PlatformAdapter.t
 import { parseMCPConfig } from "@handagent/core/mcp/MCPConfig.ts";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
+import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
 import { ThreadPersistence } from "../thread/ThreadPersistence.ts";
 import {
   AgentManager,
@@ -148,28 +151,15 @@ export function attachActivitySocketHandlers(
 }
 
 function isPlatformBridgeMessage(message: unknown): message is PlatformBridgeMessage {
-  return isRecord(message) && message.channel === "platform";
+  return PlatformBridgeMessageSchema.safeParse(message).success;
 }
 
 function isThreadCommand(message: unknown): message is ThreadCommand {
-  if (!isRecord(message)) {
-    return false;
-  }
-  return [
-    "thread.start",
-    "thread.resume",
-    "thread.list",
-    "thread.delete",
-    "op.submit",
-    "workspace.list",
-  ].includes((message as { type?: string }).type ?? "");
+  return ThreadCommandSchema.safeParse(message).success;
 }
 
 function isClientResponse(message: unknown): message is ClientResponse {
-  if (!isRecord(message)) {
-    return false;
-  }
-  return message.type === "permission.answered" || message.type === "workspace.answered";
+  return ClientResponseSchema.safeParse(message).success;
 }
 
 function parseSocketMessage(raw: { toString(): string }): unknown {
@@ -180,9 +170,154 @@ function parseSocketMessage(raw: { toString(): string }): unknown {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+const InputItemSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("text"),
+    id: z.string(),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal("text_selection"),
+    id: z.string(),
+    text: z.string(),
+  }),
+  z.object({
+    type: z.literal("image"),
+    id: z.string(),
+    mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+    base64: z.string(),
+  }),
+  z.object({
+    type: z.literal("skill"),
+    id: z.string(),
+    actionId: z.string(),
+    title: z.string(),
+    prompt: z.string(),
+  }),
+]);
+
+const UserInputOpSchema = z.object({
+  type: z.literal("user_input"),
+  opId: z.string(),
+  timestamp: z.string(),
+  payload: z.object({
+    items: z.array(InputItemSchema).min(1),
+  }),
+});
+
+const InterruptOpSchema = z.object({
+  type: z.literal("interrupt"),
+  opId: z.string(),
+  timestamp: z.string(),
+  payload: z.object({
+    reason: z.enum(["user", "system"]),
+  }),
+});
+
+const RuntimeOpSchema = z.discriminatedUnion("type", [UserInputOpSchema, InterruptOpSchema]);
+
+const ThreadCommandSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("thread.start"),
+    commandId: z.string(),
+    timestamp: z.string(),
+    payload: z.object({ workspaceId: z.string().nullable() }),
+  }),
+  z.object({
+    type: z.literal("thread.resume"),
+    threadId: z.string(),
+    commandId: z.string(),
+    timestamp: z.string(),
+  }),
+  z.object({
+    type: z.literal("thread.list"),
+    commandId: z.string(),
+    timestamp: z.string(),
+  }),
+  z.object({
+    type: z.literal("thread.delete"),
+    commandId: z.string(),
+    timestamp: z.string(),
+    payload: z.object({ targetThreadId: z.string() }),
+  }),
+  z.object({
+    type: z.literal("op.submit"),
+    threadId: z.string(),
+    commandId: z.string(),
+    timestamp: z.string(),
+    payload: z.object({ op: RuntimeOpSchema }),
+  }),
+  z.object({
+    type: z.literal("workspace.list"),
+    commandId: z.string(),
+    timestamp: z.string(),
+  }),
+]) satisfies z.ZodType<ThreadCommand>;
+
+const ClientResponseSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("permission.answered"),
+    requestId: z.string(),
+    timestamp: z.string(),
+    payload: z.object({
+      decision: z.enum(["allow", "deny"]),
+      scope: z.enum(["once", "thread", "always"]).optional(),
+      reason: z.string().optional(),
+    }),
+  }),
+  z.object({
+    type: z.literal("workspace.answered"),
+    requestId: z.string(),
+    timestamp: z.string(),
+    payload: z.object({
+      workspaceId: z.string().optional(),
+      cancelled: z.boolean().optional(),
+    }),
+  }),
+]) satisfies z.ZodType<ClientResponse>;
+
+const PlatformResponsePayloadSchema = z.discriminatedUnion("status", [
+  z.object({
+    requestId: z.string(),
+    status: z.literal("ok"),
+    result: z.unknown(),
+  }),
+  z.object({
+    requestId: z.string(),
+    status: z.literal("error"),
+    message: z.string(),
+    code: z.string().optional(),
+  }),
+]);
+
+const PlatformBridgeMessageSchema = z.discriminatedUnion("type", [
+  z.object({
+    channel: z.literal("platform"),
+    type: z.literal("platform_bridge_hello"),
+    messageId: z.string(),
+    timestamp: z.string(),
+    payload: z.object({ agent: z.string() }),
+  }),
+  z.object({
+    channel: z.literal("platform"),
+    type: z.literal("platform_request"),
+    messageId: z.string(),
+    timestamp: z.string(),
+    payload: z.object({
+      requestId: z.string(),
+      method: z.string(),
+      args: z.unknown(),
+      timeoutMs: z.number().optional(),
+    }),
+  }),
+  z.object({
+    channel: z.literal("platform"),
+    type: z.literal("platform_response"),
+    messageId: z.string(),
+    timestamp: z.string(),
+    payload: PlatformResponsePayloadSchema,
+  }),
+]) satisfies z.ZodType<PlatformBridgeMessage>;
 
 export async function startServer({
   commandRouter,
@@ -622,15 +757,6 @@ function resolveThreadWindowWebDistDir(
   return join(currentDirectory, "apps/thread-window-web/dist");
 }
 
-function isNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ENOENT"
-  );
-}
-
 function historyShowsToolsActivated(messages: readonly AgentMessage[]): boolean {
   return messages.some((m) => m.role === "tool" && m.name === META_TOOL_NAME);
 }
@@ -671,7 +797,7 @@ async function handleStaticRequest(
   try {
     const body = await readFile(targetPath);
     response.statusCode = 200;
-    response.setHeader("Content-Type", mimeTypeForExtension(extname(targetPath)));
+    response.setHeader("Content-Type", contentType(extname(targetPath)) || "application/octet-stream");
     response.end(body);
   } catch (error) {
     if (isNotFoundError(error)) {
@@ -698,30 +824,6 @@ function resolveThreadWindowRequestPath(pathname: string): string | null {
   return decodeURIComponent(rawRelativePath);
 }
 
-function mimeTypeForExtension(extension: string): string {
-  switch (extension) {
-    case ".html":
-      return "text/html; charset=utf-8";
-    case ".js":
-      return "text/javascript; charset=utf-8";
-    case ".css":
-      return "text/css; charset=utf-8";
-    case ".json":
-    case ".map":
-      return "application/json; charset=utf-8";
-    case ".svg":
-      return "image/svg+xml";
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".webp":
-      return "image/webp";
-    default:
-      return "application/octet-stream";
-  }
-}
 
 function clearThreadPermissionRules(
   permissionPolicy: FilePermissionPolicy | undefined,

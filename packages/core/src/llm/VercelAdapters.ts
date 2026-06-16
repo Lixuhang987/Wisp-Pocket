@@ -1,4 +1,5 @@
 import { jsonSchema, tool, type JSONValue, type ModelMessage, type ToolSet } from "ai";
+import { createParser, type EventSourceMessage } from "eventsource-parser";
 import type { BlobStore } from "../blob/BlobStore.ts";
 import type { AgentImageContentPart, AgentMessage } from "../runtime/AgentMessage.ts";
 import type { RegisteredTool } from "../tools/ToolRegistry.ts";
@@ -26,38 +27,27 @@ export function createOpenAICompatibleFetch(baseFetch?: typeof fetch): typeof fe
 }
 
 export function filterEmptySSEDataEvents(raw: string): string {
-  const trailingLineBreak = raw.match(/(\r?\n)$/)?.[0] ?? "";
-  const blocks = raw.split(/\r?\n\r?\n/);
-  const filteredBlocks: string[] = [];
-  let pendingEventLines: string[] = [];
+  const events = parseSSEMessages(raw);
+  const filteredEvents: EventSourceMessage[] = [];
+  let pendingEmptyEvent: EventSourceMessage | undefined;
 
-  for (const [index, block] of blocks.entries()) {
-    if (block === "" && index === blocks.length - 1) {
-      if (trailingLineBreak.length > 0) {
-        filteredBlocks.push(block);
-      }
+  for (const event of events) {
+    if (event.data.trim() === "") {
+      pendingEmptyEvent = event;
       continue;
     }
-
-    const lines = block.split(/\r?\n/);
-    const dataLines = lines.filter((line) => line.startsWith("data:"));
-    const hasOnlyEmptyData = dataLines.length > 0 && dataLines.every(isEmptySSEDataLine);
-    if (hasOnlyEmptyData) {
-      pendingEventLines = lines.filter((line) => !line.startsWith("data:"));
-      continue;
-    }
-
-    if (pendingEventLines.length > 0 && dataLines.length > 0 && !lines.some(isSSEEventLine)) {
-      filteredBlocks.push([...pendingEventLines, ...lines].join("\n"));
-      pendingEventLines = [];
-      continue;
-    }
-
-    pendingEventLines = [];
-    filteredBlocks.push(block);
+    filteredEvents.push(
+      pendingEmptyEvent && !event.event
+        ? { ...event, event: pendingEmptyEvent.event, id: event.id ?? pendingEmptyEvent.id }
+        : event,
+    );
+    pendingEmptyEvent = undefined;
   }
 
-  return filteredBlocks.join("\n\n");
+  if (filteredEvents.length === 0) {
+    return "";
+  }
+  return filteredEvents.map(formatSSEMessage).join("\n\n") + trailingLineBreak(raw);
 }
 
 function filterEmptySSEDataEventStream(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
@@ -93,12 +83,34 @@ function isEventStreamResponse(response: Response): boolean {
   return response.headers.get("content-type")?.toLowerCase().split(";")[0].trim() === "text/event-stream";
 }
 
-function isEmptySSEDataLine(line: string): boolean {
-  return /^data:\s*$/.test(line);
+function parseSSEMessages(raw: string): EventSourceMessage[] {
+  const events: EventSourceMessage[] = [];
+  const parser = createParser({
+    onEvent(event) {
+      events.push(event);
+    },
+  });
+  parser.feed(ensureDispatchTerminator(raw));
+  return events;
 }
 
-function isSSEEventLine(line: string): boolean {
-  return line.startsWith("event:");
+function ensureDispatchTerminator(raw: string): string {
+  return /\r?\n\r?\n$/.test(raw) ? raw : `${raw}\n\n`;
+}
+
+function trailingLineBreak(raw: string): string {
+  if (/\r?\n\r?\n$/.test(raw)) {
+    return "\n\n";
+  }
+  return /\r?\n$/.test(raw) ? "\n" : "";
+}
+
+function formatSSEMessage(event: EventSourceMessage): string {
+  return [
+    event.id ? `id:${event.id}` : undefined,
+    event.event ? `event:${event.event}` : undefined,
+    ...event.data.split("\n").map((line) => `data: ${line}`),
+  ].filter((line) => line !== undefined).join("\n");
 }
 
 export type VercelMessageAdapterOptions = {

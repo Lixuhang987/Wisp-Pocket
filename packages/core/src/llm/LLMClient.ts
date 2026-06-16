@@ -153,8 +153,7 @@ async function* streamFromCompletion(
 }
 
 export function throwIfAborted(signal?: AbortSignal): void {
-  if (!signal?.aborted) return;
-  throw createAbortError();
+  signal?.throwIfAborted();
 }
 
 export function createAbortError(): Error {

@@ -85,7 +85,7 @@ parts.push(renderStub({
 }));
 ```
 
-用户主动提交的图片不会直接塞入 thread JSON。`composeUserContent()` 先把 bytes 写入 BlobStore，再把可恢复的 STUB 文本写入 user message。进入下一轮 runtime 前，`agentMessagesToRuntimeMessages()` 会解析 STUB 并转成 `{ type: "image", blobId, mimeType }`。
+用户主动提交的图片不会直接塞入 thread JSON。`composeUserContent()` 先把 bytes 写入 BlobStore，再把可恢复的 STUB 文本写入 user message。图片扩展名和 MIME 反推使用 `mime-types`，只在识别失败时回退到安全默认值。进入下一轮 runtime 前，`agentMessagesToRuntimeMessages()` 会解析 STUB 并转成 `{ type: "image", blobId, mimeType }`。
 
 ### user message 保留结构化 items
 
@@ -103,7 +103,7 @@ parts.push(renderStub({
 ## 编辑约束
 
 - 新增 `AgentRuntimeEvent` 类型时，必须同时判断是否需要更新 `toThreadNotification()` 与 `toAuditEvent()`。
-- 新增用户附件类型时，必须同时处理 `composeUserContent()`、持久化表达和进入 runtime 前的展开逻辑。
+- 新增用户附件类型时，必须同时处理 `composeUserContent()`、持久化表达和进入 runtime 前的展开逻辑；能用 `structuredClone` 复制的结构化输入不要再手写 variant clone。
 - 不在这里读写真实文件路径；BlobStore 由 `thread/ThreadPersistence` 或 `server/startDefaultServer` 注入。
 
 ## 下一步阅读

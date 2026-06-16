@@ -28,14 +28,9 @@ export class TurnSummarizer implements TurnSummarizerLike {
 
   async summarizeTurn(messages: AgentMessage[]): Promise<void> {
     const targets = messages.filter(isUnsummarizedTurnToolMessage);
-
-    for (let i = 0; i < targets.length; i += this.concurrency) {
-      await Promise.all(
-        targets.slice(i, i + this.concurrency).map((message) =>
-          this.summarizeMessage(message),
-        ),
-      );
-    }
+    await runWithConcurrency(targets, this.concurrency, (message) =>
+      this.summarizeMessage(message),
+    );
   }
 
   async applyStoredSummaries(messages: AgentMessage[]): Promise<boolean> {
@@ -107,6 +102,21 @@ export class TurnSummarizer implements TurnSummarizerLike {
     });
     message.blob = { id: record.id, cached: "turn", summarized: true };
   }
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex++];
+      await worker(item);
+    }
+  }));
 }
 
 function isUnsummarizedTurnToolMessage(

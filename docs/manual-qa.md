@@ -17,6 +17,19 @@
 
 ## 开发验证记录
 
+### TypeScript 依赖收敛回归
+
+- 完成日期：待实机 QA
+- 实现位置：`docs/dependency-audit.md`、`packages/core/src/`、`apps/agent-server/src/`、`apps/electron-shell/src/main/`、`apps/thread-window-web/src/`
+- 修复结论：依赖审核中的低风险收敛项已落地：runtime 校验改用 `zod`，ThreadWindow workspace 展开状态改用 `zustand persist`，结构化输入 clone 改用 `structuredClone`，supervisor sleep 改用 `node:timers/promises`，LLM 中断改用 `AbortSignal.throwIfAborted()`，SSE 解析改用 `eventsource-parser`，权限 hash 改用 `fast-json-stable-stringify`，MIME 推断改用 `mime-types`，thread 输入锁改用 `async-mutex`，重复错误 / 文件戳 / MCP description helper 已收敛。
+- 自动化验证：需执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，提交普通 prompt，确认 ThreadWindow 可创建 thread、显示用户消息、assistant streaming 和最终 idle 状态。
+  2. 展开 / 收起左侧 workspace 分组，关闭并重开 ThreadWindow，确认展开状态仍保留。
+  3. 提交包含 text、skill、image 或 text selection 的输入，确认 live user message 与重开历史 thread 后的 snapshot 都保持结构化回显。
+  4. 使用 OpenAI-compatible `responses` 本地兼容服务提交普通 prompt，确认空 `data:` SSE 兼容逻辑仍能输出 assistant delta，不出现 JSON parse error。
+  5. 在运行中点击停止，确认中断状态收敛为 interrupted，后续新输入仍能继续执行。
+
 ### SQLite ThreadStore rollout 持久化回归
 
 - 完成日期：待实机 QA

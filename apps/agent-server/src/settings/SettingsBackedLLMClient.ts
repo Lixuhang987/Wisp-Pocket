@@ -13,6 +13,7 @@ import {
   modelSettingsFilePath,
 } from "@handagent/core/config/ModelSettings.ts";
 import type { ModelSettings } from "@handagent/core/config/ModelSettings.ts";
+import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { RegisteredTool } from "@handagent/core/tools/ToolRegistry.ts";
 import type { NetworkLogger } from "@handagent/core/logging/NetworkLogger.ts";
@@ -131,15 +132,6 @@ function readModelSettingsStamp(): string {
     }
     throw error;
   }
-}
-
-function isNotFoundError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ENOENT"
-  );
 }
 
 function sameClientSettings(
