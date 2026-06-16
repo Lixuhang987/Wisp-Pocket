@@ -13,7 +13,7 @@
 | `AppendPromptSettingsViewModel.swift` / `AppendPromptSettingsView.swift` | 管理 Append Prompt manifest；写入 `~/.spotAgent/plugins/append-prompts/plugin.json`，prompt 不包含参数字段 |
 | `MCPSettingsViewModel.swift` / `MCPSettingsView.swift` | 直接读写 `~/.spotAgent/mcp.json` 的 stdio / streamableHttp server 列表 |
 | `PermissionRulesViewModel.swift` / `PermissionRulesView.swift` | 直接读写 `~/.spotAgent/permissions.json`，展示永久规则并支持撤销 |
-| `ShortcutSettingsView.swift` | 快捷键配置 UI；固定系统入口和 manifest `ActionDefinition` 派生的 Action 快捷键 |
+| `ShortcutSettingsView.swift` | 快捷键配置 UI；固定系统入口全局快捷键、应用内快捷键（会话窗口）和 manifest `ActionDefinition` 派生的 Action 快捷键 |
 | `WorkspaceSettingsViewModel.swift` / `WorkspaceSettingsView.swift` | 直接读写 `~/.spotAgent/workspaces.json` |
 | `SettingsStyles.swift` | 共享样式与 `SettingsTab` |
 | `SettingsTextHelpers.swift` | 设置页共用字符串 trim / identifier helper |
@@ -45,7 +45,7 @@ Append Prompt 只定义 prompt action 的 trigger/title/description/template/glo
 - **不要把 store 直接传给 View**：始终经过 ViewModel。
 - **Tab 增加规则**：新建 Tab 先在 `SettingsTab` enum 增 case、标题和图标，再在 `SettingsView.tabContent` 接入内容。
 - **不要在 Settings 里读 LLM/tool 运行态**：Settings 只写本地文件；agent-server 侧按既有时机读取。
-- **快捷键只有两类模型**：固定系统入口全局快捷键；manifest prompt 派生的 Action 快捷键。
+- **快捷键只有三类模型**：固定系统入口全局快捷键；manifest prompt 派生的 Action 快捷键；应用内快捷键（app-scoped，用 `NSEvent.addLocalMonitorForEvents` 监听，不走 `HotkeyRegistering` 协议）。
 - **测试**：`AppendPromptSettingsViewModelTests` 覆盖无参数 manifest 读写；`MCPSettingsViewModelTests` 覆盖 mcp.json 读写；`PermissionRulesViewModelTests` 覆盖权限规则读取、参数摘要和撤销。
 
 ## 与其他模块的关系

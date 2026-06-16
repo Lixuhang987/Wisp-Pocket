@@ -26,6 +26,7 @@ final class AppCoordinator {
     @ObservationIgnored private let activationPolicy = AppActivationPolicyCoordinator()
     @ObservationIgnored private var isThreadWindowCountedInActivationPolicy = false
     @ObservationIgnored private var registeredActionShortcutNames: Set<KeyboardShortcuts.Name> = []
+    @ObservationIgnored private var showThreadWindowMonitor: Any?
     @ObservationIgnored private lazy var promptPanelController = PromptPanelController(
         presentationMode: services.promptPanelPresentationMode
     )
@@ -63,6 +64,9 @@ final class AppCoordinator {
     }
 
     func shutdown() {
+        if let showThreadWindowMonitor {
+            NSEvent.removeMonitor(showThreadWindowMonitor)
+        }
         services.appearanceChangeObserver.stop()
         unregisterActionShortcuts()
         agentServerHealth.stop()
@@ -168,6 +172,15 @@ final class AppCoordinator {
         }
         services.hotkeyRegistrar.registerCaptureRegion { [weak self] in
             Task { @MainActor in await self?.captureCoordinator.captureRegionAndShow() }
+        }
+        showThreadWindowMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            let shortcut = KeyboardShortcuts.getShortcut(for: .showThreadWindow)
+                ?? KeyboardShortcuts.Name.showThreadWindow.defaultShortcut
+            if let shortcut, let pressed = KeyboardShortcuts.Shortcut(event: event), pressed == shortcut {
+                Task { @MainActor in self?.send(.openHistory) }
+                return nil
+            }
+            return event
         }
     }
 

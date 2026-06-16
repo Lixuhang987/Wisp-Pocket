@@ -15,7 +15,7 @@
 | `PromptPanelFocusRestorer.swift` | 记录 PromptPanel 唤起前的前台应用，并在面板因失焦或 ESC 收起后恢复应用焦点 |
 | `PromptPanelInputFocusRetrier.swift` | 输入框 AppKit 焦点重试器 |
 | `PromptPanelWindow.swift` | `NSPanel` 子类，处理失焦自动隐藏 |
-| `PromptPanelStyles.swift` | PromptPanel 容器、action row、trigger pill、icon button 和滚动条样式 |
+| `PromptPanelStyles.swift` | PromptPanel 容器、action row、trigger pill、icon button 样式 |
 | `PromptAttachmentResult.swift` | `PromptAttachmentResult` 枚举；描述 PromptPanel 提交时附带的用户主动输入附件 |
 | `ActionDefinition.swift` | prompt action manifest 定义：trigger、title、description、template、globalShortcut、icon、校验和 trigger 冲突处理 |
 | `ActionManifestStore.swift` | 从 `~/.spotAgent/plugins/*/plugin.json` 读取 prompt action manifests |
@@ -59,7 +59,9 @@ PromptPanelGrowingTextView command
 - **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
 - **焦点语义**：提交 prompt 时是 Electron ThreadWindow handoff，Coordinator 必须在发送 `thread_window.open_initial_prompt` 前调用 `hide(restoringFocus: false)`。
 - **server 不可用时不丢草稿**：`submissionDisabledMessage != nil` 时输入框禁用并显示提示，`submit()` 直接返回，不清空 `inputItems` / `attachments`。
-- **测试**：`PromptPanelViewModelTests` 覆盖输入 item 数组、统一 chip 展示/删除/预览、skill-only 提交、过滤和附件；`PromptPanelInputCommandTests` 覆盖键盘命令解析；`ActionDefinitionTests` / `ActionInvocationTests` / `ActionManifestStoreTests` 覆盖 manifest 与 skill item 构造。
+- **滚动条样式走 Shared**：PromptPanel 输入框内部 `NSScrollView` 与 action 列表 `ScrollView` 都复用 `Sources/Shared/OverlayScrollbar.swift`；不要在 `PromptPanelStyles.swift` 再维护一份局部滚动条实现。`OverlayScrollbar` 需要同时把 `NSScrollView` 和其 `contentView` 设为透明，并按 overlay 所在区域与各 `NSScrollView` 的几何重叠选择目标；对 SwiftUI `HostingScrollView` 还要在首次更新后做一次短延迟重试，覆盖系统 scroller 的后置装配。
+- **这次回归的教训**：PromptPanel 这类“输入框滚动区 + 列表滚动区”并存的界面，不能再用“找到第一个 scroll view”或“靠 sibling 顺序猜目标”的方式注入样式。白底既可能来自系统 `NSScroller`，也可能来自 `NSClipView`；只有同时验证“命中的是正确 scroll view、`contentView` 透明、最终 scroller 已替换”三件事，才算真正修好。
+- **测试**：`PromptPanelViewModelTests` 覆盖输入 item 数组、统一 chip 展示/删除/预览、skill-only 提交、过滤和附件；`PromptPanelInputCommandTests` 覆盖键盘命令解析；`OverlayScrollbarTests` 覆盖共享 overlay 滚动条的透明背景、palette、`contentView` 透明化和 PromptPanel 多滚动容器下的几何命中；`PromptPanelAppearanceTests` 覆盖真实渲染后的 action 列表 `HostingScrollView` 透明背景与 `OverlayScroller` 注入；`ActionDefinitionTests` / `ActionInvocationTests` / `ActionManifestStoreTests` 覆盖 manifest 与 skill item 构造。
 
 ## 与其他模块的关系
 

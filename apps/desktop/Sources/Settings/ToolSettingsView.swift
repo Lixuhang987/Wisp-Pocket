@@ -14,6 +14,7 @@ struct ToolSettingsView: View {
                 Spacer(minLength: 0)
             }
         }
+        .overlayScrollbar()
     }
 
     private func toolRow(_ tool: BuiltinToolSetting) -> some View {

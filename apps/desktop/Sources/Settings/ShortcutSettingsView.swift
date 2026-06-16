@@ -21,6 +21,10 @@ struct ShortcutSettingsView: View {
                     SettingsRow("圈选区域截图") {
                         KeyboardShortcuts.Recorder("", name: .captureRegion)
                     }
+                    SettingsRowDivider()
+                    SettingsRow("会话窗口") {
+                        KeyboardShortcuts.Recorder("", name: .showThreadWindow)
+                    }
                 }
 
                 SettingsSectionSeparator()
@@ -45,5 +49,6 @@ struct ShortcutSettingsView: View {
                 Spacer(minLength: 0)
             }
         }
+        .overlayScrollbar()
     }
 }

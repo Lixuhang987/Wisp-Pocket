@@ -1,12 +1,12 @@
 # Hotkey 模块
 
-快捷键分为固定系统入口快捷键和 Action 全局快捷键两类，配置模型基于 [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) 库。
+快捷键分为固定系统入口全局快捷键、Action 全局快捷键和应用内快捷键三类。全局快捷键配置模型基于 [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) 库，应用内快捷键复用该库的 `Name` / `Recorder` 做配置持久化，但监听走 `NSEvent.addLocalMonitorForEvents`。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `GlobalShortcutNames.swift` | 定义固定系统入口 `KeyboardShortcuts.Name` 扩展（唤起面板 / 捕获文本选区 / 圈选区域截图） |
+| `GlobalShortcutNames.swift` | 定义 `KeyboardShortcuts.Name` 扩展：固定系统入口（唤起面板 / 捕获文本选区 / 圈选区域截图）和应用内快捷键（会话窗口） |
 | `NamedHotkeyRegistrar.swift` | 对 `KeyboardShortcuts.Name` 建立可测试的全局注册层；监听快捷键配置变更并重新绑定运行中的 handler |
 | `ActionShortcutDefaults.swift` | Action 快捷键默认值写入与测试辅助；不直接监听 AppKit 局部键盘事件 |
 
@@ -29,6 +29,15 @@
 - 默认值来自 action manifest prompt 级 `globalShortcut`，仅当用户未自定义时写入。
 - Action 快捷键触发后由 Coordinator 打开 PromptPanel，并把对应 action 追加为输入框内的 skill chip；用户可继续输入，也可直接提交 skill-only 输入。
 
+### 应用内快捷键（app-scoped）
+
+- `KeyboardShortcuts.Name.showThreadWindow`，默认 ⌘H，回调 `send(.openHistory)` 打开或聚焦 ThreadWindow。
+- 仅在 handAgent 持有焦点时生效（promptPanel 或 Settings 窗口在前台），不持有焦点时按键由 macOS 正常分发，不与系统 ⌘H（隐藏前台 App）冲突。
+- 监听使用 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)`，在 `AppCoordinator.setupHotkey()` 中注册，不走 `HotkeyRegistering` 协议和 Carbon Events 全局通道。
+- 配置 UI 复用 `KeyboardShortcuts.Recorder`，持久化走 KeyboardShortcuts 库写入 UserDefaults；每次 keyUp 事件通过 `KeyboardShortcuts.getShortcut(for:)` 读取当前配置，未自定义时 fallback 到 `Name` 的 `defaultShortcut`。
+- 匹配逻辑：`KeyboardShortcuts.Shortcut(event: NSEvent)` 构建 Shortcut 对象后 `==` 比对，命中则执行 action 并返回 `nil` 吞掉事件。
+- `shutdown()` 中通过 `NSEvent.removeMonitor` 清理。
+
 ### 设置界面
 
 - 由 [Settings/ShortcutSettingsView](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 渲染，上下分为“全局快捷键”和“Action 快捷键”两栏，二者都用 `KeyboardShortcuts.Recorder` 配置。
@@ -38,9 +47,11 @@
 - 新增固定系统入口快捷键：在此处加 `Name` 扩展并设默认值；注册位置统一在 Coordinator，不要散到其他模块。
 - Action 快捷键命名格式 `action.<actionId>` 不要改，否则旧用户的 UserDefaults 会失效。
 - 不要把 `KeyboardShortcuts.Recorder` 散布到非 Settings 模块。
+- 应用内快捷键的 `Name` 也定义在 `GlobalShortcutNames.swift`，但注册不走 `HotkeyRegistering` 协议；监听代码放在 Coordinator 的 `setupHotkey()` 中，用 `NSEvent.addLocalMonitorForEvents`。
 
 ## 与其他模块的关系
 
-- [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 注册全局热键回调。
+- [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 通过 `HotkeyRegistering` 协议注册全局热键回调。
 - [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 从 manifest 构建 `ActionDefinition` 列表并注册 Action 全局快捷键。
+- [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 在 `setupHotkey()` 中用 `NSEvent.addLocalMonitorForEvents` 注册应用内快捷键，不走协议层。
 - [Settings](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 提供配置 UI。

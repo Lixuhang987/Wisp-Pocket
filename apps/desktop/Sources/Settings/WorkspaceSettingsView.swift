@@ -29,6 +29,7 @@ struct WorkspaceSettingsView: View {
                 Spacer(minLength: 0)
             }
         }
+        .overlayScrollbar()
         .sheet(isPresented: Binding(
             get: { editingId != nil },
             set: { if !$0 { editingId = nil } }

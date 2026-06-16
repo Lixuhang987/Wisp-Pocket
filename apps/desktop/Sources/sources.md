@@ -9,6 +9,7 @@
 | `AppServices/` | [app-services.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/app-services.md) | 跨模块共享服务、ElectronShell 运行时、平台桥、设置和热键 |
 | `Coordinator/` | [coordinator.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) | `AppCoordinator` 单向事件流、Settings 生命周期和 Electron command lifecycle 接入 |
 | `PromptPanel/` | [prompt-panel.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/PromptPanel/prompt-panel.md) | 全局快捷键唤起的输入面板、用户主动附件采集入口和提交 UI |
+| `Shared/` | 无 | 跨 PromptPanel 与 Settings 复用的原生 UI 辅助实现，如通用 overlay 滚动条 |
 | `Settings/` | [settings.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) | 原生设置窗口 UI 与各设置页 ViewModel |
 | `Theme/` | [theme.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/Theme/theme.md) | SwiftUI 原生界面 theme token 与样式约束 |
 

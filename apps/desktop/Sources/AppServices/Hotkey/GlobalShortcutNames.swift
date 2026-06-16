@@ -8,4 +8,9 @@ extension KeyboardShortcuts.Name {
 
     static let captureSelection = Self("captureSelection")
     static let captureRegion = Self("captureRegion")
+
+    static let showThreadWindow = Self(
+        "showThreadWindow",
+        default: .init(.h, modifiers: [.command])
+    )
 }

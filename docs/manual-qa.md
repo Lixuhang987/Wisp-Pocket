@@ -153,6 +153,8 @@
   5. agent-server 不可用时，banner 使用 warning/error 语义，草稿不丢失。
   6. 图片附件 chip 可预览，删除按钮点击区域与视觉边界一致。
   7. 输入超过 5 行后，PromptPanel 输入区滚动条轨道保持透明，不出现白色边条；浅色和深色主题下 thumb 都沿用当前面板背景语义，不突兀跳成系统默认样式。
+  8. 输入能触发 action 过滤的文本，确认下方 action 列表滚动条也保持透明；不要把透明滚动条误注入到上方输入框滚动区，避免再次出现 PromptPanel 白底 gutter 回归。
+- 回归教训：这类 SwiftUI `ScrollView` 的白底问题不能只看 `NSScrollView.drawsBackground`。必须同时检查目标命中、`NSClipView`/`contentView` 背景，以及 `HostingScrollView` 是否在后续布局阶段把系统 `NSScroller` 重建回去；否则测试能过一半，实机仍会残留白底。
 
 ### ThreadWindow 与 StatusBubble 主题视觉重构
 
@@ -218,6 +220,28 @@
 
 - 完成日期：待实机 QA
 - 实现位置：`apps/thread-window-web/src/styles/tailwind.css`、`apps/thread-window-web/tests/scrollContainers.test.ts`、`apps/thread-window-web/thread-window-web.md`
+
+### PromptPanel / Shared overlay 滚动条回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/Shared/OverlayScrollbar.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelGrowingTextView.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/TestsSwift/PromptPanel/OverlayScrollbarTests.swift`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`
+- 修复结论：PromptPanel 输入框与 Action 列表统一复用 `Shared/OverlayScrollbar.swift`。共享样式会把 `NSScrollView` 背景、边框和 track 收敛为透明，仅保留浮在内容上的 overlay thumb；用于 SwiftUI `ScrollView` 的查找逻辑改为优先匹配当前 sibling 分支内最近的 `NSScrollView`，避免 PromptPanel 同时存在输入框滚动容器和 Action 列表滚动容器时，把样式误注入到错误目标，导致 Action 列表出现白底 gutter。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter OverlayScrollbarTests`、`bash ./scripts/swiftw test --filter PromptPanel`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，打开 PromptPanel，输入超过 5 行文本，确认输入框纵向滚动条只有半透明 thumb，没有白色底或描边。
+  2. 准备足够多的 Action 让列表出现纵向滚动，确认 Action 列表滚动条同样直接浮在背景上，没有白色 gutter。
+  3. 在同一个 PromptPanel 中同时让输入框和 Action 列表都可滚动，分别滚动两处，确认共享样式命中正确容器：输入框和 Action 列表都保持透明滚动条，设置页样式不受影响。
+
+### ThreadItem 选中态整行高亮回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/thread-window-web/src/components/ThreadItem.tsx`、`apps/thread-window-web/tests/historySidebar.test.ts`、`apps/thread-window-web/thread-window-web.md`
+- 修复结论：ThreadItem 选中时改为整行浅色高亮，并把鼠标点击后会残留的 focus ring 收敛到 `focus-visible`，避免出现类似图片边框的视觉效果。
+- 自动化验证：需执行 `pnpm --filter handagent-thread-window-web test`
+- 手工回归步骤：
+  1. 打开 ThreadWindow，点击任意历史 thread。
+  2. 点击其他空白区域，再回点同一个 thread。
+  3. 确认选中态只有整行高亮，不再出现一圈描边感边框。
 - 修复结论：ThreadWindow 全局滚动条样式集中在 Tailwind base layer；标准 CSS 使用 `scrollbar-width` / `scrollbar-color`，Electron/Chromium 通过 `::-webkit-scrollbar*` 覆盖 track、corner 和 thumb。track 与 corner 均为透明，滚动条 thumb 使用 `currentColor` 混合色，在浅色历史侧栏和深色消息区都直接浮在背景上，不再出现白色 gutter。
 - 自动化验证：需执行 `pnpm --filter handagent-thread-window-web exec vitest run tests/scrollContainers.test.ts`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：启动 ThreadWindow，制造左侧历史列表纵向滚动、右侧消息区纵向滚动、Composer textarea 纵向滚动和请求面板 `pre` 滚动；确认所有滚动条只有半透明 thumb，没有白色 track、白边或页面级横向滚动，并确认右侧不再有 TabBar 横向滚动容器。

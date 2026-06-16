@@ -56,6 +56,7 @@ struct MCPSettingsView: View {
                 Spacer(minLength: 0)
             }
         }
+        .overlayScrollbar()
     }
 
     private var restartNotice: some View {

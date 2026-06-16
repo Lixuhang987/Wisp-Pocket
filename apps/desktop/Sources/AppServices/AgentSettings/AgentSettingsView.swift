@@ -52,6 +52,7 @@ struct AgentSettingsView: View {
                 }
             }
         }
+        .overlayScrollbar()
     }
 
     private var apiSegmented: some View {

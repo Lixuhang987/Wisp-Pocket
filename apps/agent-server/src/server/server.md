@@ -106,6 +106,11 @@ const runtimeForThread = (threadId: string) => {
 - 新增 socket 顶层分支前先判断它是否属于 `PlatformBridgeMessage`、`ClientResponse` 或 `ThreadCommand`；`ClientResponse` 的业务处理应先包装成 Agent `client_response` Op，不要扩散自定义 union。
 - 不在本目录写业务翻译逻辑；runtime event 翻译归 `protocol/`，thread 状态归 `thread/`，工具 / MCP 归 `actions/`。
 
+## 实现约束
+
+- **静态资源服务**：`/thread-window/*` 由同一个 HTTP server 手写静态文件服务，MIME 类型通过 `mime-types` 包推断。不使用 `sirv` 或 `serve-static` 等静态服务中间件。
+- **WebSocket 路由**：单个 HTTP server 同时承载三条 WebSocket（`/api/thread`、`/api/activity`、`/api/platform`）和静态资源，通过手写 `upgrade` handler 按 `request.url` 分派。不使用 `ws` 库的 `path` 选项或创建多个 `WebSocketServer` 实例。
+
 ## 下一步阅读
 
 - thread 路由：[thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)

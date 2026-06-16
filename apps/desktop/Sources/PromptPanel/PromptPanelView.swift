@@ -199,6 +199,7 @@ struct PromptPanelView: View {
                 }
             }
         }
+        .overlayScrollbar()
     }
 
     private var emptyActionsMessage: String {

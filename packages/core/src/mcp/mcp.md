@@ -65,3 +65,7 @@
 - [stdio-mcp-client.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/stdio-mcp-client.test.ts) / [streamable-http-mcp-client.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/streamable-http-mcp-client.test.ts) — 基础链路。
 - [mcp-full-protocol.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/mcp-full-protocol.test.ts) — 自建 stdio mock server，覆盖 tools + prompts + resources 完整协议。
 - [mcp-real-server.integration.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/mcp-real-server.integration.test.ts) — 通过 `npx @modelcontextprotocol/server-filesystem` 拉起真实参考实现做端到端验证。
+
+## 实现约束
+
+- `StdioMCPClient` 和 `StreamableHttpMCPClient` 自行实现 JSON-RPC 传输层，未使用 `@modelcontextprotocol/sdk`。协议版本协商、错误恢复、elicitation 等均由本模块代码处理。

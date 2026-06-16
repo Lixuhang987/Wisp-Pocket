@@ -17,6 +17,7 @@ struct PermissionRulesView: View {
                 Spacer(minLength: 0)
             }
         }
+        .overlayScrollbar()
     }
 
     private var emptyState: some View {

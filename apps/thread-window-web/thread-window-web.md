@@ -99,6 +99,12 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 页面视觉层在 `src/styles/tailwind.css` 追加少量 `--thread-window-*` 运行时 CSS 变量，用于 light/dark 成对的 glow、floating shadow 和 inset line；组件仍通过生成的 app 语义 token 取色，不单独持久化或推导主题。
 - ThreadWindow 滚动条统一在 `src/styles/tailwind.css` 的 base layer 定义：标准属性使用 `scrollbar-width` / `scrollbar-color`，Electron/Chromium 兼容使用 `::-webkit-scrollbar*`；track 和 corner 必须保持透明，避免滚动容器出现白色 gutter。不要在组件内重复定义局部滚动条样式。
 
+## 实现约束
+
+- **弹出层**：Composer slash 菜单使用 `absolute bottom-full` 定位，App 删除确认对话框使用手写 modal overlay，均未使用 focus trap 或 portal。项目已引入 Radix UI（dropdown-menu、accordion、scroll-area）。
+- **图标**：组件使用 inline SVG 图标（约 12 处），项目未引入图标库。
+- **`id()` / `now()` 小型工具函数**：`App.tsx`、`Composer.tsx`、`threadSocketClient.ts` 中各自定义，调用点少，未做统一抽象。
+
 ## 常用命令
 
 ```bash

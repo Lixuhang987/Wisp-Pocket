@@ -70,3 +70,8 @@
 pnpm --filter handagent-electron-shell test
 pnpm --filter handagent-electron-shell build
 ```
+
+## 实现约束
+
+- **ActivityWindow 重连**：`activitySocketClient.ts` 自行实现 WebSocket 重连逻辑（指数退避、状态展示、heartbeat），未使用 `reconnecting-websocket` 等第三方库。ThreadWindow 按产品约束不做断线恢复。
+- **跨进程共享常量**：`fallbackTheme`（5 处）、`HostTheme` 类型与 `isHostTheme` 验证器（各 4 处）、`isPromiseLike`（2 处）、NDJSON 换行分割解析（2 处）分散在 renderer、preload、main 多处，当前未做统一抽象。修改这些逻辑时需同步更新所有出现位置。
