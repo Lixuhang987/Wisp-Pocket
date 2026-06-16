@@ -77,11 +77,13 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 左侧历史侧栏宽度由 `getThreadWindowSidebarLayout` 计算：窗口宽度 `< 760px` 时隐藏；否则取窗口宽度 30%，限制在 220px 到 320px。
 - 全局 `html/body/#root` 固定为 `100%` 高宽并隐藏页面级 overflow；不要在 `body` 上设置最小宽度，否则窄窗口会回到页面横向滚动。
 - 左侧历史侧栏自身固定为视口高度；Header、新建按钮和搜索框保持固定，只有 workspace/thread 列表区域使用 `overflow-y-auto`。
-- 历史侧栏使用 `groupThreadsByWorkspace` 将 `workspaceId: null` 的 thread 归入“默认对话”，并固定放在 workspace 分组之后。
+- 历史侧栏使用 `groupThreadsByWorkspace` 将 `workspaceId: null` 的 thread 归入”默认对话”，并固定放在 workspace 分组之后。
 - 右侧 workspace 是固定高度 grid：窗口错误提示和 Composer 不参与主滚动；只有 `MessageList` 是对话纵向滚动容器。
 - 窗口错误提示行由常驻 slot 占位，错误为空时高度为 0，避免 active content 与 Composer 因 grid 自动放置而前移。
 - 页面级横向滚动必须保持关闭；右侧不再有 tab 横向滚动容器，消息区、Composer、请求面板均使用 `min-w-0` / `overflow-x-hidden` 或换行布局避免撑宽窗口。
-- `WorkspaceGroup` 使用 Radix `Accordion.Item/Header/Trigger/Content`，父级 `HistorySidebar` 的滚动列表必须由 `Accordion.Root type="multiple"` 包裹，并以 `expandedWorkspaceIds` 作为受控 `value`，否则 workspace 分组渲染时会因缺少 Radix 上下文导致 React 挂载失败。
+- `WorkspaceGroup` 使用 Radix `Accordion.Item/Header/Trigger/Content`，父级 `HistorySidebar` 的滚动列表必须由 `Accordion.Root type=”multiple”` 包裹，并以 `expandedWorkspaceIds` 作为受控 `value`，否则 workspace 分组渲染时会因缺少 Radix 上下文导致 React 挂载失败。
+- `WorkspaceGroup` 展示 workspace 名称、展开/收起箭头和 thread 列表；每个 `ThreadItem` 在单行显示 preview 与相对时间，hover 时右侧出现删除按钮。
+- `ThreadItem` 统一使用单行布局：preview 和 updatedAt 在同一行显示，preview 使用 `truncate` 截断，时间使用 `flex-shrink-0` 保持可见。相对时间格式化为”刚刚”、”N小时”、”N天”或”M月D日”。
 - `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。开头输入 `/` 时会基于宿主注入的 `availableSkills` 显示 slash 菜单，`Tab` 只选择当前高亮 skill：追加一个 `skill` item、清空唯一 text item，并保持焦点留在 textarea。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
 - `MessageBubble` 对 user role 不再只显示扁平 `text`：若存在 `userInputItems`，按 image strip、chip row（`skill` / `text_selection`）和 text block 三段式渲染；旧快照或旧通知没有 `userInputItems` 时，继续回退到纯文本气泡。
 

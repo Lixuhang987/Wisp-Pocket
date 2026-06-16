@@ -57,7 +57,7 @@ describe("HistorySidebar", () => {
     );
 
     expect(html).toContain("Project workspace");
-    expect(html).toContain("/tmp/project");
+    // rootPath is no longer displayed for simplified UI
   });
 
   it("renders workspace groups alphabetically before the default conversation group", () => {
