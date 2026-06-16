@@ -224,7 +224,8 @@ describe("HistorySidebar", () => {
       }),
     );
 
-    expect(expandedHtml).toContain("C5.25 6.25");
-    expect(collapsedHtml).toContain("L6.3 4.35");
+    expect(expandedHtml).toContain("lucide-folder-open");
+    expect(collapsedHtml).not.toContain("lucide-folder-open");
+    expect(collapsedHtml).toContain("lucide-folder");
   });
 });

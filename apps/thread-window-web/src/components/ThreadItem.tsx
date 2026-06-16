@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import { X } from "lucide-react";
 import type { ThreadListEntry } from "../protocol/threadProtocol.ts";
 import { createThreadWindowStore } from "../store/threadWindowStore.ts";
 import { cn } from "../utils/cn.ts";
@@ -57,14 +58,7 @@ export function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemPro
         className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-app-text-secondary opacity-0 transition-all duration-200 group-hover:opacity-70 hover:!opacity-100 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-2 focus:ring-app-accent-ring"
         aria-label="删除对话"
       >
-        <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true">
-          <path
-            d="M3 3L11 11M11 3L3 11"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <X size={12} strokeWidth={1.5} aria-hidden="true" />
       </button>
     </div>
   );

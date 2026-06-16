@@ -1,5 +1,6 @@
 // apps/thread-window-web/src/components/WorkspaceGroup.tsx
 import * as Accordion from '@radix-ui/react-accordion';
+import { Folder, FolderOpen, MoreHorizontal, X } from 'lucide-react';
 import type { ThreadListEntry } from '../protocol/threadProtocol.ts';
 import { ThreadItem } from './ThreadItem.tsx';
 
@@ -44,11 +45,7 @@ export function WorkspaceGroup({
               className="flex h-5 w-5 items-center justify-center rounded text-app-text-secondary hover:bg-app-surface-muted hover:text-app-text-primary"
               aria-label="更多选项"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                <circle cx="2" cy="6" r="1" />
-                <circle cx="6" cy="6" r="1" />
-                <circle cx="10" cy="6" r="1" />
-              </svg>
+              <MoreHorizontal size={12} />
             </button>
 
             {/* 删除按钮 */}
@@ -60,14 +57,7 @@ export function WorkspaceGroup({
               className="flex h-5 w-5 items-center justify-center rounded text-app-text-secondary hover:bg-app-surface-muted hover:text-app-text-primary"
               aria-label="删除工作区"
             >
-              <svg width="10" height="10" viewBox="0 0 14 14">
-                <path
-                  d="M3 3L11 11M11 3L3 11"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <X size={10} strokeWidth={1.5} />
             </button>
           </div>
         </Accordion.Trigger>
@@ -96,32 +86,6 @@ export function WorkspaceGroup({
 }
 
 function FolderIcon({ isExpanded }: { isExpanded: boolean }) {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 15 15"
-      className="flex-shrink-0 text-app-text-secondary"
-      aria-hidden="true"
-    >
-      {isExpanded ? (
-        <path
-          d="M1.75 6.25H4.8C5.25 6.25 5.66 5.99 5.85 5.59L6.25 4.75H12.5C13 4.75 13.36 5.23 13.22 5.71L11.82 10.71C11.64 11.34 11.07 11.78 10.42 11.78H3.44C2.78 11.78 2.2 11.33 2.03 10.69L1.35 8.16C1.1 7.2 1.82 6.25 2.81 6.25H4.8"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.25"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ) : (
-        <path
-          d="M1.75 4.25C1.75 3.56 2.31 3 3 3H5.2L6.3 4.35H12C12.69 4.35 13.25 4.91 13.25 5.6V10.5C13.25 11.19 12.69 11.75 12 11.75H3C2.31 11.75 1.75 11.19 1.75 10.5V4.25Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.25"
-          strokeLinejoin="round"
-        />
-      )}
-    </svg>
-  );
+  const Icon = isExpanded ? FolderOpen : Folder;
+  return <Icon size={15} className="flex-shrink-0 text-app-text-secondary" aria-hidden="true" />;
 }
