@@ -9,7 +9,7 @@ const timestamp = "2026-06-09T00:00:00.000Z";
 
 const mockState: Pick<
   ThreadWindowState,
-  "workspaces" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded"
+  "workspaces" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded" | "threadsById"
 > = {
   workspaces: [
     {
@@ -22,6 +22,7 @@ const mockState: Pick<
   searchQuery: "",
   setSearchQuery: vi.fn(),
   toggleWorkspaceExpanded: vi.fn(),
+  threadsById: {},
 };
 
 vi.mock("../src/store/threadWindowStore.ts", () => ({
@@ -43,6 +44,7 @@ describe("HistorySidebar", () => {
     mockState.searchQuery = "";
     mockState.setSearchQuery = vi.fn();
     mockState.toggleWorkspaceExpanded = vi.fn();
+    mockState.threadsById = {};
   });
 
   it("provides Radix Accordion context for workspace groups", () => {
