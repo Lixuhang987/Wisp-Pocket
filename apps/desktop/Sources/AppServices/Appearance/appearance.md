@@ -8,7 +8,7 @@ Swift 宿主的主题偏好模型。`AppearanceThemePreference` 只允许 `syste
 |------|------|
 | `AppearanceChangeObserver.swift` | `AppearanceChangeObserving` 协议与生产 `SystemAppearanceChangeObserver`；生产实现监听 `NSApplication.effectiveAppearance` 变化，并把系统外观变化回调给 Coordinator；启动早期如果 `NSApplication` 尚不可用，`start()` 必须安全返回并允许后续再次启动 |
 | `AppearanceTheme.swift` | 定义用户偏好、解析后的主题枚举、`AppearanceSettings` 和传给 Electron/React 的 `HostThemePayload` |
-| `AppearanceThemeService.swift` | 从 `AgentSettingsStore` 读取偏好，解析 `system`，提供当前 `AppTheme`，并在偏好变化时回调跨进程同步；`systemAppearanceDidChange()` 由 Coordinator 的系统外观监听回调触发，用于重新下发 resolved theme |
+| `AppearanceThemeService.swift` | 从 `AgentSettingsStore` 读取偏好，解析 `system`，提供当前 `AppTheme`，并在偏好变化时回调跨进程同步；`systemAppearanceDidChange()` 由 Coordinator 的系统外观监听回调触发，用于重新下发 resolved theme。启动早期若 `NSApplication` 还不可用，`resolveSystemTheme()` 必须安全回退为 `light`，不能因为读取 `NSApp.effectiveAppearance` 触发断言 |
 
 ## 边界
 
@@ -16,3 +16,4 @@ Swift 宿主的主题偏好模型。`AppearanceThemePreference` 只允许 `syste
 - `system` 只表示用户偏好，跨进程传递时必须同时带上 Swift 解析后的 `light` 或 `dark`。
 - `system` 模式下 macOS 外观变化由 `SystemAppearanceChangeObserver` 监听；Coordinator 只把事件转给 `AppearanceThemeService`，不自行解析颜色 token。
 - `AppearanceSettings` 与 LLM / tool 设置共享 `~/.spotAgent/settings.json`，更新其中任一字段必须保留其他顶层字段。
+- `AppearanceThemeService.resolveSystemTheme()` 在 app 启动早期必须能安全返回；如果 `NSApplication` 尚未就绪，直接回退为 `light`，避免 `AppServices.defaultRuntime()` 在初始化 `HANDAGENT_INITIAL_THEME` 时崩溃。

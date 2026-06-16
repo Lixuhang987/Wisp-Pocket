@@ -144,6 +144,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             publishAvailability(force: true)
 
         case .threadWindowClosed(_, let wasVisible):
+            ThreadWindowDiagnostics.emit("electron.thread_window_closed wasVisible=\(wasVisible)")
             hasPreparedThreadWindow = false
             threadWindowErrorMessage = "Electron ThreadWindow 已关闭，正在重新预热…"
             if wasVisible {
@@ -230,6 +231,9 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
 
     private func handleCommandAck(commandId: String, ok: Bool, error: String?) {
         if let kind = pendingCommandKinds.removeValue(forKey: commandId) {
+            ThreadWindowDiagnostics.emit(
+                "electron.command_ack kind=\(String(describing: kind)) ok=\(ok) error=\(error ?? "nil")"
+            )
             onCommandResult?(
                 ThreadWindowCommandResult(
                     commandId: commandId,

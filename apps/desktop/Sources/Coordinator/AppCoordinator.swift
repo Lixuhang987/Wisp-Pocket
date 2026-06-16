@@ -27,9 +27,7 @@ final class AppCoordinator {
     @ObservationIgnored private var isThreadWindowCountedInActivationPolicy = false
     @ObservationIgnored private var registeredActionShortcutNames: Set<KeyboardShortcuts.Name> = []
     @ObservationIgnored private var showThreadWindowMonitor: Any?
-    @ObservationIgnored private lazy var promptPanelController = PromptPanelController(
-        presentationMode: services.promptPanelPresentationMode
-    )
+    @ObservationIgnored private let promptPanelController: any PromptPanelControlling
     @ObservationIgnored private lazy var captureCoordinator = PromptCaptureCoordinator(
         controller: promptPanelController,
         selectionProvider: MacSelectionCaptureProvider(),
@@ -38,7 +36,10 @@ final class AppCoordinator {
 
     convenience init() { self.init(services: AppServices()) }
 
-    init(services: AppServices) {
+    init(
+        services: AppServices,
+        promptPanelController: (any PromptPanelControlling)? = nil
+    ) {
         self.services = services
         self.agentServerHealth = AgentServerHealth(
             appServer: services.appServer,
@@ -51,6 +52,9 @@ final class AppCoordinator {
             windowPresenter: services.settingsWindowPresenter,
             activationPolicy: activationPolicy,
             setActivationPolicy: services.setActivationPolicy
+        )
+        self.promptPanelController = promptPanelController ?? PromptPanelController(
+            presentationMode: services.promptPanelPresentationMode
         )
         bootstrap()
     }
@@ -196,6 +200,7 @@ final class AppCoordinator {
         _ inputItems: [PromptPanelComposerItem],
         attachments: [PromptAttachmentResult]
     ) {
+        ThreadWindowDiagnostics.emit("coordinator.submit_prompt")
         if let agentServerError {
             promptPanelController.setSubmissionEnabled(false, message: agentServerError)
             promptPanelController.show()
@@ -240,6 +245,8 @@ final class AppCoordinator {
     }
 
     private func handleOpenHistory() {
+        ThreadWindowDiagnostics.emit("coordinator.open_history promptPanelVisible=\(promptPanelController.isVisible)")
+        promptPanelController.hide(restoringFocus: false)
         threadWindowLifecycle.openOrFocusHistory(
             onOpened: { [weak self] in
                 self?.handleThreadWindowOpened()

@@ -10,7 +10,7 @@ final class AppearanceThemeService {
 
     init(
         store: AgentSettingsStore,
-        systemResolver: @escaping @MainActor () -> ResolvedAppearanceTheme = AppearanceThemeService.resolveSystemTheme
+        systemResolver: @escaping @MainActor () -> ResolvedAppearanceTheme = { AppearanceThemeService.resolveSystemTheme() }
     ) {
         self.store = store
         self.systemResolver = systemResolver
@@ -52,7 +52,16 @@ final class AppearanceThemeService {
     }
 
     static func resolveSystemTheme() -> ResolvedAppearanceTheme {
-        let bestMatch = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        resolveSystemTheme(application: NSApp)
+    }
+
+    static func resolveSystemTheme(
+        application: NSApplication? = NSApp
+    ) -> ResolvedAppearanceTheme {
+        guard let application else {
+            return .light
+        }
+        let bestMatch = application.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
         return bestMatch == .darkAqua ? .dark : .light
     }
 }

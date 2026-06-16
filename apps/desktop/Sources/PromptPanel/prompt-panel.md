@@ -57,7 +57,8 @@ PromptPanelGrowingTextView command
 - **Controller 是窗口管理 + 事件监听层**：不直接写 thread/turn 逻辑，跨模块意图通过 `onSubmit` / `onOpenSettings` 闭包出口给 Coordinator。
 - **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加上方 chip row 中的 skill chip 并显示 PromptPanel。
 - **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
-- **焦点语义**：提交 prompt 时是 Electron ThreadWindow handoff，Coordinator 必须在发送 `thread_window.open_initial_prompt` 前调用 `hide(restoringFocus: false)`。
+- **焦点语义**：凡是从 PromptPanel 把控制权切给 Electron ThreadWindow 的路径，都必须避免恢复旧前台应用。提交 prompt 时，Coordinator 必须在发送 `thread_window.open_initial_prompt` 前调用 `hide(restoringFocus: false)`；PromptPanel 仍可见时若触发 `openHistory`，也必须先 `hide(restoringFocus: false)` 再发送 `thread_window.open_history`。
+- **首次 handoff 是高频回归点**：上面这条不能退化成“最终调用过 hide 就行”，而必须保证顺序是“先 hide(restoringFocus: false)，再 open/focus ThreadWindow”。这个 bug 已多次出现；以后改 PromptPanel 焦点恢复、失焦自动隐藏或 `showThreadWindow` 快捷键时，必须把它当强制回归项。
 - **server 不可用时不丢草稿**：`submissionDisabledMessage != nil` 时输入框禁用并显示提示，`submit()` 直接返回，不清空 `inputItems` / `attachments`。
 - **滚动条样式走 Shared**：PromptPanel 输入框内部 `NSScrollView` 与 action 列表 `ScrollView` 都复用 `Sources/Shared/OverlayScrollbar.swift`；不要在 `PromptPanelStyles.swift` 再维护一份局部滚动条实现。`OverlayScrollbar` 需要同时把 `NSScrollView` 和其 `contentView` 设为透明，并按 overlay 所在区域与各 `NSScrollView` 的几何重叠选择目标；对 SwiftUI `HostingScrollView` 还要在首次更新后做一次短延迟重试，覆盖系统 scroller 的后置装配。
 - **这次回归的教训**：PromptPanel 这类“输入框滚动区 + 列表滚动区”并存的界面，不能再用“找到第一个 scroll view”或“靠 sibling 顺序猜目标”的方式注入样式。白底既可能来自系统 `NSScroller`，也可能来自 `NSClipView`；只有同时验证“命中的是正确 scroll view、`contentView` 透明、最终 scroller 已替换”三件事，才算真正修好。

@@ -25,6 +25,7 @@
 | `ElectronShellProcess.swift` | 启动 Electron 子进程、通过 Unix socket 写入 command JSON line、读取 stdout event JSON line、处理主动停机和非主动退出 |
 | `ElectronShellProtocol.swift` | Swift 端 command/event DTO，必须与 TS `electronShellProtocol.ts` 字段一致 |
 | `ElectronBackedAppServer.swift` | app-server health gate、ThreadWindow command client、ActivityWindow command client 和 platform bridge 连接管理 |
+| `ThreadWindowDiagnostics.swift` | 仅供宿主侧排查 ThreadWindow 首次打开/关闭竞态的 stderr 诊断开关；`HANDAGENT_THREADWINDOW_TRACE=1` 时输出 `openHistory`、`hide(restoringFocus:false)`、`command.ack`、`thread_window_closed` 等关键时序 |
 | `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 的 command 抽象：open initial prompt、open history、focus、theme changed |
 | `ActivityWindowCommanding.swift` | Coordinator 面向 Electron ActivityWindow 的 show command 抽象 |
 | `UserMessageAttachmentPayload.swift` | 旧 attachment DTO 兼容辅助；当前 initial prompt command 主载荷是 `PromptUserInput.items` |
@@ -36,6 +37,7 @@
 - `agent_server.health available=false` 会断开 `/api/platform`；重新 available 后才连接 `PlatformBridgeConnectionClient`。
 - visible ThreadWindow closed 才调用 `onThreadWindowClosed`；hidden prewarm 关闭只影响可提交状态。
 - ActivityWindow renderer crash 不改变 app-server availability；ThreadWindow renderer crash 会按 fatal 处理。
+- 这条链路是高频回归点：凡是改动 `openHistory` / `focus` / `commandAck` / `threadWindowClosed` 相关行为，都要同时复验“首次 PromptPanel -> ThreadWindow handoff 不会把窗口一起带没”和 `docs/manual-qa.md` 中对应条目。
 
 ## 边界
 

@@ -10,7 +10,32 @@ enum PromptPanelPresentationMode {
 }
 
 @MainActor
-final class PromptPanelController {
+protocol PromptPanelControlling: AnyObject {
+    var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)? { get set }
+    var onOpenSettings: (() -> Void)? { get set }
+    var onDidShow: (() -> Void)? { get set }
+    var isVisible: Bool { get }
+
+    func configure(viewModel: PromptPanelViewModel)
+    func updateTheme(_ theme: AppTheme)
+    func register(actions: [ActionDefinition])
+    func appendAttachment(_ attachment: PromptAttachmentResult)
+    func selectActionAndShow(_ action: ActionDefinition)
+    func setSubmissionEnabled(_ enabled: Bool, message: String?)
+    func show()
+    func hide(restoringFocus: Bool)
+    func toggle()
+}
+
+@MainActor
+extension PromptPanelControlling {
+    func hide() {
+        hide(restoringFocus: true)
+    }
+}
+
+@MainActor
+final class PromptPanelController: PromptPanelControlling {
     private var panel: PromptPanelWindow?
     private var eventMonitor: Any?
     private var viewModel: PromptPanelViewModel?
@@ -118,6 +143,7 @@ final class PromptPanelController {
     }
 
     func hide(restoringFocus: Bool = true) {
+        ThreadWindowDiagnostics.emit("prompt_panel.hide restoringFocus=\(restoringFocus) visible=\(isVisible)")
         if !restoringFocus {
             previousFocusOwner = nil
         }

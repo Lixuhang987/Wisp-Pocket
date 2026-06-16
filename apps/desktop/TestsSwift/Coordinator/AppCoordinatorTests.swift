@@ -111,6 +111,61 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testOpenHistoryHidesPromptPanelWithoutRestoringFocus() async throws {
+        let client = RecordingThreadWindowCommandClient()
+        let promptPanel = RecordingPromptPanelController()
+        let coordinator = AppCoordinator(
+            services: electronServices(commandClient: client),
+            promptPanelController: promptPanel
+        )
+
+        coordinator.send(.showPromptPanel)
+        coordinator.send(.openHistory)
+        try await Task.sleep(for: .milliseconds(10))
+
+        XCTAssertEqual(promptPanel.hideCalls, [false])
+        XCTAssertEqual(client.openHistoryCount, 1)
+    }
+
+    @MainActor
+    func testOpenHistoryHidesPromptPanelBeforeSendingThreadWindowCommand() async throws {
+        var events: [String] = []
+        let client = RecordingThreadWindowCommandClient {
+            events.append($0)
+        }
+        let promptPanel = RecordingPromptPanelController {
+            events.append($0)
+        }
+        let coordinator = AppCoordinator(
+            services: electronServices(commandClient: client),
+            promptPanelController: promptPanel
+        )
+
+        coordinator.send(.showPromptPanel)
+        coordinator.send(.openHistory)
+        try await Task.sleep(for: .milliseconds(10))
+
+        XCTAssertEqual(events, ["promptPanel.show", "promptPanel.hide(false)", "threadWindow.openHistory"])
+    }
+
+    @MainActor
+    func testOpenHistoryHidesVisiblePromptPanelBeforeOpeningThreadWindow() async throws {
+        let client = RecordingThreadWindowCommandClient()
+        let promptPanel = RecordingPromptPanelController()
+        let coordinator = AppCoordinator(
+            services: electronServices(commandClient: client),
+            promptPanelController: promptPanel
+        )
+
+        coordinator.send(.showPromptPanel)
+        coordinator.send(.openHistory)
+        try await Task.sleep(for: .milliseconds(10))
+
+        XCTAssertEqual(promptPanel.hideCalls, [false])
+        XCTAssertFalse(promptPanel.isVisible)
+    }
+
+    @MainActor
     func testAppearancePreferenceChangeSendsThemeToElectron() {
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(services: electronServices(commandClient: client))
@@ -397,6 +452,47 @@ private func electronServices(
     )
 }
 
+@MainActor
+private final class RecordingPromptPanelController: PromptPanelControlling {
+    private let recordEvent: (String) -> Void
+    var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)?
+    var onOpenSettings: (() -> Void)?
+    var onDidShow: (() -> Void)?
+    var isVisible = false
+    private(set) var hideCalls: [Bool] = []
+
+    init(recordEvent: @escaping (String) -> Void = { _ in }) {
+        self.recordEvent = recordEvent
+    }
+
+    func configure(viewModel: PromptPanelViewModel) {}
+    func updateTheme(_ theme: AppTheme) {}
+    func register(actions: [ActionDefinition]) {}
+    func appendAttachment(_ attachment: PromptAttachmentResult) {}
+    func selectActionAndShow(_ action: ActionDefinition) {}
+    func setSubmissionEnabled(_ enabled: Bool, message: String?) {}
+
+    func show() {
+        isVisible = true
+        recordEvent("promptPanel.show")
+        onDidShow?()
+    }
+
+    func hide(restoringFocus: Bool) {
+        isVisible = false
+        hideCalls.append(restoringFocus)
+        recordEvent("promptPanel.hide(\(restoringFocus))")
+    }
+
+    func toggle() {
+        if isVisible {
+            hide(restoringFocus: true)
+        } else {
+            show()
+        }
+    }
+}
+
 private enum RecordingActivityWindowCommandError: Error {
     case showFailed
 }
@@ -459,6 +555,7 @@ private final class TriggerableAppServer: AppServerManaging {
 
 @MainActor
 private final class RecordingThreadWindowCommandClient: ThreadWindowCommanding {
+    private let recordEvent: (String) -> Void
     var onThreadWindowClosed: (() -> Void)?
     var onCommandResult: ((ThreadWindowCommandResult) -> Void)?
     private(set) var openedPrompts: [PromptSubmission] = []
@@ -471,18 +568,25 @@ private final class RecordingThreadWindowCommandClient: ThreadWindowCommanding {
         openedPrompts.count + openHistoryCount + focusedThreadIDs.count
     }
 
+    init(recordEvent: @escaping (String) -> Void = { _ in }) {
+        self.recordEvent = recordEvent
+    }
+
     func openInitialPrompt(_ prompt: PromptSubmission) throws -> String {
         openedPrompts.append(prompt)
+        recordEvent("threadWindow.openInitialPrompt")
         return nextCommandId(for: .openInitialPrompt)
     }
 
     func openHistory() throws -> String {
         openHistoryCount += 1
+        recordEvent("threadWindow.openHistory")
         return nextCommandId(for: .openHistory)
     }
 
     func focus(threadId: String?) throws -> String {
         focusedThreadIDs.append(threadId)
+        recordEvent("threadWindow.focus")
         return nextCommandId(for: .focus)
     }
 

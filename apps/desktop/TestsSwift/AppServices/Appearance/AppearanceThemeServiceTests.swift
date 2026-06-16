@@ -25,4 +25,12 @@ final class AppearanceThemeServiceTests: XCTestCase {
 
         XCTAssertEqual(service.currentTheme, HostThemePayload(preference: .system, resolved: .dark))
     }
+
+    @MainActor
+    func testResolveSystemThemeFallsBackToLightWhenApplicationIsUnavailable() {
+        XCTAssertEqual(
+            AppearanceThemeService.resolveSystemTheme(application: nil),
+            .light
+        )
+    }
 }

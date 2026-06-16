@@ -2,12 +2,12 @@ import Foundation
 
 @MainActor
 final class PromptCaptureCoordinator {
-    private let controller: PromptPanelController
+    private let controller: any PromptPanelControlling
     private let selectionProvider: any SelectionCaptureProvider
     private let regionProvider: any RegionCaptureProvider
 
     init(
-        controller: PromptPanelController,
+        controller: any PromptPanelControlling,
         selectionProvider: any SelectionCaptureProvider,
         regionProvider: any RegionCaptureProvider
     ) {

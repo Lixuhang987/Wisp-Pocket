@@ -120,6 +120,30 @@
 - 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanelControllerTests/testShowDoesNotActivateWholeApplication`、`bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
 - 手工回归步骤：启动桌面 App，打开 Settings 后切到其他前台 App；按真实全局快捷键唤起 PromptPanel；确认只出现 PromptPanel，Settings 不被带到前台。再次按全局快捷键隐藏 PromptPanel，确认焦点回到唤起前的 App；点击 PromptPanel 内设置按钮时 Settings 仍能正常打开/聚焦。
 
+### 首次 PromptPanel -> ThreadWindow handoff
+
+- 完成日期：待实机 QA
+- 实现位置：`docs/superpowers/specs/2026-06-17-threadwindow-first-open-handoff-design.md`、`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/Coordinator/coordinator.md`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`、`apps/desktop/Sources/AppServices/ElectronShell/ThreadWindowDiagnostics.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`
+- 修复结论：失败边界定位为 PromptPanel 把控制权切给 Electron ThreadWindow 时，没有统一满足“先 `hide(restoringFocus: false)`，再 open/focus ThreadWindow”这条 handoff 不变量。`submitPrompt` 之前已经修过，但 `showThreadWindow` / `openHistory` 首次打开路径遗漏了同样处理。首次启动后若 PromptPanel 仍可见，Electron ThreadWindow 首次 `show()/focus()` 与 PromptPanel 失焦恢复会产生竞态，表现为 ThreadWindow 与 PromptPanel 一起消失。修复后首轮 submit 与 `openHistory` 都走同样的 handoff 语义，先隐藏 PromptPanel 且不恢复旧前台应用，再把控制权交给 Electron。
+- 防回归级别：高。这个 bug 已多次出现；以后只要改到 `showThreadWindow` 快捷键、`openHistory`、PromptPanel `hide/restoringFocus`、Electron ThreadWindow open/focus/close ack，必须重跑本条自动化与手工步骤，不能凭局部代码阅读跳过。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter ElectronBackedAppServerTests`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，首次唤起 PromptPanel。
+  2. 在 PromptPanel 可见时直接提交首轮 prompt，确认 PromptPanel 收起后 Electron ThreadWindow 保持前台可见，不会被提交前的 App 重新盖住。
+  3. 关闭 ThreadWindow；再次打开 PromptPanel，在 PromptPanel 可见时直接按 `showThreadWindow` 快捷键，确认 PromptPanel 收起后 ThreadWindow 保持可见，不会与 PromptPanel 一起消失。
+  4. 重复第 2-3 步至少 3 次，确认首次与后续行为一致。
+  5. 若需要诊断日志，用 `HANDAGENT_THREADWINDOW_TRACE=1` 启动宿主，确认 stderr 顺序满足 `coordinator.open_history -> prompt_panel.hide restoringFocus=false -> electron.command_ack`；异常场景下若还有 `electron.thread_window_closed wasVisible=true`，可继续据此排查 Electron 首次 close 来源。
+
+### 启动期系统主题解析安全
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/AppServices/Appearance/AppearanceThemeService.swift`、`apps/desktop/Sources/AppServices/Appearance/appearance.md`、`apps/desktop/TestsSwift/AppServices/Appearance/AppearanceThemeServiceTests.swift`
+- 修复结论：`AppServices.init()` 在生成 `HANDAGENT_INITIAL_THEME` 时会读取 `AppearanceThemeService.currentTheme`。若此时 `themePreference == .system`，`resolveSystemTheme()` 不能依赖 `NSApp.effectiveAppearance` 已可用；修复后在启动早期安全回退为 `light`，避免主线程断言崩溃。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppearanceThemeServiceTests`、`bash ./scripts/swiftw test --filter AppServicesTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 保持 `appearance.themePreference = system` 启动桌面 App，确认不再在 `AppearanceThemeService.resolveSystemTheme()` 崩溃。
+  2. 切换到浅色 / 深色主题，再重启 App，确认 `HANDAGENT_INITIAL_THEME` 仍按当前主题传入 Electron。
+
 ### PromptPanel 测试隐藏展示模式
 
 - 完成日期：待实机 QA
