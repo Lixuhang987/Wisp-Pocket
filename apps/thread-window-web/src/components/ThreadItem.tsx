@@ -30,7 +30,7 @@ export function ThreadItem({ thread, isActive, onOpen, onDelete }: ThreadItemPro
       onClick={onOpen}
       onKeyDown={handleKeyDown}
       className={cn(
-        "group flex items-center gap-xs rounded-lg px-sm py-1.5 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-app-accent-ring",
+        "group flex items-center gap-xs rounded-lg px-sm py-1.5 transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-app-accent-ring",
         isActive
           ? "bg-app-accent-subtle text-app-text-primary"
           : "hover:bg-app-surface-soft/80",

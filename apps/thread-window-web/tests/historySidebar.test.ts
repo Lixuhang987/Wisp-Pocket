@@ -128,6 +128,9 @@ describe("HistorySidebar", () => {
     const activeThreadRow = html.match(/<div role="button"[^>]*aria-current="page"[^>]*>/)?.[0] ?? "";
     expect(activeThreadRow).not.toContain("bg-app-canvas");
     expect(activeThreadRow).not.toContain("border-app-accent");
+    expect(activeThreadRow).toContain("bg-app-accent-subtle");
+    expect(activeThreadRow).not.toContain("focus:ring-4");
+    expect(activeThreadRow).toContain("focus-visible:ring-4");
   });
 
   it("renders the shared running thread indicator in workspace and default groups", () => {

@@ -218,6 +218,17 @@
 
 - 完成日期：待实机 QA
 - 实现位置：`apps/thread-window-web/src/styles/tailwind.css`、`apps/thread-window-web/tests/scrollContainers.test.ts`、`apps/thread-window-web/thread-window-web.md`
+
+### ThreadItem 选中态整行高亮回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/thread-window-web/src/components/ThreadItem.tsx`、`apps/thread-window-web/tests/historySidebar.test.ts`、`apps/thread-window-web/thread-window-web.md`
+- 修复结论：ThreadItem 选中时改为整行浅色高亮，并把鼠标点击后会残留的 focus ring 收敛到 `focus-visible`，避免出现类似图片边框的视觉效果。
+- 自动化验证：需执行 `pnpm --filter handagent-thread-window-web test`
+- 手工回归步骤：
+  1. 打开 ThreadWindow，点击任意历史 thread。
+  2. 点击其他空白区域，再回点同一个 thread。
+  3. 确认选中态只有整行高亮，不再出现一圈描边感边框。
 - 修复结论：ThreadWindow 全局滚动条样式集中在 Tailwind base layer；标准 CSS 使用 `scrollbar-width` / `scrollbar-color`，Electron/Chromium 通过 `::-webkit-scrollbar*` 覆盖 track、corner 和 thumb。track 与 corner 均为透明，滚动条 thumb 使用 `currentColor` 混合色，在浅色历史侧栏和深色消息区都直接浮在背景上，不再出现白色 gutter。
 - 自动化验证：需执行 `pnpm --filter handagent-thread-window-web exec vitest run tests/scrollContainers.test.ts`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：启动 ThreadWindow，制造左侧历史列表纵向滚动、右侧消息区纵向滚动、Composer textarea 纵向滚动和请求面板 `pre` 滚动；确认所有滚动条只有半透明 thumb，没有白色 track、白边或页面级横向滚动，并确认右侧不再有 TabBar 横向滚动容器。
