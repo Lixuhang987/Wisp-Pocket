@@ -1,4 +1,5 @@
 import { useMemo, useRef } from 'react';
+import { ArrowUp, Plus, Square, Trash2 } from 'lucide-react';
 import type { AvailableSkill, InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
 import type { QueuedComposerInput } from '../store/threadWindowStore.ts';
 import { cn } from '../utils/cn.ts';
@@ -115,15 +116,7 @@ export function Composer({
                   onClick={() => onRemoveQueuedInput?.(index)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                    <path
-                      d="M3.5 4.2H10.5M5.2 4.2V3.1H8.8V4.2M5 5.8V10M7 5.8V10M9 5.8V10M4.2 4.2L4.7 11.2H9.3L9.8 4.2"
-                      stroke="currentColor"
-                      strokeWidth="1.3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <Trash2 size={14} aria-hidden="true" />
                 </button>
               </div>
               );
@@ -216,14 +209,7 @@ export function Composer({
               className="flex h-9 w-9 items-center justify-center rounded-xl text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
               title="附件（即将推出）"
             >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M10 5V15M5 10H15"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Plus size={20} strokeWidth={2} />
             </button>
 
             {isRunning ? (
@@ -234,16 +220,7 @@ export function Composer({
                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-secondary"
                 title="停止"
               >
-                <svg width="12" height="12" viewBox="0 0 12 12">
-                  <rect
-                    x="2"
-                    y="2"
-                    width="8"
-                    height="8"
-                    rx="1"
-                    fill="currentColor"
-                  />
-                </svg>
+                <Square size={12} fill="currentColor" />
               </button>
             ) : null}
             <button
@@ -252,15 +229,7 @@ export function Composer({
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-muted"
               title="发送"
             >
-              <svg width="16" height="16" viewBox="0 0 16 16">
-                <path
-                  d="M8 3V13M8 3L12 7M8 3L4 7"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <ArrowUp size={16} strokeWidth={2} />
             </button>
           </div>
         </div>

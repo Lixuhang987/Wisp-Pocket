@@ -82,7 +82,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 窗口错误提示行由常驻 slot 占位，错误为空时高度为 0，避免 active content 与 Composer 因 grid 自动放置而前移。
 - 页面级横向滚动必须保持关闭；右侧不再有 tab 横向滚动容器，消息区、Composer、请求面板均使用 `min-w-0` / `overflow-x-hidden` 或换行布局避免撑宽窗口。
 - `WorkspaceGroup` 使用 Radix `Accordion.Item/Header/Trigger/Content`，父级 `HistorySidebar` 的滚动列表必须由 `Accordion.Root type="multiple"` 包裹，并以 `expandedWorkspaceIds` 作为受控 `value`，否则 workspace 分组渲染时会因缺少 Radix 上下文导致 React 挂载失败。
-- `WorkspaceGroup` 头部布局：文件夹图标（展开/收起两种 SVG 形态）+ workspace 名称 + 操作按钮组（更多选项 `...` + 删除 `×`）。操作按钮默认 `opacity-0`，`group-hover` 时显示。子项使用 `pl-6` 缩进，与文件夹图标右侧对齐。
+- `WorkspaceGroup` 头部布局：文件夹图标（lucide-react `Folder` / `FolderOpen` 按展开状态切换）+ workspace 名称 + 操作按钮组（更多选项 `MoreHorizontal` + 删除 `X`）。操作按钮默认 `opacity-0`，`group-hover` 时显示。子项使用 `pl-6` 缩进，与文件夹图标右侧对齐。
 - `ThreadItem` 是 `HistorySidebar` 默认分组和 `WorkspaceGroup` 子项共用的组件；preview 和 updatedAt 在同一行显示，preview 使用 `truncate` 截断，时间使用 `flex-shrink-0` 保持可见。相对时间格式化为“刚刚”、“N小时”、“N天”或“M月D日”。
 - `ThreadItem` 运行状态指示器：从 store 读取 `threadsById[thread.id]?.status`，当 `status === 'running'` 时在删除按钮之前显示 accent 脉冲圆点。
 - `ThreadItem` 选中状态使用整行 `bg-app-accent-subtle` 高亮，并保留 `aria-current="page"` 语义标记；禁止使用会被误读为图片描边的 `border`、`shadow` 或点击后常驻 focus ring。键盘导航仅在 `focus-visible` 时显示焦点 ring，hover 背景只用于未选中项。
@@ -102,7 +102,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 ## 实现约束
 
 - **弹出层**：Composer slash 菜单使用 `absolute bottom-full` 定位，App 删除确认对话框使用手写 modal overlay，均未使用 focus trap 或 portal。项目已引入 Radix UI（dropdown-menu、accordion、scroll-area）。
-- **图标**：组件使用 inline SVG 图标（约 12 处），项目未引入图标库。
+- **图标**：通用图标使用 `lucide-react`（X、Trash2、Plus、Square、ArrowUp、MoreHorizontal、Folder/FolderOpen、Copy）；品牌 logo（HistorySidebar 六边形 mark）和运行状态脉冲圆点（ThreadItem RunningThreadIcon）仍为自定义实现。
 - **`id()` / `now()` 小型工具函数**：`App.tsx`、`Composer.tsx`、`threadSocketClient.ts` 中各自定义，调用点少，未做统一抽象。
 
 ## 常用命令

@@ -1,3 +1,4 @@
+import { Copy } from 'lucide-react';
 import type { ThreadMessage } from '../store/threadWindowStore.ts';
 import { cn } from '../utils/cn.ts';
 import { TypingIndicator } from './TypingIndicator.tsx';
@@ -123,24 +124,7 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
             className="flex h-7 items-center gap-1 rounded-md px-xs text-xs text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
             aria-label="复制消息"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-              <rect
-                x="4"
-                y="4"
-                width="7"
-                height="7"
-                rx="1"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-              <path
-                d="M3 10V3.5A1.5 1.5 0 0 1 4.5 2H10"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                fill="none"
-              />
-            </svg>
+            <Copy size={14} strokeWidth={1.2} aria-hidden="true" />
             <span>复制</span>
           </button>
 
