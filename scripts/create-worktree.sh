@@ -53,14 +53,11 @@ script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo_root="$(git -C "$script_root" rev-parse --show-toplevel)"
 worktree_path="$repo_root/.worktrees/$task_name"
 
-git_dir="$(cd "$(git -C "$repo_root" rev-parse --git-dir)" && pwd -P)"
-git_common_dir="$(git -C "$repo_root" rev-parse --git-common-dir)"
-if [[ "$git_common_dir" != /* ]]; then
-  git_common_dir="$repo_root/$git_common_dir"
-fi
-git_common_dir="$(cd "$git_common_dir" && pwd -P)"
+git_dir="$(cd "$(git -C "$repo_root" rev-parse --path-format=absolute --git-dir)" && pwd -P)"
+git_common_dir="$(cd "$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)" && pwd -P)"
+superproject_working_tree="$(git -C "$repo_root" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
 
-if [[ "$git_dir" != "$git_common_dir" ]] && ! git -C "$repo_root" rev-parse --show-superproject-working-tree >/dev/null 2>&1; then
+if [[ "$git_dir" != "$git_common_dir" && -z "$superproject_working_tree" ]]; then
   printf 'Already inside a linked worktree: %s\n' "$repo_root" >&2
   printf 'Run this script from the main checkout, not from another worktree.\n' >&2
   exit 2
@@ -103,12 +100,52 @@ run_quiet() {
   fi
 }
 
+restore_electron_from_main_checkout() {
+  local source_pnpm_root
+  local target_pnpm_root
+  local target_electron_dir
+  local electron_package_dir
+  local source_electron_dir
+  local restored=0
+
+  source_pnpm_root="$repo_root/node_modules/.pnpm"
+  target_pnpm_root="$worktree_path/node_modules/.pnpm"
+
+  if [[ ! -d "$source_pnpm_root" || ! -d "$target_pnpm_root" ]]; then
+    return 1
+  fi
+
+  shopt -s nullglob
+  for target_electron_dir in "$target_pnpm_root"/electron@*/node_modules/electron; do
+    electron_package_dir="$(basename "$(dirname "$(dirname "$target_electron_dir")")")"
+    source_electron_dir="$source_pnpm_root/$electron_package_dir/node_modules/electron"
+    if [[ -f "$source_electron_dir/path.txt" && -d "$source_electron_dir/dist" ]]; then
+      rm -rf "$target_electron_dir"
+      mkdir -p "$(dirname "$target_electron_dir")"
+      cp -R "$source_electron_dir" "$target_electron_dir"
+      restored=1
+    fi
+  done
+  shopt -u nullglob
+
+  [[ "$restored" == "1" ]]
+}
+
+verify_electron() {
+  if pnpm --filter handagent-electron-shell exec electron --version; then
+    return 0
+  fi
+
+  restore_electron_from_main_checkout || true
+  pnpm --filter handagent-electron-shell exec electron --version
+}
+
 run_quiet git -C "$repo_root" worktree add "$worktree_path" -b "$branch_name"
 
 cd "$worktree_path"
 
 run_quiet pnpm install
-run_quiet pnpm --filter handagent-electron-shell exec electron --version
+run_quiet verify_electron
 run_quiet codegraph init -i "$worktree_path"
 
 codegraph_status_log="$(mktemp -t "create-worktree-codegraph-status.XXXXXX")"

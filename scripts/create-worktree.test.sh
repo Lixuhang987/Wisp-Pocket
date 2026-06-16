@@ -31,6 +31,20 @@ fi
 case "${1:-}" in
   rev-parse)
     case "${2:-}" in
+      --path-format=absolute)
+        if [[ "${3:-}" == "--git-dir" ]]; then
+          if [[ "${HANDAGENT_CREATE_WORKTREE_TEST_LINKED:-0}" == "1" ]]; then
+            printf '%s\n' "$repo_root/.git/worktrees/linked"
+          else
+            printf '%s\n' "$repo_root/.git"
+          fi
+        elif [[ "${3:-}" == "--git-common-dir" ]]; then
+          printf '%s\n' "$repo_root/.git"
+        else
+          printf 'unexpected git rev-parse path-format args: %s\n' "$*" >&2
+          exit 1
+        fi
+        ;;
       --show-toplevel)
         printf '%s\n' "$repo_root"
         ;;
@@ -80,6 +94,15 @@ cat >"$FAKE_BIN_DIR/pnpm" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'pnpm %s cwd=%s\n' "$*" "$PWD" >>"${HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE:?}"
+if [[ "${HANDAGENT_CREATE_WORKTREE_TEST_ELECTRON_RESTORE:-0}" == "1" && "$*" == "install" ]]; then
+  mkdir -p "$PWD/node_modules/.pnpm/electron@42.3.3/node_modules/electron/dist"
+fi
+if [[ "${HANDAGENT_CREATE_WORKTREE_TEST_ELECTRON_RESTORE:-0}" == "1" && "$*" == "--filter handagent-electron-shell exec electron --version" ]]; then
+  if [[ ! -f "$PWD/node_modules/.pnpm/electron@42.3.3/node_modules/electron/path.txt" ]]; then
+    printf 'electron missing path.txt\n'
+    exit 1
+  fi
+fi
 printf 'pnpm stdout for %s\n' "$*"
 printf 'pnpm stderr for %s\n' "$*" >&2
 EOF
@@ -154,6 +177,49 @@ if [[ "$custom_output" != "CodeGraph projectPath: $custom_path" ]]; then
   printf 'Expected custom branch output to contain only CodeGraph projectPath, got:\n%s\n' "$custom_output" >&2
   exit 1
 fi
+
+: >"$LOG_FILE"
+mkdir -p "$REPO_ROOT/node_modules/.pnpm/electron@42.3.3/node_modules/electron/dist"
+printf 'electron' >"$REPO_ROOT/node_modules/.pnpm/electron@42.3.3/node_modules/electron/path.txt"
+printf 'version' >"$REPO_ROOT/node_modules/.pnpm/electron@42.3.3/node_modules/electron/dist/version"
+electron_restore_output="$(
+  HANDAGENT_CREATE_WORKTREE_TEST_REPO_ROOT="$REPO_ROOT" \
+  HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE="$LOG_FILE" \
+  HANDAGENT_CREATE_WORKTREE_TEST_ELECTRON_RESTORE=1 \
+  PATH="$FAKE_BIN_DIR:$PATH" \
+  "$REPO_ROOT/scripts/create-worktree.sh" electron-restore 2>&1
+)"
+
+electron_restore_path="$REPO_ROOT/.worktrees/electron-restore"
+if [[ ! -f "$electron_restore_path/node_modules/.pnpm/electron@42.3.3/node_modules/electron/path.txt" ]]; then
+  printf 'Expected Electron package to be restored from main checkout.\n' >&2
+  exit 1
+fi
+
+electron_restore_log="$(cat "$LOG_FILE")"
+electron_restore_check_count="$(grep -c 'pnpm --filter handagent-electron-shell exec electron --version' "$LOG_FILE")"
+if [[ "$electron_restore_check_count" != "2" ]]; then
+  printf 'Expected Electron version check to run twice after restore fallback, got log:\n%s\n' "$electron_restore_log" >&2
+  exit 1
+fi
+
+if [[ "$electron_restore_output" != "CodeGraph projectPath: $electron_restore_path" ]]; then
+  printf 'Expected Electron restore output to contain only CodeGraph projectPath, got:\n%s\n' "$electron_restore_output" >&2
+  exit 1
+fi
+
+mkdir -p "$REPO_ROOT/.git/worktrees/linked"
+if HANDAGENT_CREATE_WORKTREE_TEST_REPO_ROOT="$REPO_ROOT" \
+  HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE="$LOG_FILE" \
+  HANDAGENT_CREATE_WORKTREE_TEST_LINKED=1 \
+  PATH="$FAKE_BIN_DIR:$PATH" \
+  "$REPO_ROOT/scripts/create-worktree.sh" linked-refuse \
+  >"$TEST_TMP_DIR/linked-refuse.log" 2>&1; then
+  printf 'Expected linked worktree execution to fail.\n' >&2
+  exit 1
+fi
+
+grep -q 'Already inside a linked worktree:' "$TEST_TMP_DIR/linked-refuse.log"
 
 if HANDAGENT_CREATE_WORKTREE_TEST_REPO_ROOT="$REPO_ROOT" \
   HANDAGENT_CREATE_WORKTREE_TEST_LOG_FILE="$LOG_FILE" \
