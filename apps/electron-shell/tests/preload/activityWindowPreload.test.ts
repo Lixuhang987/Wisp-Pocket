@@ -1,4 +1,8 @@
+import { createRequire } from "node:module";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const nodeRequire = createRequire(import.meta.url);
+const preloadPath = nodeRequire.resolve("../../dist/preload/activityWindowPreload.cjs");
 
 type MainWorldScript = {
   func: (url: string, theme: HostTheme) => void;
@@ -19,6 +23,7 @@ type HostTheme = {
 describe("activityWindowPreload", () => {
   beforeEach(() => {
     vi.resetModules();
+    delete nodeRequire.cache[preloadPath];
     delete (globalThis as { window?: ActivityWindowGlobals }).window;
     process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-theme="));
   });
@@ -29,9 +34,9 @@ describe("activityWindowPreload", () => {
       exposeInMainWorld: vi.fn(),
     };
     const ipcRenderer = createIpcRendererMock();
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
-
-    await import("../../src/preload/activityWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer }, () => {
+      nodeRequire(preloadPath);
+    });
 
     expect(contextBridge.executeInMainWorld).toHaveBeenCalledTimes(1);
     const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
@@ -54,9 +59,9 @@ describe("activityWindowPreload", () => {
       exposeInMainWorld: vi.fn(),
     };
     const ipcRenderer = createIpcRendererMock();
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
-
-    await import("../../src/preload/activityWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer }, () => {
+      nodeRequire(preloadPath);
+    });
 
     const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
     const mainWorld: ActivityWindowGlobals = {};
@@ -73,9 +78,9 @@ describe("activityWindowPreload", () => {
       exposeInMainWorld: vi.fn(),
     };
     const ipcRenderer = createIpcRendererMock();
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
-
-    await import("../../src/preload/activityWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer }, () => {
+      nodeRequire(preloadPath);
+    });
 
     const exposed = contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === "handAgentSubscribeThemeChange")?.[1] as
       | ((handler: (theme: HostTheme) => void) => () => void)
@@ -101,9 +106,9 @@ describe("activityWindowPreload", () => {
       exposeInMainWorld: vi.fn(),
     };
     const ipcRenderer = createIpcRendererMock();
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
-
-    await import("../../src/preload/activityWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer }, () => {
+      nodeRequire(preloadPath);
+    });
     ipcRenderer.emit("handagent:theme-changed", {}, { preference: "dark", resolved: "dark" });
 
     const exposed = contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === "handAgentSubscribeThemeChange")?.[1] as
@@ -121,9 +126,9 @@ describe("activityWindowPreload", () => {
       exposeInMainWorld: vi.fn(),
     };
     const ipcRenderer = createIpcRendererMock();
-    vi.doMock("electron", () => ({ contextBridge, ipcRenderer }));
-
-    await import("../../src/preload/activityWindowPreload.js");
+    withElectronMock({ contextBridge, ipcRenderer }, () => {
+      nodeRequire(preloadPath);
+    });
 
     const [name, api] = contextBridge.exposeInMainWorld.mock.calls.find(([exposedName]) => exposedName === "handAgentActivityWindow") ?? [];
     expect(name).toBe("handAgentActivityWindow");
@@ -150,4 +155,20 @@ function createIpcRendererMock() {
       }
     },
   };
+}
+
+function withElectronMock(mock: unknown, run: () => void): void {
+  const moduleAny = nodeRequire("node:module") as { _load: typeof nodeRequire };
+  const originalLoad = moduleAny._load;
+  moduleAny._load = ((request: string, parent: unknown, isMain: boolean) => {
+    if (request === "electron") {
+      return mock;
+    }
+    return originalLoad(request, parent, isMain);
+  }) as typeof originalLoad;
+  try {
+    run();
+  } finally {
+    moduleAny._load = originalLoad;
+  }
 }

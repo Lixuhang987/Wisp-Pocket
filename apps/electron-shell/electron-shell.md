@@ -13,7 +13,7 @@
 - 处理 `activity_window.show`，创建并展示 React StatusBubble ActivityWindow。
 - visible ThreadWindow 关闭后回报 `thread_window.closed wasVisible=true`，并在 agent-server 仍可用时重新预热隐藏窗口。
 - 向 Swift 回报 `electron.ready`、`agent_server.health`、`thread_window.prepared`、`thread_window.prepare_failed`、`thread_window.closed`、`renderer.crashed` 和 `command.ack`。
-- 使用 `contextIsolation: true` 与 preload，把 React 需要的 `handAgentThreadWindowConfig`、`handAgentTheme`、theme change subscription 和初始 prompt receiver 安装到 renderer main world。`handAgentThreadWindowConfig` 现在同时承载 `/api/thread` URL 与只读 `availableSkills`。
+- 使用 `contextIsolation: true` 与 preload，把 React 需要的 `handAgentThreadWindowConfig`、`handAgentTheme`、theme change subscription 和初始 prompt receiver 安装到 renderer main world。preload 源文件使用 `.cts` 编译为 CommonJS `.cjs`，由 sandboxed renderer 加载；`handAgentThreadWindowConfig` 现在同时承载 `/api/thread` URL 与只读 `availableSkills`。
 - macOS 下 Electron main 以 accessory activation policy 运行并隐藏 Dock 图标；Electron 只作为后台 UI shell 预热，不应在 Dock / app switcher 中作为独立前台 app 出现。
 
 ## Supervisor
@@ -59,7 +59,7 @@
 
 ## 构建约束
 
-- `pnpm --filter handagent-electron-shell build` 先用 `tsc -p tsconfig.json` 编译 main/preload 到 `dist/`，再用 `tsc -p tsconfig.activity-window.json` 检查 ActivityWindow renderer，最后用 Vite 输出 `dist/activity-window`。
+- `pnpm --filter handagent-electron-shell build` 先用 `tsc -p tsconfig.json` 编译 main/preload 到 `dist/`，其中 `src/preload/*.cts` 必须输出为 `dist/preload/*.cjs`，再用 `tsc -p tsconfig.activity-window.json` 检查 ActivityWindow renderer，最后用 Vite 输出 `dist/activity-window`。
 - Swift packaged app 路径依赖 `dist/main/main.js`；修改 main/preload 后必须重新 build，不能只跑 ActivityWindow Vite。
 - `src/activity-window` 可以使用 React 和 browser API；`src/main` 可以使用 Electron/Node；`src/preload` 只能暴露受控 globals，不把 Node/Electron 全量能力泄漏给 renderer。
 

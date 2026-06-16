@@ -7,7 +7,7 @@ describe("ActivityWindowController", () => {
     const window = new FakeBrowserWindow();
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: (options) => {
         expect(options).toMatchObject({
           width: 272,
@@ -21,7 +21,7 @@ describe("ActivityWindowController", () => {
           acceptFirstMouse: true,
           resizable: false,
           webPreferences: {
-            preload: "/dist/preload/activityWindowPreload.js",
+            preload: "/dist/preload/activityWindowPreload.cjs",
             contextIsolation: true,
             nodeIntegration: false,
           },
@@ -45,7 +45,7 @@ describe("ActivityWindowController", () => {
     const createWindow = vi.fn(() => window);
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 20, y: 10, width: 1440, height: 900 }),
@@ -71,7 +71,7 @@ describe("ActivityWindowController", () => {
     };
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => window,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -104,7 +104,7 @@ describe("ActivityWindowController", () => {
     });
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -123,7 +123,7 @@ describe("ActivityWindowController", () => {
     const onRendererCrashed = vi.fn();
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => window,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -144,7 +144,7 @@ describe("ActivityWindowController", () => {
     const onNativeFocus = vi.fn();
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => window,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -166,7 +166,7 @@ describe("ActivityWindowController", () => {
     const preventDefault = vi.fn();
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => window,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -193,7 +193,7 @@ describe("ActivityWindowController", () => {
     const preventDefault = vi.fn();
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => window,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -220,7 +220,7 @@ describe("ActivityWindowController", () => {
     const preventDefault = vi.fn();
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => window,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -258,7 +258,7 @@ describe("ActivityWindowController", () => {
     });
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow,
       screenProvider: {
         getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
@@ -290,7 +290,7 @@ describe("ActivityWindowController", () => {
     const windows = [firstWindow, secondWindow];
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => {
         const window = windows.shift();
         if (!window) {
@@ -322,7 +322,7 @@ describe("ActivityWindowController", () => {
   it("ignores native focus release before the activity window exists", () => {
     const controller = new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.js",
+      preloadPath: "/dist/preload/activityWindowPreload.cjs",
       createWindow: () => {
         throw new Error("window should not be created");
       },

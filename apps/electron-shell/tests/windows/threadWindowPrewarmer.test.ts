@@ -7,7 +7,7 @@ describe("ThreadWindowPrewarmer", () => {
     const window = new FakeBrowserWindow();
     const prewarmer = new ThreadWindowPrewarmer({
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
-      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.js",
+      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
       availableSkills: [],
       createWindow: (options) => {
         expect(options.show).toBe(false);
@@ -30,7 +30,7 @@ describe("ThreadWindowPrewarmer", () => {
     const window = new FakeBrowserWindow();
     const prewarmer = new ThreadWindowPrewarmer({
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
-      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.js",
+      preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
       availableSkills: [],
       createWindow: (options) => {
         expect(options.webPreferences?.additionalArguments).toContain(

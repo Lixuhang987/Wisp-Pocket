@@ -23,9 +23,9 @@ const pluginsDirectory = process.env.HANDAGENT_PLUGINS_DIR ?? join(homedir(), ".
 const nodePath = process.env.HANDAGENT_NODE_PATH ?? "node";
 const threadWindowURL =
   process.env.HANDAGENT_THREAD_WINDOW_WEB_URL ?? "http://127.0.0.1:4317/thread-window/index.html";
-const threadPreloadPath = join(currentDir, "../preload/threadWindowPreload.js");
+const threadPreloadPath = join(currentDir, "../preload/threadWindowPreload.cjs");
 const activityWindowHTMLPath = join(currentDir, "../activity-window/index.html");
-const activityPreloadPath = join(currentDir, "../preload/activityWindowPreload.js");
+const activityPreloadPath = join(currentDir, "../preload/activityWindowPreload.cjs");
 const commandSocketPath = process.env.HANDAGENT_ELECTRON_COMMAND_SOCKET;
 
 const bridge = new JsonLineBridge({ input: process.stdin, output: process.stdout });
