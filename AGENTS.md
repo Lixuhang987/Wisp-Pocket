@@ -58,10 +58,9 @@
 
 ### Development Workflow
 
-- 读代码默认使用 CodeGraph
+- 将以下流程记录记录到TODO中
 - 读取代码，确定任务的范围，涉及的文件。涉及文件所在目录的 `<dir>.md` 必须读取，并沿父目录递归向上直到根目录的 `handAgent.md`，确保理解完整的分层上下文。
 - 需要修改代码的任务，必须先在 `.worktrees/<task-name>/` 目录下创建 worktree。统一使用 `bash ./scripts/create-worktree.sh <task-name> [branch-name]`，并且**必须从主 checkout 执行**；**不要直接使用 `EnterWorktree` 工具**，也不要手写 `git worktree add` 跳过初始化。纯文档任务或只读任务不需要 worktree。
-- 执行前必须确保 `.worktrees` 已被 git ignore；若未忽略，先修正 `.gitignore`，不要绕过检查继续创建。
 - `bash ./scripts/create-worktree.sh` 会在 worktree 内依次执行 `pnpm install`、`codegraph init -i <worktree-absolute-path>`、`codegraph status <worktree-absolute-path>`；成功时仅输出后续 CodeGraph MCP 调用必须使用的 `CodeGraph projectPath: <worktree-absolute-path>`。若 `codegraph status` 仍提示索引来自其他 git working tree，则不得继续开发。
 - 在 worktree 内使用 CodeGraph MCP 工具时，必须显式传入脚本输出的绝对路径 `projectPath`，不得依赖默认 projectPath。
 - 初始化完成后，先按改动范围跑一次分层基线，确认 worktree 可用，再开始浏览代码。默认先跑 `bash ./scripts/test.sh`；若任务涉及 `apps/desktop/`、`Package.swift`、Swift 脚本、打包脚本或会影响桌面启动链路，再追加 `bash ./scripts/swiftw build`。优先阅读目标目录下同名的架构文档。
@@ -70,15 +69,7 @@
 - 执行 `git commit` 并在 commit message 中总结改动，不要让完成的工作长时间不提交。
 - Spec 完成后的文档审核强制流程
 当前任务完成了某个 spec 的实现后，必须执行以下流程：
-1. 分发一个独立子 agent，任务只做文档审核与文档更新。
-2. 子 agent 必须：
-    - 阅读该 spec。
     - 阅读所有修改文件所在目录的 `<dir>.md`，并沿父目录读到 `handAgent.md`。
     - 核对 spec、代码、相关 md 是否一致。
     - 更新所有过期 md。
-3. 主 agent 必须在结束前确认：
-    - 子 agent 已返回审核结论。
-    - 所有相关 md 已更新。
-    - `docs/manual-qa.md` 已更新或说明无需更新。
-4. 若未完成上述流程，不得提交、不得结束任务。
 - 最后将完成的改动加入到 manual-qa 中
