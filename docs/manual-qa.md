@@ -523,8 +523,6 @@
 - 每个通过的条目都已从本文件删除，并在 [archive.md](./archive.md) 保留完整验证记录。
 - 2026-06-11 这轮重构已完成协议、runtime 骨架与 agent-server Agent owner 接线验证：`packages/core/src/protocol/Op.ts` 新增 `Op` / `UserInput` / `InputItem`，`ThreadCommand` 运行期输入只保留 `op.submit`；React ThreadWindow、Electron shell、Swift `ElectronInitialPromptPayload` 均已切到 `userInput` 载荷。`packages/core/src/runtime/AgentRunner.ts`、`AgentSession.ts`、`AgentThreadPort.ts` 已补最小实现；`apps/agent-server/src/agent/AgentManager.ts` 新增持久 Agent owner，`thread.start` 注册 Agent，`op.submit(UserInput | Interrupt)` 通过 `tx_sub` 进入对应 Agent，`input.submit` / `turn.interrupt` 已从公开 server 路径移除。独立文档审核子 agent 已核对 spec、代码和相关 md，并补齐 Electron/Swift/core/selection/agent 文档。最终自动化验证覆盖 `pnpm exec vitest run apps/agent-server/tests/agent/AgentManager.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。仍需补实机 QA：PromptPanel plain text、text selection、image region、skill action、ThreadWindow composer follow-up、running stop。
 
-### ThreadWindow 左侧历史侧栏 UI 增强
-
 - 完成日期：待实机 QA
 - 实现位置：`apps/thread-window-web/src/components/HistorySidebar.tsx`、`apps/thread-window-web/src/components/WorkspaceGroup.tsx`、`apps/thread-window-web/src/components/ThreadItem.tsx`、`apps/thread-window-web/tests/historySidebar.test.ts`
 - 修复结论：历史侧栏 UI 增强，包含视觉重构与运行状态指示器。
