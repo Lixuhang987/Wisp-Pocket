@@ -94,7 +94,6 @@
   3. 触发 `workspace.askUser` 的 prompt，确认同一 thread 内 workspace 请求串行出现；选择 workspace 或取消后 turn 正确继续。
   4. 点击停止或关闭 ThreadWindow，确认 running turn 被中断，当前 pending permission/workspace 请求被取消，thread 级临时权限规则被清理，后续新输入不复用本次临时 allow/deny。
 
-
 ### PromptPanel 输入框 item 化与 Action chip
 
 - 完成日期：待实机 QA
@@ -150,20 +149,6 @@
 - 修复结论：PromptPanel show 只执行 `orderFrontRegardless()`、layout 和 `makeKey()`，不再激活整个 App；Settings 的打开/聚焦仍只由 `.openSettings` 路径负责。
 - 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanelControllerTests/testShowDoesNotActivateWholeApplication`、`bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
 - 手工回归步骤：启动桌面 App，打开 Settings 后切到其他前台 App；按真实全局快捷键唤起 PromptPanel；确认只出现 PromptPanel，Settings 不被带到前台。再次按全局快捷键隐藏 PromptPanel，确认焦点回到唤起前的 App；点击 PromptPanel 内设置按钮时 Settings 仍能正常打开/聚焦。
-
-### 首次 PromptPanel -> ThreadWindow handoff
-
-- 完成日期：待实机 QA
-- 实现位置：`docs/superpowers/specs/2026-06-17-threadwindow-first-open-handoff-design.md`、`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/Coordinator/coordinator.md`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`、`apps/desktop/Sources/AppServices/ElectronShell/ThreadWindowDiagnostics.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`
-- 修复结论：失败边界定位为 PromptPanel 把控制权切给 Electron ThreadWindow 时，没有统一满足“先 `hide(restoringFocus: false)`，再 open/focus ThreadWindow”这条 handoff 不变量。`submitPrompt` 之前已经修过，但 `showThreadWindow` / `openHistory` 首次打开路径遗漏了同样处理。首次启动后若 PromptPanel 仍可见，Electron ThreadWindow 首次 `show()/focus()` 与 PromptPanel 失焦恢复会产生竞态，表现为 ThreadWindow 与 PromptPanel 一起消失。修复后首轮 submit 与 `openHistory` 都走同样的 handoff 语义，先隐藏 PromptPanel 且不恢复旧前台应用，再把控制权交给 Electron。
-- 防回归级别：高。这个 bug 已多次出现；以后只要改到 `showThreadWindow` 快捷键、`openHistory`、PromptPanel `hide/restoringFocus`、Electron ThreadWindow open/focus/close ack，必须重跑本条自动化与手工步骤，不能凭局部代码阅读跳过。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter ElectronBackedAppServerTests`、`bash ./scripts/swiftw build`。
-- 手工回归步骤：
-  1. 启动桌面 App，首次唤起 PromptPanel。
-  2. 在 PromptPanel 可见时直接提交首轮 prompt，确认 PromptPanel 收起后 Electron ThreadWindow 保持前台可见，不会被提交前的 App 重新盖住。
-  3. 关闭 ThreadWindow；再次打开 PromptPanel，在 PromptPanel 可见时直接按 `showThreadWindow` 快捷键，确认 PromptPanel 收起后 ThreadWindow 保持可见，不会与 PromptPanel 一起消失。
-  4. 重复第 2-3 步至少 3 次，确认首次与后续行为一致。
-  5. 若需要诊断日志，用 `HANDAGENT_THREADWINDOW_TRACE=1` 启动宿主，确认 stderr 顺序满足 `coordinator.open_history -> prompt_panel.hide restoringFocus=false -> electron.command_ack`；异常场景下若还有 `electron.thread_window_closed wasVisible=true`，可继续据此排查 Electron 首次 close 来源。
 
 ### 启动期系统主题解析安全
 
@@ -473,7 +458,6 @@
 - 链路证明：子 agent `019ea9b4-ed96-7e03-800e-e446f60cbc51` 按 `$trace-and-verify-call-chain` 验证 `ThreadRuntimeOrchestrator.beforeRun -> ThreadScopedToolRegistry.refreshForThread() -> AgentRuntime.completeAssistantResponse() -> toolRegistry.list() -> LLMClient.stream(..., tools)`。RED 阶段证明首次 `use_tools` 激活后第二轮 LLM request 的工具表仍是 `["use_tools", "frontmost.app"]`；失败 hop 定位为 `ThreadScopedToolRegistry.refreshActivated()` 在已激活 thread 中仍把 meta-tool 放入 provider 可见工具表。
 - 修复结论：已激活 thread 的工具表改为 builtin + MCP tools，不再暴露 `use_tools`；mock 模式仍保留既有特例，未激活 thread 仍只暴露 `use_tools`。该修复直接覆盖 `docs/bugs.md` 中 `AI SDK stream finished without assistant content or tool calls` 的根因边界，避免真实 provider 在已激活 thread 的 retry / 后续轮次重复调用 no-op meta-tool。
 - 自动化验证：`pnpm exec vitest run apps/agent-server/tests/thread/ThreadScopedToolRegistry.test.ts apps/agent-server/tests/actions/ThreadScopedToolRegistry.test.ts packages/core/tests/runtime/agent-runtime.test.ts packages/core/tests/runtime/system-prompt.test.ts` 通过，当前仓库目标测试与 `.worktrees` 副本共 74 files / 599 tests passed；`bash ./scripts/test.sh` 通过，Electron shell 16 files / 89 tests passed，agent-server + core 54 files passed / 329 tests passed / 1 skipped。修复提交为 `c165031`。
-
 
 ## Electron UI Shell 最终态验收（P2）
 

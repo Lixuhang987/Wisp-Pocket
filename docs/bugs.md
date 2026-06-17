@@ -30,3 +30,37 @@
 ---
 
 ## 当前 bug
+
+
+### 首次 PromptPanel -> ThreadWindow handoff
+
+- 完成日期：待实机 QA
+- 实现位置：`docs/superpowers/specs/2026-06-17-threadwindow-first-open-handoff-design.md`、`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/Coordinator/coordinator.md`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`、`apps/desktop/Sources/AppServices/ElectronShell/ThreadWindowDiagnostics.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`
+- 修复结论：失败边界定位为 PromptPanel 把控制权切给 Electron ThreadWindow 时，没有统一满足“先 `hide(restoringFocus: false)`，再 open/focus ThreadWindow”这条 handoff 不变量。`submitPrompt` 之前已经修过，但 `showThreadWindow` / `openHistory` 首次打开路径遗漏了同样处理。首次启动后若 PromptPanel 仍可见，Electron ThreadWindow 首次 `show()/focus()` 与 PromptPanel 失焦恢复会产生竞态，表现为 ThreadWindow 与 PromptPanel 一起消失。修复后首轮 submit 与 `openHistory` 都走同样的 handoff 语义，先隐藏 PromptPanel 且不恢复旧前台应用，再把控制权交给 Electron。
+- 防回归级别：高。这个 bug 已多次出现；以后只要改到 `showThreadWindow` 快捷键、`openHistory`、PromptPanel `hide/restoringFocus`、Electron ThreadWindow open/focus/close ack，必须重跑本条自动化与手工步骤，不能凭局部代码阅读跳过。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter ElectronBackedAppServerTests`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，首次唤起 PromptPanel。
+  2. 在 PromptPanel 可见时直接提交首轮 prompt，确认 PromptPanel 收起后 Electron ThreadWindow 保持前台可见，不会被提交前的 App 重新盖住。
+  3. 关闭 ThreadWindow；再次打开 PromptPanel，在 PromptPanel 可见时直接按 `showThreadWindow` 快捷键，确认 PromptPanel 收起后 ThreadWindow 保持可见，不会与 PromptPanel 一起消失。
+  4. 重复第 2-3 步至少 3 次，确认首次与后续行为一致。
+  5. 若需要诊断日志，用 `HANDAGENT_THREADWINDOW_TRACE=1` 启动宿主，确认 stderr 顺序满足 `coordinator.open_history -> prompt_panel.hide restoringFocus=false -> electron.command_ack`；异常场景下若还有 `electron.thread_window_closed wasVisible=true`，可继续据此排查 Electron 首次 close 来源。
+
+### 缺陷记录
+
+- **严重级别**：P1
+- **复现步骤**：
+  1. 在 `main` 分支执行基线检查通过后，使用 `bash ./scripts/package-app.sh --mock-llm` 重新打包，并启动 `dist/HandAgentDesktop.app`。
+  2. 通过 PromptPanel 提交 `HANDAGENT_PACKAGED_MAIN_CHAIN_20260618 [mock:assistant-ok]`，确认 thread 已创建；随后关闭 `HandAgent ThreadWindow`，窗口列表只剩 `HandAgent Activity`。
+  3. 使用全局快捷键打开 PromptPanel；系统窗口查询显示 `HandAgentDesktop` 有 1 个 `AXSystemDialog` 窗口。
+  4. 在 PromptPanel 仍可见时按 `showThreadWindow` 默认快捷键 `Command+H`。
+- **实际结果**：`HandAgent ThreadWindow` 没有重新出现；`osascript` 读取 `process "Electron"` 的窗口名仍只有 `HandAgent Activity`。与此同时，`127.0.0.1:4317` 上的 agent-server 仍保持监听，说明不是后端退出。
+- **期望结果**：在 PromptPanel 可见时按 `showThreadWindow`，应先完成 `hide(restoringFocus: false)` handoff，再重新显示 `HandAgent ThreadWindow`，用于恢复历史 thread。
+- **证据**：
+  1. 关闭 ThreadWindow 后：`process "Electron"` 窗口列表为 `HandAgent Activity`。
+  2. PromptPanel 打开后：`process "HandAgentDesktop"` 窗口计数为 `1`，窗口子角色为 `AXSystemDialog`。
+  3. 在 PromptPanel 可见时按 `Command+H` 后：`process "Electron"` 窗口列表仍为 `HandAgent Activity`，未出现 `HandAgent ThreadWindow`。
+  4. 同一运行实例中，直接向 `HANDAGENT_ELECTRON_COMMAND_SOCKET=/tmp/hae-3425800C-1D94-4AEA-9FD9-DA7D22E626A4.sock` 发送 `{"channel":"electron_shell","type":"thread_window.open_history","commandId":"qa-open-history-2"}` 后，`process "Electron"` 窗口列表立即变为 `HandAgent Activity, HandAgent ThreadWindow`。这证明 `thread_window.open_history` 命令链本身可用，失败点不在 Electron prewarmer / openHistory 命令执行。
+  5. 当前历史 thread `thread-9d0da056-16dc-41b0-8077-aa5a35cd3f4c` 已在 `~/.spotAgent/threads.sqlite` 持久化，包含 user message、assistant delta、assistant final response、`turn.completed(status=completed)` 与 `thread.status.changed(idle)`。
+- **初步调用链 / 根因边界**：期望链路是 `showThreadWindow 快捷键 -> AppCoordinator.setupHotkey() 的本地 keyUp monitor -> send(.openHistory) -> ElectronBackedAppServer.openHistory() -> thread_window.open_history command -> Electron ThreadWindowPrewarmer.openHistory()`。代码与文档都表明 `showThreadWindow` 当前通过 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)` 注册，仅在 HandAgent 持有焦点时生效；而 PromptPanel show 路径又刻意不激活整个应用。实机上 PromptPanel 可见时 `HandAgentDesktop` 仍非 frontmost，因此失败边界落在“快捷键事件没有进入 Coordinator”这一跳，`openHistory` command path 已被 direct socket 验证为正常。
+- **发现日期**：2026-06-18
