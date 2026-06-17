@@ -14,7 +14,7 @@
 | `src/native/themeConfig.ts` | 读取 host 注入的初始 theme，设置 `documentElement.dataset.theme`，订阅 `handAgentSubscribeThemeChange`。 |
 | `src/components/` | ThreadWindow UI 组件：历史侧栏、固定右侧 thread 工作区、消息列表、composer、权限与 workspace 请求面板。 |
 | `src/utils/` | 纯函数工具：workspace 分组、侧栏响应式布局、className 合并。 |
-| `tests/` | Vitest 测试，覆盖协议守卫、socket client、store、native config、slash skill 纯函数、用户消息渲染、侧栏布局、滚动容器和设计 token。 |
+| `tests/` | Vitest 测试。`use-cases/` 覆盖 initial prompt、socket client、history 和 composer 队列主路径；`boundaries/` 覆盖协议 guard、native config 和 theme config；组件、滚动容器、持久化和 design token 保留少量边界测试。 |
 
 `dist/` 与 `node_modules/` 是生成或安装产物，不作为文档索引维护对象。
 
@@ -56,7 +56,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 3. 收到匹配 `commandId` 的 `thread.started` 后，store 创建对应 `ThreadState`，`App` 把该 `threadId` 设为右侧当前展示 thread；socket client 发送 `thread.resume` 拉取初始 snapshot，再发送首轮 `op.submit(UserInput)`。
 4. 若收到匹配 `commandId` 的 `thread.error`，socket client 清理 pending prompt，store 暴露窗口级错误，不再补发 `op.submit`。
 
-这个顺序同时保护“先建 thread 再补首轮输入”和“WebSocket 未 open 时排队发送”的场景；相关测试在 `tests/nativeConfig.test.ts`、`tests/threadSocketClient.test.ts`、`tests/threadWindowStore.test.ts`。
+这个顺序同时保护“先建 thread 再补首轮输入”和“WebSocket 未 open 时排队发送”的场景；相关测试在 `tests/use-cases/initial-prompt-flow.test.ts`、`tests/use-cases/history-and-composer.test.ts`、`tests/boundaries/protocol-native-theme.test.ts`。
 
 ## Store 与 UI 状态
 
