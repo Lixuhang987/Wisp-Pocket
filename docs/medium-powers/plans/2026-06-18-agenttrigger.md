@@ -7,7 +7,7 @@
 本计划覆盖：
 
 - 独立于 PromptPanel action trigger 的 `AgentTrigger` 数据模型、安装模型、实例模型
-- Swift 宿主内的 `AgentTrigger` runtime 抽象与首个内置 provider：Chrome 书签文件夹
+- Swift 宿主内的 `AgentTrigger` runtime 抽象与首批内置 provider：Chrome 书签文件夹、系统时间点
 - Swift -> Electron -> agent-server 的后台启动链路
 - 后台 thread 落库、历史可回看、默认静默、必要时提示
 - 为后续开放第三方 provider 预留稳定接口
@@ -93,6 +93,7 @@ protocol AgentTriggerInstanceStore {
 - 实例描述“用户装了以后，这一份具体怎么跑”
 - 存储路径必须独立于 `~/.spotAgent/plugins/`，避免和现有 action manifest 混淆
 - 设置页要新增独立 AgentTrigger 入口，至少包含市场列表、已安装包、实例配置三块
+- 第一版内置的 package 类型至少两种：`chrome.bookmarks` 与 `system.clock`
 
 ### Use case map
 
@@ -110,7 +111,9 @@ flowchart LR
 
 - Integration test need to create when exceeding: `/Users/mu9/proj/handAgent/apps/desktop/TestsSwift/AgentTrigger/AgentTriggerSettingsFlowTests.swift`
 - near-code description:
-  - 准备一个 `chrome-bookmarks` package manifest，包含 `folderIds: string[]` 配置 schema
+  - 准备一个 `chrome-bookmarks` package manifest 和一个 `system-clock` package manifest
+  - `chrome.bookmarks` 用 `folderIds: string[]` 作为配置 schema
+  - `system.clock` 用 `scheduleAt` / `timezone` 作为配置 schema，允许用户配置一个或多个触发点
   - 安装 package 后，Settings 可读到该包并允许创建实例
   - 未填必填字段时保存失败且保留草稿
   - 配置合法后实例持久化成功，并触发 runtime reload
@@ -168,12 +171,13 @@ interface AgentTriggerLaunchService {
 - Swift 不直接连 `/api/thread`，而是发新的 Electron command：`agent_trigger.fire`
 - Electron main 不唤起 ThreadWindow；它通过 host-only agent-server 启动入口把请求交给 `AgentTriggerLaunchService`
 - `AgentTriggerLaunchService` 内部复用 `thread.start` + `op.submit(UserInput)` 语义，但不绑定任何 React 连接生命周期
+- 系统时间 provider 直接由宿主调度器实现，使用本地 timer/clock 语义即可，不需要远程接口；它是当前架构下最自然的定时任务切入点
 
 ### Use case map
 
 ```mermaid
 flowchart LR
-    A["Chrome 书签 provider 发出 AgentTriggerEvent"] --> B["Swift AgentTriggerRuntime 匹配实例并渲染 PromptTemplate"]
+    A["Chrome 书签 provider 或 system.clock provider 发出 AgentTriggerEvent"] --> B["Swift AgentTriggerRuntime 匹配实例并渲染 PromptTemplate"]
     B --> C["生成 AgentTriggerFireRequest(userInput/items)"]
     C --> D["Electron command: agent_trigger.fire"]
     D --> E["Electron main AgentTrigger client"]
@@ -190,6 +194,58 @@ flowchart LR
   - 断言返回 `threadId`
   - 再从 `ThreadPersistence`/`thread.resume` 读取，确认 user message、thread 状态和后续 assistant 结果都已落库
   - 断言过程中没有任何 ThreadWindow open/focus side effect
+
+## System Clock Scheduling use case
+
+### Existing Flow Inventory
+
+- 当前桌面端已经有长期存活的 Swift 宿主进程，适合作为本地时间调度器宿主。
+- 当前代码里没有独立的业务级定时任务抽象，但已有大量主线程/测试可注入 scheduler 模式，可延续“可注入时间源/调度器”的测试策略。
+- 相比远程事件源，系统时间 Trigger 不依赖浏览器或外部 API，是当前架构最容易稳定落地的第二个内置 provider。
+
+### Core structure
+
+```swift
+protocol AgentTriggerClock {
+    var now: Date { get }
+    func schedule(at date: Date, _ callback: @escaping @MainActor () -> Void) -> AnyCancellableLike
+}
+
+struct SystemClockTriggerConfig {
+    let scheduleAt: [ClockSchedulePoint]
+    let timezoneIdentifier: String
+}
+```
+
+```ts
+type ClockSchedulePoint = {
+  hour: number;
+  minute: number;
+};
+```
+
+- `system.clock` provider 负责把实例配置翻译成下一次触发时刻
+- runtime reload、系统唤醒、时间跨日后，都要重新计算下一次触发点
+- 同一个实例允许配置多个触发点，但每个命中都产出同一种统一 `AgentTriggerEvent`
+
+### Use case map
+
+```mermaid
+flowchart LR
+    A["system.clock 实例配置触发时间点"] --> B["Swift AgentTriggerClockProvider 计算下一次触发时刻"]
+    B --> C["宿主调度器挂起 timer"]
+    C --> D["本机时间到点"]
+    D --> E["生成 AgentTriggerEvent(providerKind=system.clock)"]
+    E --> F["进入统一 agent_trigger.fire 后台 thread 流程"]
+```
+
+- Integration test need to create when exceeding: `/Users/mu9/proj/handAgent/apps/desktop/TestsSwift/AgentTrigger/SystemClockTriggerProviderTests.swift`
+- near-code description:
+  - 用 fake clock/fake scheduler 构造一个 `system.clock` 实例
+  - 配置每天 `09:00` 触发
+  - 推进时钟到 `08:59` 时不触发
+  - 推进到 `09:00` 时发出一次 `AgentTriggerEvent`
+  - 同一天内不重复触发；跨到下一天后重新排下一次
 
 ## Need-Attention And History Retrieval use case
 
