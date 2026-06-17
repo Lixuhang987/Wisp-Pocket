@@ -41,7 +41,6 @@
   2. 展开 / 收起左侧 workspace 分组，关闭并重开 ThreadWindow，确认展开状态仍保留。
   3. 提交包含 text、skill、image 或 text selection 的输入，确认 live user message 与重开历史 thread 后的 snapshot 都保持结构化回显。
   4. 使用 OpenAI-compatible `responses` 本地兼容服务提交普通 prompt，确认空 `data:` SSE 兼容逻辑仍能输出 assistant delta，不出现 JSON parse error。
-  5. 在运行中点击停止，确认中断状态收敛为 interrupted，后续新输入仍能继续执行。
 
 ### SQLite ThreadStore rollout 持久化回归
 
@@ -54,7 +53,6 @@
   2. 确认 `~/.spotAgent/threads.sqlite` 被创建，`threads` 表有对应 thread，`thread_items` 中按 sequence 出现 `session_meta`、`response_item`、`event_msg` 和必要的 `turn_context`。
   3. 关闭并重启桌面 App，打开历史 thread，确认 snapshot 可恢复已持久化消息，左侧历史列表预览和 messageCount 正常。
   4. 提交一个会触发 tool 或 permission 的 prompt，确认 tool 通知仍正常显示，重启后审计事件仍能保留在 thread history 派生视图中。
-  5. 在运行中点击停止，确认 UI 收到 interrupted 状态，重启后该 thread 不会恢复成仍在 running 的半截 turn。
 
 ### Bash 构建脚本成功静默输出
 

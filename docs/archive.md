@@ -1269,3 +1269,18 @@
      - 触发后：`process "Electron"` = `HandAgent Activity, AXStandardWindow, HandAgent ThreadWindow, AXStandardWindow`
   3. 后端健康证据：`lsof -iTCP:4317 -sTCP:LISTEN` 显示 worktree packaged app 的 agent-server 进程仍在监听。
 - **结论**：通过。`showThreadWindow` 在 PromptPanel 可见时已能稳定路由到 `openHistory`，修复了此前“快捷键没有进入 Coordinator，ThreadWindow 不会恢复”的缺陷。
+### TypeScript 依赖收敛回归
+
+- **验证日期**：2026-06-18
+- **验证环境**：macOS 主 checkout `main`，`bash ./scripts/test.sh` / `bash ./scripts/swiftw test` / `bash ./scripts/swiftw build` 通过，`dist/HandAgentDesktop.app` 运行中。
+- **验证过程**：提交 `[mock:slow-focus] LIVE_QA_STOP_CHAIN_20260618` 后，ThreadWindow 进入运行态并显示 stop 方块；向 `/api/thread` 发送 `op.submit(Interrupt)` 后，ThreadWindow 收到 `turn.completed(status: "interrupted")` 与 `thread.status.changed(value: "interrupted")`，右下角状态气泡从“正在回复”收敛为“已中断”；随后在同一 thread 提交 `[mock:assistant-ok] LIVE_QA_STOP_RECOVERY_20260618`，线程继续执行并回到 `idle`。
+- **证据**：`~/.spotAgent/threads.sqlite` 中该 thread 的 `thread_items` 记录了 `turn.completed`、`thread.status.changed`、后续 `user.message.recorded` / `assistant.delta` / `turn.completed` / `thread.status.changed(value: "idle")`；系统截图显示 ThreadWindow 运行态与中断态切换。
+- **结论**：通过
+
+### SQLite ThreadStore rollout 持久化回归
+
+- **验证日期**：2026-06-18
+- **验证环境**：macOS 主 checkout `main`，`dist/HandAgentDesktop.app` + `node apps/agent-server/src/server/server.ts`。
+- **验证过程**：对 thread `thread-0c49c9f5-3199-4f52-9a7c-1798177f3560` 先提交 `[mock:slow-focus] LIVE_QA_STOP_CHAIN_20260618`，确认 `~/.spotAgent/threads.sqlite` 记录了 `session_meta`、`response_item`、`turn.started`、`turn.completed(status: "interrupted")`、`thread.status.changed(value: "interrupted")`；随后重新打开并提交 `[mock:assistant-ok] LIVE_QA_STOP_RECOVERY_20260618`，SQLite 中继续追加 `user.message.recorded`、`assistant.delta`、`turn.completed(status: "completed")`、`thread.status.changed(value: "idle")`，没有恢复成半截 running。
+- **证据**：`sqlite3 ~/.spotAgent/threads.sqlite "select sequence, kind, substr(payload_json,1,260) ..."`，以及 `/tmp/handagent-after-interrupt.png` 截图。
+- **结论**：通过
