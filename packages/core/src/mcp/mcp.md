@@ -7,8 +7,9 @@
 | `MCPConfig.ts` | 用 `zod` 解析 `~/.spotAgent/mcp.json`，含 stdio elicitation 策略与 Streamable HTTP headers 环境变量插值 |
 | `MCPClient.ts` | MCP client 接口：`initialize` / `tools/*` / `prompts/*` / `resources/*` |
 | `MCPDescriptions.ts` | stdio / Streamable HTTP client 共享的 tool、prompt、resource description 归一化 |
-| `StdioMCPClient.ts` | JSON-RPC over stdio，含 `notifications/initialized` 握手与空表单 elicitation 自动响应 |
-| `StreamableHttpMCPClient.ts` | JSON-RPC over Streamable HTTP，支持 JSON 和基于 `eventsource-parser` 的 SSE 响应，跟踪 `Mcp-Session-Id` |
+| `SDKMCPClientAdapter.ts` | `@modelcontextprotocol/sdk` Client 包装层，统一 `MCPClient` DTO 转换、request timeout 和空表单 elicitation 策略 |
+| `StdioMCPClient.ts` | 基于 `@modelcontextprotocol/sdk/client/stdio.js` 的 stdio transport 适配 |
+| `StreamableHttpMCPClient.ts` | 基于 `@modelcontextprotocol/sdk/client/streamableHttp.js` 的 Streamable HTTP transport 适配 |
 | `MCPToolAdapter.ts` | 把 MCP tool 包装为 `AgentTool`，暴露名为 `mcp.<serverId>.<toolName>` |
 
 ## Client 接口
@@ -56,6 +57,7 @@
 - `computer_use` / `computer-use` server id 是兼容例外：agent-server 保留 `mcp.<serverId>.*` 的注入形态，但 client 由 HandAgent 原生 `ComputerUseMCPClient` 接管，底层通过 PlatformBridge 调用本机能力。这样可以兼容 Codex bundled Computer Use 的配置，同时避免直接 spawn Codex 私有 Computer Use MCP 后在 `tools/call` 阶段挂起。
 - stdio server 可配置 `cwd`；也可配置 `requestTimeoutMs`，默认 60s，避免外部 server 卡死时拖挂当前 thread run。
 - stdio server 可配置 `elicitation.autoAcceptEmptyForm: true`。该选项只自动接受 `requestedSchema` 为空对象且无必填字段的 form-mode `elicitation/create`，用于 Computer Use 这类本地 App 授权握手；带字段表单或 URL mode 仍返回 decline，不代替用户填写敏感信息或打开外部 URL。
+- stdio 与 Streamable HTTP 的 JSON-RPC 编码、初始化握手、session header、SSE 响应处理和 transport lifecycle 由官方 `@modelcontextprotocol/sdk` 承担；本模块只保留 HandAgent 配置、DTO 转换和 timeout 文案。
 - `MCPConfig.ts` 只解析配置；client 生命周期、capability 缓存与 prompt/resource 调用由 agent-server 的 `MCPServerRegistry` 管理。
 - Streamable HTTP headers 支持 `${ENV_NAME}` 插值，未设置的环境变量会替换为空字符串。
 - stdio 与 Streamable HTTP 的 description 归一化必须复用 `MCPDescriptions.ts`，避免 prompt/resource/tool 字段默认值漂移。
@@ -68,4 +70,4 @@
 
 ## 实现约束
 
-- `StdioMCPClient` 和 `StreamableHttpMCPClient` 自行实现 JSON-RPC 传输层，未使用 `@modelcontextprotocol/sdk`。协议版本协商、错误恢复、elicitation 等均由本模块代码处理。
+- `StdioMCPClient` 和 `StreamableHttpMCPClient` 不直接拼装 JSON-RPC 消息；新增 MCP transport 能力时优先复用官方 SDK transport，再在 `SDKMCPClientAdapter` 中做 HandAgent 接口适配。

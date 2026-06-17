@@ -1,193 +1,23 @@
-import { createParser } from "eventsource-parser";
-import type {
-  MCPCallToolResult,
-  MCPClient,
-  MCPGetPromptResult,
-  MCPPromptDescription,
-  MCPReadResourceResult,
-  MCPResourceDescription,
-  MCPServerCapabilities,
-  MCPServerInfo,
-  MCPToolDescription,
-} from "./MCPClient.ts";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { StreamableHttpMCPServerConfig } from "./MCPConfig.ts";
-import {
-  parsePromptDescription,
-  parseResourceDescription,
-  parseToolDescription,
-} from "./MCPDescriptions.ts";
+import { SDKMCPClientAdapter } from "./SDKMCPClientAdapter.ts";
 
 type HttpServerConfig = StreamableHttpMCPServerConfig;
 
-type JsonRpcResponse = {
-  jsonrpc: "2.0";
-  id: number;
-  result?: unknown;
-  error?: { message?: string };
-};
-
-export class StreamableHttpMCPClient implements MCPClient {
-  private nextId = 1;
-  private info?: MCPServerInfo;
-  private sessionId?: string;
-
-  constructor(private readonly config: HttpServerConfig) {}
-
-  async initialize(): Promise<MCPServerInfo> {
-    const { result, sessionId } = await this.request("initialize", {
-      protocolVersion: "2025-11-25",
-      capabilities: {},
-      clientInfo: { name: "handagent", version: "0.1.0" },
-    });
-    if (sessionId) this.sessionId = sessionId;
-    const r = isRecord(result) ? result : {};
-    const serverInfo = isRecord(r.serverInfo) ? r.serverInfo : {};
-    this.info = {
-      name: typeof serverInfo.name === "string" ? serverInfo.name : "unknown",
-      version: typeof serverInfo.version === "string" ? serverInfo.version : "unknown",
-      protocolVersion: typeof r.protocolVersion === "string" ? r.protocolVersion : "2025-11-25",
-      capabilities: isRecord(r.capabilities) ? (r.capabilities as MCPServerCapabilities) : {},
-    };
-    await this.notify("notifications/initialized", {});
-    return this.info;
-  }
-
-  serverInfo(): MCPServerInfo | undefined {
-    return this.info;
-  }
-
-  // --- Tools ---
-
-  async listTools(): Promise<MCPToolDescription[]> {
-    const { result } = await this.request("tools/list", {});
-    if (!isRecord(result) || !Array.isArray(result.tools)) return [];
-    return result.tools.map(parseToolDescription);
-  }
-
-  async callTool(
-    name: string,
-    args: Record<string, unknown>,
-  ): Promise<MCPCallToolResult> {
-    const { result } = await this.request("tools/call", { name, arguments: args });
-    return isRecord(result) ? (result as MCPCallToolResult) : { content: [] };
-  }
-
-  // --- Prompts ---
-
-  async listPrompts(): Promise<MCPPromptDescription[]> {
-    const { result } = await this.request("prompts/list", {});
-    if (!isRecord(result) || !Array.isArray(result.prompts)) return [];
-    return result.prompts.map(parsePromptDescription);
-  }
-
-  async getPrompt(
-    name: string,
-    args?: Record<string, string>,
-  ): Promise<MCPGetPromptResult> {
-    const params: Record<string, unknown> = { name };
-    if (args) params.arguments = args;
-    const { result } = await this.request("prompts/get", params);
-    if (!isRecord(result)) return { messages: [] };
-    return {
-      description: typeof result.description === "string" ? result.description : undefined,
-      messages: Array.isArray(result.messages) ? result.messages : [],
-    } as MCPGetPromptResult;
-  }
-
-  // --- Resources ---
-
-  async listResources(): Promise<MCPResourceDescription[]> {
-    const { result } = await this.request("resources/list", {});
-    if (!isRecord(result) || !Array.isArray(result.resources)) return [];
-    return result.resources.map(parseResourceDescription);
-  }
-
-  async readResource(uri: string): Promise<MCPReadResourceResult> {
-    const { result } = await this.request("resources/read", { uri });
-    if (!isRecord(result) || !Array.isArray(result.contents)) {
-      return { contents: [] };
-    }
-    return { contents: result.contents } as MCPReadResourceResult;
-  }
-
-  // --- Lifecycle ---
-
-  async close(): Promise<void> {}
-
-  // --- Transport ---
-
-  private async request(
-    method: string,
-    params: unknown,
-  ): Promise<{ result: unknown; sessionId?: string }> {
-    const id = this.nextId++;
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-      "MCP-Protocol-Version": "2025-11-25",
-      ...(this.config.headers ?? {}),
-    };
-    if (this.sessionId) {
-      headers["Mcp-Session-Id"] = this.sessionId;
-    }
-
-    const response = await fetch(this.config.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
-    });
-    if (!response.ok) {
-      throw new Error(`MCP HTTP request failed: ${response.status}`);
-    }
-
-    const returnedSessionId = response.headers.get("Mcp-Session-Id") ?? undefined;
-    const contentType = response.headers.get("content-type") ?? "";
-    const text = await response.text();
-    const rpc = contentType.includes("text/event-stream")
-      ? parseEventStreamResponse(text, id)
-      : (JSON.parse(text) as JsonRpcResponse);
-    if (rpc.error) {
-      throw new Error(rpc.error.message ?? "MCP HTTP request failed");
-    }
-    return { result: rpc.result, sessionId: returnedSessionId };
-  }
-
-  private async notify(method: string, params: unknown): Promise<void> {
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      "MCP-Protocol-Version": "2025-11-25",
-      ...(this.config.headers ?? {}),
-    };
-    if (this.sessionId) {
-      headers["Mcp-Session-Id"] = this.sessionId;
-    }
-    await fetch(this.config.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ jsonrpc: "2.0", method, params }),
+export class StreamableHttpMCPClient extends SDKMCPClientAdapter {
+  constructor(private readonly config: HttpServerConfig) {
+    super({
+      serverId: config.id,
+      timeoutLabel: "HTTP",
     });
   }
-}
 
-function parseEventStreamResponse(text: string, id: number): JsonRpcResponse {
-  let matchedResponse: JsonRpcResponse | undefined;
-  const parser = createParser({
-    onEvent(event) {
-      const parsed = JSON.parse(event.data) as JsonRpcResponse;
-      if (parsed.id === id) {
-        matchedResponse = parsed;
-      }
-    },
-  });
-  parser.feed(ensureDispatchTerminator(text));
-  if (matchedResponse) return matchedResponse;
-  throw new Error("MCP HTTP event stream did not contain response");
-}
-
-function ensureDispatchTerminator(text: string): string {
-  return /\r?\n\r?\n$/.test(text) ? text : `${text}\n\n`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  protected createTransport(): Transport {
+    return new StreamableHTTPClientTransport(new URL(this.config.url), {
+      requestInit: {
+        headers: this.config.headers ?? {},
+      },
+    });
+  }
 }

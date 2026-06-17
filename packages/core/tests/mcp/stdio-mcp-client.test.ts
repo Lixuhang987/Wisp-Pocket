@@ -22,7 +22,15 @@ process.stdin.on("data", (chunk) => {
     if (!line) continue;
     const req = JSON.parse(line);
     if (req.method === "initialize") {
-      process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { protocolVersion: "2025-11-25" } }) + "\\n");
+      process.stdout.write(JSON.stringify({
+        jsonrpc: "2.0",
+        id: req.id,
+        result: {
+          protocolVersion: "2025-11-25",
+          capabilities: { tools: {} },
+          serverInfo: { name: "echo", version: "1.0.0" }
+        }
+      }) + "\\n");
     } else if (req.method === "tools/list") {
       process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { tools: [{ name: "echo", description: "Echo", inputSchema: { type: "object" } }] } }) + "\\n");
     } else if (req.method === "tools/call") {
@@ -70,7 +78,15 @@ process.stdin.on("data", (chunk) => {
     if (!line) continue;
     const req = JSON.parse(line);
     if (req.method === "initialize") {
-      process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: req.id, result: { protocolVersion: "2025-11-25" } }) + "\\n");
+      process.stdout.write(JSON.stringify({
+        jsonrpc: "2.0",
+        id: req.id,
+        result: {
+          protocolVersion: "2025-11-25",
+          capabilities: { tools: {} },
+          serverInfo: { name: "elicitation", version: "1.0.0" }
+        }
+      }) + "\\n");
     } else if (req.method === "tools/call") {
       pendingToolCall = req.id;
       process.stdout.write(JSON.stringify({
@@ -117,8 +133,29 @@ process.stdin.on("data", (chunk) => {
     await writeFile(
       serverPath,
       `#!/usr/bin/env node
+let buffer = "";
 process.stdin.setEncoding("utf8");
-process.stdin.resume();
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let index;
+  while ((index = buffer.indexOf("\\n")) !== -1) {
+    const line = buffer.slice(0, index).trim();
+    buffer = buffer.slice(index + 1);
+    if (!line) continue;
+    const req = JSON.parse(line);
+    if (req.method === "initialize") {
+      process.stdout.write(JSON.stringify({
+        jsonrpc: "2.0",
+        id: req.id,
+        result: {
+          protocolVersion: "2025-11-25",
+          capabilities: { tools: {} },
+          serverInfo: { name: "timeout", version: "1.0.0" }
+        }
+      }) + "\\n");
+    }
+  }
+});
 `,
       "utf8",
     );
@@ -132,6 +169,7 @@ process.stdin.resume();
       requestTimeoutMs: 500,
     });
 
+    await client.initialize();
     await expect(client.callTool("hangs", {})).rejects.toThrow(
       "MCP stdio request timed out after 500ms: tools/call",
     );
