@@ -1284,3 +1284,17 @@
 - **验证过程**：对 thread `thread-0c49c9f5-3199-4f52-9a7c-1798177f3560` 先提交 `[mock:slow-focus] LIVE_QA_STOP_CHAIN_20260618`，确认 `~/.spotAgent/threads.sqlite` 记录了 `session_meta`、`response_item`、`turn.started`、`turn.completed(status: "interrupted")`、`thread.status.changed(value: "interrupted")`；随后重新打开并提交 `[mock:assistant-ok] LIVE_QA_STOP_RECOVERY_20260618`，SQLite 中继续追加 `user.message.recorded`、`assistant.delta`、`turn.completed(status: "completed")`、`thread.status.changed(value: "idle")`，没有恢复成半截 running。
 - **证据**：`sqlite3 ~/.spotAgent/threads.sqlite "select sequence, kind, substr(payload_json,1,260) ..."`，以及 `/tmp/handagent-after-interrupt.png` 截图。
 - **结论**：通过
+
+
+3. 关闭并重启桌面 App，打开历史 thread，确认 snapshot 可恢复已持久化消息，左侧历史列表预览和 messageCount 正常。
+
+### SQLite ThreadStore rollout 持久化回归
+
+- **验证日期**：2026-06-18
+- **验证环境**：macOS 主 checkout `main`；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均为 `success`；标准 `open dist/HandAgentDesktop.app` 启动后由 Electron packaged app 监督 `agent-server`，同时使用本地 `thread-window/index.html` React 页面和 `ws://127.0.0.1:4317/api/thread` 做恢复验证。
+- **验证过程**：
+  1. 重启 `dist/HandAgentDesktop.app` 后，通过当前 Electron command socket 发送 `thread_window.open_history`，确认 `HandAgent ThreadWindow` 打开且左侧历史侧栏显示 SQLite 派生的历史预览，包含 `[mock:clipboard-read] LIVE_QA_TOOL_CHAIN_20260618`。
+  2. 直接向 `/api/thread` 发送 `thread.resume(thread-aa3a9918-1349-469c-874b-0e36924531ab)`，收到 `thread.snapshot`，payload 含 4 条已持久化消息：user、assistant(tool call 占位)、tool、assistant，状态为 `idle`。
+  3. 在同一 React ThreadWindow 页面中点击该历史项，前端实际 DOM 从“准备开始”空态切换为恢复后的消息视图，右侧渲染出 user message、`clipboard.read` tool 结果和最终 assistant 文案 `Mock clipboard.read completed.`。
+- **证据**：`~/.spotAgent/threads.sqlite` 中 `thread-aa3a9918-1349-469c-874b-0e36924531ab` 的 rollout item；`thread.resume` 返回的 `thread.snapshot`；Playwright snapshot 与截图 `.playwright-cli/page-2026-06-17T21-59-41-644Z.png`；系统截图 `/tmp/handagent-history-open.png` 显示历史列表已从持久化数据恢复。
+- **结论**：通过

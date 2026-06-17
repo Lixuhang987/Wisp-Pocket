@@ -51,7 +51,7 @@
 - 手工回归步骤：
   1. 启动桌面 App 并提交一个普通 prompt，确认 ThreadWindow 显示 user message、assistant streaming 和 completed/idle 状态。
   2. 确认 `~/.spotAgent/threads.sqlite` 被创建，`threads` 表有对应 thread，`thread_items` 中按 sequence 出现 `session_meta`、`response_item`、`event_msg` 和必要的 `turn_context`。
-  3. 关闭并重启桌面 App，打开历史 thread，确认 snapshot 可恢复已持久化消息，左侧历史列表预览和 messageCount 正常。
+  
   4. 提交一个会触发 tool 或 permission 的 prompt，确认 tool 通知仍正常显示，重启后审计事件仍能保留在 thread history 派生视图中。
 
 ### Bash 构建脚本成功静默输出
