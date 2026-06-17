@@ -1,3 +1,4 @@
+import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { useEffect, useRef, useState } from "react";
 import { HistorySidebar } from "./components/HistorySidebar.tsx";
 import { ThreadWorkspacePane } from "./components/ThreadWorkspacePane.tsx";
@@ -181,42 +182,44 @@ export function App() {
             createThreadWindowStore.getState().resolveWorkspaceRequest(requestId);
           }}
         />
-        {deleteTargetThreadId ? (
-          <div
-            className="absolute inset-0 z-20 grid place-items-center bg-app-canvas/55 px-lg backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Delete thread"
-          >
-            <div className="w-full max-w-[360px] rounded-xl border border-app-hairline bg-app-surface-elevated p-lg text-app-text-primary shadow-[var(--thread-window-floating-shadow)]">
-              <strong className="block text-base font-semibold">删除这个 thread？</strong>
-              <p className="mt-xs text-sm leading-6 text-app-text-secondary">历史记录会从本地持久化中移除。</p>
+        <AlertDialog.Root
+          open={deleteTargetThreadId !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTargetThreadId(null);
+          }}
+        >
+          <AlertDialog.Portal>
+            <AlertDialog.Overlay className="fixed inset-0 z-20 bg-app-canvas/55 backdrop-blur-sm" />
+            <AlertDialog.Content className="fixed left-1/2 top-1/2 z-20 w-full max-w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-app-hairline bg-app-surface-elevated p-lg text-app-text-primary shadow-[var(--thread-window-floating-shadow)] focus:outline-none">
+              <AlertDialog.Title className="text-base font-semibold">
+                删除这个 thread？
+              </AlertDialog.Title>
+              <AlertDialog.Description className="mt-xs text-sm leading-6 text-app-text-secondary">
+                历史记录会从本地持久化中移除。
+              </AlertDialog.Description>
               <div className="mt-md flex justify-end gap-xs">
-                <button
-                  type="button"
+                <AlertDialog.Action
                   className="h-9 rounded-md bg-app-error px-sm text-sm font-medium text-app-on-accent transition-colors hover:bg-app-error/90 focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
                   onClick={() => {
+                    if (!deleteTargetThreadId) return;
                     clientRef.current?.sendRaw(encodeThreadDelete({
                       commandId: id("delete"),
                       timestamp: now(),
                       targetThreadId: deleteTargetThreadId,
                     }));
-                    setDeleteTargetThreadId(null);
                   }}
                 >
                   删除
-                </button>
-                <button
-                  type="button"
+                </AlertDialog.Action>
+                <AlertDialog.Cancel
                   className="h-9 rounded-md border border-app-hairline bg-app-surface px-sm text-sm font-medium text-app-text-primary transition-colors hover:bg-app-surface-soft focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
-                  onClick={() => setDeleteTargetThreadId(null)}
                 >
                   取消
-                </button>
+                </AlertDialog.Cancel>
               </div>
-            </div>
-          </div>
-        ) : null}
+            </AlertDialog.Content>
+          </AlertDialog.Portal>
+        </AlertDialog.Root>
       </section>
     </main>
   );

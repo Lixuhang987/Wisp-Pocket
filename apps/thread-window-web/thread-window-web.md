@@ -86,7 +86,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - `ThreadItem` 是 `HistorySidebar` 默认分组和 `WorkspaceGroup` 子项共用的组件；preview 和 updatedAt 在同一行显示，preview 使用 `truncate` 截断，时间使用 `flex-shrink-0` 保持可见。相对时间格式化为“刚刚”、“N小时”、“N天”或“M月D日”。
 - `ThreadItem` 运行状态指示器：从 store 读取 `threadsById[thread.id]?.status`，当 `status === 'running'` 时在删除按钮之前显示 accent 脉冲圆点。
 - `ThreadItem` 选中状态使用整行 `bg-app-accent-subtle` 高亮，并保留 `aria-current="page"` 语义标记；禁止使用会被误读为图片描边的 `border`、`shadow` 或点击后常驻 focus ring。键盘导航仅在 `focus-visible` 时显示焦点 ring，hover 背景只用于未选中项。
-- `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。开头输入 `/` 时会基于宿主注入的 `availableSkills` 在输入框上方显示 popover 形式的 slash 菜单，`Tab` 只选择当前高亮 skill：追加一个 `skill` item、清空唯一 text item，并保持焦点留在 textarea。没有匹配 skill 时必须显示可见空态，不能留下无内容的空白菜单。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
+- `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。开头输入 `/` 时会基于宿主注入的 `availableSkills` 在输入框上方显示 Popover 形式的 slash 菜单（Portal 渲染，自动碰撞检测）。`ArrowUp`/`ArrowDown` 在候选列表中导航，`Tab` 选择当前高亮 skill：追加一个 `skill` item、清空唯一 text item，并保持焦点留在 textarea。`Escape` 清除 `/` 前缀文本并关闭菜单。没有匹配 skill 时必须显示可见空态，不能留下无内容的空白菜单。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
 - `MessageBubble` 对 user role 不再只显示扁平 `text`：若存在 `userInputItems`，图片作为独立 strip 显示在 user 气泡上方，`skill` / `text_selection` chip row 和 text block 显示在气泡内；旧快照或旧通知没有 `userInputItems` 时，继续回退到纯文本气泡。
 
 ## 样式前提
@@ -101,7 +101,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 
 ## 实现约束
 
-- **弹出层**：Composer slash 菜单使用 `absolute bottom-full` 定位，App 删除确认对话框使用手写 modal overlay，均未使用 focus trap 或 portal。项目已引入 Radix UI（dropdown-menu、accordion、scroll-area）。
+- **弹出层**：Composer slash 菜单使用 `@radix-ui/react-popover`（Portal 渲染、碰撞检测、focus 管理），App 删除确认对话框使用 `@radix-ui/react-alert-dialog`（Portal 渲染、focus trap、scroll lock、Escape 关闭）。项目已引入 Radix UI（dropdown-menu、accordion、scroll-area、popover、alert-dialog）。
 - **图标**：通用图标使用 `lucide-react`（X、Trash2、Plus、Square、ArrowUp、MoreHorizontal、Folder/FolderOpen、Copy）；品牌 logo（HistorySidebar 六边形 mark）和运行状态脉冲圆点（ThreadItem RunningThreadIcon）仍为自定义实现。
 - **`id()` / `now()` 小型工具函数**：`App.tsx`、`Composer.tsx`、`threadSocketClient.ts` 中各自定义，调用点少，未做统一抽象。
 

@@ -1,4 +1,5 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
 import { ArrowUp, Plus, Square, Trash2 } from 'lucide-react';
 import type { AvailableSkill, InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
 import type { QueuedComposerInput } from '../store/threadWindowStore.ts';
@@ -36,6 +37,12 @@ export function Composer({
   const chipItems = items.filter((item) => item.type !== "text");
   const slashState = useMemo(() => getSlashMenuState(textItem.text, availableSkills), [textItem.text, availableSkills]);
 
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [slashState.query, slashState.filteredSkills.length]);
+  const activeSkill = slashState.filteredSkills[highlightedIndex] ?? slashState.filteredSkills[0] ?? null;
+
   const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
     const target = e.currentTarget;
     onInputItemsChange(updateEditableText(items, target.value));
@@ -59,10 +66,27 @@ export function Composer({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Tab" && slashState.visible && slashState.highlightedSkill) {
-      e.preventDefault();
-      onInputItemsChange(selectSlashSkill(items, slashState.highlightedSkill));
-      return;
+    if (slashState.visible) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => Math.min(prev + 1, slashState.filteredSkills.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onInputItemsChange(updateEditableText(items, ''));
+        return;
+      }
+      if (e.key === "Tab" && activeSkill) {
+        e.preventDefault();
+        onInputItemsChange(selectSlashSkill(items, activeSkill));
+        return;
+      }
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -125,27 +149,112 @@ export function Composer({
         </div>
       ) : null}
 
-      <div className="relative mx-auto min-w-0 w-full max-w-[720pt]">
-        {slashState.visible ? (
+      <Popover.Root
+        open={slashState.visible}
+        onOpenChange={(open) => {
+          if (!open) {
+            onInputItemsChange(updateEditableText(items, ''));
+          }
+        }}
+      >
+        <Popover.Anchor className="mx-auto min-w-0 block w-full max-w-[720pt]">
           <div
-            data-slash-menu-popover="true"
+            data-composer-input-box="true"
+            className="rounded-3xl border border-app-hairline bg-app-surface-elevated/98 px-md py-xs shadow-[var(--thread-window-floating-shadow),var(--thread-window-inset-line)] transition-shadow duration-200 focus-within:border-app-accent focus-within:ring-4 focus-within:ring-app-accent-ring"
+          >
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-xs">
+            <div className="flex min-w-0 flex-wrap items-center gap-xs py-xs">
+              {chipItems.map((item) => {
+                const label = chipLabel(item);
+                return (
+                  <span
+                    key={item.id}
+                    data-composer-chip="true"
+                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-app-hairline bg-app-surface-muted px-xs py-1 text-sm text-app-text-primary"
+                  >
+                    <span className="truncate">{label}</span>
+                    <button
+                      type="button"
+                      aria-label={`移除 ${label}`}
+                      onClick={() => onInputItemsChange(removeInputItem(items, item.id))}
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-app-text-muted transition-colors hover:bg-app-surface-soft hover:text-app-text-primary focus:outline-none focus:ring-2 focus:ring-app-accent-ring"
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              })}
+              <textarea
+                ref={textareaRef}
+                value={textItem.text}
+                onChange={handleInput}
+                onKeyDown={handleKeyDown}
+                placeholder={chipItems.length > 0 ? "" : "Ask HandAgent"}
+                disabled={disabled}
+                className="min-h-[52px] min-w-[180px] flex-1 resize-none overflow-y-auto overflow-x-hidden bg-transparent px-xs py-xs text-[16px] leading-[1.5] text-app-text-primary placeholder:text-app-text-muted outline-none disabled:cursor-not-allowed disabled:text-app-text-muted/50"
+                style={{ minHeight: '52px', maxHeight: `${MAX_ROWS * LINE_HEIGHT}px` }}
+              />
+            </div>
+
+            {/* 右侧按钮区域 */}
+            <div className="flex flex-shrink-0 items-center gap-xs pb-xs">
+              {/* 附件按钮 - 占位 */}
+              <button
+                type="button"
+                disabled
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+                title="附件（即将推出）"
+              >
+                <Plus size={20} strokeWidth={2} />
+              </button>
+
+              {isRunning ? (
+                <button
+                  type="button"
+                  onClick={onStop}
+                  disabled={stopDisabled}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-secondary"
+                  title="停止"
+                >
+                  <Square size={12} fill="currentColor" />
+                </button>
+              ) : null}
+              <button
+                type="submit"
+                disabled={disabled || !isComposerInputSubmittable(items)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-muted"
+                title="发送"
+              >
+                <ArrowUp size={16} strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+          </div>
+        </Popover.Anchor>
+
+        <Popover.Portal>
+          <Popover.Content
+            side="top"
+            align="start"
+            sideOffset={4}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            onCloseAutoFocus={(e) => e.preventDefault()}
             data-slash-menu="true"
-            role="listbox"
-            aria-label="技能"
-            className="absolute bottom-full left-0 right-0 z-20 mb-xs max-h-[320px] min-w-0 overflow-y-auto rounded-2xl border border-app-hairline bg-app-surface-elevated/98 p-xs text-sm text-app-text-primary shadow-[var(--thread-window-floating-shadow)]"
+            className="z-20 max-h-[320px] min-w-0 overflow-y-auto rounded-2xl border border-app-hairline bg-app-surface-elevated/98 p-xs text-sm text-app-text-primary shadow-[var(--thread-window-floating-shadow)]"
+            style={{ width: 'var(--radix-popover-trigger-width)' }}
           >
             <div className="mb-1 px-xs text-xs font-medium text-app-text-muted">技能</div>
             {slashState.filteredSkills.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-1" role="listbox" aria-label="技能">
                 {slashState.filteredSkills.map((skill, index) => (
                   <div
                     key={skill.actionId}
                     data-slash-skill={skill.actionId}
                     role="option"
-                    aria-selected={index === 0}
+                    aria-selected={index === highlightedIndex}
                     className={cn(
                       "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-xs rounded-xl px-sm py-xs",
-                      index === 0 ? "bg-app-surface-muted text-app-text-primary" : "text-app-text-secondary",
+                      index === highlightedIndex ? "bg-app-surface-muted text-app-text-primary" : "text-app-text-secondary",
                     )}
                   >
                     <div className="min-w-0">
@@ -159,82 +268,9 @@ export function Composer({
             ) : (
               <div className="rounded-xl px-sm py-xs text-sm text-app-text-muted">没有匹配的技能</div>
             )}
-          </div>
-        ) : null}
-
-        <div
-          data-composer-input-box="true"
-          className="rounded-3xl border border-app-hairline bg-app-surface-elevated/98 px-md py-xs shadow-[var(--thread-window-floating-shadow),var(--thread-window-inset-line)] transition-shadow duration-200 focus-within:border-app-accent focus-within:ring-4 focus-within:ring-app-accent-ring"
-        >
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-xs">
-          <div className="flex min-w-0 flex-wrap items-center gap-xs py-xs">
-            {chipItems.map((item) => {
-              const label = chipLabel(item);
-              return (
-                <span
-                  key={item.id}
-                  data-composer-chip="true"
-                  className="inline-flex max-w-full items-center gap-1 rounded-full border border-app-hairline bg-app-surface-muted px-xs py-1 text-sm text-app-text-primary"
-                >
-                  <span className="truncate">{label}</span>
-                  <button
-                    type="button"
-                    aria-label={`移除 ${label}`}
-                    onClick={() => onInputItemsChange(removeInputItem(items, item.id))}
-                    className="flex h-5 w-5 items-center justify-center rounded-full text-app-text-muted transition-colors hover:bg-app-surface-soft hover:text-app-text-primary focus:outline-none focus:ring-2 focus:ring-app-accent-ring"
-                  >
-                    ×
-                  </button>
-                </span>
-              );
-            })}
-            <textarea
-              ref={textareaRef}
-              value={textItem.text}
-              onChange={handleInput}
-              onKeyDown={handleKeyDown}
-              placeholder={chipItems.length > 0 ? "" : "Ask HandAgent"}
-              disabled={disabled}
-              className="min-h-[52px] min-w-[180px] flex-1 resize-none overflow-y-auto overflow-x-hidden bg-transparent px-xs py-xs text-[16px] leading-[1.5] text-app-text-primary placeholder:text-app-text-muted outline-none disabled:cursor-not-allowed disabled:text-app-text-muted/50"
-              style={{ minHeight: '52px', maxHeight: `${MAX_ROWS * LINE_HEIGHT}px` }}
-            />
-          </div>
-
-          {/* 右侧按钮区域 */}
-          <div className="flex flex-shrink-0 items-center gap-xs pb-xs">
-            {/* 附件按钮 - 占位 */}
-            <button
-              type="button"
-              disabled
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
-              title="附件（即将推出）"
-            >
-              <Plus size={20} strokeWidth={2} />
-            </button>
-
-            {isRunning ? (
-              <button
-                type="button"
-                onClick={onStop}
-                disabled={stopDisabled}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-secondary"
-                title="停止"
-              >
-                <Square size={12} fill="currentColor" />
-              </button>
-            ) : null}
-            <button
-              type="submit"
-              disabled={disabled || !isComposerInputSubmittable(items)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-muted"
-              title="发送"
-            >
-              <ArrowUp size={16} strokeWidth={2} />
-            </button>
-          </div>
-        </div>
-        </div>
-      </div>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
     </form>
   );
 }
