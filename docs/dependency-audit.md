@@ -10,7 +10,6 @@
 
 | 审计项 | 保留原因 |
 |------|------|
-| `@modelcontextprotocol/sdk` 替换手写 MCP JSON-RPC client | 属于协议栈迁移，影响 stdio lifecycle、Streamable HTTP session、elicitation 和测试 mock server；需要单独计划和兼容性验证。 |
 | `reconnecting-websocket` 替换 ActivityWindow 手写连接逻辑 | 当前产品明确约束 ThreadWindow 不做断线恢复；ActivityWindow 的重连策略涉及状态展示和 heartbeat，需要独立确认。 |
 | `sirv` / `serve-static` 替换手写静态资源服务 | 会改变 cache headers、range、ETag、fallback 与错误语义；本轮只收敛 MIME 推断，静态服务整体替换需单独验证。 |
 | `ws` path 选项替换手写 upgrade path routing | 当前一个 HTTP server 同时承载三条 WebSocket 和静态资源；改成多 `WebSocketServer` path 配置会触及启动 / 测试结构，收益低于风险。 |

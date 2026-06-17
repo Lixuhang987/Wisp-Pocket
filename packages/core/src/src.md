@@ -89,7 +89,7 @@
 
 ## 编辑此目录的约束
 
-- core 不允许 `import` 任何 macOS / DOM 模块；只能依赖 Node 标准库和 `package.json` 已声明的运行期依赖。当前直接依赖包含 AI SDK provider、`zod`、`eventsource-parser` 与 `fast-json-stable-stringify`；新增直接 import 必须同步声明依赖。
+- core 不允许 `import` 任何 macOS / DOM 模块；只能依赖 Node 标准库和 `package.json` 已声明的运行期依赖。当前直接依赖包含 AI SDK provider、`@modelcontextprotocol/sdk`、`zod`、`eventsource-parser` 与 `fast-json-stable-stringify`；新增直接 import 必须同步声明依赖。
 - core 不反向依赖 `@handagent/thread-store`；持久化包可以依赖 core 的 DTO。
 - 跨子模块依赖必须按图层流动：runtime → {llm, tools, permission}；tools → {platform, workspace}；llm → {config, logging, runtime/AgentMessage}；不要在 platform / config / logging 中反向引用 runtime。
 - 每个子目录新增文件时，同步更新对应的 `<module>.md` 文件清单与索引表。

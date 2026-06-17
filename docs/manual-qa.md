@@ -17,6 +17,19 @@
 
 ## 开发验证记录
 
+### MCP 官方 SDK client 迁移回归
+
+- 完成日期：待实机 QA
+- 实现位置：`packages/core/src/mcp/`、`packages/core/tests/mcp/`、`docs/dependency-audit.md`
+- 修复结论：stdio 与 Streamable HTTP MCP client 已从手写 JSON-RPC transport 迁移到官方 `@modelcontextprotocol/sdk`。`SDKMCPClientAdapter` 负责保留 HandAgent 的 `MCPClient` 接口、timeout 文案、description 归一化和空表单 elicitation 自动接受策略；`StdioMCPClient` / `StreamableHttpMCPClient` 只创建官方 SDK transport。
+- 自动化验证：需执行 `pnpm exec vitest run apps/agent-server/tests/actions packages/core/tests/mcp`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 在 Settings 的 MCP 页配置 `filesystem` stdio server：`npx --yes @modelcontextprotocol/server-filesystem /tmp/handagent-mcp-real-qa`。
+  2. 重启桌面 App 后提交需要读取该目录的 prompt，确认 ThreadWindow 出现 `mcp.filesystem.*` 权限请求。
+  3. 允许权限后，确认 agent 能调用 `list_directory` / `read_file` 并把工具结果回灌到最终 assistant 回复。
+  4. 配置一个 Streamable HTTP MCP 测试 server，确认自定义 headers 仍发送，initialize 后能 list/call tools。
+  5. 配置 `elicitation.autoAcceptEmptyForm: true` 的 stdio server，确认空表单 `elicitation/create` 能自动 accept，带字段表单仍不会自动填写。
+
 ### TypeScript 依赖收敛回归
 
 - 完成日期：待实机 QA

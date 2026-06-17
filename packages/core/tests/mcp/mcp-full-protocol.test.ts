@@ -15,7 +15,7 @@ process.stdin.on("data", (chunk) => {
     buffer = buffer.slice(index + 1);
     if (!line) continue;
     const req = JSON.parse(line);
-    if (!req.id) continue; // skip notifications
+    if (req.id === undefined) continue; // skip notifications
     if (req.method === "initialize") {
       respond(req.id, {
         protocolVersion: "2025-11-25",
