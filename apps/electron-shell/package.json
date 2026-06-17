@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.activity-window.json && vite build -c vite.activity-window.config.ts",
     "dev": "pnpm build && electron dist/main/main.js",
-    "test": "vitest run"
+    "test": "tsc -p tsconfig.json && vitest run"
   },
   "dependencies": {
     "@handagent/core": "workspace:*",

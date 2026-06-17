@@ -50,7 +50,7 @@
 |------|------|------|
 | `src/` | [src/src.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/src.md) | Electron main、preload、ActivityWindow renderer 源码 |
 | `tests/` | [tests/tests.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/tests.md) | Electron shell 的 Vitest 单元测试 |
-| `package.json` | 无独立文档 | workspace 包声明；`build` 同时编译 main/preload 并打包 activity renderer |
+| `package.json` | 无独立文档 | workspace 包声明；`test` 会先编译 main/preload 产物供 preload 测试加载，`build` 再额外检查 activity renderer 并打包 `dist/activity-window` |
 | `tsconfig.json` | 无独立文档 | main 与 preload 的 NodeNext TypeScript 编译，输出到 `dist/` |
 | `tsconfig.activity-window.json` | 无独立文档 | ActivityWindow renderer 的 React/Vite TypeScript 检查，不直接输出 |
 | `vite.activity-window.config.ts` | 无独立文档 | 以 `src/activity-window` 为 root，输出 `dist/activity-window` |
