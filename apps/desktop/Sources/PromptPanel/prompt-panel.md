@@ -11,7 +11,7 @@
 | `PromptPanelInputCommand.swift` | 输入区 AppKit command selector 到 PromptPanel 意图的纯解析：Return、Shift/Option+Return、Tab、上下键 |
 | `PromptPanelInputLayout.swift` | 输入区布局辅助：根据 editable text 是否有可见内容决定文字编辑区域宽度 |
 | `PromptPanelViewModel.swift` | `@Observable` 状态：`inputItems` / 唯一 editable `draft` / `attachments` / `chipItems` / `filteredActions` / `selectedActionId`；Tab/点击/快捷键追加 skill item，提交完整 item 数组 |
-| `PromptPanelController.swift` | `NSPanel` 生命周期、ESC 局部监听、ViewModel 注入、QuickLook 预览和回调出口 |
+| `PromptPanelController.swift` | `NSPanel` 生命周期、ESC / showThreadWindow 局部监听、ViewModel 注入、QuickLook 预览和回调出口 |
 | `PromptPanelFocusRestorer.swift` | 记录 PromptPanel 唤起前的前台应用，并在面板因失焦或 ESC 收起后恢复应用焦点 |
 | `PromptPanelInputFocusRetrier.swift` | 输入框 AppKit 焦点重试器 |
 | `PromptPanelWindow.swift` | `NSPanel` 子类，处理失焦自动隐藏 |
@@ -55,6 +55,7 @@ PromptPanelGrowingTextView command
 - **View 只读 ViewModel**：不要让 View 直接调 `NSEvent` / `NSPanel` / `KeyboardShortcuts.*` API。
 - **ViewModel 不持有 SwiftUI 类型**：只暴露 plain Swift 状态与回调。
 - **Controller 是窗口管理 + 事件监听层**：不直接写 thread/turn 逻辑，跨模块意图通过 `onSubmit` / `onOpenSettings` 闭包出口给 Coordinator。
+- **PromptPanel 可见时也要消费 app-scoped ThreadWindow 快捷键**：`showThreadWindow` 不能只依赖 Coordinator 的 local monitor；当 PromptPanel 作为 `.nonactivatingPanel` 可见时，Controller 自己必须能识别同一份 shortcut 配置，并把意图通过 `onShowThreadWindow` 交回 Coordinator。
 - **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加上方 chip row 中的 skill chip 并显示 PromptPanel。
 - **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
 - **焦点语义**：凡是从 PromptPanel 把控制权切给 Electron ThreadWindow 的路径，都必须避免恢复旧前台应用。提交 prompt 时，Coordinator 必须在发送 `thread_window.open_initial_prompt` 前调用 `hide(restoringFocus: false)`；PromptPanel 仍可见时若触发 `openHistory`，也必须先 `hide(restoringFocus: false)` 再发送 `thread_window.open_history`。
