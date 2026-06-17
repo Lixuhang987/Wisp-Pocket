@@ -103,15 +103,6 @@
   9. 点击"取消"确认对话框关闭，thread 未被删除。
   10. 再次点击删除按钮，点击"删除"确认 thread 被删除且对话框关闭。
 
-### 全局快捷键只唤起 PromptPanel
-
-- 完成日期：待实机 QA
-- 实现位置：`apps/desktop/Sources/PromptPanel/PromptPanelController.swift`、`apps/desktop/TestsSwift/PromptPanel/PromptPanelControllerTests.swift`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`
-- 链路证明：期望链路是 `KeyboardShortcuts.showPromptPanel -> AppCoordinator.send(.togglePromptPanel) -> PromptPanelController.toggle/show -> 非激活 PromptPanel 前台显示`，Settings 存活状态不应被该链路打开或聚焦。失败边界定位为 `PromptPanelController.show()` 调用 `NSApp.activate(ignoringOtherApps: true)`，在 Settings 窗口存活且宿主为 `.regular` 时会激活整个 HandAgent 应用，把 Settings 一起带到前台。
-- 修复结论：PromptPanel show 只执行 `orderFrontRegardless()`、layout 和 `makeKey()`，不再激活整个 App；Settings 的打开/聚焦仍只由 `.openSettings` 路径负责。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanelControllerTests/testShowDoesNotActivateWholeApplication`、`bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
-- 手工回归步骤：启动桌面 App，打开 Settings 后切到其他前台 App；按真实全局快捷键唤起 PromptPanel；确认只出现 PromptPanel，Settings 不被带到前台。再次按全局快捷键隐藏 PromptPanel，确认焦点回到唤起前的 App；点击 PromptPanel 内设置按钮时 Settings 仍能正常打开/聚焦。
-
 ### 启动期系统主题解析安全
 
 - 完成日期：待实机 QA
