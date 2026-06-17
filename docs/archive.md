@@ -1298,3 +1298,28 @@
   3. 在同一 React ThreadWindow 页面中点击该历史项，前端实际 DOM 从“准备开始”空态切换为恢复后的消息视图，右侧渲染出 user message、`clipboard.read` tool 结果和最终 assistant 文案 `Mock clipboard.read completed.`。
 - **证据**：`~/.spotAgent/threads.sqlite` 中 `thread-aa3a9918-1349-469c-874b-0e36924531ab` 的 rollout item；`thread.resume` 返回的 `thread.snapshot`；Playwright snapshot 与截图 `.playwright-cli/page-2026-06-17T21-59-41-644Z.png`；系统截图 `/tmp/handagent-history-open.png` 显示历史列表已从持久化数据恢复。
 - **结论**：通过
+
+
+### Bash 构建脚本成功静默输出
+
+- 完成日期：待实机 QA
+- 实现位置：`scripts/test.sh`、`scripts/test.test.sh`、`scripts/swiftw`、`scripts/swiftw.test.sh`、`scripts/package-app.sh`、`scripts/package-app.test.sh`、`README.md`、`AGENTS.md`、`docs/dev.md`
+- 修复结论：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 `bash ./scripts/package-app.sh [--mock-llm]` 成功时只输出 `success`，避免 Vitest、pnpm、Swift build 和 codesign 的正常日志污染上下文；失败时回放失败步骤 stdout/stderr，并保留原始退出码。`bash ./scripts/test.sh` 真实执行 ThreadWindow Web test/build，其中 build 覆盖 `tsc -p tsconfig.json`；`swiftw run HandAgentDesktop` 仍透出最终 Swift run 输出，但会隐藏前置 `pnpm install`、theme token、ThreadWindow Web 和 Electron shell 构建的成功日志。
+- 自动化验证：需执行 `bash ./scripts/test.test.sh`、`bash ./scripts/swiftw.test.sh`、`bash ./scripts/package-app.test.sh`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 执行 `bash ./scripts/test.sh`，确认成功输出只有 `success`。
+  2. 执行 `bash ./scripts/swiftw build`，确认成功输出只有 `success`。
+  3. 执行 `bash ./scripts/package-app.sh --mock-llm`，确认成功输出只有 `success`，且 `dist/HandAgentDesktop.app` 正常生成。
+  4. 人为制造一个构建失败场景，确认脚本只回放失败步骤日志并返回非 0 退出码。
+
+### Bash 构建脚本成功静默输出
+
+- **验证日期**：2026-06-18
+- **验证环境**：macOS 主 checkout `main`；命令在 `/Users/mu9/proj/handAgent` 串行执行，避免并行写 Swift 产物造成的测试互扰。
+- **验证过程**：
+  1. 执行 `bash ./scripts/test.sh`，命令成功且标准输出仅为 `success`。
+  2. 执行 `bash ./scripts/swiftw build`，命令成功且标准输出仅为 `success`。
+  3. 执行 `bash ./scripts/package-app.sh --mock-llm`，命令成功且标准输出仅为 `success`，随后确认 `dist/HandAgentDesktop.app` 存在。
+  4. 构造失败场景：设置 `HANDAGENT_THREAD_WINDOW_WEB_DIST_DIR=/tmp/handagent-missing-web-dist` 后再次执行 `bash ./scripts/package-app.sh --mock-llm`，命令以非 0 退出，输出仅回放缺失 `ThreadWindow` 构建产物的失败信息：`Missing ThreadWindow web build: /tmp/handagent-missing-web-dist/index.html` 以及修复提示，没有额外成功日志泄漏。
+- **证据**：本轮串行执行结果分别为 `success`、`success`、`success`；`dist/HandAgentDesktop.app` 存在；失败场景命令返回 exit code 1，stderr 仅包含缺失构建产物与 `Run pnpm --filter handagent-thread-window-web build or set HANDAGENT_THREAD_WINDOW_WEB_DIST_DIR.`。
+- **结论**：通过
