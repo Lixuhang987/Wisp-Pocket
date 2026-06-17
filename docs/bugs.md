@@ -31,3 +31,24 @@
 
 ## 当前 bug
 
+
+
+### Agent rx_event request-response 收敛
+
+- 完成日期：待实机 QA
+- 实现位置：`packages/core/src/protocol/Op.ts`、`packages/core/src/protocol/AgentEvent.ts`、`apps/agent-server/src/agent/AgentRequestBroker.ts`、`apps/agent-server/src/server/server.ts`、`apps/agent-server/src/thread/ThreadCommandRouter.ts`
+- 修复结论：permission/workspace ask 不再由 `/api/thread` socket bridge 直接发送。turn 内部请求先进入 Agent `rx_event(server.request)`，app-server 从通道中发布为 `ServerRequest`；React 的 `ClientResponse` 会被 app-server 包装为 `client_response` Op 后投递到 Agent `tx_sub`，再由 `AgentRequestBroker` 唤醒 pending ask。公开 `op.submit` 仍只接受 `UserInput | Interrupt`。
+- 自动化验证：需执行 `pnpm exec vitest run packages/core/tests/protocol/op.test.ts apps/agent-server/tests/agent/AgentRequestBroker.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动 mock 或真实桌面 App，提交会触发 tool permission 的 prompt，确认 ThreadWindow 出现 `permission.requested` 面板，ActivityWindow 状态进入 waiting。
+  2. 在 ThreadWindow 选择 allow/deny，确认请求面板消失，turn 继续完成或按拒绝结果收敛，ActivityWindow 离开 waiting。
+  3. 触发 `workspace.askUser` 的 prompt，确认同一 thread 内 workspace 请求串行出现；选择 workspace 或取消后 turn 正确继续。
+  4. 点击停止或关闭 ThreadWindow，确认 running turn 被中断，当前 pending permission/workspace 请求被取消，thread 级临时权限规则被清理，后续新输入不复用本次临时 allow/deny。
+
+- **严重级别**：中
+- **发现日期**：2026-06-18
+- **复现步骤**：1. 在 `main` 主 checkout 依次执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`，并保持 packaged app 与 `http://127.0.0.1:4317/thread-window/index.html` 在线。2. 在同一个本地 ThreadWindow Web 页面活连接中提交 `[mock:permission-write] LIVE_QA_PERMISSION_ALLOWDENY_20260618`，观察 `权限请求: file.write` 面板，点击 `允许`，确认出现 `[file.write] {"workspaceId":"qa-workspace","relativePath":"permission-check.txt","bytesWritten":27}` 与 `Mock permission write completed.`。3. 在同一 thread 再提交 `[mock:workspace-ask] LIVE_QA_WORKSPACE_ALLOW_20260618`，先在 `权限请求: workspace.askUser` 点击 `允许`，再在后续 workspace 面板点击 `qa-workspace`，确认出现 `[workspace.askUser] {"workspaceId":"qa-workspace"}` 与 `Mock workspace.askUser completed.`。4. 继续在同一 thread 提交 `[mock:workspace-ask] LIVE_QA_STOP_CLEAR_RULE_20260618`，等待 `请选择 QA 要写入的 workspace` 面板出现后点击 `停止`。5. 等待 4 秒后再次抓取当前页面状态，并检查 `~/.spotAgent/threads.sqlite` 中该 thread 的最新 rollout。
+- **实际结果**：步骤 2 和 3 证明 `permission.answered`、`workspace.answered` 正常通过 `client_response` 收敛；但步骤 4 点击 `停止` 后，SQLite 已写入 `turn.completed(status: interrupted)`、`thread.status.changed(value: interrupted)`、`turn_context.status: failed` 与 `run_interrupted` 审计事件，ThreadWindow 页面却仍保留旧的 workspace 请求面板文案 `请选择 QA 要写入的 workspace / qa-workspace / 取消`，没有随着中断清空 pending request，也没有渲染中断提示。
+- **期望结果**：当 running turn 因 stop/interrupt 收敛为 `interrupted` 后，当前 thread 的 pending permission/workspace 请求应立即从 ThreadWindow UI 清除，并与 runtime/persistence 的 interrupted 状态一致；后续若再次触发同类请求，应以新的 request 重新出现，而不是残留旧面板。
+- **证据**：1. Playwright 活连接成功路径：在本地 ThreadWindow Web 页面中，`[mock:permission-write] LIVE_QA_PERMISSION_ALLOWDENY_20260618` 先显示 `权限请求: file.write`，点击 `允许` 后页面渲染 `[file.write] {"workspaceId":"qa-workspace","relativePath":"permission-check.txt","bytesWritten":27}` 与 `Mock permission write completed.`；`[mock:workspace-ask] LIVE_QA_WORKSPACE_ALLOW_20260618` 先显示 `权限请求: workspace.askUser`，点击 `允许` 后切换到 `请选择 QA 要写入的 workspace`，选择 `qa-workspace` 后页面渲染 `[workspace.askUser] {"workspaceId":"qa-workspace"}` 与 `Mock workspace.askUser completed.`。2. 停止失败路径：点击 `停止` 后 4 秒再次读取 DOM，`document.body.innerText` 仍包含 `请选择 QA 要写入的 workspace\nqa-workspace\n取消`，`hasWaiting: true`，且不包含 `本轮运行已中断`。3. SQLite 证据：thread `thread-e26b2e18-8a36-400b-b913-dbb6844135d4` 的 `thread_items` 最新序列为 `63 event_msg turn.completed payload.status=interrupted`、`64 event_msg thread.status.changed payload.value=interrupted`、`65 turn_context status=failed`，`auditEvents` 含 `message: 本轮运行已中断。`, `code: run_interrupted`。4. 基线命令在同一轮均通过：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均返回 `success`。
+- **初步调用链 / 根因边界**：后端 request-response 链路本身已通。`AgentRequestBroker -> /api/thread ServerRequest -> ClientResponse -> client_response Op` 在 allow 路径与 workspace 串行路径都已被实机证实；中断后 persistence 也正确写入 interrupted。缺陷边界落在 ThreadWindow 前端状态同步：`apps/thread-window-web/src/store/threadWindowStore.ts` 的 `handleRequest()` 会把请求推入 `thread.permissionRequests` / `thread.workspaceRequests`，但 `turn.completed` 与 `thread.status.changed` 分支只更新 `thread.status` 和 `pendingInitialPrompt`，没有在 interrupted/failed 收敛时清空这些 pending request 队列，因此 UI 残留了已经失效的请求面板。

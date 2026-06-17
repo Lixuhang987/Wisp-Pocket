@@ -68,18 +68,6 @@
   5. 在 linked worktree 内误执行 `bash ./scripts/create-worktree.sh nested-check`，确认脚本返回非 0 并提示必须从主 checkout 执行，不创建嵌套 `.worktrees`。
   6. 在后续 CodeGraph MCP 调用中显式传入该 `projectPath`，确认检索结果来自 worktree 当前分支而不是主 checkout。
 
-### Agent rx_event request-response 收敛
-
-- 完成日期：待实机 QA
-- 实现位置：`packages/core/src/protocol/Op.ts`、`packages/core/src/protocol/AgentEvent.ts`、`apps/agent-server/src/agent/AgentRequestBroker.ts`、`apps/agent-server/src/server/server.ts`、`apps/agent-server/src/thread/ThreadCommandRouter.ts`
-- 修复结论：permission/workspace ask 不再由 `/api/thread` socket bridge 直接发送。turn 内部请求先进入 Agent `rx_event(server.request)`，app-server 从通道中发布为 `ServerRequest`；React 的 `ClientResponse` 会被 app-server 包装为 `client_response` Op 后投递到 Agent `tx_sub`，再由 `AgentRequestBroker` 唤醒 pending ask。公开 `op.submit` 仍只接受 `UserInput | Interrupt`。
-- 自动化验证：需执行 `pnpm exec vitest run packages/core/tests/protocol/op.test.ts apps/agent-server/tests/agent/AgentRequestBroker.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
-- 手工回归步骤：
-  1. 启动 mock 或真实桌面 App，提交会触发 tool permission 的 prompt，确认 ThreadWindow 出现 `permission.requested` 面板，ActivityWindow 状态进入 waiting。
-  2. 在 ThreadWindow 选择 allow/deny，确认请求面板消失，turn 继续完成或按拒绝结果收敛，ActivityWindow 离开 waiting。
-  3. 触发 `workspace.askUser` 的 prompt，确认同一 thread 内 workspace 请求串行出现；选择 workspace 或取消后 turn 正确继续。
-  4. 点击停止或关闭 ThreadWindow，确认 running turn 被中断，当前 pending permission/workspace 请求被取消，thread 级临时权限规则被清理，后续新输入不复用本次临时 allow/deny。
-
 ### PromptPanel 输入框 item 化与 Action chip
 
 - 完成日期：待实机 QA
