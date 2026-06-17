@@ -1238,3 +1238,34 @@
   4. 确认不再出现 `Agent Server 已停止 / Electron shell exited with status 0` fatal alert，宿主退出链路能正常回收。
 - **自动化证据**：`ElectronBackedAppServerTests/testCleanShellTerminationRequestsHostTerminationWithoutFatalAlert` 覆盖 Electron clean exit status 0 转为宿主 terminate 请求；`AppCoordinatorTests/testHostTerminationRequestTerminatesApplication` 覆盖 Coordinator 调用 `terminateApplication`；`ElectronBackedAppServerTests/testUnexpectedShellTerminationReportsFatalErrorAndMarksUnavailable` 覆盖非 0 status 仍走 fatal error。
 - **结论**：通过。Electron ThreadWindow 前台 `Command+Q` 不再把 status 0 当作 agent-server fatal termination。
+### 首次 PromptPanel -> ThreadWindow handoff
+
+- 完成日期：待实机 QA
+- 实现位置：`docs/superpowers/specs/2026-06-17-threadwindow-first-open-handoff-design.md`、`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/Coordinator/coordinator.md`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`、`apps/desktop/Sources/AppServices/ElectronShell/ThreadWindowDiagnostics.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`
+- 修复结论：失败边界定位为 PromptPanel 把控制权切给 Electron ThreadWindow 时，没有统一满足“先 `hide(restoringFocus: false)`，再 open/focus ThreadWindow”这条 handoff 不变量。`submitPrompt` 之前已经修过，但 `showThreadWindow` / `openHistory` 首次打开路径遗漏了同样处理。首次启动后若 PromptPanel 仍可见，Electron ThreadWindow 首次 `show()/focus()` 与 PromptPanel 失焦恢复会产生竞态，表现为 ThreadWindow 与 PromptPanel 一起消失。修复后首轮 submit 与 `openHistory` 都走同样的 handoff 语义，先隐藏 PromptPanel 且不恢复旧前台应用，再把控制权交给 Electron。
+- 防回归级别：高。这个 bug 已多次出现；以后只要改到 `showThreadWindow` 快捷键、`openHistory`、PromptPanel `hide/restoringFocus`、Electron ThreadWindow open/focus/close ack，必须重跑本条自动化与手工步骤，不能凭局部代码阅读跳过。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter ElectronBackedAppServerTests`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，首次唤起 PromptPanel。
+  2. 在 PromptPanel 可见时直接提交首轮 prompt，确认 PromptPanel 收起后 Electron ThreadWindow 保持前台可见，不会被提交前的 App 重新盖住。
+  3. 关闭 ThreadWindow；再次打开 PromptPanel，在 PromptPanel 可见时直接按 `showThreadWindow` 快捷键，确认 PromptPanel 收起后 ThreadWindow 保持可见，不会与 PromptPanel 一起消失。
+  4. 重复第 2-3 步至少 3 次，确认首次与后续行为一致。
+  5. 若需要诊断日志，用 `HANDAGENT_THREADWINDOW_TRACE=1` 启动宿主，确认 stderr 顺序满足 `coordinator.open_history -> prompt_panel.hide restoringFocus=false -> electron.command_ack`；异常场景下若还有 `electron.thread_window_closed wasVisible=true`，可继续据此排查 Electron 首次 close 来源。
+### 验收记录
+
+- **验证日期**：2026-06-18
+- **验证环境**：`main` 基线 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 已通过；修复实现位于 worktree `codex/showthreadwindow-promptpanel-handoff`，打包产物为 `/Users/mu9/proj/handAgent/.worktrees/showthreadwindow-promptpanel-handoff/dist/HandAgentDesktop.app`，运行模式 `mock`。
+- **验证过程**：
+  1. 在 worktree 中完成修复后执行 `bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test --filter ElectronBackedAppServerTests`、`bash ./scripts/swiftw build`，全部通过。
+  2. 关闭主 checkout 旧实例，启动 worktree 的 packaged app，确认进程链为 `HandAgentDesktop -> Electron main.js -> agent-server`，且 `127.0.0.1:4317` 保持监听。
+  3. 清理无关旧 Electron 默认页进程后，窗口列表只剩 `HandAgent Activity`。
+  4. 发送 `⌘⇧Space` 打开 PromptPanel，确认 `HandAgentDesktop` 处于 `frontmost=true, visible=true`，且存在 1 个 `AXSystemDialog` 窗口。
+  5. 在 PromptPanel 可见时发送 `⌘H`，1 秒后 `process "Electron"` 的窗口列表从仅 `HandAgent Activity` 变为 `HandAgent Activity, HandAgent ThreadWindow`；同时 `process "HandAgentDesktop"` 已无可见窗口，符合 handoff 语义。
+- **证据**：
+  1. 自动化：`PromptPanelControllerTests`、`AppCoordinatorTests`、`ElectronBackedAppServerTests`、`swiftw build` 全部 `success`。
+  2. 实机窗口证据：
+     - 触发前：`process "Electron"` = `HandAgent Activity, AXStandardWindow`
+     - PromptPanel 可见时：`process "HandAgentDesktop"` = `true, true, 1`，窗口子角色 `AXSystemDialog`
+     - 触发后：`process "Electron"` = `HandAgent Activity, AXStandardWindow, HandAgent ThreadWindow, AXStandardWindow`
+  3. 后端健康证据：`lsof -iTCP:4317 -sTCP:LISTEN` 显示 worktree packaged app 的 agent-server 进程仍在监听。
+- **结论**：通过。`showThreadWindow` 在 PromptPanel 可见时已能稳定路由到 `openHistory`，修复了此前“快捷键没有进入 Coordinator，ThreadWindow 不会恢复”的缺陷。
