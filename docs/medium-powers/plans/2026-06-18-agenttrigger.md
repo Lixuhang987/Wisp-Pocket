@@ -17,6 +17,12 @@
 - 完整远程 Trigger 市场服务、账号体系、签名与分发治理
 - 任意第三方二进制/脚本 provider 的沙箱执行与生命周期托管
 
+补充约束：
+
+- 第一版同时实现 `chrome.bookmarks` 与 `system.clock`，主要目的不是扩功能面，而是在实现期验证 `AgentTrigger` 抽象是否真的能承载不同类型的事件源。
+- `chrome.bookmarks` 代表外部对象变化事件，`system.clock` 代表宿主内时间调度事件；两者都必须走通同一条平台链路。
+- 本计划中的数据结构是实现起点，不是冻结契约。若在实现过程中发现 `PackageManifest`、`Instance`、`Event`、`FireRequest`、`Provider` 等结构不足以自然承载两类 Trigger，可以按需调整、拆分或扩展，但不能破坏本 spec 已确认的产品边界。
+
 ## Folder Inventory
 
 - `apps/desktop/Sources/AppServices/`
