@@ -134,6 +134,9 @@ final class AppCoordinator {
         promptPanelController.onOpenSettings = { [weak self] in
             self?.send(.openSettings)
         }
+        promptPanelController.onShowThreadWindow = { [weak self] in
+            self?.send(.openHistory)
+        }
     }
 
     private func setupAppearanceTheme() {
@@ -178,9 +181,7 @@ final class AppCoordinator {
             Task { @MainActor in await self?.captureCoordinator.captureRegionAndShow() }
         }
         showThreadWindowMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
-            let shortcut = KeyboardShortcuts.getShortcut(for: .showThreadWindow)
-                ?? KeyboardShortcuts.Name.showThreadWindow.defaultShortcut
-            if let shortcut, let pressed = KeyboardShortcuts.Shortcut(event: event), pressed == shortcut {
+            if AppScopedShortcutMatcher.matches(event, name: .showThreadWindow) {
                 Task { @MainActor in self?.send(.openHistory) }
                 return nil
             }

@@ -1,5 +1,6 @@
 import XCTest
 import ObjectiveC
+import KeyboardShortcuts
 @testable import HandAgentDesktop
 
 @MainActor
@@ -129,6 +130,64 @@ final class PromptPanelControllerTests: XCTestCase {
         XCTAssertEqual(focusRestorer.captureCount, 1)
         XCTAssertEqual(focusRestorer.restoreCount, 0)
         XCTAssertEqual(focusRestorer.restoredTokens, [])
+    }
+
+    func testShowThreadWindowShortcutTriggersHandlerAndConsumesEvent() throws {
+        defer { KeyboardShortcuts.setShortcut(nil, for: .showThreadWindow) }
+        KeyboardShortcuts.setShortcut(.init(.h, modifiers: [.command]), for: .showThreadWindow)
+        let controller = makeController()
+        controller.configure(viewModel: PromptPanelViewModel(actions: []))
+        var triggerCount = 0
+        controller.onShowThreadWindow = { triggerCount += 1 }
+
+        let event = try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [.command],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: "h",
+                charactersIgnoringModifiers: "h",
+                isARepeat: false,
+                keyCode: 4
+            )
+        )
+
+        let result = controller.handleKeyEventForTesting(event)
+
+        XCTAssertEqual(triggerCount, 1)
+        XCTAssertNil(result)
+    }
+
+    func testUnmatchedShortcutFallsThrough() throws {
+        defer { KeyboardShortcuts.setShortcut(nil, for: .showThreadWindow) }
+        KeyboardShortcuts.setShortcut(.init(.h, modifiers: [.command]), for: .showThreadWindow)
+        let controller = makeController()
+        controller.configure(viewModel: PromptPanelViewModel(actions: []))
+        var triggerCount = 0
+        controller.onShowThreadWindow = { triggerCount += 1 }
+
+        let event = try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [.command],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: "j",
+                charactersIgnoringModifiers: "j",
+                isARepeat: false,
+                keyCode: 38
+            )
+        )
+
+        let result = controller.handleKeyEventForTesting(event)
+
+        XCTAssertEqual(triggerCount, 0)
+        XCTAssertTrue(result === event)
     }
 
     func testInputFocusRetrierWaitsForTextViewWindowBeforeFocusing() {

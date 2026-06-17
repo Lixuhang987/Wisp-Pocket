@@ -166,6 +166,23 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testPromptPanelShowThreadWindowShortcutRoutesToOpenHistory() async throws {
+        let client = RecordingThreadWindowCommandClient()
+        let promptPanel = RecordingPromptPanelController()
+        let coordinator = AppCoordinator(
+            services: electronServices(commandClient: client),
+            promptPanelController: promptPanel
+        )
+
+        coordinator.send(.showPromptPanel)
+        promptPanel.triggerShowThreadWindowShortcut()
+        try await Task.sleep(for: .milliseconds(10))
+
+        XCTAssertEqual(promptPanel.hideCalls, [false])
+        XCTAssertEqual(client.openHistoryCount, 1)
+    }
+
+    @MainActor
     func testAppearancePreferenceChangeSendsThemeToElectron() {
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(services: electronServices(commandClient: client))
@@ -458,6 +475,7 @@ private final class RecordingPromptPanelController: PromptPanelControlling {
     var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)?
     var onOpenSettings: (() -> Void)?
     var onDidShow: (() -> Void)?
+    var onShowThreadWindow: (() -> Void)?
     var isVisible = false
     private(set) var hideCalls: [Bool] = []
 
@@ -490,6 +508,10 @@ private final class RecordingPromptPanelController: PromptPanelControlling {
         } else {
             show()
         }
+    }
+
+    func triggerShowThreadWindowShortcut() {
+        onShowThreadWindow?()
     }
 }
 
