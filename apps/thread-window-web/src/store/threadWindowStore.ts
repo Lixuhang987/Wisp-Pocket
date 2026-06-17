@@ -348,6 +348,7 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
           thread.status = notification.payload.status === "completed" ? "idle" : notification.payload.status;
           thread.pendingInitialPrompt = null;
+          clearThreadRequests(thread);
           break;
         }
 
@@ -355,6 +356,9 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
           thread.status = notification.payload.value;
+          if (thread.status !== "running") {
+            clearThreadRequests(thread);
+          }
           break;
         }
 
@@ -387,6 +391,7 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
             thread.errorMessage = notification.payload.message;
             thread.status = "failed";
             thread.queuedInputDispatchPending = false;
+            clearThreadRequests(thread);
           } else {
             draft.windowErrorMessage = notification.payload.message;
           }
@@ -499,4 +504,9 @@ function summarizeInputItems(items: InputItem[]): string {
         return "图片附件";
     }
   }).filter((value) => value.length > 0).join("\n\n");
+}
+
+function clearThreadRequests(thread: ThreadState): void {
+  thread.permissionRequests = [];
+  thread.workspaceRequests = [];
 }

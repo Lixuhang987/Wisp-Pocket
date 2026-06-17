@@ -439,6 +439,73 @@ describe("threadWindowStore", () => {
     expect(store.getState().threadsById["thread-1"].workspaceRequests).toHaveLength(1);
   });
 
+  it("clears pending requests when a completed turn settles back to idle", () => {
+    const store = createThreadWindowStore;
+    store.getState().ensureThreadState("thread-1");
+    store.getState().handleRequest({
+      type: "permission.requested",
+      requestId: "thread-1:req-1",
+      threadId: "thread-1",
+      timestamp,
+      payload: { toolName: "workspace.askUser", toolCallId: "tool-1", arguments: { prompt: "Pick workspace" } },
+    });
+    store.getState().handleRequest({
+      type: "workspace.requested",
+      requestId: "thread-1:req-2",
+      threadId: "thread-1",
+      timestamp,
+      payload: { prompt: "Pick", candidates: [] },
+    });
+
+    store.getState().handleNotification({
+      type: "turn.completed",
+      threadId: "thread-1",
+      notificationId: "n-completed",
+      turnId: "turn-1",
+      timestamp,
+      payload: { status: "completed" },
+    });
+
+    expect(store.getState().threadsById["thread-1"]).toMatchObject({
+      status: "idle",
+      permissionRequests: [],
+      workspaceRequests: [],
+    });
+  });
+
+  it("clears pending requests when thread status changes to a non-running terminal state", () => {
+    const store = createThreadWindowStore;
+    store.getState().ensureThreadState("thread-1");
+    store.getState().handleRequest({
+      type: "permission.requested",
+      requestId: "thread-1:req-1",
+      threadId: "thread-1",
+      timestamp,
+      payload: { toolName: "workspace.askUser", toolCallId: "tool-1", arguments: { prompt: "Pick workspace" } },
+    });
+    store.getState().handleRequest({
+      type: "workspace.requested",
+      requestId: "thread-1:req-2",
+      threadId: "thread-1",
+      timestamp,
+      payload: { prompt: "Pick", candidates: [] },
+    });
+
+    store.getState().handleNotification({
+      type: "thread.status.changed",
+      threadId: "thread-1",
+      notificationId: "n-status",
+      timestamp,
+      payload: { value: "idle" },
+    });
+
+    expect(store.getState().threadsById["thread-1"]).toMatchObject({
+      status: "idle",
+      permissionRequests: [],
+      workspaceRequests: [],
+    });
+  });
+
   it("removes answered requests through explicit store actions", () => {
     const store = createThreadWindowStore;
     store.getState().ensureThreadState("thread-1");

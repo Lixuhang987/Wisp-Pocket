@@ -65,7 +65,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 - 连接状态：`disconnected`、`connecting`、`connected`。
 - 历史：`history` 来自 `thread.listed`。
 - thread 状态缓存：`threadsById` 中每个 `ThreadState` 持有 `threadId`、title、run status、messages、pending initial prompt、权限请求、workspace 请求、composer 队列和 thread 级错误。`thread.snapshot.messages[].inputItems` 与 `user.message.recorded.payload.items` 会落到 `ThreadMessage.userInputItems`，供用户消息结构化回显。右侧当前展示的 `activeThreadId` 是 `App` 本地 React state，不进入 store。
-- 请求面板：`permission.requested` / `workspace.requested` 按 `threadId` 放到对应 `ThreadState`；用户回答后根组件发送 response 并调用显式 resolve action 移除请求。
+- 请求面板：`permission.requested` / `workspace.requested` 按 `threadId` 放到对应 `ThreadState`；用户回答后根组件发送 response 并调用显式 resolve action 移除请求。若 request 没有走到显式回答分支，store 也必须在 `turn.completed`、`thread.error` 或 `thread.status.changed` 收敛到非 `running` 状态时兜底清空失效 request，避免终态 thread 继续残留旧的允许/拒绝面板。
 - composer 输入：`ThreadWorkspacePane` 按 thread 持有受控 `InputItem[]`，`Composer` 只通过 `inputItems` / `onInputItemsChange` 渲染和回写变化；提交后发送完整 `UserInput.items` 并重置为唯一空 text item。结构化输入和排队 op clone 使用 `structuredClone`，不要恢复按 item type 手写拷贝。目标 thread running 或已有 queued input 派发中时，`App` 不立即发送下一条 `op.submit(UserInput)`，而是写入对应 `ThreadState` 的 `queuedComposerInputs` 并在 Composer 上方展示队列；等对应 thread 离开 running 且连接可用后，每个 thread 一次只取一条 queued input 发送，防止多个 user message 连续插到当前 assistant 回复前。停止按钮发送 `op.submit(Interrupt)`。
 - workspace：`workspaces` 来自 `workspace.listed`，`expandedWorkspaceIds` 和 `searchQuery` 驱动历史侧栏；`expandedWorkspaceIds` 通过 `zustand/middleware` 的 `persist` 写入 `localStorage`，刷新或重开同一 ThreadWindow 前端后保留展开状态，并兼容旧版裸数组存储格式。
 - 去重：`processedNotificationIds` 防止重复处理同一 notification，特别是 streaming delta。
