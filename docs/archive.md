@@ -1323,3 +1323,24 @@
   4. 构造失败场景：设置 `HANDAGENT_THREAD_WINDOW_WEB_DIST_DIR=/tmp/handagent-missing-web-dist` 后再次执行 `bash ./scripts/package-app.sh --mock-llm`，命令以非 0 退出，输出仅回放缺失 `ThreadWindow` 构建产物的失败信息：`Missing ThreadWindow web build: /tmp/handagent-missing-web-dist/index.html` 以及修复提示，没有额外成功日志泄漏。
 - **证据**：本轮串行执行结果分别为 `success`、`success`、`success`；`dist/HandAgentDesktop.app` 存在；失败场景命令返回 exit code 1，stderr 仅包含缺失构建产物与 `Run pnpm --filter handagent-thread-window-web build or set HANDAGENT_THREAD_WINDOW_WEB_DIST_DIR.`。
 - **结论**：通过
+
+
+### SQLite ThreadStore rollout 持久化回归
+
+- 完成日期：待实机 QA
+- 实现位置：`packages/thread-store/`、`apps/agent-server/src/thread/ThreadPersistence.ts`、`apps/agent-server/src/thread/ThreadRuntimeOrchestrator.ts`、`apps/agent-server/src/server/server.ts`
+- 修复结论：thread 持久化从 core 内的每 thread JSON 文件迁移到 `@handagent/thread-store` 的 SQLite rollout item 模型；`thread.start` 只打开 live writer，首次用户输入持久化后才 materialize 到 `~/.spotAgent/threads.sqlite`。runtime 推送给 ThreadWindow 的 `assistant.delta`、`tool.started`、`tool.finished`、`turn.completed`、`thread.status.changed` 等通知会写为 `event_msg`，审计事件写入 `turn_context.auditEvents`。
+- 自动化验证：需执行 `pnpm exec vitest run packages/thread-store/tests/thread-store-lifecycle.test.ts packages/thread-store/tests/thread-store-live-writer.test.ts packages/thread-store/tests/current-thread.test.ts packages/thread-store/tests/package-exports.test.ts apps/agent-server/tests/thread/ThreadPersistence.test.ts apps/agent-server/tests/thread/ThreadCommandRouter.test.ts apps/agent-server/tests/thread/ThreadRuntimeOrchestrator.test.ts apps/agent-server/tests/server/server.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App 并提交一个普通 prompt，确认 ThreadWindow 显示 user message、assistant streaming 和 completed/idle 状态。
+  2. 确认 `~/.spotAgent/threads.sqlite` 被创建，`threads` 表有对应 thread，`thread_items` 中按 sequence 出现 `session_meta`、`response_item`、`event_msg` 和必要的 `turn_context`。
+  
+  4. 提交一个会触发 tool 或 permission 的 prompt，确认 tool 通知仍正常显示，重启后审计事件仍能保留在 thread history 派生视图中。
+
+### SQLite ThreadStore rollout 持久化回归
+
+- **验证日期**：2026-06-18
+- **验证环境**：`main` 主 checkout；已通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw build`、`bash ./scripts/package-app.sh --mock-llm`；使用 packaged mock app + `http://127.0.0.1:4317/thread-window/index.html` live 页面。
+- **验证过程**：1. 清理多余 worktree 实例后，仅保留主 checkout 的 `HandAgentDesktop -> Electron main -> node apps/agent-server/src/server/server.ts` 单实例，并确认 `127.0.0.1:4317` 仅由该 node 监听。2. 在 live ThreadWindow 新建对话并提交 `[mock:assistant-ok] LIVE_QA_THREADSTORE_RESUME_PASS_20260618`，确认右侧依次出现 user message 与 `Mock assistant response: main chain is reachable.`，最终回到 idle。3. 检查 `~/.spotAgent/threads.sqlite` 中 thread `thread-6c74b06e-2202-4a0f-8132-ca13fa961415`，确认 `threads` 表存在该行，`thread_items` 按 sequence 写入 `session_meta`、`response_item(user)`、多条 `event_msg assistant.delta`、`response_item(assistant)`、`event_msg turn.completed`、`event_msg thread.status.changed`。4. 再新建对话提交 `[mock:workspace-ask] LIVE_QA_RESUME_RESTORE_20260618_A`，确认 live UI 显示 `权限请求: workspace.askUser`。随后退出 packaged app，再重新启动并在历史侧栏点回同一 thread。5. 恢复后检查同一 thread `thread-9367b578-896e-4cd8-b8f6-7fc0cb079cb8`，确认 UI 不残留旧 request 面板，不重复 user message，而是显示 `本轮运行因 agent-server 重启而中断，请重新发送请求。`；SQLite 同步补出 `response_item(assistant)` 与 `turn_context status=failed`，证明重启后的审计/恢复痕迹可从 history 派生视图回看。
+- **证据**：1. 进程与端口：重启后 `open dist/HandAgentDesktop.app` 形成 `HandAgentDesktop pid 67193 -> Electron pid 67207 -> node pid 67221` 单实例链路，`lsof -nP -iTCP:4317 -sTCP:LISTEN` 仅显示 node 监听。2. DOM 证据：`document.body.innerText` 在普通链路下包含 `[mock:assistant-ok] LIVE_QA_THREADSTORE_RESUME_PASS_20260618` 与 `Mock assistant response: main chain is reachable.`；在恢复链路下包含 `[mock:workspace-ask] LIVE_QA_RESUME_RESTORE_20260618_A` 与 `本轮运行因 agent-server 重启而中断，请重新发送请求。`，且不包含旧的 `权限请求: workspace.askUser` 面板。3. SQLite 证据：`thread-6c74b06e-2202-4a0f-8132-ca13fa961415` 的 rollout sequence 包含 `session_meta`、`response_item`、`event_msg`、`turn.completed`、`thread.status.changed`；`thread-9367b578-896e-4cd8-b8f6-7fc0cb079cb8` 在恢复后新增 `response_item(assistant)=本轮运行因 agent-server 重启而中断，请重新发送请求。` 与 `turn_context status=failed`。
+- **结论**：通过
