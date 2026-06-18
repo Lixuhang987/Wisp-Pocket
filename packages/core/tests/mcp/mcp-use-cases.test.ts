@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { StdioMCPClient } from "../../src/mcp/StdioMCPClient.ts";
+import { MCPToolAdapter } from "../../src/mcp/MCPToolAdapter.ts";
 
 const SERVER_SCRIPT = `#!/usr/bin/env node
 let buffer = "";
@@ -125,6 +126,30 @@ describe("StdioMCPClient (full protocol)", () => {
     expect(result.contents).toHaveLength(1);
     expect(result.contents[0].text).toBe("Hello from resource");
     await client.close();
+  });
+});
+
+describe("MCPToolAdapter", () => {
+  it("exposes server-prefixed tool names and calls original MCP tool", async () => {
+    const calls: unknown[] = [];
+    const adapter = new MCPToolAdapter({
+      serverId: "github",
+      tool: {
+        name: "create_issue",
+        description: "Create issue",
+        inputSchema: { type: "object" },
+      },
+      callTool: async (name, args) => {
+        calls.push({ name, args });
+        return { content: [{ type: "text", text: "created" }] };
+      },
+    });
+
+    expect(adapter.name).toBe("mcp.github.create_issue");
+    await expect(adapter.call({ title: "Bug" })).resolves.toEqual({
+      content: [{ type: "text", text: "created" }],
+    });
+    expect(calls).toEqual([{ name: "create_issue", args: { title: "Bug" } }]);
   });
 });
 

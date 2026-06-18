@@ -2,16 +2,16 @@
 
 ## 目录职责
 
-`apps/agent-server/tests` 是 agent-server 的 Vitest 测试集合。测试目录按源码职责分组，用来验证当前主路径边界：server 顶层消息分派、thread / turn 命令路由与 notification 发布、agent request broker、protocol 翻译、settings 热加载、actions / MCP 工具组合、platform bridge。
+`apps/agent-server/tests` 是 agent-server 的 Vitest 测试集合。当前以 `use-cases/` 里的主路径测试为入口，配合少量按模块保留的边界测试，验证 `/api/thread`、`/api/activity`、`/api/platform`、settings 热加载、thread 级 tool 激活、MCP 注册和 platform bridge。
 
 ## 直接子节点索引
 
 | 子节点 | 职责 |
 |------|------|
-| `activity/` | `AgentActivityPublisher` 的 snapshot、状态派生和 subscriber 广播 |
-| `agent/` | `AgentManager` 的注册、`op.submit`/`client_response` 转发、request broker 等待队列、删除关闭和 `UserInput` bridge 转换 |
-| `server/` | `startServer`、`attachThreadSocketHandlers`、`attachPlatformSocketHandlers`、顶层 `PlatformBridgeMessage / ThreadCommand / ClientResponse` 分派、按 MCP 配置创建 client、LLM 模式解析、Computer Use client 选择 |
-| `thread/` | `ThreadCommandRouter`、`ThreadNotificationPublisher`、`ThreadRuntimeOrchestrator`、`ThreadPersistence`、thread 级工具激活状态 |
+| `use-cases/` | 主路径用例测试；当前 `thread-lifecycle.test.ts` 从 socket handler 入口覆盖 `/api/thread`、`/api/activity`、`/api/platform`、request/response 回流和 server-level MCP/LLM mode 选择 |
+| `activity/` | `AgentActivityPublisher` 的 snapshot、状态派生和 subscriber 广播边界 |
+| `agent/` | `AgentRequestBroker` 的等待队列、thread cancel 和 `client_response` 唤醒边界 |
+| `thread/` | `ThreadCommandRouter`、`ThreadRuntimeOrchestrator`、`ThreadPersistence`、thread 级工具激活状态等边界语义 |
 | `protocol/` | `MessageTranslator` 的 `ThreadNotification`、审计事件、用户附件和 image STUB 翻译 |
 | `settings/` | `SettingsBackedLLMClient` 与 `SettingsBackedToolRegistry` 的 stamp 缓存和热加载 |
 | `actions/` | `MCPServerRegistry`、`ComputerUseMCPClient`、`ThreadScopedToolRegistry` |
@@ -24,21 +24,22 @@
 全量：
 
 ```bash
+pnpm exec vitest run apps/agent-server/tests
 bash ./scripts/test.sh
 ```
 
 单目录或单文件：
 
 ```bash
-pnpm exec vitest run apps/agent-server/tests/thread/ThreadCommandRouter.test.ts
+pnpm exec vitest run apps/agent-server/tests/use-cases/thread-lifecycle.test.ts
 pnpm exec vitest run apps/agent-server/tests/bridges
 ```
 
 ## 新增测试约束
 
-- 新增源码文件时，优先把测试放进同职责测试目录。
+- 新增会跨越 socket、runtime、persistence、request-response 的行为时，优先扩展 `use-cases/` 主路径测试。
+- 只有当行为是明确的合约边界、外部依赖适配或失败语义时，才新增模块级边界测试。
 - 不把 `.test.ts` 放进 `src/`。
-- `thread/` 相关测试应覆盖 `thread.snapshot` 恢复、单连接多 thread 通知路由、运行中删除或中断等主路径语义。
-- `server/` 相关测试应覆盖 `/api/thread` 与 `/api/platform` 的路径拆分、顶层三类消息分派，以及 `ClientResponse -> client_response Op` 回流。
-- 涉及 request-response 的测试应覆盖 broker timeout、socket close 后的 thread 清理和 response op 唤醒 pending request。
+- `use-cases/` 相关测试应覆盖 `thread.snapshot` 恢复、单连接多 thread 通知路由、运行中删除或中断、`ClientResponse -> client_response Op` 回流，以及 `/api/activity` / `/api/platform` 的主路径语义。
+- 涉及 request-response 的边界测试应覆盖 broker timeout、socket close 后的 thread 清理和 response op 唤醒 pending request。
 - 涉及目录移动时，先跑 `bash ./scripts/test.sh`，再跑 Swift 验证，确保 desktop 启动路径仍能定位 agent-server 入口。

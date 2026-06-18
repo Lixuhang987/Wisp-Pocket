@@ -117,7 +117,7 @@ flowchart LR
 
 ### Core Structure
 
-保留的测试入口应集中成这些测试组：
+保留的测试入口应集中成这些测试组。当前执行中，为了复用同一个 socket harness，允许把多个主路径用例收敛到同一个 `use-cases/thread-lifecycle.test.ts` 文件内，只要每个 use case 仍有独立断言覆盖：
 
 ```ts
 // apps/agent-server/tests/use-cases/thread-lifecycle.test.ts
@@ -168,18 +168,16 @@ flowchart LR
 - `apps/agent-server/tests/use-cases/thread-lifecycle.test.ts`
   - 建 thread、提交 `UserInput`、fake LLM 返回 assistant、通知送达、ThreadStore 能恢复 history。
   - 覆盖删除/中断会关闭 agent 并清理 thread 级权限。
-- `apps/agent-server/tests/use-cases/request-response.test.ts`
-  - runtime/request broker 产出 permission/workspace request，socket 收到请求，response 回流为 `client_response` op。
-- `apps/agent-server/tests/use-cases/activity-platform.test.ts`
-  - activity 新连接先 snapshot，thread running/idle/error/request 改变时收到 changed。
-  - platform hello 后 tool request 经 bridge 转发，旧 token 或断线不能污染新连接。
-- `apps/agent-server/tests/use-cases/settings-actions.test.ts`
-  - settings 改变后 LLM/tool registry 热加载；MCP 配置创建 client；thread 级 tool 激活状态隔离。
+  - 覆盖 runtime/request broker 产出 permission/workspace request，socket 收到请求，response 回流为 `client_response` op。
+  - 覆盖 activity 新连接先 snapshot，thread running/idle/error/request 改变时收到 changed。
+  - 覆盖 platform hello 后 tool request 经 bridge 转发，旧 token 或断线不能污染新连接。
+  - 覆盖 settings 改变后 LLM/tool registry 热加载，以及 server-level MCP client/LLM mode 选择。
+- 如后续该文件继续膨胀，再按 `request-response`、`activity-platform`、`settings-actions` 拆成独立文件；当前阶段不为了文件数量而拆分。
 
 ### Implementation Tasks
 
 1. 在阶段开始前跑 `pnpm exec vitest run apps/agent-server/tests` 记录基线。
-2. 建 `apps/agent-server/tests/use-cases/`，优先复用 `server.test.ts` 里的 socket harness。
+2. 建 `apps/agent-server/tests/use-cases/`，优先复用 `server.test.ts` 里的 socket harness；允许先把多个主路径收敛到 `thread-lifecycle.test.ts`。
 3. 迁移高价值断言到 use-case 测试。
 4. 删除被覆盖的 `agent/`、`thread/`、`activity/`、`protocol/`、`settings/`、`actions/` 内部细碎测试。
 5. 更新 `apps/agent-server/tests/tests.md`，说明新的 use-case 组织方式。

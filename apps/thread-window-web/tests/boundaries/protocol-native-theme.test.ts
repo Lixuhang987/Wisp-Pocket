@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   encodeOpSubmit,
   encodePermissionAnswer,
@@ -6,7 +6,9 @@ import {
   encodeThreadStart,
   isServerRequest,
   isThreadNotification,
-} from "../src/protocol/threadProtocol.ts";
+} from "../../src/protocol/threadProtocol.ts";
+import { getAvailableSkills, installInitialPromptReceiver } from "../../src/native/nativeConfig.ts";
+import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "../../src/native/themeConfig.ts";
 
 describe("thread protocol helpers", () => {
   it("encodes thread.start with workspace only", () => {
@@ -216,5 +218,98 @@ describe("thread protocol helpers", () => {
         }],
       },
     })).toBe(false);
+  });
+});
+
+describe("native config boundaries", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(globalThis as Record<string, unknown>, "document");
+  });
+
+  function nativeWindow() {
+    return window as typeof window & {
+      handAgentThreadWindowConfig?: {
+        threadWebSocketURL?: string;
+        availableSkills?: Array<{
+          actionId: string;
+          title: string;
+          prompt: string;
+          description?: string;
+        }>;
+      };
+      handAgentPendingInitialPrompts?: Array<{
+        clientRequestId: string;
+        userInput: {
+          items: Array<{ type: "text"; id: string; text: string }>;
+        };
+      }>;
+    };
+  }
+
+  it("flushes initial prompts queued before React installs the receiver", () => {
+    nativeWindow().handAgentPendingInitialPrompts = [{
+      clientRequestId: "prompt-1",
+      userInput: {
+        items: [{ type: "text", id: "text-1", text: "hello" }],
+      },
+    }];
+    const received: string[] = [];
+
+    installInitialPromptReceiver((payload) => {
+      received.push(payload.userInput.items[0]?.type === "text" ? payload.userInput.items[0].text : "");
+    });
+
+    expect(received).toEqual(["hello"]);
+    expect(nativeWindow().handAgentPendingInitialPrompts).toEqual([]);
+  });
+
+  it("reads available skills from host config", () => {
+    const original = [
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+      { actionId: "bad", title: "Bad", prompt: 123 as never },
+    ];
+    nativeWindow().handAgentThreadWindowConfig = { availableSkills: original };
+
+    const skills = getAvailableSkills();
+    expect(skills).toEqual([
+      { actionId: "review/code", title: "Review", prompt: "Review this code" },
+    ]);
+    expect(skills).not.toBe(original);
+  });
+
+  it("falls back to system/light when preload did not provide a theme", () => {
+    expect(getInitialTheme()).toEqual({ preference: "system", resolved: "light" });
+  });
+
+  it("applies the resolved theme to documentElement", () => {
+    const documentElement = {
+      dataset: {} as DOMStringMap,
+      removeAttribute: vi.fn((name: string) => {
+        if (name === "data-theme") {
+          delete documentElement.dataset.theme;
+        }
+      }),
+    };
+    (globalThis as Record<string, unknown>).document = { documentElement } as unknown as Document;
+
+    applyThemeToDocument({ preference: "dark", resolved: "dark" });
+    expect(documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("subscribes to host theme changes and returns the host unsubscribe", () => {
+    const unsubscribe = vi.fn();
+    window.handAgentSubscribeThemeChange = vi.fn(() => unsubscribe);
+    const handler = vi.fn();
+
+    const dispose = installThemeSubscription(handler);
+
+    expect(window.handAgentSubscribeThemeChange).toHaveBeenCalledOnce();
+    dispose();
+    expect(unsubscribe).toHaveBeenCalledOnce();
   });
 });
