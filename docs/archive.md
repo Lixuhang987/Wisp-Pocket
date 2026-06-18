@@ -243,6 +243,21 @@
   - 本轮 packaged app 为新构建产物，排除了此前旧包导致的假阴性。
 - **结论**：通过。`PromptPanelController.show()` 在宿主仍为 `.accessory` 且其他 App 位于前台时，已能稳定把 PromptPanel 带到用户前台，同时不再把 Settings 一并带出。
 
+## ThreadWindow request 生命周期修复（2026-06-18 实机验证）
+
+- **验证日期**：2026-06-18
+- **验证环境**：`main` 主 checkout；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/package-app.sh --mock-llm` 通过；packaged mock app + `http://127.0.0.1:4317/thread-window/index.html` live 页面；修复 commit `10fa3c7`。
+- **验证过程**：
+  1. 在 `main` 上跑基础验证，`bash ./scripts/test.sh` 与 `bash ./scripts/swiftw build` 返回 `success`。
+  2. 用 packaged mock app 打开 live ThreadWindow，提交 `[mock:workspace-ask] LIVE_QA_REQUEST_LIFECYCLE_20260618_B`，页面出现 `权限请求: workspace.askUser`，随后选择 `允许`，再选 `qa-workspace`，页面渲染 `[workspace.askUser] {"workspaceId":"qa-workspace"}` 与 `Mock workspace.askUser completed.`。
+  3. 恢复同一 thread 后，页面只显示消息与 tool result，不再残留旧 `权限请求: workspace.askUser` 面板或旧 workspace 选择按钮。
+  4. 检查 `~/.spotAgent/threads.sqlite`，确认 thread `thread-4d2b64ff-9af0-40a6-b5cb-cac6d6e8ee68` 的 rollout 顺序为 `response_item(user)`、`turn.started`、`tool.finished`、`assistant.delta`、`response_item(tool)`、`response_item(assistant)`、`turn_context(status=completed)`、`turn.completed`、`thread.status.changed(value=idle)`。
+- **证据**：
+  - Playwright DOM：`document.body.innerText` 在恢复后包含 `Mock workspace.askUser completed.`，不再包含 `权限请求: workspace.askUser`、`允许` 或 `拒绝`。
+  - Playwright snapshot：`.playwright-cli/page-2026-06-18T00-46-58-857Z.yml` 中 active thread 恢复后仅显示 final assistant、tool result 和正文消息。
+  - SQLite：`thread-4d2b64ff-9af0-40a6-b5cb-cac6d6e8ee68` sequence 13 结束于 `thread.status.changed payload.value=idle`，没有保留 request 面板状态。
+- **结论**：通过。ThreadWindow 在 `turn.completed` / `thread.status.changed` 收敛后会清空失效 request，恢复与终态展示一致。
+
 ## showPromptPanel 不自动注入前台选区（2026-05-20 实机验证）
 
 - **验证日期**：2026-05-20
