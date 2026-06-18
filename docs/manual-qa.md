@@ -17,19 +17,6 @@
 
 ## 开发验证记录
 
-### ThreadWindow slash popover 窄高窗口碰撞约束
-
-- 完成日期：2026-06-18
-- 实现位置：`apps/thread-window-web/src/components/Composer.tsx`、`apps/thread-window-web/tests/composerInputItems.test.ts`、`apps/thread-window-web/thread-window-web.md`
-- 修复结论：Composer slash 菜单的 Radix `Popover.Content` 不再使用固定 `max-h-[320px]`。菜单宽度继续使用 `--radix-popover-trigger-width` 匹配输入框，最大高度改为 `min(320px, var(--radix-popover-content-available-height))`，并设置 `collisionPadding=8`，保证窄高窗口中即使仍停留在输入框上方，也会被约束在可见视口内。
-- 自动化验证：已执行 `pnpm --filter handagent-thread-window-web exec vitest run tests/composerInputItems.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`pnpm --filter handagent-electron-shell build`、`bash ./scripts/test.sh`、`bash ./scripts/package-app.sh --mock-llm`。
-- 实机验证记录：2026-06-18 在 worktree `codex/radix-popover-flip` 启动 mock Electron shell，DevTools 端口 `9222`，通过 command socket 创建 `THREADWINDOW_RADIX_FLIP_FIX_QA_20260618 [mock:assistant-ok]` thread。使用 System Events 将真实 Electron `HandAgent ThreadWindow` 设置为 `920x260`，在 Composer textarea 输入 `/` 后，CDP 读取到 `innerHeight=232`、`boxTop=118`、`boxBottom=216`、`menuTop=8`、`menuBottom=114`、`visible=true`、`cssMaxHeight=106px`、`styleMaxHeight=min(320px, var(--radix-popover-content-available-height))`。对比缺陷发现时 `menuTop=-206`，菜单已完整留在视口内。退出后已清理 Electron、agent-server 和 `4317` / `9222` 监听。
-- 手工回归步骤：
-  1. 打开 Electron ThreadWindow，把真实窗口缩到约 `920x260`。
-  2. 在 Composer 输入框输入 `/`，确认 slash 菜单完整可见，没有顶部跑出视口。
-  3. 若菜单仍显示在输入框上方，确认列表区域可滚动且不遮挡输入框；若 Radix 翻转到下方，确认同样完整可见。
-  4. 在窄高窗口中继续按 `ArrowDown` / `ArrowUp` / `Tab`，确认高亮和选择行为不受滚动约束影响。
-
 ### MCP 官方 SDK client 迁移回归
 
 - 完成日期：待实机 QA
