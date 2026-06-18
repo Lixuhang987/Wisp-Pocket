@@ -4,7 +4,7 @@
 
 新条目从 [待验收.md](./待验收.md) 或 [manual-qa.md](./manual-qa.md) 验证通过后移入此处。
 
-最后更新日期：2026-05-21。
+最后更新日期：2026-06-18。
 
 ---
 
@@ -226,6 +226,22 @@
   - Session 文件：`~/.spotAgent/sessions/1DEAD87B-E546-4B95-BE43-922E5B6F9C5E.json`，包含 user message 与 `error` event，错误消息为 `Missing apiKey in ~/.spotAgent/settings.json. 请先在设置页完成模型配置。`。
   - 设置恢复检查：`~/.spotAgent/settings.json` 中 `apiKeyRestored: true`，`tools.denylist: []`；退出 App 后无 `HandAgentDesktop` 进程且无 `*:4317` listener。
 - **结论**：通过。缺少 `apiKey` 时会话不会静默失败，SessionWindow 会进入 `failed` 并展示明确配置错误文案。
+
+## PromptPanel 后台全局热键前台展示修复（2026-06-18 实机验证）
+
+- **验证日期**：2026-06-18
+- **验证环境**：macOS 主 checkout `main`；`dist/HandAgentDesktop.app` packaged mock app；第三次干净单实例 live QA。
+- **验证过程**：
+  1. 执行 `bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw build`、`bash ./scripts/package-app.sh --mock-llm`，均通过。
+  2. 启动新的 `dist/HandAgentDesktop.app`，保持 `QQ` 在前台，触发真实 `showPromptPanel` 全局快捷键，确认 PromptPanel 直接出现在当前桌面前台，而不是只在进程内创建不可见窗口。
+  3. 在未打开 Settings 的情况下再次触发全局快捷键隐藏 PromptPanel，确认焦点回到唤起前的前台 App。
+  4. 打开 Settings 后再切回第三方 App，重新触发全局快捷键，确认前台只出现 PromptPanel，没有把 Settings 一起带到前台。
+  5. 使用同一 packaged app 继续验证 PromptPanel 已可见时的相关入口，确认 Action 快捷键、`captureSelection`、`captureRegion` 仍复用同一前台展示语义。
+- **证据**：
+  - 截图 `/tmp/handagent-promptpanel-global-hotkey-fixed-main-clean-v2.png` 显示 PromptPanel 覆盖在 `QQ` 上方。
+  - Accessibility 观测到 `HandAgentDesktop` 为 `frontmost=false, visible=true, windows=1`，窗口角色为 `AXWindow`、子角色为 `AXSystemDialog`，位置 `400,154`，尺寸 `640x448`。
+  - 本轮 packaged app 为新构建产物，排除了此前旧包导致的假阴性。
+- **结论**：通过。`PromptPanelController.show()` 在宿主仍为 `.accessory` 且其他 App 位于前台时，已能稳定把 PromptPanel 带到用户前台，同时不再把 Settings 一并带出。
 
 ## showPromptPanel 不自动注入前台选区（2026-05-20 实机验证）
 
