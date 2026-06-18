@@ -19,6 +19,11 @@ interface ComposerProps {
 
 const MAX_ROWS = 5;
 const LINE_HEIGHT = 24;
+export const SLASH_MENU_COLLISION_PADDING = 8;
+export const SLASH_MENU_CONTENT_STYLE: React.CSSProperties = {
+  width: 'var(--radix-popover-trigger-width)',
+  maxHeight: 'min(320px, var(--radix-popover-content-available-height))',
+};
 
 export function Composer({
   disabled,
@@ -237,11 +242,12 @@ export function Composer({
             side="top"
             align="start"
             sideOffset={4}
+            collisionPadding={SLASH_MENU_COLLISION_PADDING}
             onOpenAutoFocus={(e) => e.preventDefault()}
             onCloseAutoFocus={(e) => e.preventDefault()}
             data-slash-menu="true"
-            className="z-20 max-h-[320px] min-w-0 overflow-y-auto rounded-2xl border border-app-hairline bg-app-surface-elevated/98 p-xs text-sm text-app-text-primary shadow-[var(--thread-window-floating-shadow)]"
-            style={{ width: 'var(--radix-popover-trigger-width)' }}
+            className="z-20 min-w-0 overflow-y-auto rounded-2xl border border-app-hairline bg-app-surface-elevated/98 p-xs text-sm text-app-text-primary shadow-[var(--thread-window-floating-shadow)]"
+            style={SLASH_MENU_CONTENT_STYLE}
           >
             <div className="mb-1 px-xs text-xs font-medium text-app-text-muted">技能</div>
             {slashState.filteredSkills.length > 0 ? (
