@@ -10,7 +10,7 @@ core 不依赖 AppKit，不实现 UI，不直接读取屏幕、窗口、剪贴�
 
 - [src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)：core 源码模块索引与跨模块架构约束。
 - `package.json`：包名为 `@handagent/core`，`exports` 当前为 `"./*": "./src/*"`。
-- `tests/`：按 `src/` 模块分组的 core 测试目录。
+- `tests/`：core Vitest 测试目录。`runtime/runtime-use-cases.test.ts`、`mcp/mcp-use-cases.test.ts`、`permission/security-use-cases.test.ts` 和 `protocol/protocol-boundaries.test.ts` 覆盖主要 use-case / 合约边界；LLM adapter、logging、workspace、blob、MCP transport、builtin tools 等外部边界仍保留模块级测试。
 
 ## 包级边界
 

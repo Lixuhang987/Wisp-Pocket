@@ -166,12 +166,12 @@ process.stdin.on("data", (chunk) => {
       title: "Timeout",
       transport: "stdio",
       command: serverPath,
-      requestTimeoutMs: 500,
+      requestTimeoutMs: 2_000,
     });
 
     await client.initialize();
     await expect(client.callTool("hangs", {})).rejects.toThrow(
-      "MCP stdio request timed out after 500ms: tools/call",
+      "MCP stdio request timed out after 2000ms: tools/call",
     );
     await client.close();
   });

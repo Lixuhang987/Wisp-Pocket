@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createThreadWindowStore } from "../src/store/threadWindowStore.ts";
+import { createThreadWindowStore } from "../../src/store/threadWindowStore.ts";
 
 const timestamp = "2026-06-06T00:00:00.000Z";
 

@@ -34,4 +34,4 @@
 
 - 不在窗口控制器里解析 `ThreadCommand`、`ThreadNotification` 或 `AgentActivityEvent`。
 - 改 BrowserWindow security 选项时，必须同时检查 `src/preload/preload.md` 中的暴露边界。
-- 改窗口 close/prewarm 语义时，同步更新 `tests/windows/threadWindowPrewarmer.test.ts` 和 `tests/main/electronShellRuntime.test.ts`。
+- 改窗口 close/prewarm 语义时，同步更新 `tests/use-cases/thread-window-commands.test.ts` 和 `tests/use-cases/desktop-startup.test.ts`。

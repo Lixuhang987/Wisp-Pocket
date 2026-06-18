@@ -1,12 +1,68 @@
 import { describe, expect, it } from "vitest";
 import type { AgentActivityEvent } from "../../src/protocol/AgentActivity.ts";
 import type { ClientResponse } from "../../src/protocol/ClientResponse.ts";
+import type { Op } from "../../src/protocol/Op.ts";
 import type { PlatformBridgeMessage } from "../../src/protocol/PlatformBridgeMessage.ts";
 import type { ServerRequest } from "../../src/protocol/ServerRequest.ts";
 import type { ThreadCommand } from "../../src/protocol/ThreadCommand.ts";
 import type { ThreadNotification } from "../../src/protocol/ThreadNotification.ts";
 
-describe("thread command/notification protocol", () => {
+describe("thread protocol boundaries", () => {
+  it("supports user_input with text, image, skill, and text_selection items", () => {
+    const op: Op = {
+      type: "user_input",
+      opId: "op-1",
+      timestamp: "2026-06-10T00:00:00.000Z",
+      payload: {
+        items: [
+          { type: "text", id: "item-1", text: "hello" },
+          { type: "image", id: "item-2", mimeType: "image/png", base64: "abc" },
+          { type: "skill", id: "item-3", actionId: "skill/weather", title: "天气", prompt: "查询天气" },
+          { type: "text_selection", id: "item-4", text: "selected" },
+        ],
+      },
+    };
+
+    expect(op.type).toBe("user_input");
+    expect(op.payload.items.map((item) => item.type)).toEqual([
+      "text",
+      "image",
+      "skill",
+      "text_selection",
+    ]);
+  });
+
+  it("supports interrupt ops", () => {
+    const op: Op = {
+      type: "interrupt",
+      opId: "op-2",
+      timestamp: "2026-06-10T00:00:01.000Z",
+      payload: { reason: "user" },
+    };
+
+    expect(op.type).toBe("interrupt");
+    expect(op.payload.reason).toBe("user");
+  });
+
+  it("supports client response ops for server request answers", () => {
+    const op: Op = {
+      type: "client_response",
+      opId: "op-3",
+      timestamp: "2026-06-10T00:00:02.000Z",
+      payload: {
+        response: {
+          type: "permission.answered",
+          requestId: "thread-1:req-1",
+          timestamp: "2026-06-10T00:00:02.000Z",
+          payload: { decision: "allow", scope: "thread" },
+        },
+      },
+    };
+
+    expect(op.type).toBe("client_response");
+    expect(op.payload.response.type).toBe("permission.answered");
+  });
+
   it("keeps UI commands separate from server notifications", () => {
     const command: ThreadCommand = {
       type: "op.submit",

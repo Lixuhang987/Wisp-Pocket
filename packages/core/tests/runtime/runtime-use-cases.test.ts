@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AgentRuntime } from "../../src/runtime/AgentRuntime";
+import { AgentRunner } from "../../src/runtime/AgentRunner.ts";
 import { ToolRegistry } from "../../src/tools/ToolRegistry";
 import type { AgentTool } from "../../src/tools/AgentTool";
 import type { AgentMessage } from "../../src/runtime/AgentMessage";
 import type { LLMClient, LLMStreamEvent } from "../../src/llm/LLMClient";
 import type { BlobRecord } from "../../src/blob/BlobRecord";
 import type { BlobStore } from "../../src/blob/BlobStore";
-import type { TurnSummarizerLike } from "../../src/runtime/TurnSummarizer";
+import { TurnSummarizer, type TurnSummarizerLike } from "../../src/runtime/TurnSummarizer";
+import { parseStub, renderStub, type StubRecord } from "../../src/runtime/Stub";
 import { MetaToolUseTool, META_TOOL_NAME, META_TOOL_ALREADY_ACTIVE_RESULT } from "../../src/tools/MetaToolUseTool";
 import type { PermissionPolicy, PermissionRequest, PermissionResolution } from "../../src/permission/PermissionPolicy";
 
@@ -1004,5 +1006,201 @@ describe("AgentRuntime", () => {
     );
 
     expect(permissionChecks).toBe(0);
+  });
+});
+
+describe("AgentRunner runtime input flow", () => {
+  it("records user input, emits turn notifications, and stops on interrupt", async () => {
+    const events: string[] = [];
+    const runner = new AgentRunner({
+      config: {
+        model: "test-model",
+        provider: "test-provider",
+        workspaceId: null,
+        maxTimes: 1,
+      },
+      session: {},
+      thread: {
+        threadId: "thread-1",
+        async getMessages() {
+          return [];
+        },
+        async recordUserInput(op) {
+          events.push(`record:${op.type}`);
+          return { messageId: op.opId };
+        },
+        async emit(event) {
+          events.push(`emit:${event.type}`);
+        },
+        async waitForPendingSummaries() {
+          events.push("wait");
+        },
+      },
+      rx_sub: (async function* () {
+        yield {
+          type: "user_input" as const,
+          opId: "op-1",
+          timestamp: "2026-06-10T00:00:00.000Z",
+          payload: {
+            items: [{ type: "text" as const, id: "item-1", text: "hello" }],
+          },
+        };
+        yield {
+          type: "interrupt" as const,
+          opId: "op-2",
+          timestamp: "2026-06-10T00:00:01.000Z",
+          payload: { reason: "user" as const },
+        };
+      })(),
+    });
+
+    await runner.run();
+
+    expect(events).toContain("record:user_input");
+    expect(events).toContain("emit:user.message.recorded");
+    expect(events).toContain("emit:turn.completed");
+    expect(events).toContain("emit:thread.status.changed");
+  });
+});
+
+describe("Turn summaries and stubbed tool content", () => {
+  it("renders parseable stubs for image, persisted, and summarized turn content", () => {
+    const stubs: StubRecord[] = [
+      {
+        id: "blob-image",
+        kind: "image",
+        size: 234567,
+        path: "/tmp/blob.png",
+      },
+      {
+        id: "blob-tool",
+        kind: "tool_result",
+        cached: "persist",
+        size: 12,
+        path: "/tmp/blob.txt",
+        body: "完整内容\n第二行",
+      },
+      {
+        id: "blob-turn",
+        kind: "tool_result",
+        cached: "turn",
+        summarized: true,
+        size: 98,
+        path: "/tmp/blob.txt",
+        body: "摘要保留了关键错误信息。",
+      },
+    ];
+
+    for (const stub of stubs) {
+      expect(parseStub(renderStub(stub))).toEqual({
+        ...stub,
+        body: stub.body ?? "",
+      });
+    }
+  });
+
+  it("writes summaries to the blob store and rewrites turn-cached tool messages", async () => {
+    const blobStore = new MemoryBlobStore();
+    const fullBody = "src/app.ts:10 报错 Cannot read property 'x'";
+    const record = {
+      id: "blob-1",
+      kind: "tool_result",
+      size: Buffer.byteLength(fullBody, "utf8"),
+      path: "/tmp/blob-1.txt",
+    };
+    blobStore.records.push(record);
+    blobStore.contents.set(record.id, Buffer.from(fullBody, "utf8"));
+    const messages: AgentMessage[] = [
+      {
+        role: "tool",
+        toolCallId: "call-1",
+        name: "file.read",
+        content: renderStub({
+          ...record,
+          cached: "turn",
+          body: fullBody,
+        }),
+        blob: { id: "blob-1", cached: "turn" },
+      },
+    ];
+    const client: LLMClient = {
+      async complete(summaryMessages) {
+        expect(summaryMessages.at(-1)?.content).toContain(fullBody);
+        return {
+          message: {
+            role: "assistant",
+            content: "src/app.ts:10 有 Cannot read property 'x' 错误。",
+          },
+          toolCalls: [],
+        };
+      },
+    };
+
+    await new TurnSummarizer({ client, blobStore }).summarizeTurn(messages);
+
+    await expect(blobStore.get("blob-1")).resolves.toMatchObject({
+      summary: "src/app.ts:10 有 Cannot read property 'x' 错误。",
+    });
+    expect(messages[0]).toEqual({
+      role: "tool",
+      toolCallId: "call-1",
+      name: "file.read",
+      content:
+        `[STUB id=blob-1 kind=tool_result cached=turn summarized=true size=${Buffer.byteLength(fullBody, "utf8")} path="/tmp/blob-1.txt"]\n` +
+        "src/app.ts:10 有 Cannot read property 'x' 错误。\n" +
+        "[/STUB]",
+      blob: { id: "blob-1", cached: "turn", summarized: true },
+    });
+  });
+
+  it("keeps full body after a failed summary and retries later", async () => {
+    const blobStore = new MemoryBlobStore();
+    const fullBody = "第一轮完整内容";
+    const record = {
+      id: "blob-1",
+      kind: "tool_result",
+      size: Buffer.byteLength(fullBody, "utf8"),
+      path: "/tmp/blob-1.txt",
+    };
+    blobStore.records.push(record);
+    blobStore.contents.set(record.id, Buffer.from(fullBody, "utf8"));
+    const messages: AgentMessage[] = [
+      {
+        role: "tool",
+        toolCallId: "call-1",
+        name: "file.read",
+        content: renderStub({ ...record, cached: "turn", body: fullBody }),
+        blob: { id: "blob-1", cached: "turn" },
+      },
+    ];
+    const warn = vi.fn();
+    let attempts = 0;
+    const client: LLMClient = {
+      async complete() {
+        attempts += 1;
+        if (attempts === 1) throw new Error("summary failed");
+        return {
+          message: { role: "assistant", content: "重试后摘要。" },
+          toolCalls: [],
+        };
+      },
+    };
+    const summarizer = new TurnSummarizer({ client, blobStore, warn });
+
+    await summarizer.summarizeTurn(messages);
+
+    expect(warn).toHaveBeenCalledWith(
+      "Failed to summarize tool result blob-1: summary failed",
+    );
+    expect(messages[0].content).toContain(fullBody);
+    expect(messages[0].blob).toEqual({ id: "blob-1", cached: "turn" });
+
+    await summarizer.summarizeTurn(messages);
+
+    expect(messages[0].content).toContain("summarized=true");
+    expect(messages[0].content).toContain("重试后摘要。");
+    await expect(blobStore.get("blob-1")).resolves.toMatchObject({
+      summary: "重试后摘要。",
+    });
   });
 });

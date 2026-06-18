@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ThreadSocketClient } from "../src/thread/threadSocketClient.ts";
+import { ThreadSocketClient } from "../../src/thread/threadSocketClient.ts";
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
