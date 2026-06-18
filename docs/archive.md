@@ -1399,3 +1399,25 @@
 - **验证过程**：1. 创建 `[mock:slow-focus] THREAD_BACKSTAGE_RUNNING_QA_20260618_A`，提交后左侧历史条目显示 `运行中`，切换到历史 thread 再切回，右侧仍显示原 thread 的 user message，且下方保留 `停止` 按钮，没有出现 tab 条，也没有清空消息。2. 创建 `[mock:workspace-ask] THREAD_BACKSTAGE_REQUEST_QA_20260618_A`，提交后右侧出现 `权限请求: workspace.askUser` 面板；切到其他历史 thread 再切回，请求面板仍在，点击 `允许` 后显示 workspace 选择面板，再选择 `qa-workspace`，最终渲染 `Mock workspace.askUser completed.`。3. 让 `/api/thread` WebSocket 非主动断开，当前 ThreadWindow 页面停留在禁用状态，不自动创建新 WebSocket，不恢复订阅，不拉取 snapshot，也不发送恢复命令；已有 thread state 保持在最后收到的位置。4. 期间确认 `~/.spotAgent/threads.sqlite` 的新增 thread 记录继续按 sequence 落盘，`thread.list` / `thread.started` / `workspace.requested` / `turn.completed` 均正常写入。
 - **证据**：Playwright snapshot 显示运行中 thread 的右侧 workspace 仅含原消息和 `停止` 按钮，后台请求 thread 的右侧 workspace 显示 `权限请求: workspace.askUser` 且在切回后仍存在；`/api/thread` 断开后页面仍停在禁用态，没有重连回 connected；`thread.listed` 响应和 SQLite 历史预览也保持更新。
 - **结论**：通过。ThreadWindow 的后台 thread 状态、请求面板保留和非主动断开不恢复都符合当前实现。
+
+
+### ThreadWindow slash skill composer 与结构化 user message 回显
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/thread-window-web/src/components/Composer.tsx`、`apps/thread-window-web/src/components/MessageBubble.tsx`、`apps/thread-window-web/src/store/threadWindowStore.ts`、`apps/thread-window-web/src/native/nativeConfig.ts`、`apps/electron-shell/src/main/main.ts`、`apps/electron-shell/src/main/availableSkills.ts`、`apps/electron-shell/src/main/windows/threadWindowPrewarmer.ts`、`apps/electron-shell/src/preload/threadWindowPreload.ts`、`apps/agent-server/src/protocol/MessageTranslator.ts`、`apps/agent-server/src/thread/ThreadPersistence.ts`、`apps/agent-server/src/thread/ThreadRuntimeOrchestrator.ts`、`packages/core/src/protocol/ThreadNotification.ts`、`packages/core/src/conversation/ConversationMessage.ts`
+- 修复结论：Electron main 会从本地 skill 源目录（默认 `HANDAGENT_PLUGINS_DIR ?? ~/.spotAgent/plugins`）读取启用项，把可用 skill 汇总成只读 `availableSkills` 注入 ThreadWindow preload。React Composer 在输入开头为 `/` 时在输入框上方展示 popover 形式的 slash 菜单，`Tab` 选择 skill 后写入结构化 `skill` item 并清空过滤文本；提交时仍统一发送 `UserInput.items`。agent-server 与 core 现在会在 `user.message.recorded.payload.items?`、`thread.snapshot.messages[].inputItems?` 与持久化 user message 中保留结构化输入，MessageBubble 则把图片独立显示在 user 气泡上方，把 chip row 和 text block 显示在气泡内。
+- 自动化验证：需执行 `pnpm exec vitest run apps/thread-window-web/tests/nativeConfig.test.ts apps/thread-window-web/tests/threadProtocol.test.ts apps/thread-window-web/tests/composerInputItems.test.ts apps/thread-window-web/tests/threadWindowStore.test.ts apps/thread-window-web/tests/messageBubble.test.tsx apps/electron-shell/tests/preload/threadWindowPreload.test.ts apps/electron-shell/tests/windows/threadWindowPrewarmer.test.ts apps/agent-server/tests/protocol/MessageTranslator.test.ts apps/agent-server/tests/thread/ThreadPersistence.test.ts apps/agent-server/tests/thread/ThreadRuntimeOrchestrator.test.ts apps/agent-server/tests/server/server.test.ts`、`pnpm --filter handagent-thread-window-web build`、`pnpm --filter handagent-electron-shell build`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 打开 Electron ThreadWindow，在 Composer 输入框开头输入 `/`，确认输入框上方以 popover 形式出现全部 skill 列表，不在输入框内部撑出空白条。
+  2. 继续输入过滤词后按 `Tab`，确认出现对应 skill chip，textarea 文本被清空且焦点仍停留在输入框。
+  3. 只保留 skill chip 不输入文本直接提交，确认用户消息成功发送并进入 thread 历史。
+  4. 提交同时包含 image、skill、text_selection、text 的输入，确认图片作为独立 strip 显示在 user 气泡上方，skill / text_selection chip 与正文显示在气泡内，图片不以 base64 文本显示。
+  5. 关闭并重开同一历史 thread，确认 `thread.snapshot` 恢复后的用户消息仍保持与 live 通知一致的结构化展示，而不是退化成纯文本。
+
+### ThreadWindow slash skill composer 与结构化 user message 回显
+
+- **验证日期**：2026-06-18
+- **验证环境**：main；`bash ./scripts/test.sh` 通过；`bash ./scripts/swiftw build` 通过；`bash ./scripts/package-app.sh --mock-llm` 通过；Electron shell 以 mock LLM 启动真实 `BrowserWindow` ThreadWindow，preload 与 `/api/thread` 均走生产路径，额外只打开临时 DevTools 端口用于 CDP 观测。
+- **验证过程**：先清理旧 HandAgent / Electron / agent-server / playwright-cli 进程，确认 `127.0.0.1:4317` 无旧监听后启动 mock 环境。通过 Electron command socket 提交 `THREADWINDOW_SLASH_CDP_BOOTSTRAP_QA_20260618 [mock:assistant-ok]` 创建 thread，再通过真实 ThreadWindow renderer 输入 `/rev`。slash popover 显示 `Review With Filesystem` 与 `Review` 候选；按 `Tab` 后 Composer 生成 `Skill · Review With Filesystem` chip，textarea 清空且焦点仍在 `TEXTAREA`；直接按 `Enter` 提交 skill-only 输入，页面出现结构化 skill chip 和 `Mock assistant response: main chain is reachable.`。随后 reload renderer，点击左侧历史中的同一 thread，`thread.snapshot` 恢复后页面仍包含 `Skill · Review With Filesystem` 与 mock assistant 回复。
+- **证据**：renderer preload 中 `availableSkills` 为 `Explain Code`、`Summarize Text`、`Review With Filesystem`、`Weather`、`Review`、`QA MCP Filesystem Read`；CDP 观测输出 `menuBeforeTab` 包含两个 `/rev` 匹配项，`chipsAfterTab [\"Skill · Review With Filesystem×\"]`，`textareaAfterTab \"\"`，`activeTagAfterTab \"TEXTAREA\"`，`bodyContainsSkillChip true`，`bodyContainsAssistant true`；SQLite thread `thread-708bb120-6032-49b6-bfc0-8acf7843d0bd` 的 `thread_items` sequence 14 是 `response_item`，`inputItems[0].type=skill` 且 `inputItems[0].title=Review With Filesystem`，sequence 15 的 `user.message.recorded.payload.items[0].type=skill` 且 title 同为 `Review With Filesystem`。
+- **结论**：通过
