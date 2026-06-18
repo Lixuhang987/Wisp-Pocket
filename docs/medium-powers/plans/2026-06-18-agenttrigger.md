@@ -7,6 +7,8 @@
 本计划覆盖：
 
 - 独立于 PromptPanel action trigger 的 `AgentTrigger` 数据模型、安装模型、实例模型
+- `AgentTrigger` 是独立产品能力，只是为避免命名冲突而改名；它和现有手动 trigger 没有任何功能或代码语义关系
+- 用户从 Trigger 市场下载 package 后，为每个实例单独配置参数并独立生效
 - Swift 宿主内的 `AgentTrigger` runtime 抽象与首批内置 provider：Chrome 书签文件夹、系统时间点
 - Swift -> Electron -> agent-server 的后台启动链路
 - 后台 thread 落库、历史可回看、默认静默、必要时提示
@@ -22,13 +24,14 @@
 - 第一版同时实现 `chrome.bookmarks` 与 `system.clock`，主要目的不是扩功能面，而是在实现期验证 `AgentTrigger` 抽象是否真的能承载不同类型的事件源。
 - `chrome.bookmarks` 代表外部对象变化事件，`system.clock` 代表宿主内时间调度事件；两者都必须走通同一条平台链路。
 - 本计划中的数据结构是实现起点，不是冻结契约。若在实现过程中发现 `PackageManifest`、`Instance`、`Event`、`FireRequest`、`Provider` 等结构不足以自然承载两类 Trigger，可以按需调整、拆分或扩展，但不能破坏本 spec 已确认的产品边界。
+- 首版只做两个内置 trigger，不代表功能收敛；它们的目的就是验证同一套抽象能否同时承载“浏览器书签变化”和“定时任务”两种完全不同的事件源。
 
 ## Folder Inventory
 
 - `apps/desktop/Sources/AppServices/`
   - 新增 `AgentTrigger` 运行时、配置存储、provider 注册与宿主启动管理
 - `apps/desktop/Sources/Settings/`
-  - 新增 AgentTrigger 市场/实例配置 UI，与现有 Append Prompt 分开
+  - 新增 AgentTrigger 市场/实例配置 UI，与现有 Append Prompt 完全分开
 - `apps/desktop/Sources/Coordinator/`
   - 只负责启动/停止 AgentTrigger runtime 与必要的提示动作，不接入 PromptPanel 提交流程
 - `apps/desktop/TestsSwift/`
@@ -53,6 +56,7 @@
 - 现有 Settings 只管理模型、Append Prompt、MCP、权限、快捷键、workspace，没有自动化触发模型。
 - 现有 `~/.spotAgent/plugins/*/plugin.json` 只服务 PromptPanel action manifest，语义不能复用给 `AgentTrigger`。
 - 现有 Swift 宿主已经是配置文件代理层，适合继续承载 Trigger 市场、实例配置与 provider 生命周期。
+- 现有手动 trigger 仍然保留原语义，但它与 `AgentTrigger` 完全没有产品或代码依赖关系。
 
 ### Core structure
 
@@ -95,8 +99,10 @@ protocol AgentTriggerInstanceStore {
 }
 ```
 
+- `configSchema`、`config`、`promptTemplate` 组成每个 Trigger 实例的动态参数面；第一版先用 `chrome.bookmarks` 和 `system.clock` 验证同一抽象可以承载不同配置形态
 - 包描述“这个 Trigger 是什么、要配什么参数”
 - 实例描述“用户装了以后，这一份具体怎么跑”
+- 动态参数必须是实例级别的，不是安装级别的全局配置；同一个 package 的不同实例可以有不同参数、不同 prompt 模板、不同通知策略
 - 存储路径必须独立于 `~/.spotAgent/plugins/`，避免和现有 action manifest 混淆
 - 设置页要新增独立 AgentTrigger 入口，至少包含市场列表、已安装包、实例配置三块
 - 第一版内置的 package 类型至少两种：`chrome.bookmarks` 与 `system.clock`
@@ -316,6 +322,7 @@ flowchart LR
 
 - 现有仓库没有“外部事件源 -> 统一自动化事件”的抽象。
 - 现有 `PlatformBridge`、MCP、Append Prompt 都能提供参考，但它们分别属于平台 RPC、tool 执行、手动 prompt，不能直接当成 AgentTrigger provider runtime。
+- 首版就要把 provider contract 设计成可供第三方开发者自行实现的稳定接口；不要求这一版完成插件沙箱或进程外托管，但接口不能绑定当前内置 provider。
 
 ### Core structure
 
@@ -335,7 +342,7 @@ interface AgentTriggerProviderFactory {
 ```
 
 - `providerKind` 是 package manifest 和宿主 provider 注册表之间的稳定键
-- 首轮只内置 `chrome.bookmarks` provider
+- 首轮内置 `chrome.bookmarks` 与 `system.clock` 两种 provider，用来验证同一套 contract 能承载外部事件源和宿主定时器两类 Trigger
 - 后续第三方 provider 可以复用同一份 descriptor / event / fire request 合约
 - 如果未来要做 out-of-process provider SDK，应在这个 contract 外再加“进程桥/沙箱层”，而不是推翻实例、事件和 fire 模型
 

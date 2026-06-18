@@ -4,6 +4,8 @@
 
 本计划只处理 TypeScript / React / Electron 测试体系收敛，不改产品行为。执行顺序按依赖链从底到顶：
 
+本计划采用你选定的第一种拆分方式：按模块分阶段推进，每个阶段先补 use-case 集成测试，再删被覆盖的细碎 TDD 单测。
+
 1. `packages/core` + `packages/thread-store`
 2. `apps/agent-server`
 3. `apps/electron-shell`
