@@ -240,6 +240,11 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
             notification.payload.preview,
           );
           draft.threadsById[notification.threadId].pendingInitialPrompt = prompt ?? null;
+          upsertHistoryEntry(draft, notification.threadId, {
+            preview: notification.payload.preview,
+            createdAt: notification.timestamp,
+            updatedAt: notification.timestamp,
+          });
           break;
         }
 
@@ -279,6 +284,11 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
             role: "user",
             text: notification.payload.text,
             ...(notification.payload.items ? { userInputItems: notification.payload.items.map(cloneInputItem) } : {}),
+          });
+          upsertHistoryEntry(draft, notification.threadId, {
+            preview: notification.payload.text,
+            updatedAt: notification.timestamp,
+            messageCount: thread.messages.length,
           });
           break;
         }
@@ -349,6 +359,10 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           thread.status = notification.payload.status === "completed" ? "idle" : notification.payload.status;
           thread.pendingInitialPrompt = null;
           clearThreadRequests(thread);
+          upsertHistoryEntry(draft, notification.threadId, {
+            updatedAt: notification.timestamp,
+            messageCount: thread.messages.length,
+          });
           break;
         }
 
@@ -359,6 +373,10 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           if (thread.status !== "running") {
             clearThreadRequests(thread);
           }
+          upsertHistoryEntry(draft, notification.threadId, {
+            updatedAt: notification.timestamp,
+            messageCount: thread.messages.length,
+          });
           break;
         }
 
@@ -509,4 +527,30 @@ function summarizeInputItems(items: InputItem[]): string {
 function clearThreadRequests(thread: ThreadState): void {
   thread.permissionRequests = [];
   thread.workspaceRequests = [];
+}
+
+function upsertHistoryEntry(
+  draft: ThreadWindowState,
+  threadId: string,
+  update: Partial<Omit<ThreadListEntry, "id">>,
+): void {
+  const existingIndex = draft.history.findIndex((entry) => entry.id === threadId);
+  const existing = existingIndex >= 0 ? draft.history[existingIndex] : null;
+  const createdAt = update.createdAt ?? existing?.createdAt ?? update.updatedAt ?? new Date(0).toISOString();
+  const updatedAt = update.updatedAt ?? existing?.updatedAt ?? createdAt;
+  const nextEntry: ThreadListEntry = {
+    id: threadId,
+    preview: Object.hasOwn(update, "preview") ? update.preview ?? null : existing?.preview ?? null,
+    createdAt,
+    updatedAt,
+    messageCount: update.messageCount ?? existing?.messageCount ?? 0,
+    workspaceId: Object.hasOwn(update, "workspaceId") ? update.workspaceId ?? null : existing?.workspaceId ?? null,
+  };
+
+  if (existingIndex >= 0) {
+    draft.history[existingIndex] = nextEntry;
+  } else {
+    draft.history.push(nextEntry);
+  }
+  draft.history.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }

@@ -125,6 +125,55 @@ describe("threadWindowStore", () => {
     ]);
   });
 
+  it("inserts and updates live threads in history without waiting for a relisted snapshot", () => {
+    const store = createThreadWindowStore;
+
+    store.getState().handleNotification({
+      type: "thread.started",
+      threadId: "thread-1",
+      notificationId: "started-1",
+      commandId: "start-1",
+      timestamp,
+      payload: { preview: null },
+    });
+    store.getState().handleNotification({
+      type: "user.message.recorded",
+      threadId: "thread-1",
+      notificationId: "recorded-1",
+      timestamp: "2026-06-06T00:00:01.000Z",
+      payload: {
+        messageId: "msg-1",
+        text: "[mock:assistant-ok] live history",
+        items: [{ type: "text", id: "text-1", text: "[mock:assistant-ok] live history" }],
+      },
+    });
+
+    expect(store.getState().history[0]).toMatchObject({
+      id: "thread-1",
+      preview: "[mock:assistant-ok] live history",
+      workspaceId: null,
+      messageCount: 1,
+      updatedAt: "2026-06-06T00:00:01.000Z",
+    });
+
+    store.getState().handleNotification({
+      type: "turn.completed",
+      threadId: "thread-1",
+      notificationId: "completed-1",
+      turnId: "turn-1",
+      timestamp: "2026-06-06T00:00:02.000Z",
+      payload: { status: "completed" },
+    });
+
+    expect(store.getState().history).toHaveLength(1);
+    expect(store.getState().history[0]).toMatchObject({
+      id: "thread-1",
+      preview: "[mock:assistant-ok] live history",
+      messageCount: 1,
+      updatedAt: "2026-06-06T00:00:02.000Z",
+    });
+  });
+
   it("appends assistant delta and tool events", () => {
     const store = createThreadWindowStore;
     store.getState().ensureThreadState("thread-1");
