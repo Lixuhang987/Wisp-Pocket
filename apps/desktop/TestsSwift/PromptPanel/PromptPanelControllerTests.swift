@@ -35,10 +35,11 @@ final class PromptPanelControllerTests: XCTestCase {
 
     func testShowActivatesApplicationWhenHostUsesAccessoryPolicy() {
         var activationCount = 0
+        var promotedPolicies: [NSApplication.ActivationPolicy] = []
         let controller = PromptPanelController(
             focusRestorer: FakePromptPanelFocusRestorer(),
-            presentationMode: .hiddenForTesting,
             hostActivationPolicy: { .accessory },
+            setHostActivationPolicy: { promotedPolicies.append($0) },
             activateHostApplication: { activationCount += 1 }
         )
         controller.configure(viewModel: PromptPanelViewModel(actions: []))
@@ -46,6 +47,7 @@ final class PromptPanelControllerTests: XCTestCase {
 
         controller.show()
 
+        XCTAssertEqual(promotedPolicies, [.regular])
         XCTAssertEqual(activationCount, 1)
     }
 

@@ -25,6 +25,7 @@ final class AppCoordinator {
     @ObservationIgnored private let settingsLifecycle: SettingsLifecycle
     @ObservationIgnored private let activationPolicy = AppActivationPolicyCoordinator()
     @ObservationIgnored private var isThreadWindowCountedInActivationPolicy = false
+    @ObservationIgnored private var isPromptPanelCountedInActivationPolicy = false
     @ObservationIgnored private var registeredActionShortcutNames: Set<KeyboardShortcuts.Name> = []
     @ObservationIgnored private var showThreadWindowMonitor: Any?
     @ObservationIgnored private let promptPanelController: any PromptPanelControlling
@@ -82,11 +83,17 @@ final class AppCoordinator {
         switch action {
         case .showPromptPanel:
             refreshActionDefinitions()
+            handlePromptPanelShown()
             promptPanelController.show()
         case .hidePromptPanel:
             promptPanelController.hide()
         case .togglePromptPanel:
             refreshActionDefinitions()
+            if promptPanelController.isVisible {
+                handlePromptPanelHidden()
+            } else {
+                handlePromptPanelShown()
+            }
             promptPanelController.toggle()
         case .submitPrompt(let inputItems, let attachments):
             handleSubmitPrompt(inputItems, attachments: attachments)
@@ -133,6 +140,9 @@ final class AppCoordinator {
         }
         promptPanelController.onOpenSettings = { [weak self] in
             self?.send(.openSettings)
+        }
+        promptPanelController.onDidHide = { [weak self] in
+            self?.handlePromptPanelHidden()
         }
         promptPanelController.onShowThreadWindow = { [weak self] in
             self?.send(.openHistory)
@@ -264,6 +274,18 @@ final class AppCoordinator {
     private func handleThreadWindowOpenFailure(_ message: String) {
         promptPanelController.setSubmissionEnabled(false, message: message)
         promptPanelController.show()
+    }
+
+    private func handlePromptPanelHidden() {
+        guard isPromptPanelCountedInActivationPolicy else { return }
+        isPromptPanelCountedInActivationPolicy = false
+        services.setActivationPolicy(activationPolicy.policyAfterUpdatingOpenThreadWindows(by: -1))
+    }
+
+    private func handlePromptPanelShown() {
+        guard !isPromptPanelCountedInActivationPolicy else { return }
+        isPromptPanelCountedInActivationPolicy = true
+        services.setActivationPolicy(activationPolicy.policyAfterUpdatingOpenThreadWindows(by: 1))
     }
 
     private func handleThreadWindowOpened() {

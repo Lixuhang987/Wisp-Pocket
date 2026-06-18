@@ -14,6 +14,7 @@ protocol PromptPanelControlling: AnyObject {
     var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)? { get set }
     var onOpenSettings: (() -> Void)? { get set }
     var onDidShow: (() -> Void)? { get set }
+    var onDidHide: (() -> Void)? { get set }
     var onShowThreadWindow: (() -> Void)? { get set }
     var isVisible: Bool { get }
 
@@ -45,6 +46,7 @@ final class PromptPanelController: PromptPanelControlling {
     private let captureFocusOwner: () -> Any?
     private let restoreFocusOwner: (Any) -> Void
     private let hostActivationPolicy: () -> NSApplication.ActivationPolicy
+    private let setHostActivationPolicy: (NSApplication.ActivationPolicy) -> Void
     private let activateHostApplication: () -> Void
     private let presentationMode: PromptPanelPresentationMode
     private var previousFocusOwner: Any?
@@ -52,6 +54,7 @@ final class PromptPanelController: PromptPanelControlling {
     var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)?
     var onOpenSettings: (() -> Void)?
     var onDidShow: (() -> Void)?
+    var onDidHide: (() -> Void)?
     var onShowThreadWindow: (() -> Void)?
 
     init<FocusRestorer: PromptPanelFocusRestoring>(
@@ -59,6 +62,9 @@ final class PromptPanelController: PromptPanelControlling {
         presentationMode: PromptPanelPresentationMode = .visible,
         hostActivationPolicy: @escaping () -> NSApplication.ActivationPolicy = {
             NSApp.activationPolicy()
+        },
+        setHostActivationPolicy: @escaping (NSApplication.ActivationPolicy) -> Void = {
+            NSApp.setActivationPolicy($0)
         },
         activateHostApplication: @escaping () -> Void = {
             NSApp.activate(ignoringOtherApps: true)
@@ -71,6 +77,7 @@ final class PromptPanelController: PromptPanelControlling {
             focusRestorer.restoreFocus(to: typedToken)
         }
         self.hostActivationPolicy = hostActivationPolicy
+        self.setHostActivationPolicy = setHostActivationPolicy
         self.activateHostApplication = activateHostApplication
     }
 
@@ -137,9 +144,6 @@ final class PromptPanelController: PromptPanelControlling {
         }
         panel.center()
         panel.contentView?.layoutSubtreeIfNeeded()
-        if hostActivationPolicy() == .accessory {
-            activateHostApplication()
-        }
         guard presentationMode == .visible else {
             DispatchQueue.main.async { [weak self] in
                 self?.viewModel?.focusSeed += 1
@@ -147,8 +151,15 @@ final class PromptPanelController: PromptPanelControlling {
             }
             return
         }
+        let shouldPromoteHost = hostActivationPolicy() == .accessory
+        if shouldPromoteHost {
+            setHostActivationPolicy(.regular)
+        }
         panel.orderFrontRegardless()
         panel.makeKey()
+        if shouldPromoteHost {
+            activateHostApplication()
+        }
         installEventMonitor()
         DispatchQueue.main.async { [weak self] in
             guard let self, self.panel?.isVisible == true else { return }
@@ -165,6 +176,7 @@ final class PromptPanelController: PromptPanelControlling {
         quickLookController.dismiss()
         panel?.orderOut(nil)
         removeEventMonitor()
+        onDidHide?()
         if restoringFocus {
             restorePreviousFocusOwner()
         }

@@ -475,6 +475,7 @@ private final class RecordingPromptPanelController: PromptPanelControlling {
     var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)?
     var onOpenSettings: (() -> Void)?
     var onDidShow: (() -> Void)?
+    var onDidHide: (() -> Void)?
     var onShowThreadWindow: (() -> Void)?
     var isVisible = false
     private(set) var hideCalls: [Bool] = []
@@ -500,6 +501,7 @@ private final class RecordingPromptPanelController: PromptPanelControlling {
         isVisible = false
         hideCalls.append(restoringFocus)
         recordEvent("promptPanel.hide(\(restoringFocus))")
+        onDidHide?()
     }
 
     func toggle() {
