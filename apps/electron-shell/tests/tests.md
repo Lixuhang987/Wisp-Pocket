@@ -22,6 +22,8 @@ pnpm --filter handagent-electron-shell test
 pnpm --filter handagent-electron-shell build
 ```
 
+- `pnpm --filter handagent-electron-shell test` 现在会先执行 `tsc -p tsconfig.json`，生成 `dist/main/*` 和 `dist/preload/*.cjs`，因为 `tests/preload/*` 直接加载 CommonJS preload 产物验证 main-world globals。
+
 单文件示例：
 
 ```bash

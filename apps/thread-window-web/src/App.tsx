@@ -2,6 +2,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { useEffect, useRef, useState } from "react";
 import { HistorySidebar } from "./components/HistorySidebar.tsx";
 import { ThreadWorkspacePane } from "./components/ThreadWorkspacePane.tsx";
+import { openHistoryThread } from "./history/openHistoryThread.ts";
 import { getThreadWebSocketURL, installInitialPromptReceiver } from "./native/nativeConfig.ts";
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "./native/themeConfig.ts";
 import {
@@ -110,9 +111,15 @@ export function App() {
         <HistorySidebar
           activeThreadId={activeThreadId}
           onOpenThread={(threadId) => {
-            createThreadWindowStore.getState().ensureThreadState(threadId);
-            setActiveThreadId(threadId);
-            clientRef.current?.resumeThread(threadId);
+            openHistoryThread(threadId, {
+              ensureThreadState: (nextThreadId) => {
+                createThreadWindowStore.getState().ensureThreadState(nextThreadId);
+              },
+              setActiveThreadId,
+              resumeThread: (nextThreadId) => {
+                clientRef.current?.resumeThread(nextThreadId);
+              },
+            });
           }}
           onDeleteThread={(threadId) => {
             setDeleteTargetThreadId(threadId);
