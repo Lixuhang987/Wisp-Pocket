@@ -32,13 +32,3 @@
 ## 当前 bug
 
 
-
-### ThreadWindow 无 tab 后台 thread 状态
-
-- 完成日期：待实机 QA
-- 实现位置：`apps/thread-window-web/src/App.tsx`、`apps/thread-window-web/src/store/threadWindowStore.ts`、`apps/thread-window-web/src/thread/threadSocketClient.ts`、`apps/thread-window-web/src/components/ThreadWorkspacePane.tsx`
-- 自动化验证：需执行 `pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
-- 手工回归步骤：
-  1. 启动一个会持续流式输出的 thread，切到历史中的另一个 thread，再切回原 thread；右侧应直接显示原 thread 当前已缓存的 assistant delta，不出现 tab 条，也不清空消息。
-  2. 在后台 thread 触发 permission 或 workspace 请求后，切回该 thread；对应请求面板仍可见并可回答。
-  3. 人为让 `/api/thread` WebSocket 非主动断开时，前端连接状态可变为 `disconnected`，但不得做任何断线恢复：不得自动创建新 WebSocket，不得恢复订阅，不得拉取 snapshot，不得发送任何恢复命令；已有 thread state 保留在最后收到的位置。
