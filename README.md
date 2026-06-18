@@ -1,74 +1,82 @@
 # HandAgent
 
-HandAgent 是一个 macOS 优先的桌面 Agent Runtime MVP。当前桌面壳使用 `AppKit + SwiftUI` 承载宿主入口、PromptPanel 和 Settings；Electron shell 承载 React ThreadWindow 与 React StatusBubble，并监督本地 agent-server。Agent Core 负责 thread 与工具编排，LLM 按需调用 builtin tools；PromptPanel 会把本地 manifest prompts 构建为 `ActionDefinition`，Tab、点击或快捷键触发后追加为输入框内的 skill chip。
+**macOS 原生 Agent Runtime — 一键唤起，随处可用。**
 
-## 当前能力
+HandAgent 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 PromptPanel，选中文本或截取屏幕区域作为上下文，提交后由本地 Agent Runtime 驱动工具调用与多轮对话。所有数据留在本地，模型按你的配置连接。
 
-- 全局热键唤起 `PromptPanel`
-- `PromptPanel` 右上角按钮和 `Command+,` 打开快捷键设置页
-- 设置页支持配置模型、builtin tools、Append Prompt、MCP server、权限规则、快捷键和 workspace
-- PromptPanel 会读取 `~/.spotAgent/plugins/*/plugin.json` 中的 prompts，构建 `ActionDefinition`，并把选中的 prompt action 作为 skill chip 放入本次 `UserInput.items`
-- 文本选区与区域截图可作为 PromptPanel attachment chip 附加到用户输入
-- 提交 prompt 后由 Swift 发送 Electron command 创建或聚焦 `ThreadWindow`，Electron preload 负责 initial prompt 与宿主主题注入
-- React `ThreadWindow` 通过 `/api/thread` 发送 `ThreadCommand`，展示 user / assistant / tool 消息、历史侧栏、连接状态、权限审批气泡和 workspace 选择气泡，并维护后台 thread 状态缓存；React 和 app-server 之间不做断线恢复，非主动断开后不自动重连
-- 主题 token 以 `design/tokens.json` 为源，启动和 Web build 前生成 Swift / Tailwind v4 适配层；主题偏好由 Swift Settings 保存为 `light` / `dark` / `system` 并同步到 Electron/React
-- `agent-server` 驱动 `AgentRuntime`、builtin tool 注册、全局 MCP tool 注入、workspace 沙箱文件工具、权限策略和 thread 持久化
-- React StatusBubble 订阅 `/api/activity` 并提供当前 thread 回跳入口；没有可聚焦 ThreadWindow 时不会唤起 PromptPanel
+![Hero](docs/assets/hero.png)
 
-## 目录
+---
 
-- `apps/desktop/HandAgentApp.swift`：macOS 宿主、PromptPanel、Settings 与 Swift <-> Electron command bridge 入口
-- `apps/desktop/Sources/Settings`：模型、外观主题、快捷键与 workspace 设置页
-- `apps/electron-shell`：Electron main、ThreadWindow BrowserWindow、ActivityWindow StatusBubble 与 agent-server supervisor
-- `apps/thread-window-web`：Electron `BrowserWindow` 承载的 React ThreadWindow 前端
-- `packages/core`：跨平台 Agent Core、工具与 thread 逻辑
-- `apps/agent-server`：本地 thread server、平台反向 IPC、activity stream 与权限桥
+## 功能
 
-## 本地验证
+### 全局唤起
 
-- TypeScript / Web checks：`bash ./scripts/test.sh`
-- Swift tests：`bash ./scripts/swiftw test`
-- Swift build：`bash ./scripts/swiftw build`
+随时随地通过热键呼出 PromptPanel，无需切换窗口。支持文本选区和区域截图作为附件。
 
-这些脚本成功时只输出 `success`；失败时回放失败步骤的 stdout/stderr 并返回原始退出码。
+![PromptPanel](docs/assets/prompt-panel.png)
 
-`swiftw` 默认复用主 checkout 的 `.cache/swiftpm/` 作为 SwiftPM 依赖缓存。新 worktree 的默认基线可先跑 `bash ./scripts/test.sh`；该脚本会真实执行 ThreadWindow Web test/build、Electron shell test 和 agent-server/core vitest。涉及桌面宿主、Swift 包或打包链路时再追加 Swift build。
+### 多轮对话与工具调用
 
-## 模型配置
+ThreadWindow 展示完整对话流，包括 assistant 回复、工具调用过程与权限审批。支持历史侧栏和后台 thread 管理。
 
-当前模型配置统一由桌面端设置页写入 `~/.spotAgent/settings.json`。可配置项包括：
+![ThreadWindow](docs/assets/thread-window.png)
 
-- `provider`：当前支持 `openai-compatible`、`anthropic`
-- `model`
-- `apiKey`
-- `baseUrl`
-- `api`：当前支持 `responses`、`chat`、`completion`
+### Skill 与 MCP 扩展
 
-首次启动后，可通过应用菜单里的 `Settings...` 打开配置页并保存。配置完成后，再按正常流程启动桌面宿主：
+通过本地 manifest 定义 Skill（Append Prompt），通过 MCP 协议接入外部工具。PromptPanel 中选中 Skill 即作为 chip 附加到输入。
+
+![Skills](docs/assets/skills.png)
+
+### 灵活的模型配置
+
+支持 OpenAI Compatible / Anthropic 等多种 provider，在设置页即可切换模型、配置 API Key，保存后立即生效，无需重启。
+
+![Settings](docs/assets/settings.png)
+
+---
+
+## 快速开始
 
 ```bash
+# 安装依赖
 pnpm install
+
+# 启动桌面应用
 bash ./scripts/swiftw run HandAgentDesktop
 ```
 
-注意：
+首次启动后打开 Settings 配置模型 provider 和 API Key，即可开始使用。
 
-- `agent-server` 会在每次模型请求前重新读取 `~/.spotAgent/settings.json`，因此保存设置后无需重启应用即可影响后续新请求。
-- 如果未配置 `apiKey`，提交 prompt 后会返回明确错误：`Missing apiKey in ~/.spotAgent/settings.json. 请先在设置页完成模型配置。`
-- 如果对话里看到 `Could not connect to the server`，优先排查本地 `agent-server` 是否启动成功；这类错误发生在连接本地 thread 服务阶段，通常早于模型 API key 校验。
+---
 
-## ActionDefinition 与 MCP
+## 架构概览
 
-Action manifest 位于 `~/.spotAgent/plugins/<manifest-id>/plugin.json`。这里的 `plugins` 是历史路径名，当前 manifest 只声明 `prompts[]`、`template`、trigger、标题、描述和可选全局快捷键，不再声明 action 参数、`kind: "plugin"` 或 `mcpServerIds`。Desktop 负责构建 `ActionDefinition`；PromptPanel 选中 action 后追加 skill chip，提交时发送完整 `UserInput.items`，模型可见文本由 agent-server 在进入 runtime 前统一组合。
+| 层 | 职责 |
+|---|---|
+| **Desktop Shell** (Swift) | macOS 宿主、PromptPanel、Settings、全局热键 |
+| **Electron Shell** | ThreadWindow / StatusBubble 容器、agent-server 进程管理 |
+| **Thread Window** (React) | 对话 UI、历史管理、权限审批 |
+| **Agent Server** (Node) | AgentRuntime 驱动、tool 注册、MCP 注入、thread 持久化 |
+| **Core** (TypeScript) | 跨平台 Agent 核心、工具编排、LLM adapter |
 
-MCP server 配置位于 `~/.spotAgent/mcp.json`，支持 `stdio` 与 `streamableHttp`。真实 LLM 模式下，新 thread 初始只暴露 `use_tools` 激活入口；激活后会把 builtin tools 与全局 MCP server tools 注入当前 thread。stdio server 可按需配置 `elicitation.autoAcceptEmptyForm: true`，用于 Computer Use 这类只要求空表单确认的本地授权握手。
+---
 
-Settings 中的 `追加` 与 `MCP` 页面可以直接编辑这些本地文件，并提供与 `examples/` 目录一致的示例配置。MCP 配置由 agent-server 启动时读取，保存后需要重启桌面 App 才会进入当前运行中的 server。
+## 开发
 
-## 说明
+```bash
+# TypeScript / Web 测试
+bash ./scripts/test.sh
 
-- 默认不会把屏幕、窗口、文件、剪贴板、App 状态等上下文预注入模型。
-- 这些上下文只能由 LLM 通过 tool 按需读取。
-- 图片附件会写入 BlobStore；进入 runtime 前 agent-server 会把 image STUB 展开为多模态 image part，是否可用取决于当前 provider capability。
-- 当前 assistant delta 已接入 LLM adapter 的真实 streaming；协议用 `assistant.delta` 向桌面端增量推送。
-- 当前桌面壳只负责任务入口、thread 窗口和状态反馈，runtime 与平台抽象继续下沉在共享层。
+# Swift 测试 & 构建
+bash ./scripts/swiftw test
+bash ./scripts/swiftw build
+```
+
+详细开发文档见 [handAgent.md](handAgent.md) 和 [docs/](docs/)。
+
+---
+
+## 许可
+
+Private — 尚未开源。
