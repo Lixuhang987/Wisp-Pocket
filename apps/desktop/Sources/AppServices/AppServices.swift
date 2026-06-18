@@ -8,6 +8,7 @@ protocol SettingsWindowPresenting {
         settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
+        agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
@@ -36,6 +37,7 @@ protocol HotkeyRegistering {
 @MainActor
 protocol FatalAlertPresenting {
     func showFatal(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?)
+    func showAgentTriggerAttention(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?)
 }
 
 @MainActor
@@ -51,6 +53,7 @@ struct AppServicesRuntime {
     let appServer: any AppServerManaging
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
+    let agentTriggerCommandClient: (any AgentTriggerCommanding)?
 }
 
 @MainActor
@@ -60,7 +63,10 @@ final class AppServices {
     let appServer: any AppServerManaging
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
+    let agentTriggerCommandClient: (any AgentTriggerCommanding)?
     let settingsStore: AgentSettingsStore
+    let agentTriggerStore: AgentTriggerStore
+    let agentTriggerRuntime: AgentTriggerRuntime
     let appearanceThemeService: AppearanceThemeService
     let appearanceChangeObserver: any AppearanceChangeObserving
     let actionManifestStore: ActionManifestStore
@@ -78,6 +84,8 @@ final class AppServices {
         threadWindowCommandClient: (any ThreadWindowCommanding)? = nil,
         activityWindowCommandClient: (any ActivityWindowCommanding)? = nil,
         settingsStore: AgentSettingsStore = AgentSettingsStore(),
+        agentTriggerStore: AgentTriggerStore = AgentTriggerStore(),
+        agentTriggerRuntime: AgentTriggerRuntime? = nil,
         appearanceThemeService: AppearanceThemeService? = nil,
         appearanceChangeObserver: (any AppearanceChangeObserving)? = nil,
         actionManifestStore: ActionManifestStore = ActionManifestStore(),
@@ -106,7 +114,20 @@ final class AppServices {
         self.appServer = appServer ?? runtime!.appServer
         self.threadWindowCommandClient = threadWindowCommandClient ?? runtime?.threadWindowCommandClient ?? NopThreadWindowCommandClient()
         self.activityWindowCommandClient = activityWindowCommandClient ?? runtime?.activityWindowCommandClient
+        self.agentTriggerCommandClient = runtime?.agentTriggerCommandClient
         self.settingsStore = settingsStore
+        self.agentTriggerStore = agentTriggerStore
+        self.agentTriggerRuntime = agentTriggerRuntime ?? AgentTriggerRuntime(
+            registry: AgentTriggerRegistry(factories: [
+                ChromeBookmarksAgentTriggerProviderFactory(),
+                SystemClockAgentTriggerProviderFactory(),
+            ]),
+            store: agentTriggerStore,
+            emit: { [weak runtimeTriggerClient = runtime?.agentTriggerCommandClient] payload in
+                _ = try? runtimeTriggerClient?.fireAgentTrigger(payload)
+            }
+        )
+        try? self.agentTriggerRuntime.reload()
         self.appearanceThemeService = resolvedAppearanceThemeService
         self.appearanceChangeObserver = appearanceChangeObserver ?? SystemAppearanceChangeObserver()
         self.actionManifestStore = actionManifestStore
@@ -126,6 +147,8 @@ final class AppServices {
         activityWindowCommandClient: (any ActivityWindowCommanding)? = nil,
         settingsWindowPresenter: any SettingsWindowPresenting = NopSettingsWindowPresenter(),
         settingsStore: AgentSettingsStore = AgentSettingsStore(),
+        agentTriggerStore: AgentTriggerStore = AgentTriggerStore(),
+        agentTriggerRuntime: AgentTriggerRuntime? = nil,
         appearanceThemeService: AppearanceThemeService? = nil,
         appearanceChangeObserver: (any AppearanceChangeObserving)? = nil,
         actionManifestStore: ActionManifestStore = ActionManifestStore(
@@ -137,6 +160,8 @@ final class AppServices {
             threadWindowCommandClient: threadWindowCommandClient,
             activityWindowCommandClient: activityWindowCommandClient,
             settingsStore: settingsStore,
+            agentTriggerStore: agentTriggerStore,
+            agentTriggerRuntime: agentTriggerRuntime,
             appearanceThemeService: appearanceThemeService,
             appearanceChangeObserver: appearanceChangeObserver ?? NopAppearanceChangeObserver(),
             actionManifestStore: actionManifestStore,
@@ -175,7 +200,8 @@ final class AppServices {
         return AppServicesRuntime(
             appServer: appServer,
             threadWindowCommandClient: appServer,
-            activityWindowCommandClient: appServer
+            activityWindowCommandClient: appServer,
+            agentTriggerCommandClient: appServer
         )
     }
 
@@ -309,6 +335,17 @@ final class NopThreadWindowCommandClient: ThreadWindowCommanding {
 }
 
 @MainActor
+final class NopAgentTriggerCommandClient: AgentTriggerCommanding {
+    var onAgentTriggerCommandResult: ((AgentTriggerCommandResult) -> Void)?
+    var onAgentTriggerAttention: ((AgentTriggerAttentionResult) -> Void)?
+
+    func fireAgentTrigger(_ payload: ElectronAgentTriggerFirePayload) throws -> String {
+        _ = payload
+        return "noop-agent-trigger-fire"
+    }
+}
+
+@MainActor
 final class NopAppearanceChangeObserver: AppearanceChangeObserving {
     var onSystemAppearanceChange: (() -> Void)?
 
@@ -322,6 +359,7 @@ final class NopSettingsWindowPresenter: SettingsWindowPresenting {
         settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
+        agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
@@ -330,7 +368,19 @@ final class NopSettingsWindowPresenter: SettingsWindowPresenting {
         appTheme: AppTheme,
         onClose: @escaping () -> Void
     ) -> NSWindow? {
-        nil
+        _ = settingsViewModel
+        _ = appearanceViewModel
+        _ = toolSettingsViewModel
+        _ = agentTriggerSettingsViewModel
+        _ = appendPromptSettingsViewModel
+        _ = mcpSettingsViewModel
+        _ = permissionRulesViewModel
+        _ = workspaceViewModel
+        _ = shortcutActions
+        _ = appTheme
+        _ = onClose
+        let window: NSWindow? = nil
+        return window
     }
 
     func updateTheme(_ appTheme: AppTheme, for window: NSWindow?) {}
@@ -339,4 +389,5 @@ final class NopSettingsWindowPresenter: SettingsWindowPresenting {
 @MainActor
 final class NopFatalAlertPresenter: FatalAlertPresenting {
     func showFatal(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?) {}
+    func showAgentTriggerAttention(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?) {}
 }

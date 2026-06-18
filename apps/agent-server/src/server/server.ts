@@ -11,6 +11,8 @@ import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { AgentActivityEvent } from "@handagent/core/protocol/AgentActivity.ts";
 import type { AgentEvent } from "@handagent/core/protocol/AgentEvent.ts";
+import type { AgentTriggerFireRequest } from "@handagent/core/protocol/AgentTrigger.ts";
+import type { AgentTriggerAttention } from "@handagent/core/protocol/AgentTriggerAttention.ts";
 import type { Op } from "@handagent/core/protocol/Op.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import type { MCPServerConfig, StdioMCPServerConfig, StreamableHttpMCPServerConfig } from "@handagent/core/mcp/MCPConfig.ts";
@@ -26,6 +28,8 @@ import {
   type Agent,
 } from "../agent/AgentManager.ts";
 import { AgentActivityPublisher } from "../activity/AgentActivityPublisher.ts";
+import { AgentTriggerAttentionPublisher } from "../thread/AgentTriggerAttentionPublisher.ts";
+import { AgentTriggerLaunchService } from "../thread/AgentTriggerLaunchService.ts";
 import { ThreadCommandRouter } from "../thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../thread/ThreadNotificationPublisher.ts";
 import { ThreadRuntimeOrchestrator } from "../thread/ThreadRuntimeOrchestrator.ts";
@@ -150,6 +154,23 @@ export function attachActivitySocketHandlers(
   });
 }
 
+export function attachAgentTriggerAttentionSocketHandlers(
+  socket: ThreadSocket,
+  {
+    attentionPublisher,
+  }: {
+    attentionPublisher: AgentTriggerAttentionPublisher;
+  },
+): void {
+  const connectionId = `agent-trigger-attention-${++nextConnectionId}`;
+  attentionPublisher.attachConnection(connectionId, (outgoing) => {
+    socket.send(JSON.stringify(outgoing));
+  });
+  socket.on("close", () => {
+    attentionPublisher.detachConnection(connectionId);
+  });
+}
+
 function isPlatformBridgeMessage(message: unknown): message is PlatformBridgeMessage {
   return PlatformBridgeMessageSchema.safeParse(message).success;
 }
@@ -215,6 +236,24 @@ const InterruptOpSchema = z.object({
 });
 
 const RuntimeOpSchema = z.discriminatedUnion("type", [UserInputOpSchema, InterruptOpSchema]);
+
+const AgentTriggerFireRequestSchema = z.object({
+  triggerInstanceId: z.string(),
+  threadTitleHint: z.string().nullable(),
+  userInput: z.object({
+    items: z.array(InputItemSchema).min(1),
+  }),
+  notificationPolicy: z.object({
+    mode: z.enum(["silent", "on_failure", "on_attention"]),
+  }),
+  sourceEvent: z.object({
+    triggerInstanceId: z.string(),
+    providerKind: z.string(),
+    occurredAt: z.string(),
+    summary: z.string(),
+    payload: z.record(z.string(), z.unknown()),
+  }),
+}) satisfies z.ZodType<AgentTriggerFireRequest>;
 
 const ThreadCommandSchema = z.discriminatedUnion("type", [
   z.object({
@@ -323,6 +362,8 @@ export async function startServer({
   commandRouter,
   eventPublisher,
   activityPublisher,
+  agentTriggerAttentionPublisher,
+  agentTriggerLaunchService,
   bridge,
   permissionPolicy,
   staticFilesDir,
@@ -331,6 +372,8 @@ export async function startServer({
   commandRouter: ThreadCommandRouter;
   eventPublisher: ThreadNotificationPublisher;
   activityPublisher?: AgentActivityPublisher;
+  agentTriggerAttentionPublisher?: AgentTriggerAttentionPublisher;
+  agentTriggerLaunchService?: AgentTriggerLaunchService;
   bridge?: WebSocketPlatformBridge;
   permissionPolicy?: FilePermissionPolicy;
   staticFilesDir?: string;
@@ -341,8 +384,12 @@ export async function startServer({
   const threadWebSocketServer = new WebSocketServer({ noServer: true });
   const platformWebSocketServer = new WebSocketServer({ noServer: true });
   const activityWebSocketServer = new WebSocketServer({ noServer: true });
+  const agentTriggerAttentionWebSocketServer = new WebSocketServer({ noServer: true });
   const server = createServer((request, response) => {
-    void handleStaticRequest(request.url ?? "/", response, staticFilesDir);
+    void handleHTTPRequest(request, response, {
+      staticFilesDir,
+      agentTriggerLaunchService,
+    });
   });
 
   threadWebSocketServer.on("connection", (socket, request) => {
@@ -365,11 +412,28 @@ export async function startServer({
     attachActivitySocketHandlers(socket, { activityPublisher });
   });
 
+  agentTriggerAttentionWebSocketServer.on("connection", (socket) => {
+    if (!agentTriggerAttentionPublisher) {
+      socket.close();
+      return;
+    }
+    attachAgentTriggerAttentionSocketHandlers(socket, {
+      attentionPublisher: agentTriggerAttentionPublisher,
+    });
+  });
+
   server.on("upgrade", (request, socket, head) => {
     const path = request.url?.split("?")[0];
     if (path === "/api/activity") {
       activityWebSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
         activityWebSocketServer.emit("connection", webSocket, request);
+      });
+      return;
+    }
+
+    if (path === "/api/agent-trigger/attention") {
+      agentTriggerAttentionWebSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
+        agentTriggerAttentionWebSocketServer.emit("connection", webSocket, request);
       });
       return;
     }
@@ -547,8 +611,10 @@ export async function startDefaultServer(port = 4317) {
     },
   );
   const activityPublisher = new AgentActivityPublisher();
+  const agentTriggerAttentionPublisher = new AgentTriggerAttentionPublisher();
   const eventPublisher = new ThreadNotificationPublisher((event) => {
     activityPublisher.observe(event);
+    agentTriggerAttentionPublisher.observe(event);
   });
   const agentManager = new AgentManager();
   const createAgent = (threadId: string): Agent => {
@@ -610,11 +676,20 @@ export async function startDefaultServer(port = 4317) {
     workspaceRegistry,
     createAgent,
   );
+  const agentTriggerLaunchService = new AgentTriggerLaunchService(
+    persistence,
+    agentManager,
+    createAgent,
+    eventPublisher,
+    agentTriggerAttentionPublisher,
+  );
 
   return startServer({
     commandRouter,
     eventPublisher,
     activityPublisher,
+    agentTriggerAttentionPublisher,
+    agentTriggerLaunchService,
     bridge: platformBridge,
     permissionPolicy,
     staticFilesDir: resolveThreadWindowWebDistDir(),
@@ -762,6 +837,89 @@ function historyShowsToolsActivated(messages: readonly AgentMessage[]): boolean 
 }
 
 const THREAD_WINDOW_HTTP_PREFIX = "/thread-window";
+
+async function handleHTTPRequest(
+  request: {
+    method?: string;
+    url?: string;
+    on(event: "data", listener: (chunk: Buffer) => void): void;
+    on(event: "end", listener: () => void): void;
+    on(event: "error", listener: (error: Error) => void): void;
+  },
+  response: {
+    statusCode: number;
+    setHeader(name: string, value: string): void;
+    end(body?: string | Buffer): void;
+  },
+  options: {
+    staticFilesDir?: string;
+    agentTriggerLaunchService?: AgentTriggerLaunchService;
+  },
+): Promise<void> {
+  const pathname = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+  if (request.method === "POST" && pathname === "/api/agent-trigger/fire") {
+    await handleAgentTriggerFireRequest(request, response, options.agentTriggerLaunchService);
+    return;
+  }
+
+  await handleStaticRequest(request.url ?? "/", response, options.staticFilesDir);
+}
+
+async function handleAgentTriggerFireRequest(
+  request: {
+    on(event: "data", listener: (chunk: Buffer) => void): void;
+    on(event: "end", listener: () => void): void;
+    on(event: "error", listener: (error: Error) => void): void;
+  },
+  response: {
+    statusCode: number;
+    setHeader(name: string, value: string): void;
+    end(body?: string | Buffer): void;
+  },
+  launchService?: AgentTriggerLaunchService,
+): Promise<void> {
+  if (!launchService) {
+    response.statusCode = 503;
+    response.end("AgentTrigger launch service unavailable");
+    return;
+  }
+
+  try {
+    const rawBody = await readRequestBody(request);
+    const parsedJSON = JSON.parse(rawBody) as unknown;
+    const parsedRequest = AgentTriggerFireRequestSchema.safeParse(parsedJSON);
+    if (!parsedRequest.success) {
+      response.statusCode = 400;
+      response.end("Invalid AgentTrigger fire request");
+      return;
+    }
+
+    const result = await launchService.fire(parsedRequest.data);
+    response.statusCode = 202;
+    response.setHeader("Content-Type", "application/json");
+    response.end(JSON.stringify(result));
+  } catch (error) {
+    response.statusCode = 500;
+    response.end(error instanceof Error ? error.message : "Unknown error");
+  }
+}
+
+function readRequestBody(request: {
+  on(event: "data", listener: (chunk: Buffer) => void): void;
+  on(event: "end", listener: () => void): void;
+  on(event: "error", listener: (error: Error) => void): void;
+}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    request.on("end", () => {
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+    request.on("error", reject);
+  });
+}
 
 async function handleStaticRequest(
   rawURL: string,

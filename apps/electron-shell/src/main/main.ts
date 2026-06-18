@@ -17,6 +17,7 @@ import { ThreadWindowPrewarmer } from "./windows/threadWindowPrewarmer.js";
 import { configureMacOSBackgroundApp } from "./macosBackgroundApp.js";
 import { readAvailableSkillsFromPluginsDirectory } from "./availableSkills.js";
 import { readInitialHostTheme } from "./initialHostTheme.js";
+import { request } from "node:http";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = process.env.HANDAGENT_REPO_ROOT ?? resolve(currentDir, "../../../..");
@@ -32,6 +33,7 @@ const initialTheme = readInitialHostTheme(process.env.HANDAGENT_INITIAL_THEME);
 
 const bridge = new JsonLineBridge({ input: process.stdin, output: process.stdout });
 let commandSocketServer: CommandSocketServer | null = null;
+let agentTriggerAttentionSocket: WebSocket | null = null;
 const supervisor = createAgentServerSupervisor({
   repoRoot,
   nodePath,
@@ -134,6 +136,8 @@ function stopSupervisor(): void {
   }
 
   hasStoppedSupervisor = true;
+  agentTriggerAttentionSocket?.close();
+  agentTriggerAttentionSocket = null;
   if (hasStartedSupervisor) {
     supervisor.stop();
   }
@@ -142,11 +146,88 @@ function stopSupervisor(): void {
 const runtime = new ElectronShellRuntime({
   prewarmer,
   activityWindow,
+  fireAgentTrigger: (payload) => fireAgentTrigger(payload),
   send,
   now,
   stopSupervisor,
   quit: () => app.quit(),
 });
+
+async function fireAgentTrigger(payload: Extract<SwiftToElectronCommand, { type: "agent_trigger.fire" }>["payload"]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const req = request(
+      {
+        hostname: "127.0.0.1",
+        port: 4317,
+        path: "/api/agent-trigger/fire",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        const statusCode = res.statusCode ?? 500;
+        res.resume();
+        if (statusCode >= 200 && statusCode < 300) {
+          resolve();
+          return;
+        }
+        reject(new Error(`agent trigger fire failed with status ${statusCode}`));
+      },
+    );
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+function connectAgentTriggerAttentionSocket(): void {
+  if (agentTriggerAttentionSocket?.readyState === WebSocket.OPEN) {
+    return;
+  }
+
+  agentTriggerAttentionSocket?.close();
+  const socket = new WebSocket("ws://127.0.0.1:4317/api/agent-trigger/attention");
+  agentTriggerAttentionSocket = socket;
+
+  socket.addEventListener("message", (event) => {
+    try {
+      const raw = typeof event.data === "string" ? event.data : String(event.data);
+      const parsed = JSON.parse(raw) as {
+        threadId?: unknown;
+        triggerInstanceId?: unknown;
+        reason?: unknown;
+        message?: unknown;
+      };
+      if (
+        typeof parsed.threadId !== "string" ||
+        typeof parsed.triggerInstanceId !== "string" ||
+        typeof parsed.reason !== "string" ||
+        typeof parsed.message !== "string"
+      ) {
+        return;
+      }
+      runtime.handleAgentTriggerAttention({
+        channel: "electron_shell",
+        type: "agent_trigger.attention",
+        threadId: parsed.threadId,
+        triggerInstanceId: parsed.triggerInstanceId,
+        reason: parsed.reason as "permission" | "workspace" | "failure",
+        message: parsed.message,
+      });
+    } catch {
+      // Ignore malformed attention frames.
+    }
+  });
+
+  socket.addEventListener("close", () => {
+    if (agentTriggerAttentionSocket === socket) {
+      agentTriggerAttentionSocket = null;
+    }
+  });
+}
 
 ipcMain.on("activity-window:focus-thread", (event, threadId: unknown) => {
   handleActivityWindowFocusThreadIpc(event, threadId, {
@@ -178,6 +259,12 @@ async function handleCommandLine(line: string): Promise<void> {
 
 supervisor.onHealth((event) => {
   runtime.handleAgentServerHealth(event);
+  if (event.available) {
+    connectAgentTriggerAttentionSocket();
+  } else {
+    agentTriggerAttentionSocket?.close();
+    agentTriggerAttentionSocket = null;
+  }
 });
 
 bridge.onLine((line) => {

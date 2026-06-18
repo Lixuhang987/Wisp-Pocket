@@ -18,6 +18,7 @@ final class SettingsLifecycleTests: XCTestCase {
             settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
             toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
@@ -45,6 +46,7 @@ final class SettingsLifecycleTests: XCTestCase {
             settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
             toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
@@ -57,6 +59,7 @@ final class SettingsLifecycleTests: XCTestCase {
             settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
             toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
@@ -82,6 +85,7 @@ final class SettingsLifecycleTests: XCTestCase {
             settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
             toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
@@ -108,6 +112,7 @@ final class SettingsLifecycleTests: XCTestCase {
             settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
             toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
@@ -132,6 +137,7 @@ private final class ThemeRefreshingSettingsWindowPresenter: SettingsWindowPresen
         settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
+        agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
@@ -140,7 +146,17 @@ private final class ThemeRefreshingSettingsWindowPresenter: SettingsWindowPresen
         appTheme: AppTheme,
         onClose: @escaping () -> Void
     ) -> NSWindow? {
-        window
+        _ = settingsViewModel
+        _ = appearanceViewModel
+        _ = toolSettingsViewModel
+        _ = agentTriggerSettingsViewModel
+        _ = appendPromptSettingsViewModel
+        _ = mcpSettingsViewModel
+        _ = permissionRulesViewModel
+        _ = workspaceViewModel
+        _ = shortcutActions
+        _ = onClose
+        return window
     }
 
     func updateTheme(_ appTheme: AppTheme, for window: NSWindow?) {

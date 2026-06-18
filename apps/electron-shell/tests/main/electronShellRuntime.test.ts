@@ -67,6 +67,40 @@ describe("ElectronShellRuntime", () => {
     });
   });
 
+  it("routes agent trigger fire commands to the background launcher", async () => {
+    const harness = createHarness();
+    const payload = {
+      triggerInstanceId: "trigger-1",
+      threadTitleHint: "Digest",
+      userInput: {
+        items: [{ type: "text" as const, id: "text-1", text: "summarize" }],
+      },
+      notificationPolicy: { mode: "on_attention" as const },
+      sourceEvent: {
+        triggerInstanceId: "trigger-1",
+        providerKind: "system.clock",
+        occurredAt: "2026-06-18T10:00:00.000Z",
+        summary: "scheduled digest",
+        payload: { timezone: "Asia/Shanghai" },
+      },
+    };
+
+    await harness.runtime.handleCommand({
+      channel: "electron_shell",
+      type: "agent_trigger.fire",
+      commandId: "cmd-agent-trigger",
+      payload,
+    });
+
+    expect(harness.fireAgentTrigger).toHaveBeenCalledWith(payload);
+    expect(harness.events).toContainEqual({
+      channel: "electron_shell",
+      type: "command.ack",
+      commandId: "cmd-agent-trigger",
+      ok: true,
+    });
+  });
+
   it("routes theme changed commands to thread and activity window hosts", async () => {
     const harness = createHarness();
 
@@ -290,16 +324,18 @@ function createHarness(options: { focusResult?: boolean; prepareError?: Error } 
     releaseNativeFocusForNextClick: vi.fn(),
     updateTheme: vi.fn(async () => {}),
   };
+  const fireAgentTrigger = vi.fn(async () => {});
   const stopSupervisor = vi.fn();
   const quit = vi.fn();
   const runtime = new ElectronShellRuntime({
     prewarmer,
     activityWindow,
+    fireAgentTrigger,
     send: (event) => events.push(event),
     now: () => "2026-06-08T00:00:00.000Z",
     stopSupervisor,
     quit,
   });
 
-  return { runtime, prewarmer, activityWindow, events, stopSupervisor, quit };
+  return { runtime, prewarmer, activityWindow, fireAgentTrigger, events, stopSupervisor, quit };
 }

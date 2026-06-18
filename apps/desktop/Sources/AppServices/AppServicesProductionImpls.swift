@@ -43,6 +43,7 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
         settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
+        agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
@@ -55,6 +56,7 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
             settingsViewModel: settingsViewModel,
             appearanceViewModel: appearanceViewModel,
             toolSettingsViewModel: toolSettingsViewModel,
+            agentTriggerSettingsViewModel: agentTriggerSettingsViewModel,
             appendPromptSettingsViewModel: appendPromptSettingsViewModel,
             mcpSettingsViewModel: mcpSettingsViewModel,
             permissionRulesViewModel: permissionRulesViewModel,
@@ -115,6 +117,7 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
                 settingsViewModel: presentation.settingsViewModel,
                 appearanceViewModel: presentation.appearanceViewModel,
                 toolSettingsViewModel: presentation.toolSettingsViewModel,
+                agentTriggerSettingsViewModel: presentation.agentTriggerSettingsViewModel,
                 appendPromptSettingsViewModel: presentation.appendPromptSettingsViewModel,
                 mcpSettingsViewModel: presentation.mcpSettingsViewModel,
                 permissionRulesViewModel: presentation.permissionRulesViewModel,
@@ -148,6 +151,27 @@ final class ProductionFatalAlertPresenter: FatalAlertPresenting {
             onSecondary()
         }
     }
+
+    func showAgentTriggerAttention(
+        title: String,
+        message: String,
+        primaryButtonTitle: String,
+        secondaryButtonTitle: String?,
+        onSecondary: (() -> Void)?
+    ) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: primaryButtonTitle)
+        if let secondaryButtonTitle {
+            alert.addButton(withTitle: secondaryButtonTitle)
+        }
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn, let onSecondary {
+            onSecondary()
+        }
+    }
 }
 
 private struct SendableClosure: @unchecked Sendable {
@@ -158,6 +182,7 @@ private struct SettingsPresentation {
     let settingsViewModel: AgentSettingsViewModel
     let appearanceViewModel: AppearanceSettingsViewModel
     let toolSettingsViewModel: ToolSettingsViewModel
+    let agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel
     let appendPromptSettingsViewModel: AppendPromptSettingsViewModel
     let mcpSettingsViewModel: MCPSettingsViewModel
     let permissionRulesViewModel: PermissionRulesViewModel

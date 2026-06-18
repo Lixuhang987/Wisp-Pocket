@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, ActivityWindowCommanding {
+final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, ActivityWindowCommanding, AgentTriggerCommanding {
     private let shell: any ElectronShellProcessing
     private let platformClient: PlatformBridgeConnectionClient?
     private var hasAgentServerHealth = false
@@ -12,6 +12,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
     private var threadWindowErrorMessage: String?
     private var pendingCommandKinds: [String: ThreadWindowCommandKind] = [:]
     private var pendingActivityCommandKinds: [String: ActivityWindowCommandKind] = [:]
+    private var pendingAgentTriggerCommandKinds: [String: AgentTriggerCommandKind] = [:]
 
     var startupErrorMessage: String? {
         agentServerErrorMessage ?? threadWindowErrorMessage
@@ -23,6 +24,8 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
     var onThreadWindowClosed: (() -> Void)?
     var onCommandResult: ((ThreadWindowCommandResult) -> Void)?
     var onActivityWindowCommandResult: ((ActivityWindowCommandResult) -> Void)?
+    var onAgentTriggerCommandResult: ((AgentTriggerCommandResult) -> Void)?
+    var onAgentTriggerAttention: ((AgentTriggerAttentionResult) -> Void)?
 
     var isAvailable: Bool {
         hasAgentServerHealth && hasPreparedThreadWindow && startupErrorMessage == nil
@@ -66,8 +69,12 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         onThreadWindowClosed = nil
         onCommandResult = nil
         onActivityWindowCommandResult = nil
+        onAgentTriggerCommandResult = nil
+        onAgentTriggerAttention = nil
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
+        pendingAgentTriggerCommandKinds.removeAll()
+        pendingAgentTriggerCommandKinds.removeAll()
         platformClient?.disconnect()
         shell.stop()
         hasAgentServerHealth = false
@@ -113,6 +120,19 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             return commandId
         } catch {
             pendingActivityCommandKinds.removeValue(forKey: commandId)
+            throw error
+        }
+    }
+
+    @discardableResult
+    func fireAgentTrigger(_ payload: ElectronAgentTriggerFirePayload) throws -> String {
+        let commandId = UUID().uuidString
+        pendingAgentTriggerCommandKinds[commandId] = .fire
+        do {
+            try shell.send(.agentTriggerFire(commandId: commandId, payload: payload))
+            return commandId
+        } catch {
+            pendingAgentTriggerCommandKinds.removeValue(forKey: commandId)
             throw error
         }
     }
@@ -165,6 +185,17 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         case .commandAck(let commandId, let ok, let error):
             handleCommandAck(commandId: commandId, ok: ok, error: error)
 
+        case .agentTriggerAttention(let payload):
+            guard let reason = AgentTriggerAttentionReason(rawValue: payload.reason) else { return }
+            onAgentTriggerAttention?(
+                AgentTriggerAttentionResult(
+                    threadId: payload.threadId,
+                    triggerInstanceId: payload.triggerInstanceId,
+                    reason: reason,
+                    message: payload.message
+                )
+            )
+
         case .electronReady:
             break
         }
@@ -180,6 +211,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             platformClient?.disconnect()
             pendingCommandKinds.removeAll()
             pendingActivityCommandKinds.removeAll()
+        pendingAgentTriggerCommandKinds.removeAll()
             publishAvailability(force: lastPublishedAvailability)
             onHostTerminationRequest?()
             return
@@ -191,6 +223,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         platformClient?.disconnect()
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
+        pendingAgentTriggerCommandKinds.removeAll()
         onFatalError?(message)
         publishAvailability(force: true)
     }
@@ -204,6 +237,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         isRunning = false
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
+        pendingAgentTriggerCommandKinds.removeAll()
     }
 
     private func publishAvailability(force: Bool = false) {
@@ -245,11 +279,23 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             return
         }
 
-        guard let kind = pendingActivityCommandKinds.removeValue(forKey: commandId) else {
+        if let kind = pendingActivityCommandKinds.removeValue(forKey: commandId) {
+            onActivityWindowCommandResult?(
+                ActivityWindowCommandResult(
+                    commandId: commandId,
+                    kind: kind,
+                    ok: ok,
+                    error: error
+                )
+            )
             return
         }
-        onActivityWindowCommandResult?(
-            ActivityWindowCommandResult(
+
+        guard let kind = pendingAgentTriggerCommandKinds.removeValue(forKey: commandId) else {
+            return
+        }
+        onAgentTriggerCommandResult?(
+            AgentTriggerCommandResult(
                 commandId: commandId,
                 kind: kind,
                 ok: ok,

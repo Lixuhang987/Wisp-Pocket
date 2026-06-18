@@ -13,6 +13,7 @@
 - 在 `agent_server.health available=true` 与 `thread_window.prepared` 同时成立后，向 `AgentServerHealth` 暴露可提交状态。
 - 作为 `ThreadWindowCommanding` 实现，只接收 Coordinator 的 openInitialPrompt/openHistory/focus/themeChanged 意图；`theme.changed` 不参与 ThreadWindow 可用性 gate。启动初值由 `HANDAGENT_INITIAL_THEME` 提供，运行中变化仍由 `theme.changed` command 提供。
 - 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`。
+- 作为 `AgentTriggerCommanding` 实现，接收 Swift `agent_trigger.fire` 后台启动请求，并把 agent-server 回推的 `agent_trigger.attention` 事件转成宿主可消费的最小提示信号。
 - 连接 `/api/platform`，继续由 Swift `PlatformBridgeService` 执行 macOS 原生能力。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
 - Electron StatusBubble 点击只尝试聚焦已有 ThreadWindow；无法聚焦时不再让 Coordinator 打开 Swift PromptPanel。
@@ -26,7 +27,7 @@
 | `ElectronShellProtocol.swift` | Swift 端 command/event DTO，必须与 TS `electronShellProtocol.ts` 字段一致 |
 | `ElectronBackedAppServer.swift` | app-server health gate、ThreadWindow command client、ActivityWindow command client 和 platform bridge 连接管理 |
 | `ThreadWindowDiagnostics.swift` | 仅供宿主侧排查 ThreadWindow 首次打开/关闭竞态的 stderr 诊断开关；`HANDAGENT_THREADWINDOW_TRACE=1` 时输出 `openHistory`、`hide(restoringFocus:false)`、`command.ack`、`thread_window_closed` 等关键时序 |
-| `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 的 command 抽象：open initial prompt、open history、focus、theme changed |
+| `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 与 AgentTrigger 的 command 抽象：open initial prompt、open history、focus、theme changed、后台 trigger fire / attention 回调 |
 | `ActivityWindowCommanding.swift` | Coordinator 面向 Electron ActivityWindow 的 show command 抽象 |
 | `UserMessageAttachmentPayload.swift` | 旧 attachment DTO 兼容辅助；当前 initial prompt command 主载荷是 `PromptUserInput.items` |
 
@@ -43,7 +44,7 @@
 
 - 不持有 ThreadWindow thread 缓存、消息或历史状态。
 - 不解析 `/api/thread` 的 `ThreadNotification`。
-- 不订阅 `/api/activity`，不 mirror Electron StatusBubble 状态。
+- 不消费完整 `/api/thread` 状态；但会为后台 AgentTrigger 单独接收宿主级 attention 事件，用于权限/工作区/失败提示。
 - 不执行 ScreenCaptureKit、Accessibility、NSWorkspace、NSPasteboard 以外的新平台能力迁移。
 - 不承载 PromptPanel、Settings、Hotkey 或焦点恢复；这些仍由 Swift 宿主负责。
 
