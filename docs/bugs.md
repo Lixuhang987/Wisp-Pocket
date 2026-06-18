@@ -2,7 +2,7 @@
 
 本文记录当前已知但尚未修复的 bug。功能待办继续放在 [TODO.md](/Users/mu9/proj/handAgent/docs/TODO.md)
 
-最后核对日期：2026-06-09。
+最后核对日期：2026-06-18。
 
 ## 修 bug 约束
 
@@ -44,16 +44,6 @@
   2. 在 ThreadWindow 选择 allow/deny，确认请求面板消失，turn 继续完成或按拒绝结果收敛，ActivityWindow 离开 waiting。
   3. 触发 `workspace.askUser` 的 prompt，确认同一 thread 内 workspace 请求串行出现；选择 workspace 或取消后 turn 正确继续。
   4. 点击停止或关闭 ThreadWindow，确认 running turn 被中断，当前 pending permission/workspace 请求被取消，thread 级临时权限规则被清理，后续新输入不复用本次临时 allow/deny。
-
-### ThreadWindow 左侧历史侧栏 UI 增强
-
-- **严重级别**：中
-- **发现日期**：2026-06-18
-- **复现步骤**：1. 在 `main` 主 checkout 保持 packaged mock app 在线，打开 `http://127.0.0.1:4317/thread-window/index.html`。2. 在空白 thread 中提交 `[mock:assistant-ok] LIVE_QA_BACKGROUND_A2_20260618`，等待右侧消息列表出现 user message 与 `Mock assistant response: main chain is reachable.`。3. 不刷新页面，观察左侧 `默认对话` 历史列表。4. 运行 `sqlite3 ~/.spotAgent/threads.sqlite "select thread_id, preview, updated_at from threads where thread_id=thread-96834f8e-a97b-43a3-9823-9cf36915b88e;"`，确认 SQLite 中已经持久化该 thread。5. 直接对当前页面执行 `reload`，再在搜索框输入 `BACKGROUND_A2_20260618` 过滤历史。
-- **实际结果**：步骤 2 完成后，右侧 thread workspace 已显示新消息，SQLite 中也已有 `thread-96834f8e-a97b-43a3-9823-9cf36915b88e | [mock:assistant-ok] LIVE_QA_BACKGROUND_A2_20260618 | 2026-06-17T22:31:51.062Z`，但左侧历史列表在当前 live 会话中没有出现这条新 thread，无法立即点击切回。只有在步骤 5 手动 reload 后，搜索框过滤结果里才出现 `"[mock:assistant-ok] LIVE_QA_BACKGROUND_A2_20260618"` 的历史 row。
-- **期望结果**：新建并完成的 thread 应在当前 live 会话中即时进入左侧历史侧栏，并保持 preview/updatedAt 与当前 thread 状态同步；用户不应依赖 reload 才看到新 thread。
-- **证据**：1. Live UI：提交 `[mock:assistant-ok] LIVE_QA_BACKGROUND_A2_20260618` 后，右侧消息区渲染 user bubble 与 assistant 文案 `Mock assistant response: main chain is reachable.`；紧接着左侧历史中仍只显示旧的 permission/tool thread，没有新出现 `BACKGROUND_A2` row。2. SQLite 持久化：thread `thread-96834f8e-a97b-43a3-9823-9cf36915b88e` 的 rollout 已完整写入 `session_meta`、`response_item(user)`、多条 `assistant.delta`、`response_item(assistant)`、`turn.completed`、`thread.status.changed`。3. Reload 对照：对同一页面执行 `reload` 后，再在搜索框输入 `BACKGROUND_A2_20260618`，左侧立刻出现 `"[mock:assistant-ok] LIVE_QA_BACKGROUND_A2_20260618"` 历史 row，证明数据已存在，只是 live 列表没更新。4. 定向自动化覆盖仍通过：`pnpm --filter handagent-thread-window-web exec vitest run tests/historySidebar.test.ts` 结果为 `5 passed`。
-- **初步调用链 / 根因边界**：问题边界在 ThreadWindow 前端 store/history 同步，而不是持久化或样式。`HistorySidebar` 只读取 `state.history`；`thread.started` / `user.message.recorded` / `turn.completed` 分支会更新 `threadsById` 和右侧消息，但不会把新 thread 插入 `history`。当前 `history` 主要依赖 socket 建连时的 `thread.listed` 快照刷新，因此 live 创建的新 thread 只在 reload 或重新连接后才进入侧栏。渲染层 `ThreadItem` / `groupThreadsByWorkspace` 本身没有证据表明会丢弃这条数据。
 
 
 ### ThreadWindow 无 tab 后台 thread 状态
