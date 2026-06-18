@@ -1,13 +1,12 @@
 # activity-window
 
-`tests/activity-window` 覆盖 Electron ActivityWindow renderer 的纯 browser/React 状态逻辑。
+`tests/activity-window` 原本覆盖 Electron ActivityWindow renderer 的纯 browser/React 状态逻辑；当前主路径断言已合并到 `tests/use-cases/activity-window.test.ts`，本目录只保留索引说明。
 
 ## 文件
 
 | 文件 | 覆盖对象 |
 |------|------|
-| `activitySocketClient.test.ts` | `src/activity-window/activitySocketClient.ts` 的 event parser、非法消息忽略、断线重连和手动关闭 |
-| `activityState.test.ts` | `src/activity-window/activityState.ts` 的 snapshot/change reducer 与展示文案 |
+| `../use-cases/activity-window.test.ts` | `/api/activity` snapshot/change 解析、ActivityWindow 状态展示和 focusThread 回跳主路径 |
 
 ## 测试前提
 

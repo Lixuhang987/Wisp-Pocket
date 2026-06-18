@@ -65,7 +65,7 @@
 ## 测试
 
 - [stdio-mcp-client.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/stdio-mcp-client.test.ts) / [streamable-http-mcp-client.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/streamable-http-mcp-client.test.ts) — 基础链路。
-- [mcp-full-protocol.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/mcp-full-protocol.test.ts) — 自建 stdio mock server，覆盖 tools + prompts + resources 完整协议。
+- [mcp-use-cases.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/mcp-use-cases.test.ts) — 自建 stdio mock server，覆盖 tools + prompts + resources 完整协议。
 - [mcp-real-server.integration.test.ts](/Users/mu9/proj/handAgent/packages/core/tests/mcp/mcp-real-server.integration.test.ts) — 通过 `npx @modelcontextprotocol/server-filesystem` 拉起真实参考实现做端到端验证。
 
 ## 实现约束
