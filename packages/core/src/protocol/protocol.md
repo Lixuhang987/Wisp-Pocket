@@ -20,6 +20,8 @@
 | `ThreadProtocolShared.ts` | 共享类型：`RunStatus` / `ThreadListEntry` / `WorkspaceAskCandidate` / `ThreadAttachment` |
 | `AgentActivity.ts` | `/api/activity` 轻量活动流：`activity.snapshot` / `activity.changed` |
 | `PlatformBridgeMessage.ts` | `PlatformBridgeMessage`（平台反向 RPC 帧）/ `PlatformResponsePayload` |
+| `AgentTrigger.ts` | 后台 AgentTrigger 启动协议：`AgentTriggerFireRequest` / `AgentTriggerFireResult` / `AgentTriggerSourceEvent` / `AgentTriggerNotificationPolicy` |
+| `AgentTriggerAttention.ts` | 后台 AgentTrigger attention 事件：`AgentTriggerAttention` / `AgentTriggerAttentionReason`，供宿主在命中权限、工作区选择或失败时聚焦用户注意 |
 
 ## 单向边界
 
@@ -32,6 +34,7 @@ flowchart LR
   B -->|/api/thread ServerRequest| A
   A -->|/api/thread ClientResponse| B
   B -->|/api/activity AgentActivityEvent| E[Electron StatusBubble / 桌宠]
+  B -->|/api/agent-trigger/attention AgentTriggerAttention| EA[Electron main]
   B -->|/api/platform PlatformBridgeMessage| D[Swift desktop]
 ```
 
@@ -81,6 +84,11 @@ flowchart LR
 - `activity.changed`
 
 这组消息只用于状态气泡、桌宠等轻量运行态展示。它由 agent-server 从 thread 通知和待回执请求派生，不暴露完整消息内容。`/api/activity` subscriber 连接后先收到 `activity.snapshot`，只有状态变化时才收到 `activity.changed`。
+
+### AgentTrigger
+
+- `AgentTriggerFireRequest` / `AgentTriggerFireResult`：后台 trigger 通过 `POST /api/agent-trigger/fire` 启动新 thread 的请求与回执。
+- `AgentTriggerAttention`：后台 thread 运行中命中权限、工作区选择或失败时，agent-server 通过 `/api/agent-trigger/attention` WebSocket 向宿主发送的注意力事件，通知模式由 `AgentTriggerNotificationPolicy` 控制（`silent` / `on_failure` / `on_attention`）。
 
 ## Thread Socket 状态入口
 

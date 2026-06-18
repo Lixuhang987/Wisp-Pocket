@@ -21,6 +21,7 @@ flowchart LR
   E -->|supervise| B[apps/agent-server<br/>本地 thread 桥]
   W -->|/api/thread WebSocket| B
   S -->|/api/activity WebSocket| B
+  E -->|/api/agent-trigger/attention WebSocket| B
   A -->|/api/platform WebSocket| B
   B --> C[packages/core<br/>runtime / tool / LLM]
   B --> T[packages/thread-store<br/>SQLite thread store]
@@ -51,6 +52,7 @@ flowchart LR
 
 - Electron ActivityWindow 承载 React StatusBubble；renderer 订阅 `/api/activity`，接收 agent-server 派生的 `AgentActivityEvent`。
 - Electron 气泡点击时只请求 Electron main 聚焦已有 ThreadWindow；无法聚焦时不回告 Swift，也不打开 PromptPanel。
+- Electron main 还订阅 `/api/agent-trigger/attention`，接收后台 trigger 的 `AgentTriggerAttention` 事件，在命中权限、工作区选择或失败时引导用户注意。
 - Swift 不订阅 `/api/activity`，也不把完整 ThreadWindow thread 缓存、消息或历史同步到 Swift 状态。
 
 ## 本层关键 DTO
@@ -59,6 +61,7 @@ flowchart LR
 - `UserInput` / `InputItem` / `Op`
 - `ThreadCommand` / `ThreadNotification` / `ServerRequest` / `ClientResponse`
 - `AgentActivityEvent`
+- `AgentTriggerFireRequest` / `AgentTriggerFireResult` / `AgentTriggerAttention`
 - `PlatformBridgeMessage`（含 platform_bridge_hello / platform_request / platform_response）
 
 ## 模块边界

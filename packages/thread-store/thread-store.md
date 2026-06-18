@@ -14,7 +14,7 @@
 | `src/ThreadStore.ts` | SQLite schema、lazy create、append/persist/load/resume/shutdown/discard/list/delete、兼容派生视图 |
 | `src/CurrentThread.ts` | 当前 open thread 的语义层，封装 create/resume、append、persist、shutdown、discard |
 | `src/index.ts` | 包导出入口 |
-| `tests/` | `thread-store-use-cases.test.ts` 使用真实 SQLite 临时库覆盖 create/append/persist/resume/shutdown/discard、CurrentThread 并发 append、package exports 和派生视图 |
+| `tests/` | `thread-store-use-cases.test.ts` 使用真实 SQLite 临时库覆盖 create/append/persist/resume/shutdown/discard、CurrentThread 并发 append、package exports 和派生视图；`helpers.ts` 提供临时数据库路径与清理辅助 |
 
 ## 持久化模型
 

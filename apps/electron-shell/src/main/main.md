@@ -15,6 +15,7 @@
 | `initialHostTheme.ts` | 无独立文档 | 解析 `HANDAGENT_INITIAL_THEME`，为 Electron window controllers 提供启动期 host theme 初值 |
 | `activityWindowIpc.ts` | 无独立文档 | 只接收 ActivityWindow renderer 发出的 `focusThread` IPC |
 | `macosBackgroundApp.ts` | 无独立文档 | macOS accessory activation policy 与 Dock 隐藏 |
+| `availableSkills.ts` | 无独立文档 | 读取本地 skill manifest 根目录（`~/.spotAgent/plugins`），解析启用项的 `plugin.json`，输出只读 `AvailableSkill[]` 供 ThreadWindow preload 注入 |
 
 ## 运行时分层
 

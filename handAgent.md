@@ -10,6 +10,7 @@ flowchart TD
   E -->|supervise| B[apps/agent-server<br/>本地 thread 桥与 runtime 驱动]
   W -->|/api/thread WebSocket| B
   S -->|/api/activity WebSocket| B
+  E -->|/api/agent-trigger/attention WebSocket| B
   A -->|/api/platform WebSocket| B
   B --> C[packages/core<br/>thread、turn、消息、LLM/tool 循环]
   B --> T[packages/thread-store<br/>SQLite thread rollout 持久化]
@@ -55,6 +56,7 @@ flowchart TD
 - 初始上下文只来自用户主动输入和主动附件。PromptPanel 的 attachment 只通过 Electron initial prompt command 进入 React；屏幕、剪贴板、App 状态和文件读取都必须走 tool。
 - Thread 主协议只跑在 `/api/thread`：React 发送 `ThreadCommand` / `ClientResponse`，agent-server 发送 `ThreadNotification` / `ServerRequest`；app-server 内部会把 `ClientResponse` 包装为 `client_response` Op 投回 Agent `tx_sub`。
 - Activity 轻量状态只跑在 `/api/activity`：agent-server 只发送 `AgentActivityEvent`；新连接先收到 `activity.snapshot`，状态变化时收到 `activity.changed`。该流由 `ThreadNotification` / `ServerRequest` 派生，不承载完整 thread 消息。
+- 后台 AgentTrigger attention 只跑在 `/api/agent-trigger/attention`：agent-server 只发送 `AgentTriggerAttention`；Electron main 订阅该流，在后台 thread 命中权限、工作区选择或失败时引导用户注意。后台 trigger 启动入口是 `POST /api/agent-trigger/fire`。
 - 主题偏好由 Swift 宿主持久化和解析：用户只在 Swift Settings 中选择 `light` / `dark` / `system`。Swift 启动 Electron 时先通过 `HANDAGENT_INITIAL_THEME` 环境变量传入当前真实 `{ preference, resolved }`，避免 Electron 首个 renderer 用固定浅色或固定深色启动；运行中主题变化再通过 `theme.changed` command 同步给 Electron。Electron main 同步给 ThreadWindow 和 ActivityWindow renderer，React 侧只应用 resolved theme，不持久化偏好。
 - 平台 RPC 只跑在 `/api/platform`：Swift desktop 发送 `platform_bridge_hello`，处理 `channel: "platform"` 的 `platform_request`，并回写 `platform_response`。
 - `thread.snapshot` 是用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口；React 和 app-server 之间不做断线恢复，非主动断开后不重连、不恢复订阅、不拉取 snapshot、不发送恢复命令。`workspace.listed` 是 `workspace.list` 的连接级响应，不带 `threadId`。

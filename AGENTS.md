@@ -10,7 +10,7 @@
 
 仓库文档是一棵 DFS 索引树：每个 `<dir>.md` 只列**直接子节点**，更深层细节由子节点自己继续展开。AI / 新人按 `AGENTS.md → handAgent.md → ...` 一路向下读，需要哪一层就钻到哪一层，不必预先吞下所有路径。
 
-本文件只列根目录的直接入口；所有 `apps/` 下的模块、`packages/` 下的源码细节，由各自的 `<dir>.md` 接力展开。`docs/` 下的平铺开发说明在本文件列为叶文件；`docs/human/`、`docs/superpowers/` 是例外嵌套集合，只在此处标出集合入口。
+本文件只列根目录的直接入口；所有 `apps/` 下的模块、`packages/` 下的源码细节，由各自的 `<dir>.md` 接力展开。`docs/` 下的平铺开发说明在本文件列为叶文件；`docs/human/`、`docs/superpowers/`、`docs/medium-powers/` 是例外嵌套集合，只在此处标出集合入口。
 
 ### 根目录入口
 
@@ -69,7 +69,15 @@
 - 执行 `git commit` 并在 commit message 中总结改动，不要让完成的工作长时间不提交。
 - Spec 完成后的文档审核强制流程
 当前任务完成了某个 spec 的实现后，必须执行以下流程：
+1. 分发一个独立子 agent，使用fork_context: false，任务只做文档审核与文档更新。
+2. 子 agent 必须：
+    - 阅读该 spec。
     - 阅读所有修改文件所在目录的 `<dir>.md`，并沿父目录读到 `handAgent.md`。
     - 核对 spec、代码、相关 md 是否一致。
     - 更新所有过期 md。
+3. 主 agent 必须在结束前确认：
+    - 子 agent 已返回审核结论。
+    - 所有相关 md 已更新。
+    - `docs/manual-qa.md` 已更新或说明无需更新。
+4. 若未完成上述流程，不得提交、不得结束任务。
 - 最后将完成的改动加入到 manual-qa 中
