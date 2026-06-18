@@ -11,7 +11,7 @@
 | `PromptPanelInputCommand.swift` | 输入区 AppKit command selector 到 PromptPanel 意图的纯解析：Return、Shift/Option+Return、Tab、上下键 |
 | `PromptPanelInputLayout.swift` | 输入区布局辅助：根据 editable text 是否有可见内容决定文字编辑区域宽度 |
 | `PromptPanelViewModel.swift` | `@Observable` 状态：`inputItems` / 唯一 editable `draft` / `attachments` / `chipItems` / `filteredActions` / `selectedActionId`；Tab/点击/快捷键追加 skill item，提交完整 item 数组 |
-| `PromptPanelController.swift` | `NSPanel` 生命周期、ESC / showThreadWindow 局部监听、ViewModel 注入、QuickLook 预览和回调出口 |
+| `PromptPanelController.swift` | `NSPanel` 生命周期、ESC 监听、ViewModel 注入、QuickLook 预览和回调出口 |
 | `PromptPanelFocusRestorer.swift` | 记录 PromptPanel 唤起前的前台应用，并在面板因失焦或 ESC 收起后恢复应用焦点 |
 | `PromptPanelInputFocusRetrier.swift` | 输入框 AppKit 焦点重试器 |
 | `PromptPanelWindow.swift` | `NSPanel` 子类，处理失焦自动隐藏 |
@@ -56,11 +56,10 @@ PromptPanelGrowingTextView command
 - **ViewModel 不持有 SwiftUI 类型**：只暴露 plain Swift 状态与回调。
 - **Controller 是窗口管理 + 事件监听层**：不直接写 thread/turn 逻辑，跨模块意图通过 `onSubmit` / `onOpenSettings` 闭包出口给 Coordinator。
 - **后台热键展示语义**：`show()` 负责所有“后台宿主 -> PromptPanel”入口的前台展示，包括 `showPromptPanel`、用户主动 capture 和 Action 全局快捷键。宿主仍是 `.accessory` 时，Controller 必须先做最小宿主激活，再展示 `.nonactivatingPanel`；宿主已经是 `.regular` 时，不得再次激活整个 App，避免把 Settings 等无关窗口一起带到前台。
-- **PromptPanel 可见时也要消费 app-scoped ThreadWindow 快捷键**：`showThreadWindow` 不能只依赖 Coordinator 的 local monitor；当 PromptPanel 作为 `.nonactivatingPanel` 可见时，Controller 自己必须能识别同一份 shortcut 配置，并把意图通过 `onShowThreadWindow` 交回 Coordinator。
 - **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加上方 chip row 中的 skill chip 并显示 PromptPanel。
 - **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
 - **焦点语义**：凡是从 PromptPanel 把控制权切给 Electron ThreadWindow 的路径，都必须避免恢复旧前台应用。提交 prompt 时，Coordinator 必须在发送 `thread_window.open_initial_prompt` 前调用 `hide(restoringFocus: false)`；PromptPanel 仍可见时若触发 `openHistory`，也必须先 `hide(restoringFocus: false)` 再发送 `thread_window.open_history`。
-- **首次 handoff 是高频回归点**：上面这条不能退化成“最终调用过 hide 就行”，而必须保证顺序是“先 hide(restoringFocus: false)，再 open/focus ThreadWindow”。这个 bug 已多次出现；以后改 PromptPanel 焦点恢复、失焦自动隐藏或 `showThreadWindow` 快捷键时，必须把它当强制回归项。
+- **首次 handoff 是高频回归点**：上面这条不能退化成”最终调用过 hide 就行”，而必须保证顺序是”先 hide(restoringFocus: false)，再 open/focus ThreadWindow”。这个 bug 已多次出现；以后改 PromptPanel 焦点恢复或失焦自动隐藏时，必须把它当强制回归项。
 - **server 不可用时不丢草稿**：`submissionDisabledMessage != nil` 时输入框禁用并显示提示，`submit()` 直接返回，不清空 `inputItems` / `attachments`。
 - **滚动条样式走 Shared**：PromptPanel 输入框内部 `NSScrollView` 与 action 列表 `ScrollView` 都复用 `Sources/Shared/OverlayScrollbar.swift`；不要在 `PromptPanelStyles.swift` 再维护一份局部滚动条实现。`OverlayScrollbar` 需要同时把 `NSScrollView` 和其 `contentView` 设为透明，并按 overlay 所在区域与各 `NSScrollView` 的几何重叠选择目标；对 SwiftUI `HostingScrollView` 还要在首次更新后做一次短延迟重试，覆盖系统 scroller 的后置装配。
 - **这次回归的教训**：PromptPanel 这类“输入框滚动区 + 列表滚动区”并存的界面，不能再用“找到第一个 scroll view”或“靠 sibling 顺序猜目标”的方式注入样式。白底既可能来自系统 `NSScroller`，也可能来自 `NSClipView`；只有同时验证“命中的是正确 scroll view、`contentView` 透明、最终 scroller 已替换”三件事，才算真正修好。

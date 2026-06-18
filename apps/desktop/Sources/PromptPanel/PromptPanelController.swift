@@ -15,7 +15,6 @@ protocol PromptPanelControlling: AnyObject {
     var onOpenSettings: (() -> Void)? { get set }
     var onDidShow: (() -> Void)? { get set }
     var onDidHide: (() -> Void)? { get set }
-    var onShowThreadWindow: (() -> Void)? { get set }
     var isVisible: Bool { get }
 
     func configure(viewModel: PromptPanelViewModel)
@@ -55,7 +54,6 @@ final class PromptPanelController: PromptPanelControlling {
     var onOpenSettings: (() -> Void)?
     var onDidShow: (() -> Void)?
     var onDidHide: (() -> Void)?
-    var onShowThreadWindow: (() -> Void)?
 
     init<FocusRestorer: PromptPanelFocusRestoring>(
         focusRestorer: FocusRestorer = MacPromptPanelFocusRestorer(),
@@ -251,10 +249,6 @@ final class PromptPanelController: PromptPanelControlling {
             hide()
             return nil
         }
-        if AppScopedShortcutMatcher.matches(event, name: .showThreadWindow) {
-            onShowThreadWindow?()
-            return nil
-        }
         return event
     }
 
@@ -264,12 +258,3 @@ final class PromptPanelController: PromptPanelControlling {
         restoreFocusOwner(previousFocusOwner)
     }
 }
-
-#if DEBUG
-@MainActor
-extension PromptPanelController {
-    func handleKeyEventForTesting(_ event: NSEvent) -> NSEvent? {
-        handleKeyEvent(event)
-    }
-}
-#endif
