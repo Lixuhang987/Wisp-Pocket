@@ -1,5 +1,4 @@
 import XCTest
-import ObjectiveC
 import KeyboardShortcuts
 @testable import HandAgentDesktop
 
@@ -34,20 +33,36 @@ final class PromptPanelControllerTests: XCTestCase {
         XCTAssertEqual(viewModel.attachments, [])
     }
 
-    func testShowDoesNotActivateWholeApplication() {
-        guard let activationSpy = NSApplicationActivationSpy() else {
-            XCTFail("Unable to install NSApplication activation spy")
-            return
-        }
-        activationSpy.install()
-        defer { activationSpy.uninstall() }
-        let controller = PromptPanelController(focusRestorer: FakePromptPanelFocusRestorer())
+    func testShowActivatesApplicationWhenHostUsesAccessoryPolicy() {
+        var activationCount = 0
+        let controller = PromptPanelController(
+            focusRestorer: FakePromptPanelFocusRestorer(),
+            presentationMode: .hiddenForTesting,
+            hostActivationPolicy: { .accessory },
+            activateHostApplication: { activationCount += 1 }
+        )
         controller.configure(viewModel: PromptPanelViewModel(actions: []))
         defer { controller.hide() }
 
         controller.show()
 
-        XCTAssertEqual(activationSpy.activationCount, 0)
+        XCTAssertEqual(activationCount, 1)
+    }
+
+    func testShowDoesNotActivateWholeApplicationWhenHostIsRegular() {
+        var activationCount = 0
+        let controller = PromptPanelController(
+            focusRestorer: FakePromptPanelFocusRestorer(),
+            presentationMode: .hiddenForTesting,
+            hostActivationPolicy: { .regular },
+            activateHostApplication: { activationCount += 1 }
+        )
+        controller.configure(viewModel: PromptPanelViewModel(actions: []))
+        defer { controller.hide() }
+
+        controller.show()
+
+        XCTAssertEqual(activationCount, 0)
     }
 
     func testCaptureSelectionCoordinatorStillAppendsSelectionBeforeShowingPanel() async throws {
@@ -224,45 +239,6 @@ private func makeController(
         focusRestorer: focusRestorer,
         presentationMode: .hiddenForTesting
     )
-}
-
-@MainActor
-private final class NSApplicationActivationSpy {
-    private let original: Method
-    private let replacement: Method
-    private var isInstalled = false
-
-    var activationCount: Int { promptPanelApplicationActivationCount }
-
-    init?() {
-        guard
-            let original = class_getInstanceMethod(NSApplication.self, #selector(NSApplication.activate(ignoringOtherApps:))),
-            let replacement = class_getInstanceMethod(NSApplication.self, #selector(NSApplication.handAgentTest_activate(ignoringOtherApps:)))
-        else { return nil }
-        self.original = original
-        self.replacement = replacement
-    }
-
-    func install() {
-        guard !isInstalled else { return }
-        promptPanelApplicationActivationCount = 0
-        method_exchangeImplementations(original, replacement)
-        isInstalled = true
-    }
-
-    func uninstall() {
-        guard isInstalled else { return }
-        method_exchangeImplementations(original, replacement)
-        isInstalled = false
-    }
-}
-
-nonisolated(unsafe) private var promptPanelApplicationActivationCount = 0
-
-private extension NSApplication {
-    @objc func handAgentTest_activate(ignoringOtherApps flag: Bool) {
-        promptPanelApplicationActivationCount += 1
-    }
 }
 
 private final class FakeSelectionCaptureProvider: SelectionCaptureProvider, @unchecked Sendable {

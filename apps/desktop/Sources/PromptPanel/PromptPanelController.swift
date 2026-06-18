@@ -44,6 +44,8 @@ final class PromptPanelController: PromptPanelControlling {
     private let quickLookController = QuickLookPreviewController()
     private let captureFocusOwner: () -> Any?
     private let restoreFocusOwner: (Any) -> Void
+    private let hostActivationPolicy: () -> NSApplication.ActivationPolicy
+    private let activateHostApplication: () -> Void
     private let presentationMode: PromptPanelPresentationMode
     private var previousFocusOwner: Any?
 
@@ -54,7 +56,13 @@ final class PromptPanelController: PromptPanelControlling {
 
     init<FocusRestorer: PromptPanelFocusRestoring>(
         focusRestorer: FocusRestorer = MacPromptPanelFocusRestorer(),
-        presentationMode: PromptPanelPresentationMode = .visible
+        presentationMode: PromptPanelPresentationMode = .visible,
+        hostActivationPolicy: @escaping () -> NSApplication.ActivationPolicy = {
+            NSApp.activationPolicy()
+        },
+        activateHostApplication: @escaping () -> Void = {
+            NSApp.activate(ignoringOtherApps: true)
+        }
     ) {
         self.presentationMode = presentationMode
         captureFocusOwner = { focusRestorer.captureCurrentFocusOwner() }
@@ -62,6 +70,8 @@ final class PromptPanelController: PromptPanelControlling {
             guard let typedToken = token as? FocusRestorer.Token else { return }
             focusRestorer.restoreFocus(to: typedToken)
         }
+        self.hostActivationPolicy = hostActivationPolicy
+        self.activateHostApplication = activateHostApplication
     }
 
     func configure(viewModel: PromptPanelViewModel) {
@@ -127,6 +137,9 @@ final class PromptPanelController: PromptPanelControlling {
         }
         panel.center()
         panel.contentView?.layoutSubtreeIfNeeded()
+        if hostActivationPolicy() == .accessory {
+            activateHostApplication()
+        }
         guard presentationMode == .visible else {
             DispatchQueue.main.async { [weak self] in
                 self?.viewModel?.focusSeed += 1

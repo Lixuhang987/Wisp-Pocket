@@ -121,6 +121,19 @@
 - 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter PromptPanelAppearanceTests`、`bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：运行上述 Swift 测试和 `bash ./scripts/test.sh` 时观察桌面，确认没有 Swift PromptPanel 因自动化测试被拉到前台；正常启动桌面 App 后用全局快捷键仍能打开 PromptPanel。
 
+### PromptPanel 后台全局热键前台展示修复
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/PromptPanel/PromptPanelController.swift`、`apps/desktop/TestsSwift/PromptPanel/PromptPanelControllerTests.swift`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`
+- 修复结论：失败边界收敛在 `PromptPanelController.show()`。原实现对 `.nonactivatingPanel` 只做 `orderFrontRegardless()` / `makeKey()`，当 Swift 宿主仍是 `.accessory` 且其他 App 在前台时，PromptPanel 只会在进程内创建窗口，不会真正出现在用户前台。修复后，`show()` 统一负责所有后台进入 PromptPanel 的入口；当宿主仍是 `.accessory` 时先做最小宿主激活，再展示面板；宿主已经是 `.regular` 时不再额外激活整个 App，避免把 Settings 一起带到前台。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PromptPanelControllerTests`、`bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 用 packaged app 启动单实例 `HandAgentDesktop`，确认 `127.0.0.1:4317` 只由该实例的 agent-server 监听。
+  2. 保持 `QQ` 或其他第三方 App 为前台，触发真实 `showPromptPanel` 全局快捷键，确认 PromptPanel 真正出现在当前桌面前台。
+  3. 在未打开 Settings 的情况下，再次触发全局快捷键隐藏 PromptPanel，确认焦点回到唤起前的 App。
+  4. 先打开 Settings，再切到其他前台 App，触发真实 `showPromptPanel` 全局快捷键，确认前台只出现 PromptPanel，不把 Settings 一起带上来。
+  5. 在 PromptPanel 已经可见时，分别验证 Action 全局快捷键、`captureSelection`、`captureRegion` 三条入口仍能复用同一前台展示语义。
+
 ### Settings 深色主题分段控件文本颜色修复
 
 - 完成日期：待实机 QA

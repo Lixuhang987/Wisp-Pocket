@@ -55,6 +55,7 @@ PromptPanelGrowingTextView command
 - **View 只读 ViewModel**：不要让 View 直接调 `NSEvent` / `NSPanel` / `KeyboardShortcuts.*` API。
 - **ViewModel 不持有 SwiftUI 类型**：只暴露 plain Swift 状态与回调。
 - **Controller 是窗口管理 + 事件监听层**：不直接写 thread/turn 逻辑，跨模块意图通过 `onSubmit` / `onOpenSettings` 闭包出口给 Coordinator。
+- **后台热键展示语义**：`show()` 负责所有“后台宿主 -> PromptPanel”入口的前台展示，包括 `showPromptPanel`、用户主动 capture 和 Action 全局快捷键。宿主仍是 `.accessory` 时，Controller 必须先做最小宿主激活，再展示 `.nonactivatingPanel`；宿主已经是 `.regular` 时，不得再次激活整个 App，避免把 Settings 等无关窗口一起带到前台。
 - **PromptPanel 可见时也要消费 app-scoped ThreadWindow 快捷键**：`showThreadWindow` 不能只依赖 Coordinator 的 local monitor；当 PromptPanel 作为 `.nonactivatingPanel` 可见时，Controller 自己必须能识别同一份 shortcut 配置，并把意图通过 `onShowThreadWindow` 交回 Coordinator。
 - **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加上方 chip row 中的 skill chip 并显示 PromptPanel。
 - **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
@@ -63,7 +64,7 @@ PromptPanelGrowingTextView command
 - **server 不可用时不丢草稿**：`submissionDisabledMessage != nil` 时输入框禁用并显示提示，`submit()` 直接返回，不清空 `inputItems` / `attachments`。
 - **滚动条样式走 Shared**：PromptPanel 输入框内部 `NSScrollView` 与 action 列表 `ScrollView` 都复用 `Sources/Shared/OverlayScrollbar.swift`；不要在 `PromptPanelStyles.swift` 再维护一份局部滚动条实现。`OverlayScrollbar` 需要同时把 `NSScrollView` 和其 `contentView` 设为透明，并按 overlay 所在区域与各 `NSScrollView` 的几何重叠选择目标；对 SwiftUI `HostingScrollView` 还要在首次更新后做一次短延迟重试，覆盖系统 scroller 的后置装配。
 - **这次回归的教训**：PromptPanel 这类“输入框滚动区 + 列表滚动区”并存的界面，不能再用“找到第一个 scroll view”或“靠 sibling 顺序猜目标”的方式注入样式。白底既可能来自系统 `NSScroller`，也可能来自 `NSClipView`；只有同时验证“命中的是正确 scroll view、`contentView` 透明、最终 scroller 已替换”三件事，才算真正修好。
-- **测试**：`PromptPanelViewModelTests` 覆盖输入 item 数组、统一 chip 展示/删除/预览、skill-only 提交、过滤和附件；`PromptPanelInputCommandTests` 覆盖键盘命令解析；`OverlayScrollbarTests` 覆盖共享 overlay 滚动条的透明背景、palette、`contentView` 透明化和 PromptPanel 多滚动容器下的几何命中；`PromptPanelAppearanceTests` 覆盖真实渲染后的 action 列表 `HostingScrollView` 透明背景与 `OverlayScroller` 注入；`ActionDefinitionTests` / `ActionInvocationTests` / `ActionManifestStoreTests` 覆盖 manifest 与 skill item 构造。
+- **测试**：`PromptPanelViewModelTests` 覆盖输入 item 数组、统一 chip 展示/删除/预览、skill-only 提交、过滤和附件；`PromptPanelInputCommandTests` 覆盖键盘命令解析；`PromptPanelControllerTests` 额外覆盖 accessory/regular 宿主下的 PromptPanel 展示激活语义；`OverlayScrollbarTests` 覆盖共享 overlay 滚动条的透明背景、palette、`contentView` 透明化和 PromptPanel 多滚动容器下的几何命中；`PromptPanelAppearanceTests` 覆盖真实渲染后的 action 列表 `HostingScrollView` 透明背景与 `OverlayScroller` 注入；`ActionDefinitionTests` / `ActionInvocationTests` / `ActionManifestStoreTests` 覆盖 manifest 与 skill item 构造。
 
 ## 与其他模块的关系
 
