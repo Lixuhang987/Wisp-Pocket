@@ -72,24 +72,6 @@
   7. 用包含 `skill` item 的 initial prompt 或测试入口打开 React ThreadWindow，确认 Composer 的 chip 内嵌在输入框内，删除 chip 不影响后续输入，提交 payload 中包含 `skill` 与唯一 `text` item。
   8. 运行中出现 queued composer 面板时，确认 `user_input` 预览仍按 skill title 与 text 组合显示；若 `interrupt` op 进入同一预览路径，应显示 `停止当前运行`，不要求存在 `UserInput.items`。
 
-### ThreadWindow Radix UI 弹出层迁移
-
-- 完成日期：待实机 QA
-- 实现位置：`apps/thread-window-web/src/components/Composer.tsx`、`apps/thread-window-web/src/App.tsx`、`apps/thread-window-web/tests/composerInputItems.test.ts`、`apps/thread-window-web/thread-window-web.md`、`docs/dependency-audit.md`
-- 修复结论：Composer slash 菜单从手写 `absolute bottom-full` 定位迁移到 `@radix-ui/react-popover`（Portal 渲染、碰撞检测、focus 管理），修复了被所有祖先 `overflow: hidden` 裁剪的 bug。新增 `ArrowUp`/`ArrowDown` 候选列表导航和 `Escape` 清除文本关闭菜单，`Tab` 选择当前高亮 skill 并保持焦点在 textarea。App 删除确认对话框从手写 modal overlay 迁移到 `@radix-ui/react-alert-dialog`（Portal 渲染、focus trap、scroll lock、Escape 关闭）。
-- 自动化验证：需执行 `pnpm --filter handagent-thread-window-web exec vitest run tests/composerInputItems.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
-- 手工回归步骤：
-  1. 打开 Electron ThreadWindow，在 Composer 输入框输入 `/`，确认 popover 在输入框上方显示且不被裁剪（bug 修复验证）。
-  2. 输入过滤词后按 `ArrowDown`，确认高亮移到第二个候选；按 `ArrowUp` 回到第一个。
-  3. 按 `Tab` 确认选中当前高亮 skill（而非始终第一个），textarea 清空且焦点仍在输入框。
-  4. 输入 `/` 后按 `Escape`，确认文本被清除、popover 消失。
-  5. 点击 popover 外部区域，确认文本被清除、popover 消失。
-  6. 缩小窗口高度使 popover 上方空间不足，确认 popover 自动翻转到输入框下方（碰撞检测）。
-  7. 点击历史侧栏某个 thread 的删除按钮，确认删除确认对话框居中显示在全视口上方。
-  8. 按 `Escape` 确认对话框关闭，thread 未被删除。
-  9. 点击"取消"确认对话框关闭，thread 未被删除。
-  10. 再次点击删除按钮，点击"删除"确认 thread 被删除且对话框关闭。
-
 ### 启动期系统主题解析安全
 
 - 完成日期：待实机 QA
