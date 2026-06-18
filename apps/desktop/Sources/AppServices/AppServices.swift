@@ -117,6 +117,7 @@ final class AppServices {
         self.agentTriggerCommandClient = runtime?.agentTriggerCommandClient
         self.settingsStore = settingsStore
         self.agentTriggerStore = agentTriggerStore
+        self.agentTriggerStore.ensureBuiltinPackagesInstalled()
         self.agentTriggerRuntime = agentTriggerRuntime ?? AgentTriggerRuntime(
             registry: AgentTriggerRegistry(factories: [
                 ChromeBookmarksAgentTriggerProviderFactory(),

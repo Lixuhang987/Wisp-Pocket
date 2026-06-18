@@ -101,4 +101,67 @@ final class AgentTriggerStore {
             return false
         }
     }
+
+    @discardableResult
+    func deleteInstance(id: String) -> Bool {
+        let remaining = loadInstances().filter { $0.id != id }
+        return saveInstances(remaining)
+    }
+
+    @discardableResult
+    func ensureBuiltinPackagesInstalled() -> [String] {
+        let installedIds = Set(listInstalledPackages().map(\.id))
+        var written: [String] = []
+        for manifest in Self.builtinPackages where !installedIds.contains(manifest.id) {
+            if installPackage(manifest) {
+                written.append(manifest.id)
+            }
+        }
+        return written
+    }
+
+    static let builtinPackages: [AgentTriggerPackageManifest] = [
+        AgentTriggerPackageManifest(
+            version: 1,
+            id: "chrome-bookmarks",
+            title: "Chrome Bookmarks",
+            description: "监听指定书签文件夹新增的书签。",
+            providerKind: "chrome.bookmarks",
+            configSchema: AgentTriggerConfigSchema(fields: [
+                AgentTriggerConfigField(
+                    id: "folderIds",
+                    title: "Folders",
+                    kind: .stringList,
+                    required: true
+                )
+            ]),
+            defaultPromptTemplate: "Summarize the bookmarked page.",
+            defaultDeliveryPolicy: .default,
+            defaultNotificationPolicy: .default
+        ),
+        AgentTriggerPackageManifest(
+            version: 1,
+            id: "system-clock",
+            title: "System Clock",
+            description: "在本机时间到达指定时刻时触发任务。",
+            providerKind: "system.clock",
+            configSchema: AgentTriggerConfigSchema(fields: [
+                AgentTriggerConfigField(
+                    id: "scheduleAt",
+                    title: "Schedule",
+                    kind: .timeList,
+                    required: true
+                ),
+                AgentTriggerConfigField(
+                    id: "timezone",
+                    title: "Timezone",
+                    kind: .timezone,
+                    required: true
+                )
+            ]),
+            defaultPromptTemplate: "Run the scheduled task.",
+            defaultDeliveryPolicy: .default,
+            defaultNotificationPolicy: .default
+        )
+    ]
 }

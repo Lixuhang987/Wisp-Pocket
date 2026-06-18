@@ -13,6 +13,7 @@ final class AgentTriggerSettingsViewModel {
     private(set) var installedPackages: [AgentTriggerPackageEntry] = []
     private(set) var instances: [AgentTriggerInstance] = []
     private(set) var saveErrorMessage: String?
+    private(set) var selectedPackageId: String?
 
     @ObservationIgnored private let store: AgentTriggerStore
     @ObservationIgnored private let runtime: (any AgentTriggerRuntimeReloading)?
@@ -37,20 +38,36 @@ final class AgentTriggerSettingsViewModel {
         }
         instances = store.loadInstances()
         saveErrorMessage = store.saveErrorMessage
+        if let selected = selectedPackageId,
+           !installedPackages.contains(where: { $0.id == selected }) {
+            selectedPackageId = nil
+        }
     }
 
-    func installBuiltins() {
-        _ = store.installPackage(Self.chromeBookmarksManifest)
-        _ = store.installPackage(Self.systemClockManifest)
-        reload()
+    func selectPackage(id: String) {
+        guard installedPackages.contains(where: { $0.id == id }) else { return }
+        selectedPackageId = id
+        saveErrorMessage = nil
+    }
+
+    func clearSelection() {
+        selectedPackageId = nil
+        saveErrorMessage = nil
+    }
+
+    func instances(forPackageId id: String) -> [AgentTriggerInstance] {
+        instances.filter { $0.packageId == id }
     }
 
     @discardableResult
-    func createInstance(
-        packageId: String,
+    func createInstanceForCurrentPackage(
         title: String,
         config: [String: AgentTriggerConfigValue]
     ) -> Bool {
+        guard let packageId = selectedPackageId else {
+            saveErrorMessage = "未选中触发器"
+            return false
+        }
         guard let manifest = store.listInstalledPackages().first(where: { $0.id == packageId }) else {
             saveErrorMessage = "未找到 AgentTrigger 包"
             return false
@@ -80,47 +97,19 @@ final class AgentTriggerSettingsViewModel {
         return didSave
     }
 
-    private static let chromeBookmarksManifest = AgentTriggerPackageManifest(
-        version: 1,
-        id: "chrome-bookmarks",
-        title: "Chrome Bookmarks",
-        description: "监听指定书签文件夹新增的书签。",
-        providerKind: "chrome.bookmarks",
-        configSchema: AgentTriggerConfigSchema(fields: [
-            AgentTriggerConfigField(
-                id: "folderIds",
-                title: "Folders",
-                kind: .stringList,
-                required: true
-            )
-        ]),
-        defaultPromptTemplate: "Summarize the bookmarked page.",
-        defaultDeliveryPolicy: .default,
-        defaultNotificationPolicy: .default
-    )
+    @discardableResult
+    func deleteInstance(id: String) -> Bool {
+        let didDelete = store.deleteInstance(id: id)
+        if didDelete {
+            try? runtime?.reload()
+        }
+        reload()
+        return didDelete
+    }
 
-    private static let systemClockManifest = AgentTriggerPackageManifest(
-        version: 1,
-        id: "system-clock",
-        title: "System Clock",
-        description: "在本机时间到达指定时刻时触发任务。",
-        providerKind: "system.clock",
-        configSchema: AgentTriggerConfigSchema(fields: [
-            AgentTriggerConfigField(
-                id: "scheduleAt",
-                title: "Schedule",
-                kind: .timeList,
-                required: true
-            ),
-            AgentTriggerConfigField(
-                id: "timezone",
-                title: "Timezone",
-                kind: .timezone,
-                required: true
-            )
-        ]),
-        defaultPromptTemplate: "Run the scheduled task.",
-        defaultDeliveryPolicy: .default,
-        defaultNotificationPolicy: .default
-    )
+    func restoreBuiltinPackages() {
+        store.ensureBuiltinPackagesInstalled()
+        try? runtime?.reload()
+        reload()
+    }
 }

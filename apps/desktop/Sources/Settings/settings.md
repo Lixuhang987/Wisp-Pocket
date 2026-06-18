@@ -10,7 +10,7 @@
 | `AgentSettingsViewModel.swift` | `@Observable` 代理：把 `AgentSettingsStore.settings` 包装成可双向绑定的属性 |
 | `AppearanceSettingsViewModel.swift` / `AppearanceSettingsView.swift` | 外观主题偏好 UI 与写入 |
 | `ToolSettingsViewModel.swift` / `ToolSettingsView.swift` | builtin tool 列表与启用/禁用 |
-| `AgentTriggerSettingsViewModel.swift` / `AgentTriggerSettingsView.swift` | 管理 AgentTrigger package 与实例；首版内置 `chrome.bookmarks`、`system.clock` 两种 provider，并为每个实例单独保存动态参数、prompt 模板与通知策略 |
+| `AgentTriggerSettingsViewModel.swift` / `AgentTriggerSettingsView.swift` | 两级触发器设置：一级展示已安装 package 卡片 + 恢复内置触发器入口，二级按 `providerKind` 渲染表单管理"自动化"（`AgentTriggerInstance`）。内置 manifest 与 `ensureBuiltinPackagesInstalled` 由 `AgentTriggerStore` 提供，启动期由 `AppServices` 在 runtime reload 之前调用以确保首次启动直接可见 |
 | `AppendPromptSettingsViewModel.swift` / `AppendPromptSettingsView.swift` | 管理 Append Prompt manifest；写入 `~/.spotAgent/plugins/append-prompts/plugin.json`，prompt 不包含参数字段 |
 | `MCPSettingsViewModel.swift` / `MCPSettingsView.swift` | 直接读写 `~/.spotAgent/mcp.json` 的 stdio / streamableHttp server 列表 |
 | `PermissionRulesViewModel.swift` / `PermissionRulesView.swift` | 直接读写 `~/.spotAgent/permissions.json`，展示永久规则并支持撤销 |

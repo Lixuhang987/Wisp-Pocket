@@ -3,24 +3,15 @@ import SwiftUI
 struct AgentTriggerSettingsView: View {
     @Bindable var viewModel: AgentTriggerSettingsViewModel
     @Environment(\.appTheme) private var theme
-    @State private var isAdding = false
-    @State private var selectedPackageId = "chrome-bookmarks"
-    @State private var title = ""
-    @State private var folderIds = ""
-    @State private var scheduleAt = ""
-    @State private var timezone = "Asia/Shanghai"
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                packagesSection
-                SettingsSectionSeparator()
-                instancesSection
-                SettingsSectionSeparator()
-                addButton
-                if isAdding {
-                    SettingsSectionSeparator()
-                    createForm
+                if let packageId = viewModel.selectedPackageId,
+                   let package = viewModel.installedPackages.first(where: { $0.id == packageId }) {
+                    PackageDetailView(viewModel: viewModel, package: package)
+                } else {
+                    PackageListView(viewModel: viewModel)
                 }
                 if let error = viewModel.saveErrorMessage {
                     SettingsSection {
@@ -34,10 +25,15 @@ struct AgentTriggerSettingsView: View {
         }
         .overlayScrollbar()
     }
+}
 
-    private var packagesSection: some View {
+private struct PackageListView: View {
+    @Bindable var viewModel: AgentTriggerSettingsViewModel
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
         Group {
-            SettingsSectionHeader("已安装 Trigger")
+            SettingsSectionHeader("已安装的触发器")
             SettingsSection {
                 if viewModel.installedPackages.isEmpty {
                     Text("当前没有安装的 AgentTrigger")
@@ -46,82 +42,187 @@ struct AgentTriggerSettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     ForEach(viewModel.installedPackages) { package in
-                        HStack(alignment: .top, spacing: theme.spacing.md) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(package.title)
-                                    .font(theme.typography.bodyFont.weight(.semibold))
-                                    .foregroundStyle(theme.colors.ink)
-                                Text(package.providerKind)
-                                    .font(theme.typography.captionFont.monospaced())
-                                    .foregroundStyle(theme.colors.textSecondary)
-                                if !package.description.isEmpty {
-                                    Text(package.description)
-                                        .font(theme.typography.captionFont)
-                                        .foregroundStyle(theme.colors.textSecondary)
-                                }
-                            }
-                            Spacer()
-                        }
-                        if package.id != viewModel.installedPackages.last?.id {
+                        if package.id != viewModel.installedPackages.first?.id {
                             SettingsRowDivider()
                         }
+                        Button {
+                            viewModel.selectPackage(id: package.id)
+                        } label: {
+                            packageRow(package: package)
+                        }
+                        .buttonStyle(.plain)
                     }
+                }
+            }
+            SettingsSection {
+                HStack {
+                    Spacer()
+                    Button {
+                        viewModel.restoreBuiltinPackages()
+                    } label: {
+                        Label("恢复内置触发器", systemImage: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(canRestore ? theme.colors.accent : theme.colors.textSecondary)
+                    .disabled(!canRestore)
                 }
             }
         }
     }
 
-    private var instancesSection: some View {
+    private var canRestore: Bool {
+        let installedIds = Set(viewModel.installedPackages.map(\.id))
+        return !AgentTriggerStore.builtinPackages
+            .map(\.id)
+            .allSatisfy { installedIds.contains($0) }
+    }
+
+    private func packageRow(package: AgentTriggerPackageEntry) -> some View {
+        let automationCount = viewModel.instances(forPackageId: package.id).count
+        return HStack(alignment: .center, spacing: theme.spacing.md) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(package.title)
+                    .font(theme.typography.bodyFont.weight(.semibold))
+                    .foregroundStyle(theme.colors.ink)
+                Text(package.providerKind)
+                    .font(theme.typography.captionFont.monospaced())
+                    .foregroundStyle(theme.colors.textSecondary)
+                if !package.description.isEmpty {
+                    Text(package.description)
+                        .font(theme.typography.captionFont)
+                        .foregroundStyle(theme.colors.textSecondary)
+                }
+                Text(automationCount == 0 ? "暂无自动化" : "\(automationCount) 条自动化")
+                    .font(theme.typography.captionFont)
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.colors.textSecondary)
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+private struct PackageDetailView: View {
+    @Bindable var viewModel: AgentTriggerSettingsViewModel
+    let package: AgentTriggerPackageEntry
+    @Environment(\.appTheme) private var theme
+    @State private var isAdding = false
+    @State private var title = ""
+    @State private var folderIds = ""
+    @State private var scheduleAt = ""
+    @State private var timezone = "Asia/Shanghai"
+
+    var body: some View {
+        VStack(spacing: 0) {
+            backRow
+            packageHeader
+            SettingsSectionSeparator()
+            automationsSection
+            SettingsSectionSeparator()
+            addToggle
+            if isAdding {
+                SettingsSectionSeparator()
+                createForm
+            }
+        }
+        .onChange(of: viewModel.selectedPackageId) { _, _ in
+            resetForm()
+        }
+    }
+
+    private var backRow: some View {
+        SettingsSection {
+            Button {
+                viewModel.clearSelection()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("返回")
+                }
+                .foregroundStyle(theme.colors.accent)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var packageHeader: some View {
+        SettingsSection {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(package.title)
+                    .font(theme.typography.titleFont.weight(.semibold))
+                    .foregroundStyle(theme.colors.ink)
+                Text(package.providerKind)
+                    .font(theme.typography.captionFont.monospaced())
+                    .foregroundStyle(theme.colors.textSecondary)
+                if !package.description.isEmpty {
+                    Text(package.description)
+                        .font(theme.typography.captionFont)
+                        .foregroundStyle(theme.colors.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var automationsSection: some View {
         Group {
-            SettingsSectionHeader("实例")
+            SettingsSectionHeader("自动化")
             SettingsSection {
-                if viewModel.instances.isEmpty {
-                    Text("当前没有 AgentTrigger 实例")
+                let automations = viewModel.instances(forPackageId: package.id)
+                if automations.isEmpty {
+                    Text("暂无自动化")
                         .font(theme.typography.captionFont)
                         .foregroundStyle(theme.colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    ForEach(viewModel.instances) { instance in
-                        HStack(alignment: .top, spacing: theme.spacing.md) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(instance.title)
-                                    .font(theme.typography.bodyFont.weight(.semibold))
-                                    .foregroundStyle(theme.colors.ink)
-                                Text(instance.packageId)
-                                    .font(theme.typography.captionFont.monospaced())
-                                    .foregroundStyle(theme.colors.textSecondary)
-                                Text(configSummary(instance))
-                                    .font(theme.typography.captionFont)
-                                    .foregroundStyle(theme.colors.textSecondary)
-                            }
-                            Spacer()
-                        }
-                        if instance.id != viewModel.instances.last?.id {
+                    ForEach(automations) { instance in
+                        if instance.id != automations.first?.id {
                             SettingsRowDivider()
                         }
+                        automationRow(instance)
                     }
                 }
             }
         }
     }
 
-    private var addButton: some View {
+    private func automationRow(_ instance: AgentTriggerInstance) -> some View {
+        HStack(alignment: .top, spacing: theme.spacing.md) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(instance.title)
+                    .font(theme.typography.bodyFont.weight(.semibold))
+                    .foregroundStyle(theme.colors.ink)
+                Text(configSummary(instance))
+                    .font(theme.typography.captionFont)
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+            Spacer()
+            Button {
+                _ = viewModel.deleteInstance(id: instance.id)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(theme.colors.error)
+        }
+        .padding(.vertical, theme.spacing.xs)
+    }
+
+    private var addToggle: some View {
         SettingsSection {
             HStack {
-                Button {
-                    viewModel.installBuiltins()
-                } label: {
-                    Label("安装内置 Trigger", systemImage: "square.and.arrow.down")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.textSecondary)
-
                 Spacer()
-
                 Button {
                     isAdding.toggle()
+                    if !isAdding {
+                        resetForm()
+                    }
                 } label: {
-                    Label(isAdding ? "收起" : "新增实例", systemImage: isAdding ? "chevron.up" : "plus")
+                    Label(isAdding ? "收起" : "新增自动化", systemImage: isAdding ? "chevron.up" : "plus")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(theme.colors.accent)
@@ -131,76 +232,79 @@ struct AgentTriggerSettingsView: View {
 
     private var createForm: some View {
         VStack(spacing: 0) {
-            SettingsSectionHeader("新增 AgentTrigger 实例")
+            SettingsSectionHeader("新增自动化")
             SettingsSection {
-                SettingsRow("类型") {
-                    Picker("", selection: $selectedPackageId) {
-                        ForEach(viewModel.installedPackages) { package in
-                            Text(package.title).tag(package.id)
+                if hasFormFields {
+                    SettingsRow("标题") {
+                        TextField("My Automation", text: $title)
+                            .textFieldStyle(SettingsFieldStyle())
+                    }
+                    if package.providerKind == "chrome.bookmarks" {
+                        SettingsRowDivider()
+                        SettingsRow("Folders") {
+                            TextField("folder-a,folder-b", text: $folderIds)
+                                .textFieldStyle(SettingsFieldStyle())
                         }
                     }
-                    .pickerStyle(.menu)
-                }
-                SettingsRowDivider()
-                SettingsRow("标题") {
-                    TextField("My Trigger", text: $title)
-                        .textFieldStyle(SettingsFieldStyle())
-                }
-                if selectedPackageId == "chrome-bookmarks" {
-                    SettingsRowDivider()
-                    SettingsRow("Folders") {
-                        TextField("folder-a,folder-b", text: $folderIds)
-                            .textFieldStyle(SettingsFieldStyle())
-                    }
-                }
-                if selectedPackageId == "system-clock" {
-                    SettingsRowDivider()
-                    SettingsRow("时间点") {
-                        TextField("09:00,21:00", text: $scheduleAt)
-                            .textFieldStyle(SettingsFieldStyle())
+                    if package.providerKind == "system.clock" {
+                        SettingsRowDivider()
+                        SettingsRow("时间点") {
+                            TextField("09:00,21:00", text: $scheduleAt)
+                                .textFieldStyle(SettingsFieldStyle())
+                        }
+                        SettingsRowDivider()
+                        SettingsRow("时区") {
+                            TextField("Asia/Shanghai", text: $timezone)
+                                .textFieldStyle(SettingsFieldStyle())
+                        }
                     }
                     SettingsRowDivider()
-                    SettingsRow("时区") {
-                        TextField("Asia/Shanghai", text: $timezone)
-                            .textFieldStyle(SettingsFieldStyle())
-                    }
-                }
-                SettingsRowDivider()
-                HStack {
-                    Button("取消") {
-                        resetForm()
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(theme.colors.textSecondary)
-
-                    Spacer()
-
-                    Button("保存") {
-                        let didCreate = viewModel.createInstance(
-                            packageId: selectedPackageId,
-                            title: title,
-                            config: currentConfig()
-                        )
-                        if didCreate {
+                    HStack {
+                        Button("取消") {
+                            isAdding = false
                             resetForm()
                         }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(theme.colors.textSecondary)
+
+                        Spacer()
+
+                        Button("保存") {
+                            let didCreate = viewModel.createInstanceForCurrentPackage(
+                                title: title,
+                                config: currentConfig()
+                            )
+                            if didCreate {
+                                isAdding = false
+                                resetForm()
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(theme.colors.accent)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(theme.colors.accent)
+                } else {
+                    Text("暂不支持自定义参数")
+                        .font(theme.typography.captionFont)
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
     }
 
+    private var hasFormFields: Bool {
+        package.providerKind == "chrome.bookmarks" || package.providerKind == "system.clock"
+    }
+
     private func currentConfig() -> [String: AgentTriggerConfigValue] {
-        switch selectedPackageId {
-        case "chrome-bookmarks":
+        switch package.providerKind {
+        case "chrome.bookmarks":
             let ids = folderIds
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
             return ["folderIds": .stringList(ids)]
-        case "system-clock":
+        case "system.clock":
             let schedule = scheduleAt
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -229,8 +333,6 @@ struct AgentTriggerSettingsView: View {
     }
 
     private func resetForm() {
-        isAdding = false
-        selectedPackageId = "chrome-bookmarks"
         title = ""
         folderIds = ""
         scheduleAt = ""
