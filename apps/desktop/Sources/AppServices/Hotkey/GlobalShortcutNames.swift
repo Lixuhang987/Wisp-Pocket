@@ -11,6 +11,6 @@ extension KeyboardShortcuts.Name {
 
     static let showThreadWindow = Self(
         "showThreadWindow",
-        default: .init(.h, modifiers: [.command])
+        default: .init(.l, modifiers: [.command])
     )
 }

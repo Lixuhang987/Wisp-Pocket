@@ -144,9 +144,6 @@ final class AppCoordinator {
         promptPanelController.onDidHide = { [weak self] in
             self?.handlePromptPanelHidden()
         }
-        promptPanelController.onShowThreadWindow = { [weak self] in
-            self?.send(.openHistory)
-        }
     }
 
     private func setupAppearanceTheme() {
