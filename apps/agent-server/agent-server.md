@@ -2,12 +2,13 @@
 
 `apps/agent-server` 是 desktop 派生的本地 Node 服务。它只做本地 bridge、路由、持久化封装和 runtime 驱动：不渲染 ThreadWindow UI，不实现 macOS 原生能力，也不在本包定义跨进程 DTO。
 
-同一端口 `127.0.0.1:4317` 暴露四类入口：
+同一端口 `127.0.0.1:4317` 暴露五类入口：
 
 | 入口 | 消费方 | 消息边界 |
 |------|------|------|
 | `ws://127.0.0.1:4317/api/thread` | React ThreadWindow | 接收 `ThreadCommand` / `ClientResponse`，发送 `ThreadNotification` / `ServerRequest` |
 | `ws://127.0.0.1:4317/api/activity` | Electron StatusBubble；后续桌宠 | 只发送 `AgentActivityEvent`，连接后先发 `activity.snapshot`，状态变化时发 `activity.changed` |
+| `ws://127.0.0.1:4317/api/agent-trigger/attention` | Electron main | 只发送后台 AgentTrigger 的宿主级 attention 事件；命中权限、工作区选择或失败时触发 |
 | `ws://127.0.0.1:4317/api/platform` | Swift desktop | 只承载 `PlatformBridgeMessage`，用于 core platform tool 反向请求 desktop |
 | `http://127.0.0.1:4317/thread-window/*` | Electron ThreadWindow `BrowserWindow` | 返回 React 静态资源，不参与 thread 协议 |
 
@@ -37,8 +38,8 @@ node --experimental-transform-types --experimental-specifier-resolution=node app
 5. 通过 `SettingsBackedLLMClient` 或 `MockLLMClient` 选择 LLM 模式。
 6. 按 thread 缓存 `AgentRuntime`，注入 thread 级 tool registry、permission policy、blob store 和 turn summarizer；mock 模式使用 `MockLLMClient` 且不启用 summarizer。
 7. 创建 `AgentManager` 作为持久 Agent owner；每个 Agent 暴露 `tx_sub`、`rx_event`、`agent_status`、`session`，并在内部复用 `ThreadRuntimeOrchestrator` 执行 ReAct turn。
-8. 创建 `AgentActivityPublisher`、`ThreadPersistence`、`ThreadNotificationPublisher`、`ThreadCommandRouter`。
-9. 启动同端口 HTTP + WebSocket 服务：`/api/thread` 挂载 thread command/response handler，`/api/activity` 挂载 activity subscriber handler，`/api/platform` 挂载 platform bridge handler，`/thread-window/*` 提供 React 静态资源，未知 path 直接关闭或返回 404。
+8. 创建 `AgentActivityPublisher`、`AgentTriggerAttentionPublisher`、`ThreadPersistence`、`ThreadNotificationPublisher`、`ThreadCommandRouter`、`AgentTriggerLaunchService`。
+9. 启动同端口 HTTP + WebSocket 服务：`/api/thread` 挂载 thread command/response handler，`/api/activity` 挂载 activity subscriber handler，`/api/agent-trigger/attention` 挂载后台 trigger attention subscriber，`/api/platform` 挂载 platform bridge handler，`/thread-window/*` 提供 React 静态资源，`POST /api/agent-trigger/fire` 作为后台启动入口，未知 path 直接关闭或返回 404。
 
 ## 主消息流
 

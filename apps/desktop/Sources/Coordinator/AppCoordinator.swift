@@ -12,6 +12,7 @@ final class AppCoordinator {
         case submitPrompt([PromptPanelComposerItem], attachments: [PromptAttachmentResult])
         case openSettings
         case openHistory
+        case handleAgentTriggerAttention(AgentTriggerAttention)
         case settingsWindowClosed
         case threadWindowClosed
     }
@@ -94,6 +95,8 @@ final class AppCoordinator {
             handleOpenSettings()
         case .openHistory:
             handleOpenHistory()
+        case .handleAgentTriggerAttention(let attention):
+            handleAgentTriggerAttention(attention)
         case .settingsWindowClosed:
             settingsLifecycle.handleClosed()
         case .threadWindowClosed:
@@ -111,6 +114,13 @@ final class AppCoordinator {
 
     func makeToolSettingsViewModel() -> ToolSettingsViewModel {
         ToolSettingsViewModel(store: services.settingsStore)
+    }
+
+    func makeAgentTriggerSettingsViewModel() -> AgentTriggerSettingsViewModel {
+        AgentTriggerSettingsViewModel(
+            store: services.agentTriggerStore,
+            runtime: services.agentTriggerRuntime
+        )
     }
 
     func makeAppendPromptSettingsViewModel() -> AppendPromptSettingsViewModel {
@@ -154,6 +164,19 @@ final class AppCoordinator {
         services.appServer.onHostTerminationRequest = { [weak self] in
             guard let self else { return }
             self.services.terminateApplication()
+        }
+        services.agentTriggerCommandClient?.onAgentTriggerAttention = { [weak self] result in
+            guard let self else { return }
+            self.send(
+                .handleAgentTriggerAttention(
+                    AgentTriggerAttention(
+                        threadId: result.threadId,
+                        triggerInstanceId: result.triggerInstanceId,
+                        reason: result.reason,
+                        message: result.message
+                    )
+                )
+            )
         }
         agentServerHealth.onAvailabilityChange = { [weak self] available, message in
             guard let self else { return }
@@ -234,6 +257,7 @@ final class AppCoordinator {
             settingsViewModel: makeSettingsViewModel(),
             appearanceViewModel: makeAppearanceSettingsViewModel(),
             toolSettingsViewModel: makeToolSettingsViewModel(),
+            agentTriggerSettingsViewModel: makeAgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: makeAppendPromptSettingsViewModel(),
             mcpSettingsViewModel: makeMCPSettingsViewModel(),
             permissionRulesViewModel: makePermissionRulesViewModel(),
@@ -276,6 +300,44 @@ final class AppCoordinator {
         guard isThreadWindowCountedInActivationPolicy else { return }
         isThreadWindowCountedInActivationPolicy = false
         services.setActivationPolicy(activationPolicy.policyAfterUpdatingOpenThreadWindows(by: -1))
+    }
+
+    private func handleAgentTriggerAttention(_ attention: AgentTriggerAttention) {
+        let title: String
+        switch attention.reason {
+        case .permission:
+            title = "后台 Trigger 需要权限确认"
+        case .workspace:
+            title = "后台 Trigger 需要选择工作区"
+        case .failure:
+            title = "后台 Trigger 运行失败"
+        }
+
+        services.fatalAlertPresenter.showAgentTriggerAttention(
+            title: title,
+            message: attention.message,
+            primaryButtonTitle: "忽略",
+            secondaryButtonTitle: "查看 Thread",
+            onSecondary: { [weak self] in
+                guard let self else { return }
+                self.promptPanelController.hide(restoringFocus: false)
+                if self.threadWindowLifecycle.focus(threadID: attention.threadId, onFailure: {}) {
+                    self.handleThreadWindowOpened()
+                    return
+                }
+                self.threadWindowLifecycle.openOrFocusHistory(
+                    onOpened: { [weak self] in
+                        guard let self else { return }
+                        self.handleThreadWindowOpened()
+                        _ = self.threadWindowLifecycle.focus(threadID: attention.threadId, onFailure: {})
+                    },
+                    onFailed: { _ in },
+                    onClosed: { [weak self] in
+                        self?.send(.threadWindowClosed)
+                    }
+                )
+            }
+        )
     }
 
     private func refreshActionDefinitions() {

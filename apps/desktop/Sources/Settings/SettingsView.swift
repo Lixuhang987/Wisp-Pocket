@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Bindable var settingsViewModel: AgentSettingsViewModel
     @Bindable var appearanceViewModel: AppearanceSettingsViewModel
     @Bindable var toolSettingsViewModel: ToolSettingsViewModel
+    @Bindable var agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel
     @Bindable var appendPromptSettingsViewModel: AppendPromptSettingsViewModel
     @Bindable var mcpSettingsViewModel: MCPSettingsViewModel
     @Bindable var permissionRulesViewModel: PermissionRulesViewModel
@@ -31,6 +32,8 @@ struct SettingsView: View {
             AppearanceSettingsView(viewModel: appearanceViewModel)
         case .tools:
             ToolSettingsView(viewModel: toolSettingsViewModel)
+        case .agentTriggers:
+            AgentTriggerSettingsView(viewModel: agentTriggerSettingsViewModel)
         case .appendPrompts:
             AppendPromptSettingsView(viewModel: appendPromptSettingsViewModel)
         case .mcp:

@@ -1,15 +1,16 @@
 # Settings 模块
 
-设置窗口的容器与各 Tab 视图。当前八个 Tab：模型配置、外观主题、builtin 工具管理、Append Prompt 管理、MCP 管理、权限规则管理、快捷键配置、工作区管理。窗口本身由 Coordinator 用 `NSWindow + NSHostingController` 管理。
+设置窗口的容器与各 Tab 视图。当前九个 Tab：模型配置、外观主题、builtin 工具管理、AgentTrigger 管理、Append Prompt 管理、MCP 管理、权限规则管理、快捷键配置、工作区管理。窗口本身由 Coordinator 用 `NSWindow + NSHostingController` 管理。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `SettingsView.swift` | 设置容器，挂"模型" / "外观" / "工具" / "追加" / "MCP" / "权限" / "快捷键" / "工作区"八个 Tab |
+| `SettingsView.swift` | 设置容器，挂"模型" / "外观" / "工具" / "AgentTrigger" / "追加" / "MCP" / "权限" / "快捷键" / "工作区"九个 Tab |
 | `AgentSettingsViewModel.swift` | `@Observable` 代理：把 `AgentSettingsStore.settings` 包装成可双向绑定的属性 |
 | `AppearanceSettingsViewModel.swift` / `AppearanceSettingsView.swift` | 外观主题偏好 UI 与写入 |
 | `ToolSettingsViewModel.swift` / `ToolSettingsView.swift` | builtin tool 列表与启用/禁用 |
+| `AgentTriggerSettingsViewModel.swift` / `AgentTriggerSettingsView.swift` | 管理 AgentTrigger package 与实例；首版内置 `chrome.bookmarks`、`system.clock` 两种 provider，并为每个实例单独保存动态参数、prompt 模板与通知策略 |
 | `AppendPromptSettingsViewModel.swift` / `AppendPromptSettingsView.swift` | 管理 Append Prompt manifest；写入 `~/.spotAgent/plugins/append-prompts/plugin.json`，prompt 不包含参数字段 |
 | `MCPSettingsViewModel.swift` / `MCPSettingsView.swift` | 直接读写 `~/.spotAgent/mcp.json` 的 stdio / streamableHttp server 列表 |
 | `PermissionRulesViewModel.swift` / `PermissionRulesView.swift` | 直接读写 `~/.spotAgent/permissions.json`，展示永久规则并支持撤销 |
@@ -29,6 +30,7 @@ Coordinator.send(.openSettings)
             ├─ AgentSettingsView        → ~/.spotAgent/settings.json
             ├─ AppearanceSettingsView   → settings.json + theme.changed
             ├─ ToolSettingsView         → settings.json tools
+            ├─ AgentTriggerSettingsView → ~/.spotAgent/agent-triggers/*
             ├─ AppendPromptSettingsView → ~/.spotAgent/plugins/append-prompts/plugin.json
             ├─ MCPSettingsView          → ~/.spotAgent/mcp.json
             ├─ PermissionRulesView      → ~/.spotAgent/permissions.json
@@ -41,6 +43,7 @@ Append Prompt 只定义 prompt action 的 trigger/title/description/template/glo
 ## 编辑此目录的约束
 
 - **ViewModel 是配置文件代理层**：模型和 builtin tool 通过 `AgentSettingsStore` 代理；Append Prompt / MCP / 权限 / Workspace 直接代理各自共享 JSON 文件。
+- **AgentTrigger 独立于现有手动 trigger**：Settings 里的 AgentTrigger 页只服务后台自动触发能力，不复用 Append Prompt 的 package 目录、配置语义或提交流程。
 - **写入时统一 trim**：所有字符串字段在 setter 或创建入口中 trim。
 - **不要把 store 直接传给 View**：始终经过 ViewModel。
 - **Tab 增加规则**：新建 Tab 先在 `SettingsTab` enum 增 case、标题和图标，再在 `SettingsView.tabContent` 接入内容。

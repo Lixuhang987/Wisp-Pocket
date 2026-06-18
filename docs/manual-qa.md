@@ -17,6 +17,20 @@
 
 ## 开发验证记录
 
+### AgentTrigger 首版后台触发回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/AppServices/AgentTrigger/`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView*`、`apps/electron-shell/src/main/`、`apps/agent-server/src/thread/AgentTrigger*`、`packages/core/src/protocol/AgentTrigger*.ts`
+- 修复结论：新增独立于现有手动 trigger 的 `AgentTrigger` 平台。首版内置 `chrome.bookmarks` 与 `system.clock` 两种 provider；设置页支持安装 package、创建实例、配置动态参数和 prompt 模板。命中后由 Swift 直接发送 `agent_trigger.fire` 给 Electron，再由 agent-server 创建后台 thread，不走 PromptPanel / React 提交流程，也不在启动时自动唤起 ThreadWindow。后台 thread 默认静默落库，只有权限确认、工作区选择或运行失败时，Electron main 才会通过宿主级 `agent_trigger.attention` 提示用户，并允许打开对应历史 thread。
+- 自动化验证：需执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 打开 Settings 的 AgentTrigger 页，确认能看到内置 `Chrome Bookmarks` 与 `System Clock` 两类 package，并可分别创建实例。
+  2. 创建一个 `system.clock` 实例，配置未来 1-2 分钟内的触发时间和简单 prompt 模板；到点后确认不会自动弹出 ThreadWindow，但稍后在历史里能看到新增 thread。
+  3. 创建一个 `chrome.bookmarks` 实例，指向本机 Chrome 书签文件中的某个 folder id；修改该文件夹内容后确认会生成新的后台 thread。
+  4. 使用会触发权限确认或工作区选择的 prompt 模板，确认后台 thread 命中 `permission.requested` / `workspace.requested` 时，宿主出现最小提示；点击“查看 Thread”后才打开 ThreadWindow，并聚焦到对应 thread。
+  5. 使用一个会稳定失败的 prompt 或 mock 环境，确认后台失败时宿主出现失败提示；忽略提示时不自动开窗，点击查看后才打开历史 thread。
+  6. 重启桌面 App，确认已保存的 AgentTrigger 实例会自动 reload，后续书签变化或到点事件仍能继续触发。
+
 ### MCP 官方 SDK client 迁移回归
 
 - 完成日期：待实机 QA

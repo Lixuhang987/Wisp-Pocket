@@ -6,6 +6,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case model
     case appearance
     case tools
+    case agentTriggers
     case appendPrompts
     case mcp
     case permissions
@@ -19,6 +20,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .model: return "模型"
         case .appearance: return "外观"
         case .tools: return "工具"
+        case .agentTriggers: return "触发器"
         case .appendPrompts: return "追加"
         case .mcp: return "MCP"
         case .permissions: return "权限"
@@ -32,6 +34,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .model: return "cpu"
         case .appearance: return "circle.lefthalf.filled"
         case .tools: return "slider.horizontal.3"
+        case .agentTriggers: return "bolt.badge.clock"
         case .appendPrompts: return "text.badge.plus"
         case .mcp: return "server.rack"
         case .permissions: return "lock.shield"

@@ -1,4 +1,5 @@
 import type {
+  AgentTriggerAttentionEvent,
   ElectronToSwiftEvent,
   HostTheme,
   SwiftToElectronCommand,
@@ -28,9 +29,15 @@ type ActivityWindowHost = {
   updateTheme(theme: HostTheme): Promise<void>;
 };
 
+type AgentTriggerFireCommand = Extract<
+  SwiftToElectronCommand,
+  { type: "agent_trigger.fire" }
+>;
+
 type Options = {
   prewarmer: ThreadWindowHost;
   activityWindow: ActivityWindowHost;
+  fireAgentTrigger: (payload: AgentTriggerFireCommand["payload"]) => Promise<void>;
   send: (event: ElectronToSwiftEvent) => void;
   now: () => string;
   stopSupervisor: () => void;
@@ -55,6 +62,10 @@ export class ElectronShellRuntime {
     if (event.available) {
       void this.prewarmThreadWindowAfterServerReady();
     }
+  }
+
+  handleAgentTriggerAttention(event: AgentTriggerAttentionEvent): void {
+    this.options.send(event);
   }
 
   handleThreadWindowClosed(event: ThreadWindowClosedEvent): void {
@@ -105,6 +116,9 @@ export class ElectronShellRuntime {
         return;
       case "activity_window.show":
         await this.runCommand(command, () => this.options.activityWindow.show());
+        return;
+      case "agent_trigger.fire":
+        await this.runCommand(command, () => this.options.fireAgentTrigger(command.payload));
         return;
       case "theme.changed":
         await this.runCommand(command, async () => {

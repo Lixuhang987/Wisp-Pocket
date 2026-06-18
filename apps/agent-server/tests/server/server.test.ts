@@ -21,6 +21,8 @@ import {
   createSharedAgentStatus,
 } from "../../src/agent/AgentManager.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
+import { AgentTriggerAttentionPublisher } from "../../src/thread/AgentTriggerAttentionPublisher.ts";
+import { AgentTriggerLaunchService } from "../../src/thread/AgentTriggerLaunchService.ts";
 import { ThreadRuntimeOrchestrator } from "../../src/thread/ThreadRuntimeOrchestrator.ts";
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
@@ -645,6 +647,74 @@ describe("startServer", () => {
       ) {
         socket.terminate();
       }
+      server.close();
+      await once(server, "close");
+    }
+  });
+
+  it("fires agent trigger requests through the background launch service", async () => {
+    const store = testStore(() => "2026-06-18T00:00:00.000Z");
+    const persistence = new ThreadPersistence(store, () => "2026-06-18T00:00:00.000Z");
+    const eventPublisher = new ThreadNotificationPublisher();
+    const commandRouter = {
+      receive: vi.fn(async () => {}),
+      interruptThread: vi.fn(),
+      handleResponse: vi.fn(),
+    } as unknown as ThreadCommandRouter;
+    const launchService = new AgentTriggerLaunchService(
+      persistence,
+      new AgentManager(),
+      () => ({
+        tx_sub: {
+          async send() {},
+        },
+        rx_event: (async function* emptyRuntimeEventStream() {})(),
+        agent_status: createSharedAgentStatus(),
+        session: { threadId: "trigger-thread" },
+        async close() {},
+      }),
+      eventPublisher,
+      new AgentTriggerAttentionPublisher(),
+      () => "2026-06-18T00:00:00.000Z",
+    );
+
+    const server = await startServer({
+      commandRouter,
+      eventPublisher,
+      agentTriggerLaunchService: launchService,
+      port: 0,
+    });
+    const address = server.address() as AddressInfo;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/agent-trigger/fire`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          triggerInstanceId: "trigger-1",
+          threadTitleHint: "Digest",
+          userInput: {
+            items: [{ type: "text", id: "item-1", text: "summarize this" }],
+          },
+          notificationPolicy: { mode: "on_attention" },
+          sourceEvent: {
+            triggerInstanceId: "trigger-1",
+            providerKind: "system.clock",
+            occurredAt: "2026-06-18T00:00:00.000Z",
+            summary: "scheduled digest",
+            payload: {},
+          },
+        }),
+      });
+
+      expect(response.status).toBe(202);
+      const body = await response.json() as { threadId: string; acceptedAt: string };
+      expect(body.threadId).toBeTruthy();
+      expect(body.acceptedAt).toBe("2026-06-18T00:00:00.000Z");
+      expect(await persistence.getThread(body.threadId)).not.toBeNull();
+    } finally {
       server.close();
       await once(server, "close");
     }

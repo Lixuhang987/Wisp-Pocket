@@ -6,7 +6,8 @@
 
 本计划覆盖：
 
-- 独立于 PromptPanel action trigger 的 `AgentTrigger` 数据模型、安装模型、实例模型
+- 独立于现有手动 trigger 的 `AgentTrigger` 数据模型、安装模型、实例模型
+- Trigger 市场下载/安装后的实例化模型：每个 Trigger 实例都有独立配置项，并允许 provider 自定义动态参数、过滤条件、prompt 模板、落库/通知策略
 - Swift 宿主内的 `AgentTrigger` runtime 抽象与首批内置 provider：Chrome 书签文件夹、系统时间点
 - Swift -> Electron -> agent-server 的后台启动链路
 - 后台 thread 落库、历史可回看、默认静默、必要时提示
@@ -19,6 +20,7 @@
 
 补充约束：
 
+- 这次的 `AgentTrigger` 与现有手动 trigger 没有产品关系，也不复用它的 UI 或协议语义；即使名称相近，也必须作为完全独立的功能体系实现。
 - 第一版同时实现 `chrome.bookmarks` 与 `system.clock`，主要目的不是扩功能面，而是在实现期验证 `AgentTrigger` 抽象是否真的能承载不同类型的事件源。
 - `chrome.bookmarks` 代表外部对象变化事件，`system.clock` 代表宿主内时间调度事件；两者都必须走通同一条平台链路。
 - 本计划中的数据结构是实现起点，不是冻结契约。若在实现过程中发现 `PackageManifest`、`Instance`、`Event`、`FireRequest`、`Provider` 等结构不足以自然承载两类 Trigger，可以按需调整、拆分或扩展，但不能破坏本 spec 已确认的产品边界。
@@ -77,6 +79,7 @@ type AgentTriggerInstance = {
   title: string;
   enabled: boolean;
   config: Record<string, unknown>;
+  filterConfig: Record<string, unknown>;
   promptTemplate: string;
   deliveryPolicy: DeliveryPolicy;
   notificationPolicy: NotificationPolicy;
@@ -97,6 +100,8 @@ protocol AgentTriggerInstanceStore {
 
 - 包描述“这个 Trigger 是什么、要配什么参数”
 - 实例描述“用户装了以后，这一份具体怎么跑”
+- `configSchema` 需要覆盖 provider 的动态参数输入，例如 Chrome 书签的 `folderIds`、系统时间的 `scheduleAt` / `timezone`
+- `filterConfig` 用于承载可配置过滤条件，避免把事件源和筛选逻辑硬编码到宿主层
 - 存储路径必须独立于 `~/.spotAgent/plugins/`，避免和现有 action manifest 混淆
 - 设置页要新增独立 AgentTrigger 入口，至少包含市场列表、已安装包、实例配置三块
 - 第一版内置的 package 类型至少两种：`chrome.bookmarks` 与 `system.clock`
@@ -118,7 +123,7 @@ flowchart LR
 - Integration test need to create when exceeding: `/Users/mu9/proj/handAgent/apps/desktop/TestsSwift/AgentTrigger/AgentTriggerSettingsFlowTests.swift`
 - near-code description:
   - 准备一个 `chrome-bookmarks` package manifest 和一个 `system-clock` package manifest
-  - `chrome.bookmarks` 用 `folderIds: string[]` 作为配置 schema
+  - `chrome.bookmarks` 用 `folderIds: string[]` 作为动态参数 schema，并允许同一个 package 创建多个实例，每个实例配置不同的收藏夹列表
   - `system.clock` 用 `scheduleAt` / `timezone` 作为配置 schema，允许用户配置一个或多个触发点
   - 安装 package 后，Settings 可读到该包并允许创建实例
   - 未填必填字段时保存失败且保留草稿
@@ -310,7 +315,7 @@ flowchart LR
   - Swift attention sink 收到事件后只显示提示，不自动打开 ThreadWindow
   - 用户明确点击后才调用既有 focus/openHistory 路径
 
-## Provider Abstraction use case
+## Generic Trigger Contract use case
 
 ### Existing Flow Inventory
 
@@ -335,20 +340,21 @@ interface AgentTriggerProviderFactory {
 ```
 
 - `providerKind` 是 package manifest 和宿主 provider 注册表之间的稳定键
-- 首轮只内置 `chrome.bookmarks` provider
+- 第一版内置 `chrome.bookmarks` 与 `system.clock` 两种 provider
 - 后续第三方 provider 可以复用同一份 descriptor / event / fire request 合约
 - 如果未来要做 out-of-process provider SDK，应在这个 contract 外再加“进程桥/沙箱层”，而不是推翻实例、事件和 fire 模型
+- 这个 contract 要足够通用，能够让第三方开发者自行把 QQ 消息、GitHub PR 等远程事件源适配到同一接口，而不需要宿主知道具体业务来源
 
 ### Use case map
 
 ```mermaid
 flowchart LR
     A["开发者提供新的 providerKind 与 schema"] --> B["宿主注册 AgentTriggerProviderFactory"]
-    B --> C["市场包声明 providerKind"]
-    C --> D["用户安装后创建实例配置"]
+    B --> C["Trigger 市场包声明 providerKind"]
+    C --> D["用户安装后创建带独立参数/过滤条件的实例配置"]
     D --> E["runtime 按 providerKind 找到 factory 并启动 provider"]
     E --> F["provider 发出统一 AgentTriggerEvent"]
-    F --> G["后续流程与 Chrome 书签完全一致"]
+    F --> G["后续流程与 Chrome 书签、系统时间完全一致"]
 ```
 
 - Integration test need to create when exceeding: `/Users/mu9/proj/handAgent/apps/desktop/TestsSwift/AgentTrigger/AgentTriggerProviderRegistryTests.swift`

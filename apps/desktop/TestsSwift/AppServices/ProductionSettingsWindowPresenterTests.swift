@@ -12,6 +12,7 @@ final class ProductionSettingsWindowPresenterTests: XCTestCase {
             settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
             toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
@@ -23,8 +24,8 @@ final class ProductionSettingsWindowPresenterTests: XCTestCase {
         defer { window?.close() }
 
         XCTAssertEqual(
-            window?.appearance?.bestMatch(from: [.aqua, .darkAqua]),
-            .aqua
+            window?.appearance?.bestMatch(from: [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua]),
+            NSAppearance.Name.aqua
         )
         XCTAssertTrue(window?.contentViewController is NSHostingController<AnyView>)
     }
@@ -36,6 +37,7 @@ final class ProductionSettingsWindowPresenterTests: XCTestCase {
             settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
             toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
