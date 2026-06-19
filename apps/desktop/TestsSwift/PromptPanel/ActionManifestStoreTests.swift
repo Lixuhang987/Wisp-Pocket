@@ -2,7 +2,7 @@ import XCTest
 @testable import HandAgentDesktop
 
 final class ActionManifestStoreTests: XCTestCase {
-    func testLoadsPluginManifestsFromStablePluginDirectories() throws {
+    func testLoadsActionManifestsFromStableActionDirectories() throws {
         let root = try FileManager.default.url(
             for: .itemReplacementDirectory,
             in: .userDomainMask,
@@ -10,13 +10,13 @@ final class ActionManifestStoreTests: XCTestCase {
             create: true
         )
         defer { try? FileManager.default.removeItem(at: root) }
-        let plugins = root.appendingPathComponent("plugins", isDirectory: true)
-        try FileManager.default.createDirectory(at: plugins.appendingPathComponent("beta", isDirectory: true), withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: plugins.appendingPathComponent("alpha", isDirectory: true), withIntermediateDirectories: true)
-        try writePlugin(id: "beta", trigger: "b", to: plugins.appendingPathComponent("beta/plugin.json"))
-        try writePlugin(id: "alpha", trigger: "a", to: plugins.appendingPathComponent("alpha/plugin.json"))
+        let actions = root.appendingPathComponent("actions", isDirectory: true)
+        try FileManager.default.createDirectory(at: actions.appendingPathComponent("beta", isDirectory: true), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: actions.appendingPathComponent("alpha", isDirectory: true), withIntermediateDirectories: true)
+        try writeActionManifest(id: "beta", trigger: "b", to: actions.appendingPathComponent("beta/action.json"))
+        try writeActionManifest(id: "alpha", trigger: "a", to: actions.appendingPathComponent("alpha/action.json"))
 
-        let store = ActionManifestStore(pluginsDirectoryURL: plugins)
+        let store = ActionManifestStore(actionsDirectoryURL: actions)
         let result = store.load()
 
         XCTAssertEqual(result.actions.map(\.id), ["alpha/code_review", "beta/code_review"])
@@ -31,20 +31,20 @@ final class ActionManifestStoreTests: XCTestCase {
             create: true
         )
         defer { try? FileManager.default.removeItem(at: root) }
-        let plugins = root.appendingPathComponent("plugins", isDirectory: true)
-        let wrong = plugins.appendingPathComponent("wrong", isDirectory: true)
+        let actions = root.appendingPathComponent("actions", isDirectory: true)
+        let wrong = actions.appendingPathComponent("wrong", isDirectory: true)
         try FileManager.default.createDirectory(at: wrong, withIntermediateDirectories: true)
-        try writePlugin(id: "actual", trigger: "a", to: wrong.appendingPathComponent("plugin.json"))
+        try writeActionManifest(id: "actual", trigger: "a", to: wrong.appendingPathComponent("action.json"))
 
-        let result = ActionManifestStore(pluginsDirectoryURL: plugins).load()
+        let result = ActionManifestStore(actionsDirectoryURL: actions).load()
 
         XCTAssertEqual(result.actions, [])
-        XCTAssertEqual(result.disabled.map(\.id), ["plugin:wrong"])
-        XCTAssertEqual(result.disabled.first?.reason, "plugin id must match directory name")
+        XCTAssertEqual(result.disabled.map(\.id), ["action:wrong"])
+        XCTAssertEqual(result.disabled.first?.reason, "action manifest id must match directory name")
     }
 }
 
-private func writePlugin(id: String, trigger: String, to url: URL) throws {
+private func writeActionManifest(id: String, trigger: String, to url: URL) throws {
     let json = """
     {
       "version": 1,

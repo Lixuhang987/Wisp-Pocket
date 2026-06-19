@@ -7,7 +7,7 @@
 支持一个通用的 `AgentTrigger` 接口，允许第三方开发者实现不同事件源的适配，例如 Chrome 指定书签文件夹、系统时间点、QQ 会话消息、GitHub PR 变化等。第一版内置两个可用 Trigger：Chrome 书签 Trigger，以及系统时间 Trigger。每个 Trigger 实例都可以定义自己的动态参数配置、过滤条件、prompt 模板、落库策略和通知策略；命中后以等效于一次 prompt 提交的方式交给 `agent-server`，创建后台 thread 并保留历史，供后续在 ThreadWindow 中查看。
 
 ## Non-Goals
-不把它做成现有手动 `trigger` 的扩展或别名。不要求所有事件源都在第一版内建实现；第一版只要求通用平台边界、Chrome 书签 Trigger 和系统时间 Trigger 的产品形态。不在本 spec 中展开具体代码结构、协议字段或插件打包细节。
+不把它做成现有手动 `trigger` 的扩展或别名。不要求所有事件源都在第一版内建实现；第一版只要求通用平台边界、Chrome 书签 Trigger 和系统时间 Trigger 的产品形态。不在本 spec 中展开具体代码结构、协议字段或第三方打包细节。
 
 ## Use Cases
 - 用户从 Trigger 市场安装一个 Chrome 书签 Trigger，并为该实例选择要监听的书签文件夹。

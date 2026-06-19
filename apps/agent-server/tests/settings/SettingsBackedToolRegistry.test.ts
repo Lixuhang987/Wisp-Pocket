@@ -54,7 +54,7 @@ describe("SettingsBackedToolRegistry", () => {
   });
 
   it("does not register legacy external tools", async () => {
-    const legacyToolName = "plugin" + ".echo";
+    const legacyToolName = "external" + ".echo";
     const manager = new SettingsBackedToolRegistry(
       { platform: new OfflinePlatformAdapter() },
       {

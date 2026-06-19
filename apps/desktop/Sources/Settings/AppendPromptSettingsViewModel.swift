@@ -2,7 +2,7 @@ import Foundation
 
 struct AppendPromptEntry: Identifiable, Equatable {
     let id: String
-    let pluginId: String
+    let actionPackageId: String
     let name: String
     let trigger: String
     let title: String
@@ -17,22 +17,22 @@ final class AppendPromptSettingsViewModel {
     private(set) var saveErrorMessage: String?
 
     @ObservationIgnored private let fileManager: FileManager
-    @ObservationIgnored private let pluginsDirectoryURL: URL
-    @ObservationIgnored private let managedPluginId = "append-prompts"
+    @ObservationIgnored private let actionsDirectoryURL: URL
+    @ObservationIgnored private let managedActionPackageId = "append-prompts"
 
     init(
         homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         fileManager: FileManager = .default
     ) {
         self.fileManager = fileManager
-        self.pluginsDirectoryURL = Self.promptsDirectoryURL(homeDirectoryURL: homeDirectoryURL)
+        self.actionsDirectoryURL = Self.promptsDirectoryURL(homeDirectoryURL: homeDirectoryURL)
         reload()
     }
 
     static func promptsDirectoryURL(homeDirectoryURL: URL) -> URL {
         homeDirectoryURL
             .appendingPathComponent(".spotAgent", isDirectory: true)
-            .appendingPathComponent("plugins", isDirectory: true)
+            .appendingPathComponent("actions", isDirectory: true)
     }
 
     func reload() {
@@ -40,7 +40,7 @@ final class AppendPromptSettingsViewModel {
             manifest.prompts.compactMap { prompt in
                 return AppendPromptEntry(
                     id: "\(manifest.id)/\(prompt.name)",
-                    pluginId: manifest.id,
+                    actionPackageId: manifest.id,
                     name: prompt.name,
                     trigger: prompt.trigger,
                     title: prompt.title,
@@ -78,15 +78,15 @@ final class AppendPromptSettingsViewModel {
             return false
         }
 
-        var manifest = loadManifest(pluginId: managedPluginId) ?? PluginManifestDefinition(
+        var manifest = loadManifest(actionPackageId: managedActionPackageId) ?? ActionManifestDefinition(
             version: 1,
-            id: managedPluginId,
+            id: managedActionPackageId,
             title: "Append Prompts",
             description: "User-managed append prompt actions",
             enabled: true,
             prompts: []
         )
-        let prompt = PluginPromptDefinition(
+        let prompt = ActionPromptDefinition(
             name: promptName,
             trigger: actionTrigger,
             title: actionTitle,
@@ -95,7 +95,7 @@ final class AppendPromptSettingsViewModel {
             globalShortcut: nil,
             icons: nil
         )
-        manifest = PluginManifestDefinition(
+        manifest = ActionManifestDefinition(
             version: manifest.version,
             id: manifest.id,
             title: manifest.title,
@@ -103,14 +103,14 @@ final class AppendPromptSettingsViewModel {
             enabled: manifest.enabled,
             prompts: manifest.prompts.filter { $0.name != promptName } + [prompt]
         )
-        persist(manifest, pluginId: managedPluginId)
+        persist(manifest, actionPackageId: managedActionPackageId)
         reload()
         return saveErrorMessage == nil
     }
 
     func installExamplePrompts() {
         let prompts = [
-            PluginPromptDefinition(
+            ActionPromptDefinition(
                 name: "explain-code",
                 trigger: "explain",
                 title: "Explain Code",
@@ -121,7 +121,7 @@ final class AppendPromptSettingsViewModel {
                 globalShortcut: nil,
                 icons: nil
             ),
-            PluginPromptDefinition(
+            ActionPromptDefinition(
                 name: "summarize-text",
                 trigger: "sum",
                 title: "Summarize Text",
@@ -133,33 +133,33 @@ final class AppendPromptSettingsViewModel {
                 icons: nil
             )
         ]
-        let manifest = PluginManifestDefinition(
+        let manifest = ActionManifestDefinition(
             version: 1,
-            id: managedPluginId,
+            id: managedActionPackageId,
             title: "Append Prompts",
             description: "User-managed append prompt actions",
             enabled: true,
             prompts: prompts
         )
-        persist(manifest, pluginId: managedPluginId)
+        persist(manifest, actionPackageId: managedActionPackageId)
         reload()
     }
 
     func deletePrompt(id: String) {
         let parts = id.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return }
-        let pluginId = parts[0]
+        let actionPackageId = parts[0]
         let promptName = parts[1]
-        guard var manifest = loadManifest(pluginId: pluginId) else { return }
+        guard var manifest = loadManifest(actionPackageId: actionPackageId) else { return }
 
         let remaining = manifest.prompts.filter { $0.name != promptName }
         if remaining.isEmpty {
-            deleteManifest(pluginId: pluginId)
+            deleteManifest(actionPackageId: actionPackageId)
             reload()
             return
         }
 
-        manifest = PluginManifestDefinition(
+        manifest = ActionManifestDefinition(
             version: manifest.version,
             id: manifest.id,
             title: manifest.title,
@@ -167,13 +167,13 @@ final class AppendPromptSettingsViewModel {
             enabled: manifest.enabled,
             prompts: remaining
         )
-        persist(manifest, pluginId: pluginId)
+        persist(manifest, actionPackageId: actionPackageId)
         reload()
     }
 
-    private func loadManifests() -> [PluginManifestDefinition] {
+    private func loadManifests() -> [ActionManifestDefinition] {
         guard let directories = try? fileManager.contentsOfDirectory(
-            at: pluginsDirectoryURL,
+            at: actionsDirectoryURL,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else {
@@ -182,30 +182,30 @@ final class AppendPromptSettingsViewModel {
 
         return directories
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
-            .compactMap { directory -> PluginManifestDefinition? in
+            .compactMap { directory -> ActionManifestDefinition? in
                 guard (try? directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
                     return nil
                 }
-                return loadManifest(pluginId: directory.lastPathComponent)
+                return loadManifest(actionPackageId: directory.lastPathComponent)
             }
     }
 
-    private func loadManifest(pluginId: String) -> PluginManifestDefinition? {
-        let fileURL = pluginsDirectoryURL
-            .appendingPathComponent(pluginId, isDirectory: true)
-            .appendingPathComponent("plugin.json")
+    private func loadManifest(actionPackageId: String) -> ActionManifestDefinition? {
+        let fileURL = actionsDirectoryURL
+            .appendingPathComponent(actionPackageId, isDirectory: true)
+            .appendingPathComponent(ActionManifestStore.manifestFileName)
         guard let data = try? Data(contentsOf: fileURL),
-              let manifest = try? PluginManifestDefinition.decode(data),
-              manifest.id == pluginId else {
+              let manifest = try? ActionManifestDefinition.decode(data),
+              manifest.id == actionPackageId else {
             return nil
         }
         return manifest
     }
 
-    private func persist(_ manifest: PluginManifestDefinition, pluginId: String) {
-        let fileURL = pluginsDirectoryURL
-            .appendingPathComponent(pluginId, isDirectory: true)
-            .appendingPathComponent("plugin.json")
+    private func persist(_ manifest: ActionManifestDefinition, actionPackageId: String) {
+        let fileURL = actionsDirectoryURL
+            .appendingPathComponent(actionPackageId, isDirectory: true)
+            .appendingPathComponent(ActionManifestStore.manifestFileName)
         do {
             try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let encoder = JSONEncoder()
@@ -217,9 +217,9 @@ final class AppendPromptSettingsViewModel {
         }
     }
 
-    private func deleteManifest(pluginId: String) {
+    private func deleteManifest(actionPackageId: String) {
         do {
-            let directoryURL = pluginsDirectoryURL.appendingPathComponent(pluginId, isDirectory: true)
+            let directoryURL = actionsDirectoryURL.appendingPathComponent(actionPackageId, isDirectory: true)
             if fileManager.fileExists(atPath: directoryURL.path) {
                 try fileManager.removeItem(at: directoryURL)
             }

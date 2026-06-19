@@ -6,11 +6,11 @@
 
 ## 子节点
 
-- `plugins/plugins.md`：Action manifest 示例目录，目录名沿用历史 `plugins` 路径，当前只保留 Append Prompt。
+- `actions/actions.md`：Action manifest 示例目录，当前只保留 Append Prompt。
 - `mcp/mcp.md`：MCP server 配置示例目录。
 
 ## 使用方式
 
-- Append Prompt 示例复制到 `~/.spotAgent/plugins/append-prompts/plugin.json`。
+- Append Prompt 示例复制到 `~/.spotAgent/actions/append-prompts/action.json`。
 - MCP 示例复制到 `~/.spotAgent/mcp.json`，保存后重启桌面 App。
 - Settings 页面也提供"添加示例"按钮，会写入同等结构的本地配置。

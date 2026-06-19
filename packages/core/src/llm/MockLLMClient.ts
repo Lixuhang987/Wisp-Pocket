@@ -164,76 +164,9 @@ export const mockLLMScenarios: MockLLMScenario[] = [
     finalText: "Mock permission write completed.",
   }),
   toolScenario({
-    id: "plugin-echo",
-    trigger: "[mock:plugin-echo]",
-    description: "调用 plugin.echo，用于验证本地插件 tool 加载、执行与热禁用。",
-    toolCall: {
-      id: "mock-plugin-echo-1",
-      name: "plugin.echo",
-      arguments: { message: "hello from MockLLMClient" },
-    },
-    finalText: "Mock plugin.echo completed.",
-  }),
-  toolScenario({
-    id: "plugin-workspace-read",
-    trigger: "[mock:plugin-workspace-read]",
-    description: "调用带合法 workspace read 参数的 plugin.echo，用于验证插件 workspace 注入。",
-    toolCall: {
-      id: "mock-plugin-workspace-read-1",
-      name: "plugin.echo",
-      arguments: {
-        workspaceId: "qa-workspace",
-        relativePath: "plugin-input.txt",
-      },
-    },
-    finalText: "Mock plugin workspace read completed.",
-  }),
-  toolScenario({
-    id: "plugin-workspace-write",
-    trigger: "[mock:plugin-workspace-write]",
-    description: "调用带合法 workspace write 参数的 plugin.echo，用于验证插件 workspace 注入。",
-    toolCall: {
-      id: "mock-plugin-workspace-write-1",
-      name: "plugin.echo",
-      arguments: {
-        workspaceId: "qa-workspace",
-        relativePath: "plugin-output.txt",
-      },
-    },
-    finalText: "Mock plugin workspace write completed.",
-  }),
-  toolScenario({
-    id: "plugin-workspace-escape",
-    trigger: "[mock:plugin-workspace-escape]",
-    description: "调用带 ../../ 越界路径的 plugin.echo，用于验证插件 workspace 路径拦截。",
-    toolCall: {
-      id: "mock-plugin-workspace-escape-1",
-      name: "plugin.echo",
-      arguments: {
-        workspaceId: "qa-workspace",
-        relativePath: "../../etc/passwd",
-      },
-    },
-    finalText: "Mock plugin workspace escape completed.",
-  }),
-  toolScenario({
-    id: "plugin-workspace-symlink",
-    trigger: "[mock:plugin-workspace-symlink]",
-    description: "调用指向 workspace symlink 的 plugin.echo，用于验证插件 workspace realpath 拦截。",
-    toolCall: {
-      id: "mock-plugin-workspace-symlink-1",
-      name: "plugin.echo",
-      arguments: {
-        workspaceId: "qa-workspace",
-        relativePath: "outside-link/plugin.txt",
-      },
-    },
-    finalText: "Mock plugin workspace symlink completed.",
-  }),
-  toolScenario({
     id: "mcp-echo",
     trigger: "[mock:mcp-echo]",
-    description: "调用 mcp.qa_echo.echo，用于验证 plugin action 绑定的 MCP tool 作用域。",
+    description: "调用 mcp.qa_echo.echo，用于验证 MCP tool 作用域。",
     toolCall: {
       id: "mock-mcp-echo-1",
       name: "mcp.qa_echo.echo",

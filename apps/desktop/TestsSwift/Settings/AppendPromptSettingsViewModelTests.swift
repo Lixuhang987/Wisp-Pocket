@@ -6,7 +6,7 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
     func testLoadsSkillPromptsFromManifestsWithoutArguments() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
-        try TestFiles.writePlugin(
+        try TestFiles.writeActionManifest(
             homeURL,
             id: "append-prompts",
             json: """
@@ -49,8 +49,8 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
             template: "Explain the code the user provides."
         )
 
-        let manifest = try PluginManifestDefinition.decode(
-            Data(contentsOf: TestFiles.pluginsDirectoryURL(homeURL).appendingPathComponent("append-prompts/plugin.json"))
+        let manifest = try ActionManifestDefinition.decode(
+            Data(contentsOf: TestFiles.actionsDirectoryURL(homeURL).appendingPathComponent("append-prompts/action.json"))
         )
         XCTAssertEqual(manifest.id, "append-prompts")
         XCTAssertEqual(manifest.prompts.first?.name, "explain")
@@ -93,7 +93,7 @@ final class AppendPromptSettingsViewModelTests: XCTestCase {
         viewModel.deletePrompt(id: "append-prompts/explain")
 
         XCTAssertEqual(viewModel.prompts, [])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: TestFiles.pluginsDirectoryURL(homeURL).appendingPathComponent("append-prompts/plugin.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: TestFiles.actionsDirectoryURL(homeURL).appendingPathComponent("append-prompts/action.json").path))
     }
 
     @MainActor

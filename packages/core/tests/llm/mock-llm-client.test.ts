@@ -41,11 +41,6 @@ describe("MockLLMClient", () => {
       "[mock:symlink-escape]",
       "[mock:workspace-ask]",
       "[mock:permission-write]",
-      "[mock:plugin-echo]",
-      "[mock:plugin-workspace-read]",
-      "[mock:plugin-workspace-write]",
-      "[mock:plugin-workspace-escape]",
-      "[mock:plugin-workspace-symlink]",
       "[mock:mcp-echo]",
       "[mock:mcp-filesystem-read]",
       "[mock:computer-use-list-apps]",
@@ -224,66 +219,6 @@ describe("MockLLMClient", () => {
           id: "mock-screen-window-1",
           name: "screen.capture",
           arguments: { target: { kind: "window", windowId: 123 } },
-        },
-      ],
-    });
-
-    await expect(
-      client.complete([{ role: "user", content: "run [mock:plugin-echo]" }], []),
-    ).resolves.toMatchObject({
-      toolCalls: [
-        {
-          id: "mock-plugin-echo-1",
-          name: "plugin.echo",
-          arguments: { message: "hello from MockLLMClient" },
-        },
-      ],
-    });
-
-    await expect(
-      client.complete([{ role: "user", content: "run [mock:plugin-workspace-read]" }], []),
-    ).resolves.toMatchObject({
-      toolCalls: [
-        {
-          id: "mock-plugin-workspace-read-1",
-          name: "plugin.echo",
-          arguments: { workspaceId: "qa-workspace", relativePath: "plugin-input.txt" },
-        },
-      ],
-    });
-
-    await expect(
-      client.complete([{ role: "user", content: "run [mock:plugin-workspace-write]" }], []),
-    ).resolves.toMatchObject({
-      toolCalls: [
-        {
-          id: "mock-plugin-workspace-write-1",
-          name: "plugin.echo",
-          arguments: { workspaceId: "qa-workspace", relativePath: "plugin-output.txt" },
-        },
-      ],
-    });
-
-    await expect(
-      client.complete([{ role: "user", content: "run [mock:plugin-workspace-escape]" }], []),
-    ).resolves.toMatchObject({
-      toolCalls: [
-        {
-          id: "mock-plugin-workspace-escape-1",
-          name: "plugin.echo",
-          arguments: { workspaceId: "qa-workspace", relativePath: "../../etc/passwd" },
-        },
-      ],
-    });
-
-    await expect(
-      client.complete([{ role: "user", content: "run [mock:plugin-workspace-symlink]" }], []),
-    ).resolves.toMatchObject({
-      toolCalls: [
-        {
-          id: "mock-plugin-workspace-symlink-1",
-          name: "plugin.echo",
-          arguments: { workspaceId: "qa-workspace", relativePath: "outside-link/plugin.txt" },
         },
       ],
     });

@@ -26,7 +26,7 @@
 - 关闭 ThreadWindow 或 ActivityWindow 不停止 agent-server；只有 Electron shutdown 会停止后台服务。
 - hidden ThreadWindow 预热由 Electron main 在 agent-server ready 后主动执行。
 - ThreadWindow 创建时通过 preload `additionalArguments` 获得当前 host theme；进程启动初值来自 `HANDAGENT_INITIAL_THEME`，后续 `theme.changed` 通过 `handagent:theme-changed` IPC 推送给同一个 renderer。
-- Electron main 启动时还会读取本地 skill manifest 根目录（默认 `HANDAGENT_PLUGINS_DIR ?? ~/.spotAgent/plugins`）下的配置，把启用项整理成只读 `availableSkills`，随 ThreadWindow preload 一起注入 renderer；ThreadWindow renderer 不再向 agent-server 额外请求 skill 列表。
+- Electron main 启动时还会读取本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）下的配置，把启用项整理成只读 `availableSkills`，随 ThreadWindow preload 一起注入 renderer；ThreadWindow renderer 不再向 agent-server 额外请求 skill 列表。
 
 ## StatusBubble
 

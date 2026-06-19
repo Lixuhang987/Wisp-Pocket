@@ -153,7 +153,7 @@ final class AppServices {
         appearanceThemeService: AppearanceThemeService? = nil,
         appearanceChangeObserver: (any AppearanceChangeObserving)? = nil,
         actionManifestStore: ActionManifestStore = ActionManifestStore(
-            pluginsDirectoryURL: URL(fileURLWithPath: "/dev/null", isDirectory: true)
+            actionsDirectoryURL: URL(fileURLWithPath: "/dev/null", isDirectory: true)
         )
     ) -> AppServices {
         AppServices(

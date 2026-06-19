@@ -109,7 +109,7 @@ desktop 与 agent-server 共享的模型、builtin tool 和外观主题配置文
 
 `PromptAttachmentResult` 是 PromptPanel 提交时能进入 initial prompt 的用户主动附件，只包含 5 类：`.noAttachment`、`.textToken`、`.textSelection`、`.imageRegion`、`.selectionError`。屏幕、剪贴板、App 状态不能在这里默认注入。
 
-`ActionDefinition` 来自 `~/.spotAgent/plugins/*/plugin.json` 的 `prompts[]`。desktop 负责 trigger、标题、描述、prompt 文本和快捷键；Tab、点击 action 或 Action 全局快捷键只会把 action 追加为输入框内的 skill chip。提交时 Swift 发送完整 `UserInput.items`，不再发送 `actionBinding`，也不在 desktop 侧渲染参数。
+`ActionDefinition` 来自 `~/.spotAgent/actions/*/action.json` 的 `prompts[]`。desktop 负责 trigger、标题、描述、prompt 文本和快捷键；Tab、点击 action 或 Action 全局快捷键只会把 action 追加为输入框内的 skill chip。提交时 Swift 发送完整 `UserInput.items`，不再发送 `actionBinding`，也不在 desktop 侧渲染参数。
 
 ## 注意事项
 

@@ -2,20 +2,20 @@ import AppKit
 import Foundation
 import KeyboardShortcuts
 
-struct PluginManifestDefinition: Codable, Equatable {
+struct ActionManifestDefinition: Codable, Equatable {
     let version: Int
     let id: String
     let title: String
     let description: String?
     let enabled: Bool?
-    let prompts: [PluginPromptDefinition]
+    let prompts: [ActionPromptDefinition]
 
-    static func decode(_ data: Data) throws -> PluginManifestDefinition {
-        try JSONDecoder().decode(PluginManifestDefinition.self, from: data)
+    static func decode(_ data: Data) throws -> ActionManifestDefinition {
+        try JSONDecoder().decode(ActionManifestDefinition.self, from: data)
     }
 }
 
-struct PluginPromptDefinition: Codable, Equatable {
+struct ActionPromptDefinition: Codable, Equatable {
     let name: String
     let trigger: String
     let title: String
@@ -172,7 +172,7 @@ struct ActionDefinition: Equatable, Identifiable {
         )
     }
 
-    static func buildActions(from manifests: [PluginManifestDefinition]) -> ActionDefinitionBuildResult {
+    static func buildActions(from manifests: [ActionManifestDefinition]) -> ActionDefinitionBuildResult {
         var enabled: [ActionDefinition] = []
         var disabled: [DisabledActionDefinition] = []
         var triggers: [String: String] = [:]
@@ -225,8 +225,8 @@ struct ActionDefinition: Equatable, Identifiable {
     }
 
     private static func validate(
-        manifest: PluginManifestDefinition,
-        prompt: PluginPromptDefinition
+        manifest: ActionManifestDefinition,
+        prompt: ActionPromptDefinition
     ) -> String? {
         if manifest.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return "manifest id must not be empty"

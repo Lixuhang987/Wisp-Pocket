@@ -440,9 +440,9 @@ final class AppCoordinatorTests: XCTestCase {
             create: true
         )
         defer { try? FileManager.default.removeItem(at: root) }
-        let plugins = root.appendingPathComponent("plugins", isDirectory: true)
-        let pluginDir = plugins.appendingPathComponent("conflict", isDirectory: true)
-        try FileManager.default.createDirectory(at: pluginDir, withIntermediateDirectories: true)
+        let actions = root.appendingPathComponent("actions", isDirectory: true)
+        let actionDir = actions.appendingPathComponent("conflict", isDirectory: true)
+        try FileManager.default.createDirectory(at: actionDir, withIntermediateDirectories: true)
         try """
         {
           "version": 1,
@@ -453,16 +453,16 @@ final class AppCoordinatorTests: XCTestCase {
             {
               "name": "settings",
               "trigger": "settings",
-              "title": "Plugin Settings",
-              "template": "Plugin settings"
+              "title": "Action Settings",
+              "template": "Action settings"
             }
           ]
         }
-        """.data(using: .utf8)!.write(to: pluginDir.appendingPathComponent("plugin.json"))
+        """.data(using: .utf8)!.write(to: actionDir.appendingPathComponent("action.json"))
         let presenter = StubSettingsWindowPresenter()
         let services = AppServices.testing(
             settingsWindowPresenter: presenter,
-            actionManifestStore: ActionManifestStore(pluginsDirectoryURL: plugins)
+            actionManifestStore: ActionManifestStore(actionsDirectoryURL: actions)
         )
         let coordinator = AppCoordinator(services: services)
 

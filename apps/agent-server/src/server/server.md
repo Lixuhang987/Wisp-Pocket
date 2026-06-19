@@ -100,7 +100,7 @@ const runtimeForThread = (threadId: string) => {
 - `~/.spotAgent/threads.sqlite`：thread SQLite rollout 数据库。
 - `~/.spotAgent/blobs/`：图片附件和大段 tool 输出。
 - `~/.spotAgent/log/`：LLM 网络日志。
-- `~/.spotAgent/plugins/`：Append Prompt manifest 历史目录名，供 desktop 构建 `ActionDefinition`；agent-server 不读取该目录。
+- `~/.spotAgent/actions/`：Append Prompt action manifest 目录，供 desktop 构建 `ActionDefinition`；agent-server 不读取该目录。
 - `~/.spotAgent/mcp.json`：MCP server 配置。
 - `~/.spotAgent/workspaces.json`：workspace 注册表。
 - `~/.spotAgent/permissions.json`：永久权限规则。

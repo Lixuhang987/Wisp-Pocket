@@ -21,10 +21,10 @@ enum TestFiles {
             .appendingPathComponent("permissions.json")
     }
 
-    static func pluginsDirectoryURL(_ homeURL: URL) -> URL {
+    static func actionsDirectoryURL(_ homeURL: URL) -> URL {
         homeURL
             .appendingPathComponent(".spotAgent", isDirectory: true)
-            .appendingPathComponent("plugins", isDirectory: true)
+            .appendingPathComponent("actions", isDirectory: true)
     }
 
     static func mcpConfigFileURL(_ homeURL: URL) -> URL {
@@ -42,10 +42,10 @@ enum TestFiles {
         try Data(json.utf8).write(to: fileURL)
     }
 
-    static func writePlugin(_ homeURL: URL, id: String, json: String) throws {
-        let fileURL = pluginsDirectoryURL(homeURL)
+    static func writeActionManifest(_ homeURL: URL, id: String, json: String) throws {
+        let fileURL = actionsDirectoryURL(homeURL)
             .appendingPathComponent(id, isDirectory: true)
-            .appendingPathComponent("plugin.json")
+            .appendingPathComponent("action.json")
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true

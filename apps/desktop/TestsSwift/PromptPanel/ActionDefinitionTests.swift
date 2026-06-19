@@ -22,7 +22,7 @@ final class ActionDefinitionTests: XCTestCase {
         }
         """.data(using: .utf8)!
 
-        let manifest = try PluginManifestDefinition.decode(data)
+        let manifest = try ActionManifestDefinition.decode(data)
         let actions = ActionDefinition.buildActions(from: [manifest])
 
         XCTAssertEqual(actions.enabled.map(\.id), ["review/code_review"])
@@ -51,14 +51,14 @@ final class ActionDefinitionTests: XCTestCase {
     }
 
     func testTemplatePlaceholdersArePlainTextNow() {
-        let manifest = PluginManifestDefinition(
+        let manifest = ActionManifestDefinition(
             version: 1,
             id: "review",
             title: "Review",
             description: nil,
             enabled: true,
             prompts: [
-                PluginPromptDefinition(
+                ActionPromptDefinition(
                     name: "prompt",
                     trigger: "r",
                     title: "Review",
@@ -77,8 +77,8 @@ final class ActionDefinitionTests: XCTestCase {
     }
 
     func testTriggerConflictKeepsFirstManifestByStableOrder() throws {
-        let first = PluginManifestDefinition.testManifest(id: "alpha", trigger: "r")
-        let second = PluginManifestDefinition.testManifest(id: "beta", trigger: "R")
+        let first = ActionManifestDefinition.testManifest(id: "alpha", trigger: "r")
+        let second = ActionManifestDefinition.testManifest(id: "beta", trigger: "R")
 
         let actions = ActionDefinition.buildActions(from: [second, first])
 
@@ -88,16 +88,16 @@ final class ActionDefinitionTests: XCTestCase {
     }
 }
 
-private extension PluginManifestDefinition {
-    static func testManifest(id: String, trigger: String) -> PluginManifestDefinition {
-        PluginManifestDefinition(
+private extension ActionManifestDefinition {
+    static func testManifest(id: String, trigger: String) -> ActionManifestDefinition {
+        ActionManifestDefinition(
             version: 1,
             id: id,
             title: id,
             description: nil,
             enabled: true,
             prompts: [
-                PluginPromptDefinition(
+                ActionPromptDefinition(
                     name: "code_review",
                     trigger: trigger,
                     title: "Review",

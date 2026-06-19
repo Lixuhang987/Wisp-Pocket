@@ -18,7 +18,7 @@
 | `PromptPanelStyles.swift` | PromptPanel 容器、action row、trigger pill、icon button 样式 |
 | `PromptAttachmentResult.swift` | `PromptAttachmentResult` 枚举；描述 PromptPanel 提交时附带的用户主动输入附件 |
 | `ActionDefinition.swift` | prompt action manifest 定义：trigger、title、description、template、globalShortcut、icon、校验和 trigger 冲突处理 |
-| `ActionManifestStore.swift` | 从 `~/.spotAgent/plugins/*/plugin.json` 读取 prompt action manifests |
+| `ActionManifestStore.swift` | 从 `~/.spotAgent/actions/*/action.json` 读取 prompt action manifests |
 | `ActionInvocation.swift` | 把 `ActionDefinition` 转成 `PromptPanelSkillInputItem` |
 | `QuickLookPreviewController.swift` | 把 `imageRegion` 的 base64 写入临时文件，并通过 `QLPreviewPanel` 预览 |
 

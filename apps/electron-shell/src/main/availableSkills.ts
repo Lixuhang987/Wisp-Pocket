@@ -8,7 +8,7 @@ export type AvailableSkill = {
   description?: string;
 };
 
-type PluginManifestDefinition = {
+type ActionManifestDefinition = {
   version: number;
   id: string;
   title: string;
@@ -23,23 +23,23 @@ type PluginManifestDefinition = {
   }>;
 };
 
-export function readAvailableSkillsFromPluginsDirectory(pluginsDirectoryURL: string): AvailableSkill[] {
+export function readAvailableSkillsFromActionsDirectory(actionsDirectoryURL: string): AvailableSkill[] {
   try {
-    const directories = readdirSync(pluginsDirectoryURL, { withFileTypes: true })
+    const directories = readdirSync(actionsDirectoryURL, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => join(pluginsDirectoryURL, entry.name))
+      .map((entry) => join(actionsDirectoryURL, entry.name))
       .sort((a, b) => a.localeCompare(b));
 
     const skills: AvailableSkill[] = [];
     for (const directory of directories) {
-      const pluginId = directory.split("/").pop() ?? directory;
-      const manifestURL = join(directory, "plugin.json");
+      const actionPackageId = directory.split("/").pop() ?? directory;
+      const manifestURL = join(directory, "action.json");
       if (!isReadableFile(manifestURL)) {
         continue;
       }
 
-      const manifest = JSON.parse(readFileSync(manifestURL, "utf8")) as PluginManifestDefinition;
-      if (manifest.version !== 1 || manifest.id !== pluginId || manifest.enabled === false) {
+      const manifest = JSON.parse(readFileSync(manifestURL, "utf8")) as ActionManifestDefinition;
+      if (manifest.version !== 1 || manifest.id !== actionPackageId || manifest.enabled === false) {
         continue;
       }
 

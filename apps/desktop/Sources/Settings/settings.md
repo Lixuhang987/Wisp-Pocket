@@ -11,7 +11,7 @@
 | `AppearanceSettingsViewModel.swift` / `AppearanceSettingsView.swift` | 外观主题偏好 UI 与写入 |
 | `ToolSettingsViewModel.swift` / `ToolSettingsView.swift` | builtin tool 列表与启用/禁用 |
 | `AgentTriggerSettingsViewModel.swift` / `AgentTriggerSettingsView.swift` | 两级触发器设置：一级展示已安装 package 卡片 + 恢复内置触发器入口，二级按 `providerKind` 渲染表单管理"自动化"（`AgentTriggerInstance`）。内置 manifest 与 `ensureBuiltinPackagesInstalled` 由 `AgentTriggerStore` 提供，启动期由 `AppServices` 在 runtime reload 之前调用以确保首次启动直接可见 |
-| `AppendPromptSettingsViewModel.swift` / `AppendPromptSettingsView.swift` | 管理 Append Prompt manifest；写入 `~/.spotAgent/plugins/append-prompts/plugin.json`，prompt 不包含参数字段 |
+| `AppendPromptSettingsViewModel.swift` / `AppendPromptSettingsView.swift` | 管理 Append Prompt manifest；写入 `~/.spotAgent/actions/append-prompts/action.json`，prompt 不包含参数字段 |
 | `MCPSettingsViewModel.swift` / `MCPSettingsView.swift` | 直接读写 `~/.spotAgent/mcp.json` 的 stdio / streamableHttp server 列表 |
 | `PermissionRulesViewModel.swift` / `PermissionRulesView.swift` | 直接读写 `~/.spotAgent/permissions.json`，展示永久规则并支持撤销 |
 | `ShortcutSettingsView.swift` | 快捷键配置 UI；固定系统入口全局快捷键、应用内快捷键（会话窗口）和 manifest `ActionDefinition` 派生的 Action 快捷键 |
@@ -31,14 +31,14 @@ Coordinator.send(.openSettings)
             ├─ AppearanceSettingsView   → settings.json + theme.changed
             ├─ ToolSettingsView         → settings.json tools
             ├─ AgentTriggerSettingsView → ~/.spotAgent/agent-triggers/*
-            ├─ AppendPromptSettingsView → ~/.spotAgent/plugins/append-prompts/plugin.json
+            ├─ AppendPromptSettingsView → ~/.spotAgent/actions/append-prompts/action.json
             ├─ MCPSettingsView          → ~/.spotAgent/mcp.json
             ├─ PermissionRulesView      → ~/.spotAgent/permissions.json
             ├─ ShortcutSettingsView     → KeyboardShortcuts UserDefaults
             └─ WorkspaceSettingsView    → ~/.spotAgent/workspaces.json
 ```
 
-Append Prompt 只定义 prompt action 的 trigger/title/description/template/globalShortcut。PromptPanel 选择 action 后会追加 skill chip，提交时进入 `UserInput.items`；Settings 不再创建 `arguments`、`kind: "plugin"` 或 MCP 绑定字段。
+Append Prompt 只定义 prompt action 的 trigger/title/description/template/globalShortcut。PromptPanel 选择 action 后会追加 skill chip，提交时进入 `UserInput.items`；Settings 不再创建参数声明、运行期类型或 MCP 绑定字段。
 
 ## 编辑此目录的约束
 

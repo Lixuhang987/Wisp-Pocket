@@ -55,7 +55,7 @@
 ### Existing Flow Inventory
 
 - 现有 Settings 只管理模型、Append Prompt、MCP、权限、快捷键、workspace，没有自动化触发模型。
-- 现有 `~/.spotAgent/plugins/*/plugin.json` 只服务 PromptPanel action manifest，语义不能复用给 `AgentTrigger`。
+- 现有 `~/.spotAgent/actions/*/action.json` 只服务 PromptPanel action manifest，语义不能复用给 `AgentTrigger`。
 - 现有 Swift 宿主已经是配置文件代理层，适合继续承载 Trigger 市场、实例配置与 provider 生命周期。
 - 现有手动 trigger 仍然保留原语义，但它与 `AgentTrigger` 完全没有产品或代码依赖关系。
 
@@ -107,7 +107,7 @@ protocol AgentTriggerInstanceStore {
 - 动态参数必须是实例级别的，不是安装级别的全局配置；同一个 package 的不同实例可以有不同参数、不同 prompt 模板、不同通知策略
 - `configSchema` 需要覆盖 provider 的动态参数输入，例如 Chrome 书签的 `folderIds`、系统时间的 `scheduleAt` / `timezone`
 - `filterConfig` 用于承载可配置过滤条件，避免把事件源和筛选逻辑硬编码到宿主层
-- 存储路径必须独立于 `~/.spotAgent/plugins/`，避免和现有 action manifest 混淆
+- 存储路径必须独立于 `~/.spotAgent/actions/`，避免和现有 action manifest 混淆
 - 设置页要新增独立 AgentTrigger 入口，至少包含市场列表、已安装包、实例配置三块
 - 第一版内置的 package 类型至少两种：`chrome.bookmarks` 与 `system.clock`
 
@@ -326,7 +326,7 @@ flowchart LR
 
 - 现有仓库没有“外部事件源 -> 统一自动化事件”的抽象。
 - 现有 `PlatformBridge`、MCP、Append Prompt 都能提供参考，但它们分别属于平台 RPC、tool 执行、手动 prompt，不能直接当成 AgentTrigger provider runtime。
-- 首版就要把 provider contract 设计成可供第三方开发者自行实现的稳定接口；不要求这一版完成插件沙箱或进程外托管，但接口不能绑定当前内置 provider。
+- 首版就要把 provider contract 设计成可供第三方开发者自行实现的稳定接口；不要求这一版完成第三方进程沙箱或进程外托管，但接口不能绑定当前内置 provider。
 
 ### Core structure
 
@@ -372,6 +372,6 @@ flowchart LR
 
 ## Self-Review
 
-- 不复用 `~/.spotAgent/plugins/`、PromptPanel `ActionDefinition`、React `/api/thread` 连接来承载 `AgentTrigger`，因为它们分别绑定了错误的产品语义和 UI 生命周期。
+- 不复用 `~/.spotAgent/actions/`、PromptPanel `ActionDefinition`、React `/api/thread` 连接来承载 `AgentTrigger`，因为它们分别绑定了错误的产品语义和 UI 生命周期。
 - 后台触发复用现有 `UserInput -> AgentManager -> ThreadPersistence` 运行链，而不是新造第二套 agent 执行引擎。
 - 第三方开发者“自由实现”的目标通过稳定 provider contract 先落模型；完整的第三方进程托管、签名和隔离单独作为后续增量，不挤进首个可交付切片。

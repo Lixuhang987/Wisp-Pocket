@@ -7,14 +7,14 @@ import {
 } from "../../src/tools/registerTools.ts";
 
 describe("registerTools", () => {
-  it("ignores extra legacy loader options while registering builtin tools", async () => {
-    const legacyLoaderOption = "plugin" + "Loaders";
-    const legacyToolName = "plugin" + ".echo";
+  it("ignores extra external loader options while registering builtin tools", async () => {
+    const externalLoaderOption = "external" + "Loaders";
+    const externalToolName = "external" + ".echo";
     const options = {
       platform: new OfflinePlatformAdapter(),
-      [legacyLoaderOption]: [
+      [externalLoaderOption]: [
         async () => ({
-          tools: [makeTool(legacyToolName)],
+          tools: [makeTool(externalToolName)],
           disabled: [],
         }),
       ],
@@ -22,8 +22,8 @@ describe("registerTools", () => {
 
     const result = await registerTools(options);
 
-    expect(result.registered).not.toContain(legacyToolName);
-    expect(result.registry.get(legacyToolName)).toBeUndefined();
+    expect(result.registered).not.toContain(externalToolName);
+    expect(result.registry.get(externalToolName)).toBeUndefined();
   });
 });
 

@@ -48,7 +48,7 @@ flowchart LR
 
 `SettingsBackedToolRegistry` 在 agent-server 启动和每轮 user message 进入 runtime 前按 `settings.json` 文件戳刷新 builtin tool；`disabled` 列表回流到 `console.log`，便于排错；当 `workspaceRegistry` 缺失时，`workspace.list`、`workspace.askUser`、`file.read`、`file.write` 四个 workspace/file tool 直接进 disabled；当缺少 `WorkspaceAskResolver` 时，`workspace.askUser` 单独进 disabled。
 
-本目录不再包含私有 `tools[] + command` 插件运行时，也不通过 action binding 改变 thread tool scope。PromptPanel Action manifest 只负责生成 skill prompt chip；外部能力统一通过 `~/.spotAgent/mcp.json` 的全局 MCP tools 或 builtin tools 暴露。
+本目录不再包含私有 `tools[] + command` 外部工具运行时，也不通过 action binding 改变 thread tool scope。PromptPanel Action manifest 只负责生成 skill prompt chip；外部能力统一通过 `~/.spotAgent/mcp.json` 的全局 MCP tools 或 builtin tools 暴露。
 
 ## 编辑此目录的约束
 
