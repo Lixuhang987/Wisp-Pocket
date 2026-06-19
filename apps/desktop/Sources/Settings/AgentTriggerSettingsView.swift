@@ -209,40 +209,34 @@ private struct PackageDetailView: View {
             SettingsSection {
                 if hasFormFields {
                     SettingsRow("标题") {
-                        TextField("My Automation", text: $title)
-                            .textFieldStyle(SettingsFieldStyle())
+                        SettingsTextField(placeholder: "My Automation", text: $title)
                     }
                     if package.providerKind == "chrome.bookmarks" {
                         SettingsRowDivider()
                         SettingsRow("Folders") {
-                            TextField("folder-a,folder-b", text: $folderIds)
-                                .textFieldStyle(SettingsFieldStyle())
+                            SettingsTextField(placeholder: "folder-a,folder-b", text: $folderIds)
                         }
                     }
                     if package.providerKind == "system.clock" {
                         SettingsRowDivider()
                         SettingsRow("时间点") {
-                            TextField("09:00,21:00", text: $scheduleAt)
-                                .textFieldStyle(SettingsFieldStyle())
+                            SettingsTextField(placeholder: "09:00,21:00", text: $scheduleAt)
                         }
                         SettingsRowDivider()
                         SettingsRow("时区") {
-                            TextField("Asia/Shanghai", text: $timezone)
-                                .textFieldStyle(SettingsFieldStyle())
+                            SettingsTextField(placeholder: "Asia/Shanghai", text: $timezone)
                         }
                     }
                     SettingsRowDivider()
                     HStack {
-                        Button("取消") {
+                        SettingsActionButton(title: "取消", role: .secondary) {
                             isAdding = false
                             resetForm()
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(theme.colors.textSecondary)
 
                         Spacer()
 
-                        Button("保存") {
+                        SettingsActionButton(title: "保存", role: .primary) {
                             let didCreate = viewModel.createInstanceForCurrentPackage(
                                 title: title,
                                 config: currentConfig()
@@ -252,8 +246,6 @@ private struct PackageDetailView: View {
                                 resetForm()
                             }
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(theme.colors.accent)
                     }
                 } else {
                     Text("暂不支持自定义参数")

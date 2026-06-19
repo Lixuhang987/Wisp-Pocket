@@ -118,23 +118,19 @@ struct AppendPromptSettingsView: View {
             SettingsSectionHeader("新增 Append Prompt")
             SettingsSection {
                 SettingsRow("名称") {
-                    TextField("explain", text: $name)
-                        .textFieldStyle(SettingsFieldStyle())
+                    SettingsTextField(placeholder: "explain", text: $name)
                 }
                 SettingsRowDivider()
                 SettingsRow("Trigger") {
-                    TextField("explain", text: $trigger)
-                        .textFieldStyle(SettingsFieldStyle())
+                    SettingsTextField(placeholder: "explain", text: $trigger)
                 }
                 SettingsRowDivider()
                 SettingsRow("标题") {
-                    TextField("Explain Code", text: $title)
-                        .textFieldStyle(SettingsFieldStyle())
+                    SettingsTextField(placeholder: "Explain Code", text: $title)
                 }
                 SettingsRowDivider()
                 SettingsRow("描述") {
-                    TextField("Explain a code block", text: $description)
-                        .textFieldStyle(SettingsFieldStyle())
+                    SettingsTextField(placeholder: "Explain a code block", text: $description)
                 }
                 SettingsRowDivider()
                 SettingsRow("Template") {
@@ -148,32 +144,32 @@ struct AppendPromptSettingsView: View {
 
     private var formButtons: some View {
         HStack {
-            Button {
-                resetForm()
-            } label: {
-                Label("取消", systemImage: "xmark")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(theme.colors.textSecondary)
+            SettingsActionButton(
+                title: "取消",
+                systemImage: "xmark",
+                role: .secondary,
+                action: resetForm
+            )
 
             Spacer()
 
-            Button {
-                let didCreate = viewModel.createPrompt(
-                    name: name,
-                    trigger: trigger,
-                    title: title,
-                    description: description,
-                    template: template
-                )
-                if didCreate {
-                    resetForm()
+            SettingsActionButton(
+                title: "保存",
+                systemImage: "checkmark",
+                role: .primary,
+                action: {
+                    let didCreate = viewModel.createPrompt(
+                        name: name,
+                        trigger: trigger,
+                        title: title,
+                        description: description,
+                        template: template
+                    )
+                    if didCreate {
+                        resetForm()
+                    }
                 }
-            } label: {
-                Label("保存", systemImage: "checkmark")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(theme.colors.accent)
+            )
             .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .font(theme.typography.bodyFont)
@@ -189,11 +185,6 @@ struct AppendPromptSettingsView: View {
     }
 
     private func errorFooter(_ error: String) -> some View {
-        SettingsSection {
-            Label(error, systemImage: "exclamationmark.triangle.fill")
-                .font(theme.typography.captionFont)
-                .foregroundStyle(theme.colors.error)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        SettingsErrorFooter(message: error)
     }
 }

@@ -107,20 +107,23 @@ struct WorkspaceSettingsView: View {
             Text("编辑 Workspace")
                 .font(theme.typography.titleFont)
                 .foregroundStyle(theme.colors.ink)
-            TextField("名称", text: $editName)
-                .textFieldStyle(SettingsFieldStyle())
-            TextField("描述（200 字以内）", text: $editDescription)
-                .textFieldStyle(SettingsFieldStyle())
+            SettingsTextField(placeholder: "名称", text: $editName)
+            SettingsTextField(placeholder: "描述（200 字以内）", text: $editDescription)
             Text("\(editDescription.count)/200")
                 .font(theme.typography.captionFont)
                 .foregroundStyle(editDescription.count > 200 ? theme.colors.error : theme.colors.textSecondary)
             HStack {
-                Button("取消") { editingId = nil }
+                SettingsActionButton(title: "取消", role: .secondary) { editingId = nil }
                 Spacer()
-                Button("保存") {
-                    viewModel.update(id: ws.id, name: editName, description: String(editDescription.prefix(200)))
-                    editingId = nil
-                }
+                SettingsActionButton(
+                    title: "保存",
+                    systemImage: nil,
+                    role: .primary,
+                    action: {
+                        viewModel.update(id: ws.id, name: editName, description: String(editDescription.prefix(200)))
+                        editingId = nil
+                    }
+                )
                 .disabled(editName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }

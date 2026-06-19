@@ -308,3 +308,184 @@ struct SettingsSectionSeparator: View {
             .frame(height: 0.5)
     }
 }
+
+// MARK: - Page Container
+
+struct SettingsPage<Content: View>: View {
+    @Environment(\.appTheme) private var theme
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                content()
+            }
+            .padding(.vertical, theme.spacing.lg)
+        }
+    }
+}
+
+// MARK: - Theme-safe Inputs
+
+struct SettingsTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    var width: CGFloat? = 340
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        TextField(
+            "",
+            text: $text,
+            prompt: Text(placeholder).foregroundStyle(theme.colors.textSecondary)
+        )
+        .textFieldStyle(SettingsFieldStyle())
+        .frame(maxWidth: width)
+    }
+}
+
+struct SettingsSecureField: View {
+    let placeholder: String
+    @Binding var text: String
+    var width: CGFloat? = 340
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        SecureField(
+            "",
+            text: $text,
+            prompt: Text(placeholder).foregroundStyle(theme.colors.textSecondary)
+        )
+        .textFieldStyle(SettingsFieldStyle())
+        .frame(maxWidth: width)
+    }
+}
+
+// MARK: - Action Button
+
+struct SettingsActionButton: View {
+    enum Role: Equatable {
+        case primary
+        case secondary
+        case destructive
+    }
+
+    let title: String
+    let systemImage: String?
+    let role: Role
+    let action: () -> Void
+    @Environment(\.appTheme) private var theme
+
+    init(
+        title: String,
+        systemImage: String? = nil,
+        role: Role = .secondary,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.role = role
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: theme.spacing.xs) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 12, weight: .medium))
+                }
+                Text(title)
+                    .font(theme.typography.bodyFont.weight(.medium))
+            }
+            .foregroundStyle(labelColor)
+            .padding(.horizontal, theme.spacing.md)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: theme.radius.sm)
+                    .fill(fillColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: theme.radius.sm)
+                    .strokeBorder(borderColor, lineWidth: 0.8)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var labelColor: Color {
+        switch role {
+        case .primary: return theme.colors.onPrimary
+        case .secondary: return theme.colors.textPrimary
+        case .destructive: return theme.colors.error
+        }
+    }
+
+    private var fillColor: Color {
+        switch role {
+        case .primary: return theme.colors.accent
+        case .secondary: return theme.colors.surfaceSoft
+        case .destructive: return theme.colors.surfaceSoft
+        }
+    }
+
+    private var borderColor: Color {
+        switch role {
+        case .primary: return Color.clear
+        case .secondary: return theme.colors.hairline
+        case .destructive: return theme.colors.error.opacity(0.4)
+        }
+    }
+}
+
+// MARK: - Empty State
+
+struct SettingsEmptyState: View {
+    let title: String
+    let systemImage: String
+    let reload: (() -> Void)?
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        SettingsSection {
+            VStack(spacing: theme.spacing.sm) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(theme.colors.muted)
+                Text(title)
+                    .font(theme.typography.captionFont)
+                    .foregroundStyle(theme.colors.textSecondary)
+                if let reload {
+                    SettingsActionButton(
+                        title: "刷新",
+                        systemImage: "arrow.clockwise",
+                        role: .secondary,
+                        action: reload
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, theme.spacing.lg)
+        }
+    }
+}
+
+// MARK: - Error Footer
+
+struct SettingsErrorFooter: View {
+    let message: String
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: theme.spacing.xs) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(theme.colors.error)
+            Text(message)
+                .font(theme.typography.captionFont)
+                .foregroundStyle(theme.colors.error)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, theme.spacing.xxl)
+        .padding(.vertical, theme.spacing.sm)
+    }
+}

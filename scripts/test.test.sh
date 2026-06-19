@@ -7,6 +7,7 @@ TEST_TMP_DIR="$(mktemp -d -t handagent-test-sh-test.XXXXXX)"
 TEMP_ROOT="$TEST_TMP_DIR/root"
 FAKE_BIN_DIR="$TEST_TMP_DIR/bin"
 PNPM_CALLS_LOG="$TEST_TMP_DIR/pnpm-calls.log"
+SWIFTLINT_CALLS_LOG="$TEST_TMP_DIR/swiftlint-calls.log"
 
 cleanup() {
   rm -rf "$TEST_TMP_DIR"
@@ -17,7 +18,7 @@ mkdir -p "$TEMP_ROOT/scripts" "$FAKE_BIN_DIR"
 cp "$ROOT_DIR/scripts/test.sh" "$TEMP_ROOT/scripts/test.sh"
 chmod +x "$TEMP_ROOT/scripts/test.sh"
 
-for script_name in swiftw.test.sh package-app.test.sh create-worktree.test.sh test.test.sh; do
+for script_name in swiftw.test.sh package-app.test.sh create-worktree.test.sh swiftlint.test.sh test.test.sh; do
   cat >"$TEMP_ROOT/scripts/$script_name" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -33,6 +34,19 @@ EOF
   chmod +x "$TEMP_ROOT/scripts/$script_name"
 done
 
+cat >"$TEMP_ROOT/scripts/swiftlint.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "\${HANDAGENT_TEST_SH_SWIFTLINT_CALLS_LOG:-}" ]]; then
+  printf 'swiftlint.sh invoked\n' >>"\${HANDAGENT_TEST_SH_SWIFTLINT_CALLS_LOG}"
+fi
+
+printf 'swiftlint stdout\n'
+printf 'swiftlint stderr\n' >&2
+EOF
+chmod +x "$TEMP_ROOT/scripts/swiftlint.sh"
+
 cat >"$FAKE_BIN_DIR/pnpm" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -47,9 +61,15 @@ EOF
 chmod +x "$FAKE_BIN_DIR/pnpm"
 
 : >"$PNPM_CALLS_LOG"
-success_output="$(HANDAGENT_TEST_SH_PNPM_CALLS_LOG="$PNPM_CALLS_LOG" PATH="$FAKE_BIN_DIR:$PATH" "$TEMP_ROOT/scripts/test.sh" 2>&1)"
+: >"$SWIFTLINT_CALLS_LOG"
+success_output="$(HANDAGENT_TEST_SH_PNPM_CALLS_LOG="$PNPM_CALLS_LOG" HANDAGENT_TEST_SH_SWIFTLINT_CALLS_LOG="$SWIFTLINT_CALLS_LOG" PATH="$FAKE_BIN_DIR:$PATH" "$TEMP_ROOT/scripts/test.sh" 2>&1)"
 if [[ "$success_output" != "success" ]]; then
   printf 'Expected successful scripts/test.sh output to be exactly "success", got:\n%s\n' "$success_output" >&2
+  exit 1
+fi
+
+if [[ ! -s "$SWIFTLINT_CALLS_LOG" ]]; then
+  printf 'Expected scripts/test.sh to invoke scripts/swiftlint.sh during success checks\n' >&2
   exit 1
 fi
 

@@ -1,0 +1,25 @@
+included:
+  - apps/desktop/Sources/Settings
+  - apps/desktop/Sources/AppServices/AgentSettings
+
+excluded:
+  - apps/desktop/Sources/Settings/SettingsStyles.swift
+
+# Only enforce the Settings theme guardrails; default SwiftLint rules are
+# intentionally disabled to avoid coupling CI to pre-existing style debt.
+only_rules:
+  - settings_no_bare_textfield
+  - settings_no_hardcoded_colors
+
+custom_rules:
+  settings_no_bare_textfield:
+    name: "Settings No Bare TextField"
+    regex: '\b(TextField|SecureField|TextEditor)\('
+    message: "Settings UI must use SettingsTextField, SettingsSecureField, or SettingsTextEditor."
+    severity: error
+
+  settings_no_hardcoded_colors:
+    name: "Settings No Hardcoded Colors"
+    regex: 'Color\.(white|black|gray|red|blue|green)\b'
+    message: "Settings UI must use theme.colors tokens, not hardcoded Color primitives."
+    severity: error

@@ -26,7 +26,10 @@ run_quiet() {
 run_quiet bash "$PROJECT_ROOT/scripts/swiftw.test.sh"
 run_quiet bash "$PROJECT_ROOT/scripts/package-app.test.sh"
 run_quiet bash "$PROJECT_ROOT/scripts/create-worktree.test.sh"
+run_quiet bash "$PROJECT_ROOT/scripts/swiftlint.test.sh"
 run_quiet bash "$PROJECT_ROOT/scripts/test.test.sh"
+
+run_quiet bash "$PROJECT_ROOT/scripts/swiftlint.sh"
 
 run_quiet pnpm test:theme-tokens
 run_quiet pnpm --filter handagent-thread-window-web test

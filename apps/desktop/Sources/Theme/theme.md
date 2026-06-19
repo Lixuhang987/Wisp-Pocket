@@ -35,3 +35,4 @@
 
 - SwiftUI 原生模块的 `*View.swift` 与 `*Styles.swift` 优先通过 `@Environment(\.appTheme)` 消费 token；少量局部 layout 数值按模块后续收敛。
 - ViewModifier（PromptPanelStyles / SettingsStyles）是 token 的二次封装层：跨模块复用的样式组合写在 Styles 文件，单 View 一次性的样式直接写在 View 里。
+- **Settings 主题封装层**：`apps/desktop/Sources/Settings/SettingsStyles.swift` 是 Settings 主题安全的唯一封装入口。`SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor` / `SettingsActionButton` / `SettingsEmptyState` / `SettingsErrorFooter` / `SettingsPage` 都消费 `@Environment(\.appTheme)`；只有该文件允许直接调用原生 `TextField` / `SecureField` / `TextEditor`，其他 Settings / `AgentSettingsView` 源文件必须使用上述封装组件，由 `.swiftlint.yml` custom rule 静态拦截。

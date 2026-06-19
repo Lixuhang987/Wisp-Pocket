@@ -16,7 +16,7 @@
 | `PermissionRulesViewModel.swift` / `PermissionRulesView.swift` | 直接读写 `~/.spotAgent/permissions.json`，展示永久规则并支持撤销 |
 | `ShortcutSettingsView.swift` | 快捷键配置 UI；固定系统入口全局快捷键、应用内快捷键（会话窗口）和 manifest `ActionDefinition` 派生的 Action 快捷键 |
 | `WorkspaceSettingsViewModel.swift` / `WorkspaceSettingsView.swift` | 直接读写 `~/.spotAgent/workspaces.json` |
-| `SettingsStyles.swift` | 共享样式与 `SettingsTab` |
+| `SettingsStyles.swift` | 共享样式与 `SettingsTab`，以及 Settings 主题安全输入组件（`SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor` / `SettingsActionButton` / `SettingsEmptyState` / `SettingsErrorFooter` / `SettingsPage`） |
 | `SettingsTextHelpers.swift` | 设置页共用字符串 trim / identifier helper |
 
 模型设置的具体 UI 在 [AppServices/AgentSettings/AgentSettingsView.swift](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/AgentSettings/AgentSettingsView.swift)，由本模块的 SettingsView 嵌入。
@@ -42,6 +42,8 @@ Append Prompt 只定义 prompt action 的 trigger/title/description/template/glo
 
 ## 编辑此目录的约束
 
+- **Settings UI 必须使用共享主题组件**：所有表单输入走 `SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor`，页级容器走 `SettingsPage`，动作按钮走 `SettingsActionButton`（role: `primary` / `secondary` / `destructive`），错误提示走 `SettingsErrorFooter`，空状态走 `SettingsEmptyState`。这些组件统一消费 `@Environment(\.appTheme)`，确保 light / dark 下 placeholder、输入内容、强调与危险操作可读。不要在 Settings 与 `AgentSettingsView` 内直接调用裸 `TextField` / `SecureField` / `TextEditor` / `Color.*`，否则会被 SwiftLint custom rule 拦截。`SettingsStyles.swift` 是唯一允许使用原生控件与硬编码颜色 fallback 的封装层。
+- **SwiftLint 约束**：仓库根 `.swiftlint.yml` 只对 `apps/desktop/Sources/Settings` 与 `apps/desktop/Sources/AppServices/AgentSettings` 启用，并只强制 `settings_no_bare_textfield` 与 `settings_no_hardcoded_colors` 两条 custom rule（`SettingsStyles.swift` 在 `excluded` 内）。脚本入口 `bash ./scripts/swiftlint.sh` 通过 SwiftPM `SwiftLintCommandPlugin` 运行，并被 `scripts/test.sh` 在其他检查之前调用。
 - **ViewModel 是配置文件代理层**：模型和 builtin tool 通过 `AgentSettingsStore` 代理；Append Prompt / MCP / 权限 / Workspace 直接代理各自共享 JSON 文件。
 - **AgentTrigger 独立于现有手动 trigger**：Settings 里的 AgentTrigger 页只服务后台自动触发能力，不复用 Append Prompt 的 package 目录、配置语义或提交流程。
 - **写入时统一 trim**：所有字符串字段在 setter 或创建入口中 trim。

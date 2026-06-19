@@ -11,7 +11,8 @@ let package = Package(
         .executable(name: "HandAgentDesktop", targets: ["HandAgentDesktop"])
     ],
     dependencies: [
-        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.0.0")
+        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.0.0"),
+        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.63.3")
     ],
     targets: [
         .executableTarget(

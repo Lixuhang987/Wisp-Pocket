@@ -80,17 +80,7 @@ struct MCPSettingsView: View {
     }
 
     private var emptyState: some View {
-        SettingsSection {
-            HStack(spacing: theme.spacing.sm) {
-                Image(systemName: "server.rack")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(theme.colors.textSecondary)
-                Text("暂无 MCP Server")
-                    .font(theme.typography.bodyFont)
-                    .foregroundStyle(theme.colors.textSecondary)
-                Spacer()
-            }
-        }
+        SettingsEmptyState(title: "暂无 MCP Server", systemImage: "server.rack", reload: nil)
     }
 
     private func serverRow(_ server: MCPServerEntry) -> some View {
@@ -126,23 +116,21 @@ struct MCPSettingsView: View {
     private var addButton: some View {
         SettingsSection {
             HStack {
-                Button {
-                    isAdding.toggle()
-                } label: {
-                    Label(isAdding ? "收起" : "新增 MCP Server", systemImage: isAdding ? "chevron.up" : "plus")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.accent)
+                SettingsActionButton(
+                    title: isAdding ? "收起" : "新增 MCP Server",
+                    systemImage: isAdding ? "chevron.up" : "plus",
+                    role: .primary,
+                    action: { isAdding.toggle() }
+                )
 
                 Spacer()
 
-                Button {
-                    viewModel.installExampleServers()
-                } label: {
-                    Label("添加示例", systemImage: "sparkles")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.textSecondary)
+                SettingsActionButton(
+                    title: "添加示例",
+                    systemImage: "sparkles",
+                    role: .secondary,
+                    action: { viewModel.installExampleServers() }
+                )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -162,13 +150,11 @@ struct MCPSettingsView: View {
                 }
                 SettingsRowDivider()
                 SettingsRow("Server ID") {
-                    TextField("filesystem", text: $serverId)
-                        .textFieldStyle(SettingsFieldStyle())
+                    SettingsTextField(placeholder: "filesystem", text: $serverId)
                 }
                 SettingsRowDivider()
                 SettingsRow("标题") {
-                    TextField("Filesystem", text: $title)
-                        .textFieldStyle(SettingsFieldStyle())
+                    SettingsTextField(placeholder: "Filesystem", text: $title)
                 }
 
                 if transport == .stdio {
@@ -187,23 +173,19 @@ struct MCPSettingsView: View {
     private var stdioFields: some View {
         SettingsRowDivider()
         SettingsRow("Command") {
-            TextField("npx", text: $command)
-                .textFieldStyle(SettingsFieldStyle())
+            SettingsTextField(placeholder: "npx", text: $command)
         }
         SettingsRowDivider()
         SettingsRow("Args") {
-            TextField("--yes @modelcontextprotocol/server-filesystem /tmp", text: $argsText)
-                .textFieldStyle(SettingsFieldStyle())
+            SettingsTextField(placeholder: "--yes @modelcontextprotocol/server-filesystem /tmp", text: $argsText)
         }
         SettingsRowDivider()
         SettingsRow("CWD") {
-            TextField("/path/to/server", text: $cwd)
-                .textFieldStyle(SettingsFieldStyle())
+            SettingsTextField(placeholder: "/path/to/server", text: $cwd)
         }
         SettingsRowDivider()
         SettingsRow("Timeout") {
-            TextField("60000", text: $requestTimeoutMsText)
-                .textFieldStyle(SettingsFieldStyle())
+            SettingsTextField(placeholder: "60000", text: $requestTimeoutMsText)
         }
         SettingsRowDivider()
         SettingsRow("Elicitation") {
@@ -216,8 +198,7 @@ struct MCPSettingsView: View {
     private var httpFields: some View {
         SettingsRowDivider()
         SettingsRow("URL") {
-            TextField("https://example.com/mcp", text: $url)
-                .textFieldStyle(SettingsFieldStyle())
+            SettingsTextField(placeholder: "https://example.com/mcp", text: $url)
         }
         SettingsRowDivider()
         SettingsRow("Headers") {
@@ -227,25 +208,25 @@ struct MCPSettingsView: View {
 
     private var formButtons: some View {
         HStack {
-            Button {
-                resetForm()
-            } label: {
-                Label("取消", systemImage: "xmark")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(theme.colors.textSecondary)
+            SettingsActionButton(
+                title: "取消",
+                systemImage: "xmark",
+                role: .secondary,
+                action: resetForm
+            )
 
             Spacer()
 
-            Button {
-                if saveServer() {
-                    resetForm()
+            SettingsActionButton(
+                title: "保存",
+                systemImage: "checkmark",
+                role: .primary,
+                action: {
+                    if saveServer() {
+                        resetForm()
+                    }
                 }
-            } label: {
-                Label("保存", systemImage: "checkmark")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(theme.colors.accent)
+            )
             .disabled(serverId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .font(theme.typography.bodyFont)
@@ -288,11 +269,6 @@ struct MCPSettingsView: View {
     }
 
     private func errorFooter(_ error: String) -> some View {
-        SettingsSection {
-            Label(error, systemImage: "exclamationmark.triangle.fill")
-                .font(theme.typography.captionFont)
-                .foregroundStyle(theme.colors.error)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        SettingsErrorFooter(message: error)
     }
 }
