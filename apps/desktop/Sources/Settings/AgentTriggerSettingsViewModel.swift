@@ -106,10 +106,4 @@ final class AgentTriggerSettingsViewModel {
         reload()
         return didDelete
     }
-
-    func restoreBuiltinPackages() {
-        store.ensureBuiltinPackagesInstalled()
-        try? runtime?.reload()
-        reload()
-    }
 }

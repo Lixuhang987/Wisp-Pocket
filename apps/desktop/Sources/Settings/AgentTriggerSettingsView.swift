@@ -32,49 +32,26 @@ private struct PackageListView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        Group {
-            SettingsSectionHeader("已安装的触发器")
-            SettingsSection {
-                if viewModel.installedPackages.isEmpty {
-                    Text("当前没有安装的 AgentTrigger")
-                        .font(theme.typography.captionFont)
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    ForEach(viewModel.installedPackages) { package in
-                        if package.id != viewModel.installedPackages.first?.id {
-                            SettingsRowDivider()
-                        }
-                        Button {
-                            viewModel.selectPackage(id: package.id)
-                        } label: {
-                            packageRow(package: package)
-                        }
-                        .buttonStyle(.plain)
+        SettingsSection {
+            if viewModel.installedPackages.isEmpty {
+                Text("当前没有安装的 AgentTrigger")
+                    .font(theme.typography.captionFont)
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ForEach(viewModel.installedPackages) { package in
+                    if package.id != viewModel.installedPackages.first?.id {
+                        SettingsRowDivider()
                     }
-                }
-            }
-            SettingsSection {
-                HStack {
-                    Spacer()
                     Button {
-                        viewModel.restoreBuiltinPackages()
+                        viewModel.selectPackage(id: package.id)
                     } label: {
-                        Label("恢复内置触发器", systemImage: "arrow.counterclockwise")
+                        packageRow(package: package)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(canRestore ? theme.colors.accent : theme.colors.textSecondary)
-                    .disabled(!canRestore)
                 }
             }
         }
-    }
-
-    private var canRestore: Bool {
-        let installedIds = Set(viewModel.installedPackages.map(\.id))
-        return !AgentTriggerStore.builtinPackages
-            .map(\.id)
-            .allSatisfy { installedIds.contains($0) }
     }
 
     private func packageRow(package: AgentTriggerPackageEntry) -> some View {
@@ -84,22 +61,21 @@ private struct PackageListView: View {
                 Text(package.title)
                     .font(theme.typography.bodyFont.weight(.semibold))
                     .foregroundStyle(theme.colors.ink)
-                Text(package.providerKind)
-                    .font(theme.typography.captionFont.monospaced())
-                    .foregroundStyle(theme.colors.textSecondary)
                 if !package.description.isEmpty {
                     Text(package.description)
                         .font(theme.typography.captionFont)
                         .foregroundStyle(theme.colors.textSecondary)
                 }
-                Text(automationCount == 0 ? "暂无自动化" : "\(automationCount) 条自动化")
+            }
+            Spacer(minLength: theme.spacing.md)
+            HStack(spacing: theme.spacing.xs) {
+                Text(automationCount == 0 ? "暂无自动化" : "\(automationCount) 个自动化")
                     .font(theme.typography.captionFont)
                     .foregroundStyle(theme.colors.textSecondary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.colors.textSecondary)
             }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.colors.textSecondary)
         }
         .contentShape(Rectangle())
     }
@@ -155,9 +131,6 @@ private struct PackageDetailView: View {
                 Text(package.title)
                     .font(theme.typography.titleFont.weight(.semibold))
                     .foregroundStyle(theme.colors.ink)
-                Text(package.providerKind)
-                    .font(theme.typography.captionFont.monospaced())
-                    .foregroundStyle(theme.colors.textSecondary)
                 if !package.description.isEmpty {
                     Text(package.description)
                         .font(theme.typography.captionFont)
