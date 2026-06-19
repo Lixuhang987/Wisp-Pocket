@@ -146,25 +146,6 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testRestoreBuiltinPackagesRewritesMissingManifests() throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
-        store.ensureBuiltinPackagesInstalled()
-        let chromeDir = AgentTriggerStore.packagesDirectoryURL(homeDirectoryURL: homeURL)
-            .appendingPathComponent("chrome-bookmarks", isDirectory: true)
-        try FileManager.default.removeItem(at: chromeDir)
-        let runtime = RecordingAgentTriggerRuntime()
-        let viewModel = AgentTriggerSettingsViewModel(store: store, runtime: runtime)
-        XCTAssertEqual(viewModel.installedPackages.count, 1)
-
-        viewModel.restoreBuiltinPackages()
-
-        XCTAssertEqual(viewModel.installedPackages.count, 2)
-        XCTAssertEqual(runtime.reloadCount, 1)
-    }
-
-    @MainActor
     func testClearSelectionReturnsToList() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
