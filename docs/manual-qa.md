@@ -139,19 +139,19 @@
   3. 在 MCP 页展开新增表单，确认 transport 分段控件在深色主题下文字、背景、边框都使用当前 theme token。
   4. 切回 `浅色` 和 `跟随系统`，确认上述分段控件随 Settings 已打开窗口实时刷新，没有固定深色或固定浅色残留。
 
-### Settings 主题安全组件与 SwiftLint 守卫
+### Desktop Common 组件层与 Settings 主题安全守卫
 
 - 完成日期：待实机 QA
-- 实现位置：`apps/desktop/Sources/Settings/SettingsStyles.swift`、`apps/desktop/Sources/Settings/MCPSettingsView.swift`、`apps/desktop/Sources/Settings/AppendPromptSettingsView.swift`、`apps/desktop/Sources/Settings/WorkspaceSettingsView.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView.swift`、`apps/desktop/Sources/AppServices/AgentSettings/AgentSettingsView.swift`、`apps/desktop/TestsSwift/Settings/SettingsStylesThemeTests.swift`、`apps/desktop/TestsSwift/Settings/SettingsStyleMigrationTests.swift`、`Package.swift`、`.swiftlint.yml`、`scripts/swiftlint.sh`、`scripts/swiftlint.test.sh`、`scripts/test.sh`、`scripts/test.test.sh`、`apps/desktop/Sources/Settings/settings.md`、`apps/desktop/Sources/Theme/theme.md`
-- 修复结论：Settings 与 `AgentSettingsView` 的输入、错误、空状态、动作按钮统一改为消费 `@Environment(\.appTheme)` 的共享组件（`SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor` / `SettingsActionButton` / `SettingsEmptyState` / `SettingsErrorFooter` / `SettingsPage`）。placeholder 通过 `TextField(prompt:)` 使用 `theme.colors.textSecondary`，避免 dark 下对比不足。引入 SwiftPM `SwiftLintCommandPlugin`（`Package.swift` 依赖 `SimplyDanny/SwiftLintPlugins` 0.63.3），`.swiftlint.yml` 仅对 Settings 目录启用 `settings_no_bare_textfield` 与 `settings_no_hardcoded_colors` 两条 custom rule（`SettingsStyles.swift` 在 `excluded` 内），`scripts/swiftlint.sh` 通过 `swift package --allow-writing-to-package-directory swiftlint` 运行，并接入 `scripts/test.sh` 在其他检查之前。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter SettingsStylesThemeTests`、`bash ./scripts/swiftw test --filter SettingsStyleMigrationTests`、`bash ./scripts/swiftlint.sh`、`bash ./scripts/swiftlint.test.sh`、`bash ./scripts/test.test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 实现位置：`apps/desktop/Sources/Common/CommonComponents.swift`、`apps/desktop/Sources/Common/common.md`、`apps/desktop/Sources/Settings/SettingsStyles.swift`、`apps/desktop/Sources/Settings/MCPSettingsView.swift`、`apps/desktop/Sources/Settings/AppendPromptSettingsView.swift`、`apps/desktop/Sources/Settings/WorkspaceSettingsView.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView.swift`、`apps/desktop/Sources/AppServices/AgentSettings/AgentSettingsView.swift`、`apps/desktop/TestsSwift/Common/`、`apps/desktop/TestsSwift/Settings/SettingsStyleMigrationTests.swift`、`.swiftlint.yml`、`scripts/swiftlint.test.sh`、`apps/desktop/Sources/sources.md`、`apps/desktop/Sources/Settings/settings.md`、`apps/desktop/Sources/PromptPanel/prompt-panel.md`、`apps/desktop/Sources/Theme/theme.md`
+- 修复结论：新增 `Sources/Common` 作为 Swift 原生 UI 通用组件层。Settings 的 page、section、row、input、text editor、action button、form actions、empty/error、segmented control 通过 `SettingsStyles.swift` 指向 Common 薄包装；Common 输入框使用 overlay placeholder 真实渲染 `theme.colors.textSecondary`，不再只依赖 macOS 原生 `TextField(prompt:)`。AgentTrigger 二级新增自动化表单改用 `SettingsPage` 与 `SettingsFormActions`，保存/取消按钮按表单 control 列对齐，不再贴窗口两端。SwiftLint / source scan 继续阻止 Settings 裸输入、硬编码颜色和常见裸动作按钮。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter CommonComponentsThemeTests`、`bash ./scripts/swiftw test --filter CommonDocumentationTests`、`bash ./scripts/swiftw test --filter SettingsStylesThemeTests`、`bash ./scripts/swiftw test --filter SettingsStyleMigrationTests`、`bash ./scripts/swiftlint.sh`、`bash ./scripts/swiftlint.test.sh`、`bash ./scripts/test.test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
 - 手工回归步骤：
   1. 打开 Settings → 模型页，切到 `深色`，确认 Base URL 与 API Key 输入框的 placeholder 与输入内容在深色背景上均可读，API Key 为安全输入；切回 `浅色` 与 `跟随系统` 确认无残留。
   2. 进入 MCP 页点"新增 MCP Server"，在深色主题下展开 stdio 与 streamableHTTP 两种表单，确认所有 `SettingsTextField` / `SettingsTextEditor` 的 placeholder、边框、背景一致，错误时 `SettingsErrorFooter` 使用 `theme.colors.error` 红色且带图标。
   3. 在 MCP 空列表状态确认使用 `SettingsEmptyState`（图标 + 文案）。
-  4. 进入 AgentTrigger 二级 Chrome Bookmarks / System Clock，点"新增自动化"，确认深色下标题、Folders / 时间点 / 时区输入框与"取消 / 保存"按钮（`SettingsActionButton` primary/secondary）对比清晰，disabled 保存按钮明显灰显。
+  4. 进入 AgentTrigger 二级 Chrome Bookmarks / System Clock，点"新增自动化"，确认深色下标题、Folders / 时间点 / 时区输入框与"取消 / 保存"按钮（`SettingsActionButton` primary/secondary）对比清晰；按钮位于表单输入列内，不贴窗口左右边缘。
   5. 进入 Append Prompt 与 Workspace 编辑弹窗，确认深色下输入框与"取消 / 保存"按钮一致。
-  6. 故意在任意 Settings View 内新增裸 `TextField(` 或 `Color.red`，执行 `bash ./scripts/swiftlint.sh` 应报 error 并退出非零；删除后 `bash ./scripts/test.sh` 与 `bash ./scripts/swiftw test` 恢复 `success`。
+  6. 故意在任意 Settings View 内新增裸 `TextField(`、`Color.red` 或常见裸动作 `Button("保存")`，执行 `bash ./scripts/swiftlint.sh` 应报 error 并退出非零；删除后 `bash ./scripts/test.sh` 与 `bash ./scripts/swiftw test` 恢复 `success`。
 
 ### PromptPanel Warm Command Sheet / theme sync
 

@@ -5,14 +5,12 @@ struct ToolSettingsView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                SettingsListSection(items: viewModel.tools) { tool in
-                    toolRow(tool)
-                }
-
-                Spacer(minLength: 0)
+        SettingsPage {
+            SettingsListSection(items: viewModel.tools) { tool in
+                toolRow(tool)
             }
+
+            Spacer(minLength: 0)
         }
         .overlayScrollbar()
     }

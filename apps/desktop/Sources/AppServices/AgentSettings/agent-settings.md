@@ -7,7 +7,7 @@ LLM 模型配置、tool allowlist / denylist 与 Swift 宿主外观主题偏好�
 | 文件 | 职责 |
 |------|------|
 | `AgentSettingsStore.swift` | `@Observable` + `@MainActor`，从 `~/.spotAgent/settings.json` 读写外观主题、LLM 配置与 tool allowlist / denylist，500ms 轮询热加载 |
-| `AgentSettingsView.swift` | 模型设置的 SwiftUI 表单（provider / model / api / baseURL / apiKey），provider / api 使用 token 化 `SettingsSegmentedControl`，文本输入使用 `SecureField` 与 `SettingsFieldStyle`，由 [Settings/SettingsView](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 嵌入 |
+| `AgentSettingsView.swift` | 模型设置的 SwiftUI 表单（provider / model / api / baseURL / apiKey），provider / api 使用 token 化 `SettingsSegmentedControl`，文本输入使用 `SettingsTextField` / `SettingsSecureField`，由 [Settings/SettingsView](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 嵌入 |
 
 ## 数据模型
 

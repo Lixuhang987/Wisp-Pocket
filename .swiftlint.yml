@@ -9,6 +9,7 @@ excluded:
 # intentionally disabled to avoid coupling CI to pre-existing style debt.
 only_rules:
   - settings_no_bare_textfield
+  - settings_no_bare_common_action_buttons
   - settings_no_hardcoded_colors
 
 custom_rules:
@@ -16,6 +17,12 @@ custom_rules:
     name: "Settings No Bare TextField"
     regex: '\b(TextField|SecureField|TextEditor)\('
     message: "Settings UI must use SettingsTextField, SettingsSecureField, or SettingsTextEditor."
+    severity: error
+
+  settings_no_bare_common_action_buttons:
+    name: "Settings No Bare Common Action Buttons"
+    regex: 'Button\s*\(\s*"(保存|取消|删除|新增|添加示例|添加 Workspace|撤销)"'
+    message: "Settings common actions must use SettingsActionButton or SettingsFormActions."
     severity: error
 
   settings_no_hardcoded_colors:
