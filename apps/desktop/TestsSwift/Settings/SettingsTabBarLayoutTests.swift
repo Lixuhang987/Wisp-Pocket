@@ -17,8 +17,8 @@ final class SettingsTabBarLayoutTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(source.contains(".frame(maxWidth: .infinity, minHeight: 56)"))
-        XCTAssertFalse(source.contains(".frame(width: 72, height: 56)"))
+        XCTAssertTrue(source.contains(".frame(maxWidth: .infinity, minHeight: 32)"))
+        XCTAssertFalse(source.contains(".frame(width: 72, height: 32)"))
     }
 
     func testSettingsStylesURLPrefersRuntimeRepositoryOverStaleCompiledPath() throws {

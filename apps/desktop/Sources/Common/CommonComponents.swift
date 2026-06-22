@@ -28,12 +28,13 @@ struct CommonSectionHeader: View {
 
     var body: some View {
         Text(title)
-            .font(theme.typography.captionFont.weight(.semibold))
+            .font(.system(size: 12, weight: .semibold))
+            .tracking(1)
             .foregroundStyle(theme.colors.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, theme.spacing.xxl)
+            .padding(.leading, CommonLayout.dividerLeadingPadding)
             .padding(.top, theme.spacing.lg)
-            .padding(.bottom, theme.spacing.xs)
+            .padding(.bottom, 12)
     }
 }
 
@@ -50,7 +51,7 @@ struct CommonSection<Content: View>: View {
             content
         }
         .padding(.vertical, theme.spacing.lg)
-        .padding(.horizontal, theme.spacing.xxl)
+        .padding(.horizontal, theme.spacing.xl)
     }
 }
 
@@ -87,7 +88,7 @@ struct CommonRow<Control: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: theme.spacing.xl) {
+        HStack(alignment: .center, spacing: theme.spacing.md) {
             Text(label)
                 .font(theme.typography.bodyFont)
                 .foregroundStyle(theme.colors.body)
@@ -95,7 +96,7 @@ struct CommonRow<Control: View>: View {
             control
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, theme.spacing.md)
+        .padding(.vertical, 12)
     }
 }
 
@@ -104,7 +105,7 @@ struct CommonRowDivider: View {
 
     var body: some View {
         Divider()
-            .overlay(theme.colors.hairline)
+            .overlay(theme.colors.hairlineSoft)
             .padding(.leading, CommonLayout.dividerLeadingPadding)
     }
 }
@@ -357,7 +358,7 @@ struct CommonFormActions<Leading: View, Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: theme.spacing.xl) {
+        HStack(alignment: .center, spacing: theme.spacing.md) {
             Color.clear
                 .frame(width: CommonLayout.labelWidth, height: 1)
             HStack(spacing: theme.spacing.sm) {
@@ -368,7 +369,7 @@ struct CommonFormActions<Leading: View, Trailing: View>: View {
             .frame(maxWidth: CommonLayout.controlMaxWidth)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, theme.spacing.md)
+        .padding(.vertical, 12)
     }
 }
 
@@ -415,7 +416,7 @@ struct CommonErrorFooter: View {
                 .foregroundStyle(theme.colors.error)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, theme.spacing.xxl)
+        .padding(.horizontal, theme.spacing.xl)
         .padding(.vertical, theme.spacing.sm)
     }
 }
@@ -481,7 +482,7 @@ private struct CommonInputPlaceholder: View {
 }
 
 private enum CommonLayout {
-    static let labelWidth: CGFloat = 120
-    static let dividerLeadingPadding: CGFloat = 152
-    static let controlMaxWidth: CGFloat = 340
+    static let labelWidth: CGFloat = 140
+    static let dividerLeadingPadding: CGFloat = 188
+    static let controlMaxWidth: CGFloat = 420
 }

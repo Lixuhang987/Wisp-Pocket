@@ -50,15 +50,18 @@ struct SettingsTabBar: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        HStack(spacing: theme.spacing.sm) {
+        HStack(spacing: 4) {
             ForEach(tabs) { tab in
                 tabButton(tab)
             }
         }
         .padding(.horizontal, theme.spacing.lg)
-        .padding(.top, theme.spacing.sm)
-        .padding(.bottom, theme.spacing.sm)
-        .background(theme.colors.surfaceSoft)
+        .padding(.vertical, 8)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(theme.colors.hairline)
+                .frame(height: 0.5)
+        }
     }
 
     private func tabButton(_ tab: SettingsTab) -> some View {
@@ -66,26 +69,19 @@ struct SettingsTabBar: View {
         return Button {
             selected = tab
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 20))
-                    .frame(height: 24)
+                    .font(.system(size: 14))
+                    .frame(height: 16)
                 Text(tab.title)
                     .font(.system(size: 11))
             }
             .foregroundStyle(isSelected ? theme.colors.ink : theme.colors.muted)
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .borderedCard(
-                fill: isSelected ? theme.colors.canvas : Color.clear,
-                border: isSelected ? theme.colors.accentRing : Color.clear,
-                cornerRadius: theme.radius.md
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .background(
+                RoundedRectangle(cornerRadius: theme.radius.md)
+                    .fill(isSelected ? theme.colors.canvas : Color.clear)
             )
-            .overlay(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: theme.radius.pill)
-                    .fill(isSelected ? theme.colors.accent : Color.clear)
-                    .frame(width: 28, height: 2)
-                    .offset(y: -4)
-            }
             .contentShape(RoundedRectangle(cornerRadius: theme.radius.md))
         }
         .buttonStyle(.plain)

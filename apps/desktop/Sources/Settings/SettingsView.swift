@@ -19,7 +19,7 @@ struct SettingsView: View {
             SettingsSectionSeparator()
             tabContent
         }
-        .frame(width: 660, height: 520)
+        .frame(width: 680, height: 560)
         .background(theme.colors.canvas)
     }
 
