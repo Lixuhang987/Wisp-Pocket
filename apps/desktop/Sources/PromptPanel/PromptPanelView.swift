@@ -9,16 +9,20 @@ struct PromptPanelView: View {
     @State private var inputHeight: CGFloat = 20
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.spacing.lg) {
+        VStack(alignment: .leading, spacing: 0) {
+            firstRow
+                .padding(.bottom, viewModel.chipItems.isEmpty ? 16 : 8)
             if !viewModel.chipItems.isEmpty {
                 chipRow
+                    .padding(.bottom, 16)
             }
-            firstRow
             if let message = viewModel.submissionDisabledMessage {
                 submissionDisabledBanner(message)
+                    .padding(.bottom, 16)
             }
             Divider()
                 .overlay(theme.colors.hairline)
+                .padding(.bottom, 8)
             actionList
         }
         .promptPanelContainer()
@@ -28,7 +32,7 @@ struct PromptPanelView: View {
 
     private var chipRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: theme.spacing.sm) {
+            HStack(spacing: 6) {
                 ForEach(viewModel.chipItems) { chip in
                     chipView(chip)
                 }
@@ -38,7 +42,7 @@ struct PromptPanelView: View {
 
     private func chipView(_ chip: PromptPanelChipItem) -> some View {
         let style = chipStyle(for: chip)
-        return HStack(spacing: 6) {
+        return HStack(spacing: 4) {
             chipLabel(for: chip, foreground: style.foreground)
             Button {
                 viewModel.removeChip(id: chip.id)
@@ -53,9 +57,8 @@ struct PromptPanelView: View {
             .help("移除")
             .accessibilityLabel("移除 \(chip.displayLabel)")
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 4)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .borderedCard(fill: style.background, border: style.border, cornerRadius: theme.radius.sm, borderWidth: 0.8)
         .help(chip.tooltip)
     }
@@ -69,9 +72,9 @@ struct PromptPanelView: View {
             return (theme.colors.error, theme.colors.surfaceSoft, theme.colors.error.opacity(0.55))
         }
         if chip.isImage || chip.isSkill {
-            return (theme.colors.textPrimary, theme.colors.surfaceSoft, theme.colors.accentRing)
+            return (theme.colors.textPrimary, theme.colors.surfaceCard, Color.clear)
         }
-        return (theme.colors.textPrimary, theme.colors.surfaceSoft, theme.colors.hairline)
+        return (theme.colors.textPrimary, theme.colors.surfaceSoft, Color.clear)
     }
 
     @ViewBuilder
@@ -81,7 +84,7 @@ struct PromptPanelView: View {
                 .font(.system(size: 11, weight: (chip.isImage || chip.isSkill) ? .semibold : .regular))
                 .foregroundStyle((chip.isImage || chip.isSkill) ? theme.colors.accent : foreground)
             Text(chip.displayLabel)
-                .font(theme.typography.captionFont)
+                .font(.system(size: 12))
                 .foregroundStyle(foreground)
                 .lineLimit(1)
         }
@@ -99,7 +102,7 @@ struct PromptPanelView: View {
     }
 
     private var firstRow: some View {
-        HStack(spacing: theme.spacing.md) {
+        HStack(spacing: 12) {
             inputComposer
             if !inputShouldExpand {
                 Spacer(minLength: theme.spacing.lg)
@@ -169,7 +172,7 @@ struct PromptPanelView: View {
     private var settingsButton: some View {
         Button { viewModel.openSettings() } label: {
             Image(systemName: "gearshape")
-                .foregroundStyle(isSettingsHovered ? theme.colors.textPrimary : theme.colors.textSecondary)
+                .foregroundStyle(isSettingsHovered ? theme.colors.textSecondary : theme.colors.mutedSoft)
                 .font(.system(size: 14, weight: .medium))
                 .promptPanelIconButton(isHovered: isSettingsHovered)
         }
@@ -185,7 +188,7 @@ struct PromptPanelView: View {
 
     private var actionList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: theme.spacing.xs) {
+            LazyVStack(alignment: .leading, spacing: 2) {
                 if viewModel.filteredActions.isEmpty {
                     Text(emptyActionsMessage)
                         .foregroundStyle(theme.colors.muted)
@@ -214,14 +217,14 @@ struct PromptPanelView: View {
         let isHighlighted = isHovered || isSelected
         return Button { viewModel.selectAction(action) } label: {
             HStack(alignment: .center, spacing: theme.spacing.md) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(action.title)
-                        .font(theme.typography.bodyFont)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(isHighlighted ? theme.colors.textPrimary : theme.colors.bodyStrong)
                         .lineLimit(1)
                     if let description = action.description, !description.isEmpty {
                         Text(description)
-                            .font(theme.typography.captionFont)
+                            .font(.system(size: 12))
                             .foregroundStyle(theme.colors.muted)
                             .lineLimit(1)
                     }

@@ -5,15 +5,15 @@ struct PromptPanelContainerModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(theme.spacing.xl)
-            .frame(minWidth: 640, minHeight: 420)
+            .padding(theme.spacing.md)
+            .frame(minWidth: 600, minHeight: 420, maxHeight: 480)
             .background(theme.colors.canvas.opacity(0.97))
             .clipShape(RoundedRectangle(cornerRadius: theme.radius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: theme.radius.lg)
                     .strokeBorder(theme.colors.hairline, lineWidth: 0.8)
             )
-            .shadow(color: theme.colors.ink.opacity(0.14), radius: 26, x: 0, y: 18)
+            .shadow(color: theme.colors.ink.opacity(0.12), radius: 32, x: 0, y: 12)
     }
 }
 
@@ -23,15 +23,11 @@ struct ActionRowModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(.vertical, 9)
-            .padding(.horizontal, theme.spacing.md)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
             .background(
                 RoundedRectangle(cornerRadius: theme.radius.md)
                     .fill(isHighlighted ? theme.colors.surfaceHover : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: theme.radius.md)
-                    .strokeBorder(isHighlighted ? theme.colors.accentRing : Color.clear, lineWidth: 0.8)
             )
             .contentShape(RoundedRectangle(cornerRadius: theme.radius.md))
     }
@@ -63,12 +59,12 @@ struct PromptPanelTriggerPillModifier: ViewModifier {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(
-                Capsule()
-                    .fill(isHighlighted ? theme.colors.surfaceHover : theme.colors.surfaceSoft)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.clear)
             )
             .overlay(
-                Capsule()
-                    .strokeBorder(isHighlighted ? theme.colors.accentRing : theme.colors.hairlineSoft, lineWidth: 0.6)
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(isHighlighted ? theme.colors.hairline : Color.clear, lineWidth: 0.6)
             )
     }
 }
