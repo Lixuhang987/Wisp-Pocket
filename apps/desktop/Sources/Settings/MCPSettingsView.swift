@@ -29,32 +29,30 @@ struct MCPSettingsView: View {
     @State private var headersText = ""
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                restartNotice
+        SettingsPage {
+            restartNotice
 
-                if viewModel.servers.isEmpty {
-                    emptyState
-                } else {
-                    SettingsListSection(items: viewModel.servers) { server in
-                        serverRow(server)
-                    }
+            if viewModel.servers.isEmpty {
+                emptyState
+            } else {
+                SettingsListSection(items: viewModel.servers) { server in
+                    serverRow(server)
                 }
-
-                SettingsSectionSeparator()
-                addButton
-
-                if isAdding {
-                    SettingsSectionSeparator()
-                    createForm
-                }
-
-                if let error = viewModel.saveErrorMessage {
-                    errorFooter(error)
-                }
-
-                Spacer(minLength: 0)
             }
+
+            SettingsSectionSeparator()
+            addButton
+
+            if isAdding {
+                SettingsSectionSeparator()
+                createForm
+            }
+
+            if let error = viewModel.saveErrorMessage {
+                errorFooter(error)
+            }
+
+            Spacer(minLength: 0)
         }
         .overlayScrollbar()
     }
@@ -68,13 +66,9 @@ struct MCPSettingsView: View {
                     .font(theme.typography.captionFont)
                     .foregroundStyle(theme.colors.textSecondary)
                 Spacer()
-                Button {
+                SettingsActionButton(title: "刷新", systemImage: "arrow.clockwise", role: .secondary) {
                     viewModel.reload()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12))
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -93,14 +87,9 @@ struct MCPSettingsView: View {
                         .lineLimit(2)
                         .truncationMode(.middle)
                     Spacer()
-                    Button {
+                    SettingsActionButton(title: "删除", systemImage: "trash", role: .destructive) {
                         viewModel.removeServer(id: server.id)
-                    } label: {
-                        Label("删除", systemImage: "trash")
                     }
-                    .font(theme.typography.captionFont)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(theme.colors.error)
                 }
                 HStack(spacing: theme.spacing.sm) {
                     Text(server.id)
@@ -207,16 +196,14 @@ struct MCPSettingsView: View {
     }
 
     private var formButtons: some View {
-        HStack {
+        SettingsFormActions {
             SettingsActionButton(
                 title: "取消",
                 systemImage: "xmark",
                 role: .secondary,
                 action: resetForm
             )
-
-            Spacer()
-
+        } trailing: {
             SettingsActionButton(
                 title: "保存",
                 systemImage: "checkmark",

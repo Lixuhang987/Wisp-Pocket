@@ -10,24 +10,20 @@ struct WorkspaceSettingsView: View {
     @State private var editDescription = ""
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                SettingsListSection(items: viewModel.workspaces) { workspace in
-                    workspaceRow(workspace)
-                }
+        SettingsPage {
+            SettingsListSection(items: viewModel.workspaces) { workspace in
+                workspaceRow(workspace)
+            }
 
-                SettingsSectionSeparator()
+            SettingsSectionSeparator()
 
-                Button("添加 Workspace") {
+            SettingsSection {
+                SettingsActionButton(title: "添加 Workspace", systemImage: "plus", role: .primary) {
                     showingAdd = true
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.accent)
-                .padding(.horizontal, theme.spacing.xl)
-                .padding(.vertical, theme.spacing.md)
-
-                Spacer(minLength: 0)
             }
+
+            Spacer(minLength: 0)
         }
         .overlayScrollbar()
         .sheet(isPresented: Binding(
@@ -73,19 +69,15 @@ struct WorkspaceSettingsView: View {
                         .font(theme.typography.captionFont)
                         .foregroundStyle(theme.colors.accent)
                 }
-                Button("编辑") {
+                SettingsActionButton(title: "编辑", role: .secondary) {
                     editName = ws.name
                     editDescription = ws.description
                     editingId = ws.id
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.accent)
                 if !ws.isDefault {
-                    Button("删除") {
+                    SettingsActionButton(title: "删除", role: .destructive) {
                         viewModel.remove(id: ws.id)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(theme.colors.error)
                 }
             }
         }

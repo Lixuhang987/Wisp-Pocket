@@ -2,6 +2,8 @@
 
 Spec: [2026-06-19-settings-style-theme-spec.md](/Users/mu9/proj/handAgent/docs/medium-powers/specs/2026-06-19-settings-style-theme-spec.md)
 
+> 后续 Common 组件层计划 [2026-06-20-desktop-common-ui-components.md](/Users/mu9/proj/handAgent/docs/medium-powers/plans/2026-06-20-desktop-common-ui-components.md) 已替代本计划中关于 `SettingsFieldStyle` 与 `TextField(prompt:)` 的实现细节。当前实现应以 `apps/desktop/Sources/Common/` 的通用组件和 overlay placeholder 为准。
+
 ## Scope And Folder Map
 
 - `apps/desktop/Sources/Settings/`：Settings 容器、Tab 内容页、共享 Settings 样式组件。主要改动点。

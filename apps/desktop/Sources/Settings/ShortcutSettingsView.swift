@@ -6,48 +6,46 @@ struct ShortcutSettingsView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                SettingsSectionHeader("全局快捷键")
-                SettingsSection {
-                    SettingsRow("唤起面板") {
-                        KeyboardShortcuts.Recorder("", name: .showPromptPanel)
-                    }
-                    SettingsRowDivider()
-                    SettingsRow("捕获文本选区") {
-                        KeyboardShortcuts.Recorder("", name: .captureSelection)
-                    }
-                    SettingsRowDivider()
-                    SettingsRow("圈选区域截图") {
-                        KeyboardShortcuts.Recorder("", name: .captureRegion)
-                    }
-                    SettingsRowDivider()
-                    SettingsRow("会话窗口") {
-                        KeyboardShortcuts.Recorder("", name: .showThreadWindow)
-                    }
+        SettingsPage {
+            SettingsSectionHeader("全局快捷键")
+            SettingsSection {
+                SettingsRow("唤起面板") {
+                    KeyboardShortcuts.Recorder("", name: .showPromptPanel)
                 }
-
-                SettingsSectionSeparator()
-
-                SettingsSectionHeader("Action 快捷键")
-                SettingsSection {
-                    if actions.isEmpty {
-                        SettingsRow("快捷键") {
-                            Text("当前没有可配置的 Action 快捷键")
-                                .font(theme.typography.captionFont)
-                                .foregroundStyle(theme.colors.textSecondary)
-                        }
-                    } else {
-                        SettingsListSection(items: actions) { action in
-                            SettingsRow(action.title) {
-                                KeyboardShortcuts.Recorder("", name: action.shortcutName)
-                            }
-                        }
-                    }
+                SettingsRowDivider()
+                SettingsRow("捕获文本选区") {
+                    KeyboardShortcuts.Recorder("", name: .captureSelection)
                 }
-
-                Spacer(minLength: 0)
+                SettingsRowDivider()
+                SettingsRow("圈选区域截图") {
+                    KeyboardShortcuts.Recorder("", name: .captureRegion)
+                }
+                SettingsRowDivider()
+                SettingsRow("会话窗口") {
+                    KeyboardShortcuts.Recorder("", name: .showThreadWindow)
+                }
             }
+
+            SettingsSectionSeparator()
+
+            SettingsSectionHeader("Action 快捷键")
+            SettingsSection {
+                if actions.isEmpty {
+                    SettingsRow("快捷键") {
+                        Text("当前没有可配置的 Action 快捷键")
+                            .font(theme.typography.captionFont)
+                            .foregroundStyle(theme.colors.textSecondary)
+                    }
+                } else {
+                    SettingsListSection(items: actions) { action in
+                        SettingsRow(action.title) {
+                            KeyboardShortcuts.Recorder("", name: action.shortcutName)
+                        }
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
         }
         .overlayScrollbar()
     }

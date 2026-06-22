@@ -11,53 +11,34 @@ struct AppendPromptSettingsView: View {
     @State private var template = ""
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                if viewModel.prompts.isEmpty {
-                    emptyState
-                } else {
-                    SettingsListSection(items: viewModel.prompts) { prompt in
-                        promptRow(prompt)
-                    }
+        SettingsPage {
+            if viewModel.prompts.isEmpty {
+                emptyState
+            } else {
+                SettingsListSection(items: viewModel.prompts) { prompt in
+                    promptRow(prompt)
                 }
-
-                SettingsSectionSeparator()
-                addButton
-
-                if isAdding {
-                    SettingsSectionSeparator()
-                    createForm
-                }
-
-                if let error = viewModel.saveErrorMessage {
-                    errorFooter(error)
-                }
-
-                Spacer(minLength: 0)
             }
+
+            SettingsSectionSeparator()
+            addButton
+
+            if isAdding {
+                SettingsSectionSeparator()
+                createForm
+            }
+
+            if let error = viewModel.saveErrorMessage {
+                errorFooter(error)
+            }
+
+            Spacer(minLength: 0)
         }
         .overlayScrollbar()
     }
 
     private var emptyState: some View {
-        SettingsSection {
-            HStack(spacing: theme.spacing.sm) {
-                Image(systemName: "text.badge.plus")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(theme.colors.textSecondary)
-                Text("暂无 Append Prompt")
-                    .font(theme.typography.bodyFont)
-                    .foregroundStyle(theme.colors.textSecondary)
-                Spacer()
-                Button {
-                    viewModel.reload()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-            }
-        }
+        SettingsEmptyState(title: "暂无 Append Prompt", systemImage: "text.badge.plus", reload: viewModel.reload)
     }
 
     private func promptRow(_ prompt: AppendPromptEntry) -> some View {
@@ -69,14 +50,9 @@ struct AppendPromptSettingsView: View {
                         .foregroundStyle(theme.colors.textPrimary)
                         .lineLimit(2)
                     Spacer()
-                    Button {
+                    SettingsActionButton(title: "删除", systemImage: "trash", role: .destructive) {
                         viewModel.deletePrompt(id: prompt.id)
-                    } label: {
-                        Label("删除", systemImage: "trash")
                     }
-                    .font(theme.typography.captionFont)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(theme.colors.error)
                 }
                 HStack(spacing: theme.spacing.sm) {
                     Text(prompt.trigger)
@@ -91,23 +67,19 @@ struct AppendPromptSettingsView: View {
     private var addButton: some View {
         SettingsSection {
             HStack {
-                Button {
+                SettingsActionButton(
+                    title: isAdding ? "收起" : "新增 Append Prompt",
+                    systemImage: isAdding ? "chevron.up" : "plus",
+                    role: .primary
+                ) {
                     isAdding.toggle()
-                } label: {
-                    Label(isAdding ? "收起" : "新增 Append Prompt", systemImage: isAdding ? "chevron.up" : "plus")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.accent)
 
                 Spacer()
 
-                Button {
+                SettingsActionButton(title: "添加示例", systemImage: "sparkles", role: .secondary) {
                     viewModel.installExamplePrompts()
-                } label: {
-                    Label("添加示例", systemImage: "sparkles")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -143,16 +115,14 @@ struct AppendPromptSettingsView: View {
     }
 
     private var formButtons: some View {
-        HStack {
+        SettingsFormActions {
             SettingsActionButton(
                 title: "取消",
                 systemImage: "xmark",
                 role: .secondary,
                 action: resetForm
             )
-
-            Spacer()
-
+        } trailing: {
             SettingsActionButton(
                 title: "保存",
                 systemImage: "checkmark",

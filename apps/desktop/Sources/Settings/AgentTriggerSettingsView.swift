@@ -5,22 +5,15 @@ struct AgentTriggerSettingsView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                if let packageId = viewModel.selectedPackageId,
-                   let package = viewModel.installedPackages.first(where: { $0.id == packageId }) {
-                    PackageDetailView(viewModel: viewModel, package: package)
-                } else {
-                    PackageListView(viewModel: viewModel)
-                }
-                if let error = viewModel.saveErrorMessage {
-                    SettingsSection {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(theme.typography.captionFont)
-                            .foregroundStyle(theme.colors.error)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+        SettingsPage {
+            if let packageId = viewModel.selectedPackageId,
+               let package = viewModel.installedPackages.first(where: { $0.id == packageId }) {
+                PackageDetailView(viewModel: viewModel, package: package)
+            } else {
+                PackageListView(viewModel: viewModel)
+            }
+            if let error = viewModel.saveErrorMessage {
+                SettingsErrorFooter(message: error)
             }
         }
         .overlayScrollbar()
@@ -32,13 +25,10 @@ private struct PackageListView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        SettingsSection {
-            if viewModel.installedPackages.isEmpty {
-                Text("当前没有安装的 AgentTrigger")
-                    .font(theme.typography.captionFont)
-                    .foregroundStyle(theme.colors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
+        if viewModel.installedPackages.isEmpty {
+            SettingsEmptyState(title: "当前没有安装的 AgentTrigger", systemImage: "clock.badge.exclamationmark", reload: viewModel.reload)
+        } else {
+            SettingsSection {
                 ForEach(viewModel.installedPackages) { package in
                     if package.id != viewModel.installedPackages.first?.id {
                         SettingsRowDivider()
@@ -111,17 +101,9 @@ private struct PackageDetailView: View {
 
     private var backRow: some View {
         SettingsSection {
-            Button {
+            SettingsActionButton(title: "返回", systemImage: "chevron.left", role: .secondary) {
                 viewModel.clearSelection()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("返回")
-                }
-                .foregroundStyle(theme.colors.accent)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -144,14 +126,11 @@ private struct PackageDetailView: View {
     private var automationsSection: some View {
         Group {
             SettingsSectionHeader("自动化")
-            SettingsSection {
-                let automations = viewModel.instances(forPackageId: package.id)
-                if automations.isEmpty {
-                    Text("暂无自动化")
-                        .font(theme.typography.captionFont)
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
+            let automations = viewModel.instances(forPackageId: package.id)
+            if automations.isEmpty {
+                SettingsEmptyState(title: "暂无自动化", systemImage: "clock.badge.exclamationmark", reload: nil)
+            } else {
+                SettingsSection {
                     ForEach(automations) { instance in
                         if instance.id != automations.first?.id {
                             SettingsRowDivider()
@@ -174,13 +153,9 @@ private struct PackageDetailView: View {
                     .foregroundStyle(theme.colors.textSecondary)
             }
             Spacer()
-            Button {
+            SettingsActionButton(title: "删除", systemImage: "trash", role: .destructive) {
                 _ = viewModel.deleteInstance(id: instance.id)
-            } label: {
-                Label("删除", systemImage: "trash")
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(theme.colors.error)
         }
         .padding(.vertical, theme.spacing.xs)
     }
@@ -189,16 +164,16 @@ private struct PackageDetailView: View {
         SettingsSection {
             HStack {
                 Spacer()
-                Button {
+                SettingsActionButton(
+                    title: isAdding ? "收起" : "新增自动化",
+                    systemImage: isAdding ? "chevron.up" : "plus",
+                    role: .primary
+                ) {
                     isAdding.toggle()
                     if !isAdding {
                         resetForm()
                     }
-                } label: {
-                    Label(isAdding ? "收起" : "新增自动化", systemImage: isAdding ? "chevron.up" : "plus")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.colors.accent)
             }
         }
     }
@@ -228,14 +203,12 @@ private struct PackageDetailView: View {
                         }
                     }
                     SettingsRowDivider()
-                    HStack {
+                    SettingsFormActions {
                         SettingsActionButton(title: "取消", role: .secondary) {
                             isAdding = false
                             resetForm()
                         }
-
-                        Spacer()
-
+                    } trailing: {
                         SettingsActionButton(title: "保存", role: .primary) {
                             let didCreate = viewModel.createInstanceForCurrentPackage(
                                 title: title,

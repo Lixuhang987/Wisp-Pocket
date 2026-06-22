@@ -5,7 +5,7 @@ struct AppearanceSettingsView: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(spacing: 0) {
+        SettingsPage {
             SettingsSectionHeader("外观")
             SettingsSection {
                 SettingsRow("主题") {
@@ -18,12 +18,10 @@ struct AppearanceSettingsView: View {
                 }
             }
             if let saveErrorMessage = viewModel.saveErrorMessage {
-                Text(saveErrorMessage)
-                    .font(theme.typography.captionFont)
-                    .foregroundStyle(theme.colors.error)
-                    .padding(.horizontal, theme.spacing.xxl)
+                SettingsErrorFooter(message: saveErrorMessage)
             }
             Spacer(minLength: 0)
         }
+        .overlayScrollbar()
     }
 }

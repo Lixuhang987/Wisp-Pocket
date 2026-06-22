@@ -32,6 +32,16 @@ fi
 EOF
 chmod +x "$FAKE_BIN_DIR/swift"
 
+if ! grep -q "settings_no_bare_common_action_buttons" "$ROOT_DIR/.swiftlint.yml"; then
+  printf 'Expected .swiftlint.yml to define settings_no_bare_common_action_buttons\n' >&2
+  exit 1
+fi
+
+if grep -q "apps/desktop/Sources/Common" "$ROOT_DIR/.swiftlint.yml"; then
+  printf 'Expected .swiftlint.yml not to lint Common internal implementations as Settings pages\n' >&2
+  exit 1
+fi
+
 cp "$ROOT_DIR/scripts/swiftlint.sh" "$TEMP_ROOT/scripts/swiftlint.sh"
 chmod +x "$TEMP_ROOT/scripts/swiftlint.sh"
 
@@ -41,10 +51,15 @@ included:
   - apps/desktop/Sources/Settings
 only_rules:
   - settings_no_bare_textfield
+  - settings_no_bare_common_action_buttons
 custom_rules:
   settings_no_bare_textfield:
     regex: '\bTextField\('
     message: "Use SettingsTextField."
+    severity: error
+  settings_no_bare_common_action_buttons:
+    regex: 'Button\s*\(\s*"(保存|取消|删除|新增|添加示例|添加 Workspace|撤销)"'
+    message: "Use SettingsActionButton."
     severity: error
 EOF
 
