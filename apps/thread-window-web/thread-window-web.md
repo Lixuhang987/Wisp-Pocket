@@ -102,7 +102,7 @@ React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver
 ## 实现约束
 
 - **弹出层**：Composer slash 菜单使用 `@radix-ui/react-popover`（Portal 渲染、碰撞检测、focus 管理），App 删除确认对话框使用 `@radix-ui/react-alert-dialog`（Portal 渲染、focus trap、scroll lock、Escape 关闭）。项目已引入 Radix UI（dropdown-menu、accordion、scroll-area、popover、alert-dialog）。
-- **图标**：通用图标使用 `lucide-react`（X、Trash2、Plus、Square、ArrowUp、MoreHorizontal、Folder/FolderOpen、Copy）；品牌 logo（HistorySidebar 六边形 mark）和运行状态脉冲圆点（ThreadItem RunningThreadIcon）仍为自定义实现。
+- **图标**：通用图标使用 `lucide-react`（X、Trash2、Plus、Square、ArrowUp、MoreHorizontal、Folder/FolderOpen、Copy）；运行状态脉冲圆点（ThreadItem RunningThreadIcon）仍为自定义实现。
 - **`id()` / `now()` 小型工具函数**：`App.tsx`、`Composer.tsx`、`threadSocketClient.ts` 中各自定义，调用点少，未做统一抽象。
 
 ## 常用命令

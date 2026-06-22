@@ -1,12 +1,12 @@
 # PromptPanel 模块
 
-全局热键唤起的命令面板：输入普通 prompt、追加用户主动附件，或通过 `ActionDefinition` 把 prompt action 追加为上方统一 chip row 中的 skill chip。架构是 **View + ViewModel + Controller + Styles** 四件套。
+全局热键唤起的命令面板：输入普通 prompt、追加用户主动附件，或通过 `ActionDefinition` 把 prompt action 追加为输入框下方统一 chip row 中的 skill chip。架构是 **View + ViewModel + Controller + Styles** 四件套。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `PromptPanelView.swift` | 纯 UI：统一 chip row、输入框、action 列表、server 不可用提示和设置按钮 |
+| `PromptPanelView.swift` | 纯 UI：输入框、chip row、action 列表、server 不可用提示和设置按钮 |
 | `PromptPanelGrowingTextView.swift` | `NSViewRepresentable` 输入控件：封装 `NSTextView + NSScrollView`，支持自动增高、键盘命令转发 |
 | `PromptPanelInputCommand.swift` | 输入区 AppKit command selector 到 PromptPanel 意图的纯解析：Return、Shift/Option+Return、Tab、上下键 |
 | `PromptPanelInputLayout.swift` | 输入区布局辅助：根据 editable text 是否有可见内容决定文字编辑区域宽度 |
@@ -43,7 +43,7 @@ PromptPanelGrowingTextView command
 输入框模型是数组：
 
 - 数组里始终只有一个 editable text item。
-- `PromptPanelChipItem` 是展示层模型，把 `inputItems` 中的 skill 与 `attachments` 中的用户主动附件统一渲染为上方 chip row。
+- `PromptPanelChipItem` 是展示层模型，把 `inputItems` 中的 skill 与 `attachments` 中的用户主动附件统一渲染为输入框下方 chip row。
 - 用户可以添加多个 skill chip，也可以用 chip 的删除按钮删除对应 skill 或附件；Backspace 只编辑文本，不删除 chip。
 - Return 提交完整 `inputItems + attachments`；如果只有 skill chip 没有文本，也可以提交。
 - 手写 trigger 或 `[name: value]` 不再有特殊语义，只是普通文本。
@@ -56,7 +56,7 @@ PromptPanelGrowingTextView command
 - **ViewModel 不持有 SwiftUI 类型**：只暴露 plain Swift 状态与回调。
 - **Controller 是窗口管理 + 事件监听层**：不直接写 thread/turn 逻辑，跨模块意图通过 `onSubmit` / `onOpenSettings` 闭包出口给 Coordinator。
 - **后台热键展示语义**：`show()` 负责所有“后台宿主 -> PromptPanel”入口的前台展示，包括 `showPromptPanel`、用户主动 capture 和 Action 全局快捷键。宿主仍是 `.accessory` 时，Controller 必须先做最小宿主激活，再展示 `.nonactivatingPanel`；宿主已经是 `.regular` 时，不得再次激活整个 App，避免把 Settings 等无关窗口一起带到前台。
-- **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加上方 chip row 中的 skill chip 并显示 PromptPanel。
+- **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加输入框下方 chip row 中的 skill chip 并显示 PromptPanel。
 - **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
 - **焦点语义**：凡是从 PromptPanel 把控制权切给 Electron ThreadWindow 的路径，都必须避免恢复旧前台应用。提交 prompt 时，Coordinator 必须在发送 `thread_window.open_initial_prompt` 前调用 `hide(restoringFocus: false)`；PromptPanel 仍可见时若触发 `openHistory`，也必须先 `hide(restoringFocus: false)` 再发送 `thread_window.open_history`。
 - **首次 handoff 是高频回归点**：上面这条不能退化成”最终调用过 hide 就行”，而必须保证顺序是”先 hide(restoringFocus: false)，再 open/focus ThreadWindow”。这个 bug 已多次出现；以后改 PromptPanel 焦点恢复或失焦自动隐藏时，必须把它当强制回归项。
