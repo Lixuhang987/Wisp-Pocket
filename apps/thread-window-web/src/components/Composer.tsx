@@ -207,7 +207,7 @@ export function Composer({
               <button
                 type="button"
                 disabled
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
                 title="附件（即将推出）"
               >
                 <Plus size={20} strokeWidth={2} />
@@ -218,7 +218,7 @@ export function Composer({
                   type="button"
                   onClick={onStop}
                   disabled={stopDisabled}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-secondary"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-secondary"
                   title="停止"
                 >
                   <Square size={12} fill="currentColor" />
@@ -227,7 +227,7 @@ export function Composer({
               <button
                 type="submit"
                 disabled={disabled || !isComposerInputSubmittable(items)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-muted"
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-app-accent text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-muted"
                 title="发送"
               >
                 <ArrowUp size={16} strokeWidth={2} />

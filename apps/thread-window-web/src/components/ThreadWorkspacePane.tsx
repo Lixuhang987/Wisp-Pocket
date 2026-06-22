@@ -98,11 +98,8 @@ export function ThreadWorkspacePane({
           />
         </>
       ) : (
-        <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden text-sm text-app-text-muted">
-          <div className="rounded-xl border border-app-hairline bg-app-surface-elevated/95 px-lg py-md text-center shadow-[var(--thread-window-floating-shadow)]">
-            <div className="font-display text-[30px] leading-none text-app-text-primary">准备开始</div>
-            <div className="mt-xs text-sm text-app-text-secondary">选择历史或创建新对话</div>
-          </div>
+        <div className="flex min-h-0 min-w-0 items-center justify-center overflow-hidden">
+          <span className="text-sm text-app-text-muted">选择历史或创建新对话</span>
         </div>
       )}
     </section>

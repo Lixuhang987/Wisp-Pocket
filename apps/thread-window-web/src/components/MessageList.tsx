@@ -21,15 +21,8 @@ export function MessageList({ messages, errorMessage, isRunning = false }: Messa
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-sm overflow-y-auto overflow-x-hidden bg-transparent px-lg py-md">
       {messages.length === 0 ? (
-        <div className="flex h-full items-center justify-center text-sm text-app-text-muted">
-          <div className="rounded-xl border border-app-hairline bg-app-surface-elevated/95 px-lg py-md text-center shadow-[var(--thread-window-floating-shadow)]">
-            <div className="font-display text-[28px] font-normal text-app-text-primary">
-              等待输入
-            </div>
-            <div className="mt-xs text-sm text-app-text-muted">
-              从下方输入框开始一个 thread
-            </div>
-          </div>
+        <div className="flex h-full items-center justify-center">
+          <span className="text-sm text-app-text-muted">等待输入</span>
         </div>
       ) : null}
 

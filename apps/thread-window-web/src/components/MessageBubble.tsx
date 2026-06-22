@@ -1,4 +1,4 @@
-import { Copy } from 'lucide-react';
+import { Copy, Pencil, RefreshCw } from 'lucide-react';
 import type { ThreadMessage } from '../store/threadWindowStore.ts';
 import { cn } from '../utils/cn.ts';
 import { TypingIndicator } from './TypingIndicator.tsx';
@@ -30,7 +30,7 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
     >
       <div className={cn(
         'w-full',
-        isUser && 'max-w-[85%]'
+        isUser && 'max-w-[75%]'
       )}>
         {isUser && userSections?.images.length ? (
           <div data-testid="user-message-images" className="mb-xs grid justify-items-end gap-xs">
@@ -49,9 +49,9 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
           data-testid={isUser ? "user-message-bubble" : undefined}
           className={cn(
             'px-lg py-md',
-            isUser && 'rounded-2xl border border-app-hairline/70 bg-app-user-bubble text-app-text-primary shadow-soft',
+            isUser && 'rounded-2xl border border-app-hairline/70 bg-app-user-bubble text-app-text-primary',
             isAssistant && 'bg-transparent text-app-text-primary',
-            isTool && 'rounded-xl border border-app-hairline bg-app-tool-bubble/70 text-app-text-muted shadow-product-inner'
+            isTool && 'rounded-xl bg-app-tool-bubble text-app-text-muted'
           )}
         >
           {message.toolName && (
@@ -114,33 +114,32 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
         </div>
 
         <div
-          className={cn(
-            'mt-xs flex h-8 items-center gap-xs px-xs opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100',
-            isUser && 'opacity-100'
-          )}
+          className="mt-xs flex h-8 items-center gap-xs px-xs"
         >
           <button
             onClick={handleCopy}
-            className="flex h-7 items-center gap-1 rounded-md px-xs text-xs text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
             aria-label="复制消息"
+            title="复制"
           >
             <Copy size={14} strokeWidth={1.2} aria-hidden="true" />
-            <span>复制</span>
           </button>
 
           <button
             disabled
-            className="h-7 cursor-not-allowed rounded-md px-xs text-xs text-app-text-muted/50"
-            title="即将推出"
+            className="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-md text-app-text-muted/50"
+            title="编辑（即将推出）"
+            aria-label="编辑"
           >
-            编辑
+            <Pencil size={14} strokeWidth={1.2} aria-hidden="true" />
           </button>
           <button
             disabled
-            className="h-7 cursor-not-allowed rounded-md px-xs text-xs text-app-text-muted/50"
-            title="即将推出"
+            className="flex h-7 w-7 cursor-not-allowed items-center justify-center rounded-md text-app-text-muted/50"
+            title="重新生成（即将推出）"
+            aria-label="重新生成"
           >
-            重新生成
+            <RefreshCw size={14} strokeWidth={1.2} aria-hidden="true" />
           </button>
         </div>
       </div>
