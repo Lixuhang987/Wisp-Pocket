@@ -74,28 +74,28 @@
 }
 
 :root[data-theme="dark"] {
-  --ha-color-accent: #d88a6d;
-  --ha-color-accent-hover: #e49b7f;
-  --ha-color-accent-pressed: #b7654c;
-  --ha-color-accent-ring: rgba(216, 138, 109, 0.36);
-  --ha-color-accent-subtle: rgba(216, 138, 109, 0.18);
-  --ha-color-amber: #efb66e;
+  --ha-color-accent: #cc785c;
+  --ha-color-accent-hover: #e09880;
+  --ha-color-accent-pressed: #a9583e;
+  --ha-color-accent-ring: rgba(204, 120, 92, 0.36);
+  --ha-color-accent-subtle: rgba(204, 120, 92, 0.18);
+  --ha-color-amber: #e8a55a;
   --ha-color-assistant-bubble: transparent;
-  --ha-color-canvas: #181715;
-  --ha-color-error: #e16868;
-  --ha-color-hairline: rgba(250, 249, 245, 0.12);
-  --ha-color-hairline-soft: rgba(250, 249, 245, 0.08);
-  --ha-color-on-accent: #141413;
-  --ha-color-success: #70c987;
-  --ha-color-surface: #1f1e1b;
-  --ha-color-surface-elevated: #2d2a26;
-  --ha-color-surface-muted: #363229;
-  --ha-color-surface-soft: #252320;
-  --ha-color-teal: #75cab9;
-  --ha-color-text-muted: #a09d96;
-  --ha-color-text-primary: #faf9f5;
-  --ha-color-text-secondary: #c7c1b8;
-  --ha-color-tool-bubble: #252320;
-  --ha-color-user-bubble: #302821;
-  --ha-color-warning: #e4b44c;
+  --ha-color-canvas: #2a2522;
+  --ha-color-error: #c64545;
+  --ha-color-hairline: #3e3833;
+  --ha-color-hairline-soft: #342f2a;
+  --ha-color-on-accent: #1a1614;
+  --ha-color-success: #5db872;
+  --ha-color-surface: #211e1b;
+  --ha-color-surface-elevated: #3a3530;
+  --ha-color-surface-muted: #342f2a;
+  --ha-color-surface-soft: #262320;
+  --ha-color-teal: #5db8a6;
+  --ha-color-text-muted: #8e8b82;
+  --ha-color-text-primary: #efe9de;
+  --ha-color-text-secondary: #b8b2a7;
+  --ha-color-tool-bubble: #211e1b;
+  --ha-color-user-bubble: #3a3530;
+  --ha-color-warning: #d4a017;
 }
