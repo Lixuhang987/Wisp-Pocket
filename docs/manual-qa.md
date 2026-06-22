@@ -536,3 +536,17 @@
   9. 点击 thread item 的正文区域，确认可以正常打开对应 thread。
   10. 点击删除按钮，确认只触发删除确认，不同时触发打开 thread。
   11. 确认搜索框、新建对话按钮、workspace 分组排序与原有行为一致。
+
+### 前端视觉重构 5 阶段验收
+
+- 完成日期：待实机 QA
+- 实现位置：`design/tokens.json`、`apps/desktop/Sources/Theme/GeneratedThemeTokens.swift`、`apps/thread-window-web/src/styles/generated-theme.css`、`apps/desktop/Sources/PromptPanel/PromptPanelStyles.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/Settings/SettingsView.swift`、`apps/desktop/Sources/Settings/SettingsStyles.swift`、`apps/desktop/Sources/Common/CommonComponents.swift`、`apps/thread-window-web/src/styles/tailwind.css`、`apps/thread-window-web/src/components/HistorySidebar.tsx`、`apps/thread-window-web/src/components/MessageBubble.tsx`、`apps/thread-window-web/src/components/MessageList.tsx`、`apps/thread-window-web/src/components/ThreadWorkspacePane.tsx`、`apps/thread-window-web/src/components/Composer.tsx`、`apps/electron-shell/src/activity-window/styles.css`
+- 修复结论：统一 handAgent 全部可见前端为"安静高效的日常工具"。5 个阶段按依赖顺序实施：暗色主题 Token 替换、PromptPanel 重构、Settings 重构、ThreadWindow 重构、StatusBubble 重构。
+- 自动化验证：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均通过。
+- 手工回归步骤：
+  1. **暗色主题 Token**：切到暗色主题，确认 canvas 不再纯黑，呈现暖深棕灰 (#2a2522)；accent 保持珊瑚橘 (#cc785c)；语义色 success/warning/error/teal/amber 与亮色一致。
+  2. **PromptPanel**：热键唤起 PromptPanel，确认视觉更紧凑（padding 更小、间距更紧）；输入框在最顶部；各 chip 类型（text/skill/image/error）显示正常无边框（Error chip 除外）；Action 列表行间距更紧凑；Trigger pill 为键帽矩形风格；settings 按钮常态更淡。
+  3. **Settings**：打开 Settings，确认窗口略大 (680×560)；Tab 栏更紧凑（~48pt）；选中 Tab 只有 canvas 背景填充，无边框无指示条；9 个 Tab 都能正常切换；Row label/control 间距更紧凑；SectionHeader 对齐到 Control 区左边缘。
+  4. **ThreadWindow**：打开 ThreadWindow，确认背景 glow 更柔和（几乎不可见）；HistorySidebar 头部只有 + 图标按钮和搜索框（无 logo/标题/描述/大按钮）；搜索框高度更小；User bubble 更窄 (75%)、无阴影；Tool bubble 无边框无阴影；消息操作按钮固定显示为纯 icon (复制/编辑/重新生成)；空状态为极简文字；Composer 按钮略小。
+  5. **StatusBubble**：确认 StatusBubble 表面颜色跟随主题系统；6 种状态颜色与主题 token 一致（idle=#8e8b82 running=#cc785c tool=#5db8a6 waiting=#e8a55a done=#5db872 error=#c64545）；hover 无位移只变色；pulse 动画为柔和呼吸扩散；label 字重更轻(600)；detail 字号略大(13px)。
+  6. **亮色主题交叉验证**：切回亮色主题，确认所有界面暖奶白底色不变，PromptPanel/Settings/ThreadWindow/StatusBubble 视觉更紧凑但功能不变。
