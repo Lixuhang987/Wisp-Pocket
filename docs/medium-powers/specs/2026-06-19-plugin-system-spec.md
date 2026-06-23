@@ -2,49 +2,49 @@
 
 ## Background
 
-HandAgent 当前的 "skill" 机制仅提供提示词追加能力——用户在 PromptPanel 选择一个 skill 后，其 template 文本拼入 system prompt，LLM 获得额外上下文但没有新的可执行工具。
+HandAgent 当前有三类工具来源：core 内置工具、`~/.spotAgent/mcp.json` 中的全局 MCP server，以及 Swift desktop 通过 `/api/platform` 提供的 macOS 原生能力。`/api/platform` 只服务内置平台工具，无法覆盖 plugin、浏览器扩展、开发者自建前端等多个调用端。
 
-系统已有 MCP server 集成（`MCPServerRegistry` + `SDKMCPClientAdapter`），但生命周期是 server 级 lazy init、跨 thread 共享，与 codex 的 session-scoped 模型不一致。
-
-用户需要一种方式让 LLM 调用真实的客户端系统能力（accessibility、屏幕操作、app 控制等），这些能力需要原生 macOS API，无法用 Node.js 实现。
+仓库中已经有 `dynamicTools` 的持久化雏形：thread store 可在 thread metadata 中保存 dynamic tool spec，但 runtime 还没有把它作为统一工具调用模型。目标是把这条雏形补成正式能力，并用它替代 `/api/platform`。
 
 ## Goal
 
-引入 plugin 概念：一个 plugin 是一个预编译 Swift binary，实现 MCP 协议（stdin/stdout JSON-RPC），同时附带一段提示词和 UI 元数据。用户在 PromptPanel 显式选择 plugin 后，agent-server 在 thread 创建时 spawn plugin 进程，将其 tools 注册到该 thread 的 tool registry，将其 prompt 注入 system prompt。LLM 即可调用 plugin 提供的工具，tool call 通过 MCP `tools/call` 到达 plugin binary 执行。
+引入统一的 dynamic tool 机制：thread 创建时携带可启用的 `dynamicTools` 候选集合，core 保存这些 tool spec，并在 LLM 调用 `use_tools` 后把它们暴露给模型。LLM 调用 dynamic tool 时，core 产生 tool call request，agent-server 转发给对应 provider，provider 回传 tool response，core 再继续当前 turn。
 
-同时将现有 MCP server 的生命周期统一改为 thread-scoped（对齐 codex 的 `McpConnectionManager` 模式）：所有 MCP 进程在 thread 创建时启动，thread 结束时关闭。
+Swift desktop 是默认 dynamic tool provider。原先通过 `/api/platform` 暴露的 macOS 能力迁移为 Swift 默认注册的 dynamic tools，并在 Swift 宿主创建的所有 thread 中默认进入候选集合。`/api/platform` 删除，`PlatformAdapter` / `RemotePlatformAdapter` 不再承担 macOS tool 调用链路。
+
+Plugin 生命周期由 Swift 控制。常驻 plugin 可以在 App 启动后持续运行并注册 dynamic tools；只暴露 tool 的 plugin 可以由 Swift 按设置或需要启动。agent-server 不 spawn plugin binary，只负责保存 tool spec、路由 dynamic tool call request、等待 provider response。
 
 ## Non-Goals
 
-- 第三方 plugin 分发市场 / 自动更新机制
-- Plugin 沙盒 / 代码签名验证（后续安全迭代）
-- Plugin 间通信或依赖声明
-- MCP 协议的 resources / prompts 能力暴露给 LLM（本期只用 tools）
-- Plugin 的热重载（修改后需重新开始 thread）
+- 第三方 plugin 分发市场、自动更新或签名校验。
+- Plugin 沙盒、安全隔离和权限 UI 的完整设计。
+- MCP `resources` / `prompts` 作为 plugin 对外能力暴露。
+- 将 workspace / file 工具迁移为 dynamic tools；这些 Node/core 侧工具继续保留现有 workspace 沙箱与 thread 权限模型。
+- 让 Swift desktop 直接持有 `/api/thread` client 或直接创建 thread。
 
 ## Use Cases
 
-### UC1: 用户选择 plugin 并在对话中使用
+### UC1: 默认 macOS 能力作为 dynamic tools 进入 thread
 
-- 触发：用户在 PromptPanel 输入 trigger 或搜索，看到按 skill / plugin 分栏的列表，选中一个 plugin（如 "screen-reader"），作为 chip 出现在 composer 中
-- 结果：提交后 agent-server 创建 thread 时 spawn screen-reader binary，其 tools 可被 LLM 调用
+- 触发：用户通过 PromptPanel、ThreadWindow 新建空白 thread，或后台 AgentTrigger 创建 thread。
+- 结果：Swift 宿主提供的默认 host dynamic tools 被写入 `thread.start.payload.dynamicTools`，并随 thread metadata 持久化；未激活前模型仍只看到 `use_tools`。
 
-### UC2: 常驻 plugin 自动附加
+### UC2: LLM 激活工具后调用默认 host tool
 
-- 触发：用户在 plugin 设置页面将某个 plugin 设为"常驻触发"
-- 结果：每次新建 thread 时，该 plugin 自动 spawn 并注入，无需手动选择
+- 触发：LLM 在某个 thread 中调用 `use_tools`。
+- 结果：该 thread 的 builtin Node tools、MCP tools 和 dynamic tools 一起暴露；后续 LLM 调用如 `host_macos.screen_capture` 时，core 发出 dynamic tool call request，Swift provider 执行并回传结果。
 
-### UC3: 多 plugin + 多 skill 同时使用
+### UC3: Swift 控制 plugin 生命周期
 
-- 触发：用户在一次提交中同时选中 2 个 plugin 和 1 个 skill
-- 结果：2 个 plugin binary 同时 spawn，各自的 tools 都注册到 thread，skill 的 prompt 也一并注入
+- 触发：用户启用常驻 plugin，或选择某个只提供 tool 的 plugin。
+- 结果：Swift 启动并管理对应 plugin；plugin 注册的 dynamic tools 加入新 thread 的候选集合，或按用户选择加入指定 thread 的候选集合。agent-server 不拥有 plugin 进程。
 
-### UC4: Thread 结束时清理 plugin 进程
+### UC4: 多调用端共享同一 dynamic tool 模型
 
-- 触发：thread 结束（用户关闭、超时、或 agent idle）
-- 结果：该 thread 关联的所有 MCP 进程（含 plugin）被 close/kill，资源释放
+- 触发：未来浏览器扩展或开发者自建前端连接 agent-server 并注册 tool provider。
+- 结果：调用端只需提供 `DynamicToolSpec` 和处理 tool call request / response；core runtime 不需要区分工具来自 Swift、plugin、浏览器扩展还是自建前端。
 
-### UC5: Plugin 开发者创建 plugin
+### UC5: Dynamic tools 可恢复和可审计
 
-- 触发：开发者在 `~/.spotAgent/plugins/<id>/` 放置 `plugin.json` manifest 和编译好的 binary
-- 结果：HandAgent 启动时或 PromptPanel 展示时扫描到该 plugin，列入可选列表
+- 触发：thread 被持久化、恢复或历史回放。
+- 结果：thread metadata 中保存创建时的 `dynamicTools`，恢复后仍能知道该 thread 允许哪些 dynamic tools；动态工具调用过程以 request / response 事件进入审计和历史记录。

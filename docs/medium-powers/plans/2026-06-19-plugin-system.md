@@ -1,382 +1,359 @@
 # Plugin System Implementation Plan
 
-## UC1: 用户选择 plugin 并在对话中使用（含 UC3 多 plugin）
+## UC1: Dynamic tool 数据模型与持久化
 
 ### Goal
 
-用户在 PromptPanel 选择一个或多个 plugin 后，提交触发 thread 创建。agent-server 在 thread 创建时 spawn 对应 plugin binary 进程（MCP stdio），初始化连接、拉取 tools、注册到 thread 的 ToolRegistry，并将 plugin prompt 注入 system prompt。LLM 可调用 plugin tool，通过 MCP `tools/call` 执行。
+将 `dynamicTools` 从 thread-store 雏形提升为 core 协议能力。thread 创建时可以携带 dynamic tool 候选集合；thread metadata 持久化该集合；runtime 在 `use_tools` 激活后把集合注册进当前 thread 的工具表。
 
 ### Existing Flow Inventory
 
-1. **PromptPanel → Electron**：Swift `PromptPanelViewModel.submit()` 产出 `[PromptPanelComposerItem]`，经 `AppCoordinator` 发送 `thread_window.open_initial_prompt` command 给 Electron，payload 是 `InitialPromptPayload { clientRequestId, userInput: UserInput }`。
-2. **UserInput → agent-server**：`UserInput { items: InputItem[] }`，其中 `SkillInputItem { type: "skill", id, actionId, title, prompt }` 传递 skill 信息。
-3. **Thread 创建**：React 发 `thread.start` command → `ThreadCommandRouter.handleCreateThread` → `ThreadPersistence.createThread`。thread 创建后，首轮 `op.submit` 带 `UserInput`。
-4. **MCP 管理**：`MCPServerRegistry`（server 级单例，lazy init）+ `ThreadScopedToolRegistry`（thread 级工具表）。`ThreadScopedToolRegistry.activate(threadId)` 时拉取全局 MCP tools。
-5. **System prompt**：`AgentRuntime` 持有 `systemPromptSections: SystemPromptSection[]`，每轮 LLM 调用前 resolve 为 system messages。
-6. **Skill prompt 注入**：当前 skill prompt 通过 `SkillInputItem.prompt` 作为用户消息的一部分进入 LLM（不是 system prompt），由 `MessageTranslator.composeUserInputContent` 处理。
+1. `ThreadStartCommand.payload` 当前只有 `workspaceId`。
+2. `packages/thread-store` 已有 `DynamicToolSpec`、`CreateThreadParams.dynamicTools`、`SessionMeta.dynamicTools` 和 `dynamic_tools_json` 存储字段。
+3. `ThreadPersistence.createThread(preview?, workspaceId?)` 当前没有接收 dynamic tools。
+4. `ThreadScopedToolRegistry` 当前负责 `use_tools` 懒加载、builtin tools 和全局 MCP tools。
+5. core 还没有正式的 dynamic tool DTO、handler 或 request / response 协议。
 
 ### Core Structure
 
 ```typescript
-// packages/core/src/mcp/MCPConfig.ts — 扩展 plugin manifest
-export type PluginManifest = {
-  id: string;
-  title: string;
-  description?: string;
-  version: number;
-  transport: "stdio";
-  command: string;  // binary 相对路径或绝对路径
-  args?: string[];
-  env?: Record<string, string>;
-  prompt?: string;  // 注入 system prompt 的提示词
+// packages/core/src/protocol/DynamicTool.ts
+export type DynamicToolSpec = {
+  namespace?: string;
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  deferLoading?: boolean; // 默认 false；为后续延迟加载策略预留
 };
 
-// packages/core/src/protocol/Op.ts — 新增 PluginInputItem
-export type PluginInputItem = {
-  type: "plugin";
-  id: string;
-  pluginId: string;
-  title: string;
-  prompt?: string;
+export type DynamicToolCallRequestPayload = {
+  threadId: string;
+  turnId: string;
+  callId: string;
+  namespace?: string;
+  tool: string;
+  arguments: unknown;
 };
 
-export type InputItem =
-  | TextInputItem
-  | ImageInputItem
-  | SkillInputItem
-  | PluginInputItem
-  | TextSelectionInputItem;
-
-// apps/agent-server/src/actions/MCPServerRegistry.ts — 改为 thread-scoped
-// MCPServerRegistry 不再是全局单例，每个 thread 创建自己的实例
-// 构造时接收 server configs（含全局 MCP + 选中 plugin），统一 initialize
-
-export class MCPServerRegistry {
-  constructor(options: {
-    createClient: (serverId: string) => MCPClient;
-    serverIds: string[];  // 新增：声明式传入需要初始化的 server 列表
-  }) {}
-
-  async initializeAll(): Promise<void>;  // 新增：启动所有声明的 server
-  async listAllTools(): Promise<AgentTool[]>;  // 新增：合并所有 server tools
-  pluginPrompts(): string[];  // 新增：返回所有 plugin 的 prompt 文本
-  async closeAll(): Promise<void>;
-}
+export type DynamicToolCallResponsePayload = {
+  callId: string;
+  success: boolean;
+  contentItems: Array<
+    | { type: "inputText"; text: string }
+    | { type: "inputImage"; imageUrl: string }
+  >;
+};
 ```
 
-```swift
-// apps/desktop/Sources/PromptPanel/ActionDefinition.swift — 扩展
-enum ActionSubmission: Equatable {
-    case appendSkill
-    case plugin  // 新增
-}
+`packages/thread-store` 不再维护自己的 `DynamicToolSpec` 形状，改为引用 core DTO，继续复用现有 `dynamic_tools_json` 存储列。
 
-struct ActionDefinition: Equatable, Identifiable {
-    let id: String
-    let trigger: String
-    let title: String
-    let description: String?
-    let template: String
-    let icons: [ActionIconDefinition]
-    let defaultShortcut: KeyboardShortcuts.Shortcut?
-    let submission: ActionSubmission
-    let type: ActionType  // 新增：用于列表分栏
+### Use case map
 
-    enum ActionType: Equatable {
-        case skill
-        case plugin
+```mermaid
+flowchart LR
+  A["thread.start payload.dynamicTools"] --> B["ThreadCommandRouter.handleCreateThread"]
+  B --> C["ThreadPersistence.createThread({ dynamicTools })"]
+  C --> D["ThreadStore session_meta.dynamicTools + dynamic_tools_json"]
+  D --> E["ThreadScopedToolRegistry 候选集合"]
+  E --> F["未激活：只暴露 use_tools"]
+  F --> G["LLM 调用 use_tools"]
+  G --> H["builtin + MCP + dynamic tools 暴露给当前 thread"]
+```
+
+### Implementation loops
+
+**Loop 1: core DTO**
+- 新增 `packages/core/src/protocol/DynamicTool.ts`。
+- `ThreadCommand.ts` 的 `ThreadStartCommand.payload` 增加 `dynamicTools?: DynamicToolSpec[]`。
+- server Zod schema 校验 `dynamicTools`：`namespace/name` 只允许 ASCII 字母、数字、`_`、`-`；禁止空白、重复和保留 namespace。
+
+**Loop 2: persistence**
+- `ThreadPersistence.createThread` 接收对象参数：`{ preview?, workspaceId?, dynamicTools? }`。
+- `ThreadCommandRouter.handleCreateThread` 把 command 中的 `dynamicTools` 传入 persistence。
+- `packages/thread-store` 复用已有 `dynamic_tools_json`，补测试验证创建、持久化、恢复后 `session_meta.dynamicTools` 不丢失。
+
+**Loop 3: tool registry**
+- `ThreadScopedToolRegistry` 为每个 thread 保存 `dynamicTools` 候选集合。
+- 未激活 thread 仍只暴露 `use_tools`。
+- 调用 `use_tools` 后，registry 将 dynamic tools 包装为 `AgentTool` 并加入当前 thread 工具表。
+
+### Tests
+
+- `packages/core/tests/protocol/dynamic-tools.test.ts`：DTO 校验、重复 name / namespace 拒绝。
+- `packages/thread-store/tests/thread-store-use-cases.test.ts`：`dynamicTools` 写入 `session_meta` 并恢复。
+- `apps/agent-server/tests/thread/ThreadCommandRouter.test.ts`：`thread.start.payload.dynamicTools` 传入 persistence。
+- `apps/agent-server/tests/actions/thread-scoped-tool-registry.test.ts`：未激活只见 `use_tools`，激活后可见 dynamic tools。
+
+---
+
+## UC2: Dynamic tool call request / response 路由
+
+### Goal
+
+core runtime 不直接执行 dynamic tool，而是发出 request，等待对应 provider 回 response。agent-server 负责把 request 转给 provider，并把 response 投回当前 runtime。
+
+### Existing Flow Inventory
+
+1. `AgentRuntime` 当前直接从 `ToolRegistry.get(name)` 取 `AgentTool.call()`。
+2. `ServerRequest` / `ClientResponse` 已覆盖 permission / workspace 的 UI 回执，但不适合复用给 provider，因为 provider 不一定是 React ThreadWindow。
+3. Codex dynamic tool 模型是：dynamic tool handler 发 request event，app-server 转为 provider request，provider response 回到 pending call。
+
+### Core Structure
+
+```typescript
+export type DynamicToolProviderMessage =
+  | {
+      channel: "dynamic_tools";
+      type: "provider_hello";
+      providerId: string;
+      tools: DynamicToolSpec[];
     }
-}
+  | {
+      channel: "dynamic_tools";
+      type: "tool_call_request";
+      payload: DynamicToolCallRequestPayload;
+    }
+  | {
+      channel: "dynamic_tools";
+      type: "tool_call_response";
+      payload: DynamicToolCallResponsePayload;
+    };
 ```
+
+生产通道使用新的 WebSocket：`/api/dynamic-tools`。该通道取代 `/api/platform`，并允许 Swift desktop、plugin host、浏览器扩展和开发者前端作为 provider 连接。
+
+### Use case map
+
+```mermaid
+sequenceDiagram
+  participant LLM
+  participant Core as core AgentRuntime
+  participant Server as agent-server DynamicToolBridge
+  participant Provider as Swift/plugin/browser provider
+
+  LLM->>Core: tool_call host_macos.screen_capture(args)
+  Core->>Server: DynamicToolCallRequest
+  Server->>Provider: tool_call_request
+  Provider-->>Server: tool_call_response
+  Server-->>Core: DynamicToolCallResponse
+  Core-->>LLM: tool result
+```
+
+### Implementation loops
+
+**Loop 1: dynamic tool adapter**
+- 新增 core `DynamicToolAdapter`，把 `DynamicToolSpec` 包装成 `AgentTool`。
+- `call()` 不直接执行能力，而是调用注入的 `DynamicToolBridge.call(payload)`。
+- bridge 以 `threadId + toolCallId` 追踪 pending response，断连或超时返回可读错误。
+
+**Loop 2: agent-server provider bridge**
+- 新增 `apps/agent-server/src/bridges/WebSocketDynamicToolBridge.ts`。
+- 新增 `/api/dynamic-tools` socket handler。
+- 支持 provider hello、provider detach、tool call request、tool call response。
+- 同一 tool spec 必须能定位到 provider；provider 断开后，该 provider 的 pending call 全部失败。
+
+**Loop 3: runtime event / audit**
+- dynamic tool call 开始和结束写入 thread audit event，至少包含 `toolName`、`arguments`、`status`、`durationMs`。
+- 历史回放能看到 dynamic tool call request / response 的最终状态。
+
+### Tests
+
+- `packages/core/tests/runtime/dynamic-tool-runtime.test.ts`：LLM 调用 dynamic tool，bridge 收到 request，response 回灌后 runtime 继续。
+- `apps/agent-server/tests/bridges/dynamic-tool-bridge.test.ts`：provider 注册、调用路由、断连失败、超时失败。
+- `apps/agent-server/tests/use-cases/dynamic-tools.test.ts`：从 `thread.start.dynamicTools` 到 tool call response 的完整链路。
+
+---
+
+## UC3: 删除 `/api/platform` 并迁移默认 macOS tools
+
+### Goal
+
+删除专用 platform bridge。原先依赖 Swift/macOS 的平台工具改为 Swift 默认 dynamic tools，不再通过 `PlatformAdapter` / `RemotePlatformAdapter` 调用。
+
+### Existing Flow Inventory
+
+1. `/api/platform` 由 agent-server `attachPlatformSocketHandlers` 挂载。
+2. Swift `PlatformBridgeConnectionClient` 连接 `/api/platform`，`PlatformBridgeService` 分发到 `MacPlatformProvider`。
+3. core `RemotePlatformAdapter` 通过 `PlatformBridge.call()` 调用 `clipboard.read`、`screen.capture`、`accessibility.*` 等方法。
+4. platform 类 builtin tools 依赖 `PlatformAdapter`。
+
+### Migration target
+
+Swift desktop 默认注册 `host_macos` namespace：
+
+| Dynamic tool | 迁移来源 |
+| --- | --- |
+| `host_macos.clipboard_read` | `clipboard.read` |
+| `host_macos.app_list` | `app.list` |
+| `host_macos.app_frontmost` | `app.frontmost` |
+| `host_macos.window_list` | `window.list` |
+| `host_macos.screen_capture` | `screen.capture` |
+| `host_macos.ocr_read` | `ocr.read` |
+| `host_macos.accessibility_snapshot` | `accessibility.snapshot` |
+| `host_macos.accessibility_action` | `accessibility.action` |
+
+名称使用 dynamic tool 兼容的 `_` 风格；LLM 看到的是 namespace + tool，而不是点号 builtin name。
 
 ### Use case map
 
 ```mermaid
 flowchart LR
-    A["用户在 PromptPanel 选择 plugin<br/>→ PromptPanelComposerItem.plugin(PluginInputItem)"] --> B["Swift submit → Electron open_initial_prompt<br/>→ React 收到 InitialPromptPayload"]
-    B --> C["React 发 thread.start + op.submit<br/>UserInput.items 包含 PluginInputItem"]
-    C --> D["ThreadCommandRouter.handleCreateThread<br/>创建 thread"]
-    D --> E["handleOpSubmit → 解析 UserInput.items 中的 plugin items<br/>→ 创建 thread-scoped MCPServerRegistry"]
-    E --> F["MCPServerRegistry.initializeAll()<br/>spawn plugin binary，MCP initialize + tools/list"]
-    F --> G["tools 注册到 ThreadScopedToolRegistry<br/>plugin prompts 注入 systemPromptSections"]
-    G --> H["AgentRuntime.run 时 LLM 看到 plugin tools + prompt<br/>→ tools/call → MCPServerRegistry → plugin binary"]
-    H --> I["tool result 返回 → LLM 继续推理"]
+  A["Swift App 启动"] --> B["连接 /api/dynamic-tools"]
+  B --> C["provider_hello: host_macos tools"]
+  C --> D["Swift/Electron/React 创建 thread 时携带默认 dynamicTools"]
+  D --> E["LLM use_tools 后看到 host_macos.*"]
+  E --> F["tool_call_request 回到 Swift 执行 MacPlatformProvider 等价能力"]
 ```
 
-**Loop 1: PromptPanel → UserInput**
-- Input: 用户选择 plugin action
-- Consumer: `PromptPanelViewModel.submit()`
-- 处理: 产出 `PromptPanelComposerItem.plugin(PluginInputItem)`，包含 pluginId、title、prompt
-- Output: `UserInput { items: [..., PluginInputItem] }` 进入 `InitialPromptPayload`
-- 需实现: Swift `ActionDefinition.plugin()` 工厂方法 + `PromptPanelComposerItem` 增加 `.plugin` case + electron `UserInput` schema 增加 `PluginInputItem`
+### Implementation loops
 
-**Loop 2: agent-server thread 创建 → MCP 进程启动**
-- Input: `UserInput.items` 中的 `PluginInputItem[]`
-- Consumer: agent-server 在 thread 首轮处理时（`ThreadRuntimeOrchestrator` 或 `server.ts` 组合根中）
-- 处理: 根据 pluginId 查找 manifest → 创建 thread-scoped `MCPServerRegistry` 实例 → 调用 `initializeAll()` spawn 所有 plugin binary + 全局 MCP server
-- Output: initialized `MCPServerRegistry` 绑定到 thread
-- 需实现: `readPluginManifests(pluginsDir)` 函数、`MCPServerRegistry` 改造为声明式初始化、thread 创建时的 MCP 绑定逻辑
+**Loop 1: Swift provider**
+- 新增 Swift `DynamicToolProviderConnectionClient`，连接 `/api/dynamic-tools`。
+- 复用现有 `MacPlatformProvider` 的能力实现，但输出 dynamic tool response。
+- `PlatformBridgeConnectionClient`、`PlatformBridgeService`、`PlatformBridgeMessage` 和 `/api/platform` 挂载删除。
 
-**Loop 3: tools 注册 + prompt 注入**
-- Input: initialized `MCPServerRegistry`（含 plugin tools）
-- Consumer: `ThreadScopedToolRegistry.activate(threadId)`
-- 处理: 从 `MCPServerRegistry.listAllTools()` 获取所有 tool → 注册到 thread 的 `ToolRegistry`；从 `MCPServerRegistry.pluginPrompts()` 获取 prompt → 作为额外 `SystemPromptSection` 注入
-- Output: thread 的 `AgentRuntime` 可看到所有 tools + plugin prompts
-- 需实现: `ThreadScopedToolRegistry` 支持 thread-scoped MCP registry、`AgentRuntime` 支持动态 system prompt sections
+**Loop 2: default tools 传递**
+- Swift 生成默认 `DynamicToolSpec[]`。
+- Electron ThreadWindow preload config 增加 `defaultDynamicTools`，来源是 Swift host/provider 当前可用工具集合。
+- `ElectronInitialPromptPayload` 增加 `dynamicTools`。
+- Electron protocol 和 preload initial prompt payload 同步增加 `dynamicTools`。
+- React `InitialPromptPayload` 增加 `dynamicTools`。
+- `ThreadSocketClient.startInitialPrompt` 把 `prompt.dynamicTools` 写入 `thread.start.payload.dynamicTools`。
+- ThreadWindow 新建空白 thread 和后台 AgentTrigger 创建 thread 也必须携带默认 host dynamic tools，避免入口不一致。
 
-**Loop 4: LLM 调用 plugin tool**
-- Input: LLM 输出 tool_call（name = `mcp.<pluginId>.<toolName>`）
-- Consumer: `AgentRuntime.handleToolCall` → `ToolRegistry.get(name)` → `MCPToolAdapter.call`
-- 处理: `MCPToolAdapter` 调用 `MCPClient.callTool(name, args)` → stdin JSON-RPC 到 plugin binary
-- Output: tool result 回到 LLM
-- 需实现: 复用现有 `MCPToolAdapter` + `StdioMCPClient`，无需额外实现
+**Loop 3: remove platform abstractions**
+- core 删除 `PlatformBridge`、`RemotePlatformAdapter` 和 platform 类 builtin 注册。
+- `registerTools` 保留 workspace/file 类工具和不依赖 Swift 的 Node/core 工具。
+- `packages/core/src/tools/tools.md`、`packages/core/src/platform/platform.md` 和上层架构文档同步更新。
 
-**Integration test:** `apps/agent-server/tests/use-cases/plugin-lifecycle.test.ts`
+### Tests
 
-```typescript
-describe("plugin lifecycle", () => {
-  // 准备一个 mock plugin binary（简单 MCP server：echo tool）
-  // 构造 thread 创建流程，UserInput 包含 PluginInputItem
-  // 验证：plugin binary 被 spawn、tools 注册到 thread、LLM 可调用 tool、tool result 返回
-  // 验证：plugin prompt 出现在 system messages 中
-
-  it("spawns plugin MCP server on thread start and registers tools", async () => {
-    // 1. 创建 mock plugin manifest + binary（node script 实现 MCP protocol）
-    // 2. startServer with plugin config
-    // 3. 发送 thread.start + op.submit（含 PluginInputItem）
-    // 4. 等待 thread running
-    // 5. 验证 thread tool registry 包含 plugin tools
-    // 6. 验证 system prompt 包含 plugin prompt
-  });
-
-  it("routes tool call to plugin binary via MCP protocol", async () => {
-    // 1. 用 MockLLMClient 让 LLM 调用 plugin tool
-    // 2. 验证 plugin binary 收到 tools/call
-    // 3. 验证 tool result 返回到 runtime
-  });
-
-  it("supports multiple plugins in one thread", async () => {
-    // UserInput 含 2 个 PluginInputItem
-    // 验证 2 个 binary 都 spawn
-    // 验证两个 plugin 的 tools 都注册
-  });
-});
-```
+- Swift `DynamicToolProviderConnectionClientTests`：连接后发送 provider hello、收到 request 后回 response。
+- Swift `MacHostDynamicToolsTests`：默认 tool specs 与 provider dispatch table 一致。
+- Electron protocol tests：initial prompt payload 保留 `dynamicTools`。
+- ThreadWindow initial prompt flow tests：`thread.start` 携带 `dynamicTools`。
+- agent-server server tests：`/api/platform` 不再挂载，`/api/dynamic-tools` 可连接。
 
 ---
 
-## UC4: Thread 结束时清理 plugin 进程
+## UC4: Swift 控制 plugin 生命周期
 
 ### Goal
 
-Thread 结束时（用户关闭、idle timeout、delete），该 thread 关联的所有 MCP 进程被 close/kill。
+Plugin 进程生命周期归 Swift desktop 管理。agent-server 不读取 plugin binary、不 spawn plugin、不按 thread 清理 plugin 进程。
 
-### Existing Flow Inventory
+### Lifecycle model
 
-1. **Thread 删除**：`ThreadCommandRouter.handleDeleteThread` → `AgentManager.delete(threadId)` → `agent.close()`。
-2. **当前 MCP 清理**：全局 `MCPServerRegistry.closeAll()` 只在 server 关闭时调用。
-3. **Runtime 清理**：`runtimeByThread.delete(threadId)` 在 thread delete 时调用（`server.ts` 中 `onThreadDeleted` callback）。
+| Plugin 类型 | 生命周期 owner | dynamic tools 进入方式 |
+| --- | --- | --- |
+| 默认 host tools | Swift App | 所有 Swift 宿主创建的 thread 默认携带 |
+| 常驻 plugin | Swift App / plugin manager | App 启动或设置启用后运行，注册 tools；新 thread 默认携带 |
+| 按需 tool plugin | Swift App / plugin manager | 用户选择或设置触发后启动，注册 tools；指定 thread 或后续新 thread 携带 |
 
-### Core Structure
+### Manifest shape
 
-```typescript
-// thread 删除/关闭时的清理钩子
-// server.ts onThreadDeleted callback 扩展：
-const onThreadDeleted = (threadId: string) => {
-  runtimeByThread.delete(threadId);
-  threadScopedMcpRegistries.get(threadId)?.closeAll();
-  threadScopedMcpRegistries.delete(threadId);
-};
-```
-
-### Use case map
-
-```mermaid
-flowchart LR
-    A["用户发送 thread.delete / thread 关闭"] --> B["ThreadCommandRouter.handleDeleteThread"]
-    B --> C["AgentManager.delete(threadId)"]
-    C --> D["onThreadDeleted callback"]
-    D --> E["threadScopedMcpRegistries.get(threadId).closeAll()"]
-    E --> F["每个 MCPClient.close() → kill stdio child process"]
-```
-
-- Input: thread 删除事件
-- Consumer: `onThreadDeleted` callback
-- 处理: 从 `threadScopedMcpRegistries` Map 取出该 thread 的 `MCPServerRegistry` → `closeAll()`
-- Output: 所有 plugin child process 被 terminate
-- 需实现: `threadScopedMcpRegistries: Map<string, MCPServerRegistry>` 在 server.ts 中维护
-
-**Integration test:** 同 `plugin-lifecycle.test.ts`
-
-```typescript
-it("kills plugin processes when thread is deleted", async () => {
-  // 1. 启动带 plugin 的 thread
-  // 2. 验证 plugin process running
-  // 3. 发送 thread.delete
-  // 4. 验证 plugin process 已退出
-});
-```
-
----
-
-## UC5: Plugin 开发者创建 plugin（发现与 manifest 解析）
-
-### Goal
-
-agent-server 启动时扫描 `~/.spotAgent/plugins/` 目录，解析每个 plugin 的 `plugin.json` manifest，验证格式，产出可用 plugin 列表供 PromptPanel 使用。
-
-### Existing Flow Inventory
-
-1. **现有 skill 发现**：electron `readAvailableSkillsFromPluginsDirectory(pluginsDirectoryURL)` 在 `apps/electron-shell/src/main/availableSkills.ts` 中实现，扫描 `~/.spotAgent/plugins/` 下的 `plugin.json`。
-2. **传递给 ThreadWindow**：通过 `ThreadWindowPrewarmer` 的 `additionalArguments` 传递 `availableSkills` 给 renderer。
-
-### Core Structure
-
-```typescript
-// packages/core/src/mcp/PluginManifest.ts — 新文件
-export type PluginManifest = {
-  id: string;
-  version: number;
-  title: string;
-  description?: string;
-  prompt?: string;
-  transport: "stdio";
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-};
-
-export type AvailablePlugin = {
-  pluginId: string;
-  title: string;
-  description?: string;
-  prompt?: string;
-  trigger: string;
-  binaryPath: string;
-  args?: string[];
-  env?: Record<string, string>;
-};
-
-export function parsePluginManifest(data: unknown, pluginDir: string): PluginManifest | null;
-export function readAvailablePlugins(pluginsDir: string): AvailablePlugin[];
-```
-
-### Use case map
-
-```mermaid
-flowchart LR
-    A["agent-server 启动 / electron prewarmer 创建"] --> B["readAvailablePlugins(~/.spotAgent/plugins/)"]
-    B --> C["遍历子目录，读 plugin.json"]
-    C --> D["parsePluginManifest 验证格式"]
-    D --> E["产出 AvailablePlugin[]"]
-    E --> F["传递给 ThreadWindowPrewarmer → React PromptPanel"]
-```
-
-- Input: `~/.spotAgent/plugins/` 目录
-- Consumer: `readAvailablePlugins`
-- 处理: 遍历子目录 → 读 `plugin.json` → zod schema 验证 → 解析 binary 路径
-- Output: `AvailablePlugin[]`
-- 需实现: `parsePluginManifest`（zod schema）+ `readAvailablePlugins`
-
-**Integration test:** unit test 即可
-
-```typescript
-// packages/core/tests/mcp/plugin-manifest.test.ts
-describe("parsePluginManifest", () => {
-  it("parses valid manifest", () => { /* ... */ });
-  it("rejects manifest without command", () => { /* ... */ });
-  it("rejects manifest with version !== 1", () => { /* ... */ });
-});
-```
-
----
-
-## UC2: 常驻 plugin 自动附加
-
-### Goal
-
-用户在设置页面标记某个 plugin 为"常驻触发"后，每次新建 thread 自动附加该 plugin（无需手动选择）。
-
-### Existing Flow Inventory
-
-1. **Settings 持久化**：`~/.spotAgent/settings.json` 由 Swift desktop 写入。
-2. **agent-server 读 settings**：`SettingsBackedLLMClient` / `SettingsBackedToolRegistry` 从 settings.json 热加载。
-
-### Core Structure
-
-```typescript
-// ~/.spotAgent/settings.json 新增字段
+```json
 {
-  "alwaysOnPlugins": ["screen-reader", "browser-control"]
+  "version": 1,
+  "id": "screen-reader",
+  "title": "Screen Reader",
+  "description": "Read and act on visible UI",
+  "lifecycle": "alwaysOn",
+  "command": "bin/screen-reader",
+  "args": [],
+  "tools": [
+    {
+      "namespace": "screen_reader",
+      "name": "snapshot",
+      "description": "Read the current screen state",
+      "inputSchema": { "type": "object", "properties": {} }
+    }
+  ]
 }
-
-// agent-server 在 thread 创建时合并用户选择的 plugins + alwaysOnPlugins
-type ResolvedPluginsForThread = {
-  fromUserSelection: string[];   // UserInput 中的 PluginInputItem
-  fromAlwaysOn: string[];        // settings.json alwaysOnPlugins
-  merged: AvailablePlugin[];     // 去重后的最终列表
-};
 ```
+
+`lifecycle` 初始支持：
+
+- `alwaysOn`：App 启动或用户启用后持续运行。
+- `onDemand`：用户选择或设置触发后启动。
+- `toolsOnly`：不需要后台工作，只在被调用前由 Swift 确保可用。
+
+### Implementation loops
+
+**Loop 1: Swift plugin manager**
+- 扫描 `~/.spotAgent/plugins/<id>/plugin.json`。
+- 验证 manifest 并产出 action / settings 列表。
+- 按 lifecycle 启动或停止 plugin。
+- 将 plugin tools 合并进 Swift 可提供的 dynamic tool specs。
+
+**Loop 2: provider dispatch**
+- plugin tool call request 先到 Swift provider。
+- Swift 根据 namespace/tool 路由到 host capability 或对应 plugin。
+- plugin 的内部协议本期由 Swift 侧决定；agent-server 不感知。
+
+**Loop 3: PromptPanel / Settings**
+- PromptPanel 继续展示 skill / plugin action。
+- 选择 plugin 不表示 agent-server spawn 进程，只表示该 thread 的 dynamicTools 候选集合追加对应 plugin tools 和 prompt。
+- Settings 负责启用、禁用和 lifecycle 偏好。
+
+### Tests
+
+- Swift manifest parser tests。
+- Swift plugin lifecycle manager tests：alwaysOn 启动、onDemand 延迟启动、禁用后停止。
+- PromptPanel tests：选择 plugin 后 initial prompt 带对应 dynamic tools。
+
+---
+
+## UC5: `use_tools` 懒加载语义保持不变
+
+### Goal
+
+dynamic tools 默认进入 thread 候选集合，但不代表立即暴露给 LLM。未激活 thread 仍只暴露 `use_tools`，减少普通对话里的工具噪音。
 
 ### Use case map
 
 ```mermaid
 flowchart LR
-    A["thread 创建，解析 UserInput plugins"] --> B["读取 settings.json alwaysOnPlugins"]
-    B --> C["合并去重 → merged plugin list"]
-    C --> D["MCPServerRegistry 按 merged list 初始化"]
+  A["thread metadata.dynamicTools 存在 host/plugin tools"] --> B["registryForThread(threadId)"]
+  B --> C["未激活：ToolRegistry = use_tools"]
+  C --> D["LLM 调用 use_tools"]
+  D --> E["activate(threadId)"]
+  E --> F["ToolRegistry = builtin Node tools + MCP tools + dynamic tools"]
 ```
 
-- Input: UserInput 中的 plugin ids + settings.json `alwaysOnPlugins`
-- Consumer: thread 创建时的 plugin 解析逻辑
-- 处理: 合并、去重
-- Output: 最终需要 spawn 的 plugin 列表
-- 需实现: settings.json schema 扩展 + agent-server 读取 `alwaysOnPlugins` + 合并逻辑
+### Implementation loops
 
-**Integration test:** 在 `plugin-lifecycle.test.ts` 中追加
+- `ThreadScopedToolRegistry` 的激活状态继续作为唯一开关。
+- `dynamicTools` 候选集合不受 `settings.tools.allowlist/denylist` 直接过滤；provider 自身是否启用由 Swift/plugin 设置控制。
+- 激活后若某 provider 不在线，对应 dynamic tool 调用返回明确错误，而不是隐藏 tool spec。
+- `use_tools` 返回文案更新，说明已启用的工具来源包括 host/plugin dynamic tools。
 
-```typescript
-it("auto-attaches always-on plugins without user selection", async () => {
-  // 配置 alwaysOnPlugins = ["echo-plugin"]
-  // 发送 thread.start + op.submit（不含 PluginInputItem）
-  // 验证 echo-plugin 仍被 spawn 并注册 tools
-});
-```
+### Tests
+
+- 未激活：`registry.list()` 只包含 `use_tools`。
+- 激活：包含 host dynamic tools。
+- provider 离线：tool call 返回 provider offline 错误并写入 audit event。
 
 ---
 
-## Swift PromptPanel 展示层（UC1 + UC2 前端联动）
+## 文档更新范围
 
-### Goal
-
-PromptPanel 按 skill / plugin 分栏展示 action 列表，plugin 使用和 skill 相同的 trigger/搜索/chip 交互。
-
-### Existing Flow Inventory
-
-1. **ActionDefinition.buildActions(from:)**：从 manifests 产出 enabled/disabled action 列表。
-2. **PromptPanelViewModel.filteredActions**：使用 `ActionDefinition.filter` 过滤。
-3. **appendSkill**：选中 action 后以 chip 形式追加到 composer items。
-
-### Core Structure
-
-见上方 `ActionDefinition` Swift 扩展。关键变更：
-
-- `ActionSubmission` 增加 `.plugin`
-- `ActionDefinition` 增加 `type: ActionType`（`.skill` / `.plugin`）
-- `PromptPanelComposerItem` 增加 `.plugin(PluginInputItem)` case
-- `buildActions` 同时解析 plugin manifest（新增 `buildPluginActions` 分支）
-- `filteredActions` 改为按 type 分组返回，UI 分栏渲染
-
-### Use case map
-
-不单独写 integration test。Swift 侧的测试在 `PromptPanelViewModelTests.swift` 中扩展。
-
----
+- [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md)：删除 `/api/platform` 架构描述，新增 `/api/dynamic-tools`。
+- [apps/apps.md](/Users/mu9/proj/handAgent/apps/apps.md)：Swift 不再处理 platform bridge，改为 dynamic tool provider。
+- [apps/desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md)：新增 Swift host/plugin lifecycle 职责，删除 `/api/platform` 说明。
+- [apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：新增 dynamic tools socket，删除 platform socket。
+- [packages/core/core.md](/Users/mu9/proj/handAgent/packages/core/core.md) 与 [packages/core/src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)：说明 dynamic tool runtime 和 platform abstraction 删除。
+- [packages/core/src/tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md)：更新工具来源和 builtin tool 列表。
+- [packages/core/src/platform/platform.md](/Users/mu9/proj/handAgent/packages/core/src/platform/platform.md)：实现时删除或改为历史迁移说明。
+- [docs/manual-qa.md](/Users/mu9/proj/handAgent/docs/manual-qa.md)：实现完成后补 Swift host dynamic tools 和 plugin 生命周期手测步骤。
 
 ## 实现顺序
 
-1. **UC5**（manifest 解析）→ 基础设施，其他 UC 依赖
-2. **UC1**（核心链路：选择 → spawn → tool call）→ 主功能
-3. **UC4**（thread 清理）→ 与 UC1 一起实现
-4. **UC2**（常驻 plugin）→ 增量
-5. **Swift PromptPanel**（前端展示）→ 可并行
+1. 定义 core `DynamicToolSpec` / request / response DTO，并接入 `thread.start.payload.dynamicTools`。
+2. 打通 thread-store `dynamicTools` 持久化与恢复测试。
+3. 实现 core `DynamicToolAdapter` 和 agent-server `WebSocketDynamicToolBridge`。
+4. 保持 `use_tools` 懒加载语义，激活后注册 dynamic tools。
+5. Swift 新增 host dynamic tool provider，并让所有 thread 创建入口携带默认 host dynamic tools。
+6. 迁移 macOS 平台工具，删除 `/api/platform`。
+7. Swift plugin manager 接管 plugin manifest、生命周期和 provider dispatch。
+8. 更新架构文档和 manual QA。
