@@ -51,3 +51,41 @@
   8. 按 `Escape` 确认对话框关闭，thread 未被删除。
   9. 点击"取消"确认对话框关闭，thread 未被删除。
   10. 再次点击删除按钮，点击"删除"确认 thread 被删除且对话框关闭。
+
+
+### AgentTrigger 设置二级菜单与默认安装内置触发器
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/AppServices/AgentTrigger/AgentTriggerStore.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsViewModel.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView.swift`、`apps/desktop/TestsSwift/AppServices/AgentTriggerStoreTests.swift`、`apps/desktop/TestsSwift/Settings/AgentTriggerSettingsViewModelTests.swift`、`apps/desktop/Sources/Settings/settings.md`
+- 修复结论：`AgentTriggerStore` 持有内置 `chrome-bookmarks` / `system-clock` manifest 并提供幂等 `ensureBuiltinPackagesInstalled()`；`AppServices.init` 在构造 `AgentTriggerRuntime` 前调用，使首次启动 reload 即可看到内置 package。Settings → 触发器为两级：一级是已安装 package 行（左侧 name + description，右侧"N 个自动化 >"进入二级），不再有"恢复内置触发器"入口；二级顶部展示 name + description，并按 `providerKind` 渲染对应表单，新增 / 删除 / 多自动化操作均通过 `AgentTriggerSettingsViewModel.createInstanceForCurrentPackage` / `deleteInstance(id:)` 落到 store 并 reload runtime。内置 manifest 的恢复仅由 `AppServices.init` 启动期 `ensureBuiltinPackagesInstalled()` 保证（设置页内无手动恢复按钮）。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 删除 `~/.spotAgent/agent-triggers/` 后启动桌面 App，进入 Settings → 触发器，确认一级直接显示 `Chrome Bookmarks` 与 `System Clock` 两行（左 name + description，右"N 个自动化 >"），无需点"安装内置 Trigger"。
+  2. 点击 `Chrome Bookmarks` 行，确认进入二级页面，顶部看到包 name + description 与 `暂无自动化`；顶部"返回"可回一级。
+  3. 在 Chrome Bookmarks 二级点"新增自动化"，填写"标题"、"Folders"和"提示词"，保存后回到该二级页面，自动化列表出现一条；空 title 时按"保存"显示"标题不能为空"且不创建，空提示词时显示"提示词不能为空"且不创建。
+  4. 进入 System Clock 二级，连续创建两条自动化（不同时间点），确认列表显示两条，磁盘 `instances.json` 也包含两条。
+  5. 在二级页面对某条自动化点"删除"，确认列表立即移除该条，runtime reload，对应触发器停止。
+  6. 手工删除 `~/.spotAgent/agent-triggers/packages/chrome-bookmarks/`，重启桌面 App（设置页内无"恢复内置触发器"按钮），确认 Chrome Bookmarks 行由启动期 `ensureBuiltinPackagesInstalled()` 重新写入并出现，且未影响已存在的 System Clock manifest（包括用户改过 title 的情况）。
+  7. 重启桌面 App，确认所有创建的自动化仍存在并继续触发后台 thread。
+
+### AgentTrigger 新增自动化取消后错误状态残留
+
+- **严重级别**：P3
+- **复现步骤**：
+  1. 备份并移走 `~/.spotAgent/agent-triggers/` 后，执行 `bash ./scripts/swiftw run HandAgentDesktop` 启动桌面 App。
+  2. 通过菜单 `HandAgentDesktop → 设置…` 打开 Settings，进入 `触发器` 页。
+  3. 点击 `Chrome Bookmarks`，进入二级页面。
+  4. 点击 `新增自动化`，在标题为空时点击 `保存`，页面显示 `标题不能为空` 且 `~/.spotAgent/agent-triggers/instances.json` 未创建。
+  5. 点击 `取消` 或收起新增表单，回到二级详情页。
+- **实际结果**：新增表单已收起，但页面底部仍显示红色错误 `标题不能为空`。
+- **期望结果**：取消或收起新增表单后，应清除本次表单校验错误；错误不应残留在详情页。
+- **证据**：
+  - `/tmp/handagent-settings-triggers-level1.png`：一级触发器页直接显示 `Chrome Bookmarks` 与 `System Clock`。
+  - `/tmp/handagent-settings-triggers-chrome-detail.png`：Chrome Bookmarks 二级页显示包名、描述与 `暂无自动化`。
+  - `/tmp/handagent-settings-triggers-chrome-empty-title.png`：空标题保存后显示 `标题不能为空`。
+  - `/tmp/handagent-settings-after-cancel.png`：点击取消/收起后新增表单消失，但 `标题不能为空` 仍残留。
+  - `find ~/.spotAgent/agent-triggers -maxdepth 2 -type f` 仅显示内置 package 与 bridge 文件，未出现 `instances.json`，证明空标题未创建实例。
+- **初步调用链 / 根因边界**：`AgentTriggerSettingsView` 的新增表单把校验错误保存在 `AgentTriggerSettingsViewModel.saveErrorMessage`；空标题保存时 `createInstanceForCurrentPackage()` 设置该错误。`取消` 按钮和 `isAdding` 收起逻辑只执行局部 `resetForm()`，未清空 `viewModel.saveErrorMessage`，因此错误 footer 仍由父视图渲染。
+- **发现日期**：2026-06-24
+- **基线结果**：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均返回 `success`。
+- **清理状态**：原 `~/.spotAgent/agent-triggers/` 已移动到 `~/.spotAgent/qa-backup-agent-triggers-20260624-015530`；本轮 QA 创建的临时 `~/.spotAgent/agent-triggers/` 仍保留用于后续修复回归。
