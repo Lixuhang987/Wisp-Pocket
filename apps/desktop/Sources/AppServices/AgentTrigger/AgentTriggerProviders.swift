@@ -1,29 +1,17 @@
 import Foundation
 
-private struct ChromeBookmarksSnapshot: Equatable {
-    let fingerprintsByFolderId: [String: String]
-}
-
 final class ChromeBookmarksAgentTriggerProvider: AgentTriggerProvider {
     let kind = "chrome.bookmarks"
 
-    private let fileManager: FileManager
-    private let homeDirectoryURL: URL
-    private let pollInterval: Duration
+    private let eventSource: any ChromeBookmarksExtensionEventSource
     private let queue = DispatchQueue(label: "handagent.agent-trigger.chrome-bookmarks")
-    private var pollingTimer: DispatchSourceTimer?
-    private var lastSnapshotsByInstanceId: [String: ChromeBookmarksSnapshot] = [:]
     private var emit: ((AgentTriggerEvent) -> Void)?
     private(set) var instances: [AgentTriggerInstance] = []
 
     init(
-        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
-        fileManager: FileManager = .default,
-        pollInterval: Duration = .milliseconds(250)
+        eventSource: any ChromeBookmarksExtensionEventSource = ChromeBookmarksExtensionBridgeServer()
     ) {
-        self.homeDirectoryURL = homeDirectoryURL
-        self.fileManager = fileManager
-        self.pollInterval = pollInterval
+        self.eventSource = eventSource
     }
 
     func start(
@@ -33,117 +21,53 @@ final class ChromeBookmarksAgentTriggerProvider: AgentTriggerProvider {
         queue.sync {
             self.instances = instances
             self.emit = emit
-            self.lastSnapshotsByInstanceId = [:]
-            self.pollingTimer?.cancel()
-            self.refreshSnapshots(instances: instances, emitOnlyWhenChanged: false)
         }
-
-        let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + durationToDispatchInterval(pollInterval), repeating: durationToDispatchInterval(pollInterval))
-        timer.setEventHandler { [weak self] in
-            self?.refreshSnapshots(instances: instances, emitOnlyWhenChanged: true)
-        }
-        timer.resume()
-        queue.sync {
-            self.pollingTimer = timer
+        try eventSource.start { [weak self] event in
+            self?.handle(event)
         }
     }
 
     func stop() throws {
+        try eventSource.stop()
         queue.sync {
-            self.pollingTimer?.cancel()
-            self.pollingTimer = nil
             self.emit = nil
-            self.lastSnapshotsByInstanceId = [:]
             self.instances = []
         }
     }
 
-    private func refreshSnapshots(
-        instances: [AgentTriggerInstance],
-        emitOnlyWhenChanged: Bool
-    ) {
-        let current = readCurrentSnapshots()
-        guard let emit else { return }
-        for instance in instances where instance.enabled {
-            let selectedFolderIds = instance.folderIds
-            guard !selectedFolderIds.isEmpty else { continue }
-            let fingerprint = current.snapshot(for: selectedFolderIds)
-            let previous = lastSnapshotsByInstanceId[instance.id]
-            lastSnapshotsByInstanceId[instance.id] = fingerprint
-
-            guard emitOnlyWhenChanged, previous != nil, previous != fingerprint else {
-                continue
+    private func handle(_ event: ChromeBookmarksExtensionEvent) {
+        queue.async {
+            guard event.type == "handagent.bookmarks.created",
+                  event.protocolVersion == 1,
+                  let parentId = event.parentId,
+                  let title = event.title,
+                  let url = event.url,
+                  let profileId = event.profileId,
+                  let occurredAt = event.occurredAt,
+                  !url.isEmpty,
+                  let emit = self.emit else {
+                return
             }
 
-            emit(
-                AgentTriggerEvent(
-                    triggerInstanceId: instance.id,
-                    providerKind: kind,
-                    occurredAt: ISO8601DateFormatter().string(from: Date()),
-                    summary: "Chrome bookmarks changed for \(selectedFolderIds.joined(separator: ", "))",
-                    payload: [
-                        "folderIds": .stringList(selectedFolderIds),
-                        "profileRoots": .stringList(current.profilePaths)
-                    ]
+            for instance in self.instances where instance.enabled && instance.folderIds.contains(parentId) {
+                emit(
+                    AgentTriggerEvent(
+                        triggerInstanceId: instance.id,
+                        providerKind: self.kind,
+                        occurredAt: occurredAt,
+                        summary: "Chrome bookmark created: \(title)",
+                        payload: [
+                            "url": .string(url),
+                            "title": .string(title),
+                            "folderId": .string(parentId),
+                            "bookmarkId": .string(event.bookmarkId ?? ""),
+                            "profileId": .string(profileId)
+                        ]
+                    )
                 )
-            )
-        }
-    }
-
-    private func readCurrentSnapshots() -> ChromeBookmarksSnapshotReader {
-        let roots = chromeBookmarkRoots()
-        var fingerprintsByFolderId: [String: String] = [:]
-        for root in roots {
-            guard let data = try? Data(contentsOf: root),
-                  let file = try? JSONDecoder().decode(ChromeBookmarksFile.self, from: data) else {
-                continue
-            }
-            let folders = file.allFolders()
-            for folder in folders {
-                guard let folderId = folder.id else { continue }
-                fingerprintsByFolderId[folderId] = folder.fingerprint()
             }
         }
-        return ChromeBookmarksSnapshotReader(
-            profilePaths: roots.map { $0.deletingLastPathComponent().path },
-            fingerprintsByFolderId: fingerprintsByFolderId
-        )
     }
-
-    private func chromeBookmarkRoots() -> [URL] {
-        let chromeRoot = homeDirectoryURL
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent("Google", isDirectory: true)
-            .appendingPathComponent("Chrome", isDirectory: true)
-
-        guard let enumerator = fileManager.enumerator(
-            at: chromeRoot,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-
-        var result: [URL] = []
-        for case let url as URL in enumerator {
-            if url.lastPathComponent == "Bookmarks" {
-                result.append(url)
-                enumerator.skipDescendants()
-            }
-        }
-        return result
-    }
-}
-
-private func durationToDispatchInterval(_ duration: Duration) -> DispatchTimeInterval {
-    let components = duration.components
-    let seconds = components.seconds
-    let attoseconds = components.attoseconds
-    let nanosecondsFromAttoseconds = Int(attoseconds / 1_000_000_000)
-    let totalNanoseconds = seconds * 1_000_000_000 + Int64(nanosecondsFromAttoseconds)
-    return .nanoseconds(max(1, Int(totalNanoseconds)))
 }
 
 struct ChromeBookmarksAgentTriggerProviderFactory: AgentTriggerProviderFactory {
@@ -329,68 +253,5 @@ private extension AgentTriggerInstance {
         default:
             return []
         }
-    }
-}
-
-private struct ChromeBookmarksSnapshotReader {
-    let profilePaths: [String]
-    let fingerprintsByFolderId: [String: String]
-
-    func snapshot(for folderIds: [String]) -> ChromeBookmarksSnapshot {
-        ChromeBookmarksSnapshot(
-            fingerprintsByFolderId: Dictionary(
-                uniqueKeysWithValues: folderIds.map { folderId in
-                    (folderId, fingerprintsByFolderId[folderId] ?? "")
-                }
-            )
-        )
-    }
-}
-
-private struct ChromeBookmarksFile: Decodable {
-    let roots: ChromeBookmarksRoots
-
-    func allFolders() -> [ChromeBookmarksNode] {
-        roots.allFolders()
-    }
-}
-
-private struct ChromeBookmarksRoots: Decodable {
-    let bookmark_bar: ChromeBookmarksNode?
-    let other: ChromeBookmarksNode?
-    let synced: ChromeBookmarksNode?
-
-    func allFolders() -> [ChromeBookmarksNode] {
-        [bookmark_bar, other, synced].compactMap { $0 }.flatMap { $0.allFolders() }
-    }
-}
-
-private struct ChromeBookmarksNode: Decodable {
-    let id: String?
-    let type: String?
-    let name: String?
-    let url: String?
-    let children: [ChromeBookmarksNode]?
-
-    func allFolders() -> [ChromeBookmarksNode] {
-        guard type == "folder" else { return [] }
-        return [self] + (children ?? []).flatMap { $0.allFolders() }
-    }
-
-    func fingerprint() -> String {
-        let childFingerprints = (children ?? []).flatMap { $0.allBookmarkFingerprints() }.sorted()
-        return [
-            id ?? "",
-            name ?? "",
-            url ?? "",
-            childFingerprints.joined(separator: "|"),
-        ].joined(separator: "::")
-    }
-
-    func allBookmarkFingerprints() -> [String] {
-        if let url, type == "url" {
-            return [url]
-        }
-        return (children ?? []).flatMap { $0.allBookmarkFingerprints() }
     }
 }

@@ -85,6 +85,75 @@ final class AgentTriggerRuntimeTests: XCTestCase {
         XCTAssertEqual(chromeProvider.stopCallCount, 1)
     }
 
+    @MainActor
+    func testReloadStartsInstalledProviderWithoutInstances() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        XCTAssertTrue(store.installPackage(makeManifest(id: "chrome-bookmarks", kind: "chrome.bookmarks")))
+        let chromeProvider = RecordingAgentTriggerProvider(kind: "chrome.bookmarks")
+        let runtime = AgentTriggerRuntime(
+            registry: AgentTriggerRegistry(factories: [
+                RecordingAgentTriggerProviderFactory(provider: chromeProvider),
+            ]),
+            store: store
+        )
+
+        try runtime.reload()
+
+        XCTAssertEqual(chromeProvider.startCallCount, 1)
+        XCTAssertTrue(chromeProvider.startedInstances.isEmpty)
+    }
+
+    @MainActor
+    func testRendersBookmarkPayloadFieldsIntoPromptTemplate() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        XCTAssertTrue(store.installPackage(makeManifest(id: "chrome-bookmarks", kind: "chrome.bookmarks")))
+        XCTAssertTrue(store.saveInstances([
+            AgentTriggerInstance(
+                id: "bookmark-review",
+                packageId: "chrome-bookmarks",
+                title: "Bookmark Review",
+                enabled: true,
+                config: ["folderIds": .stringList(["folder-a"])],
+                promptTemplate: "Read {{title}} at {{url}} from {{folderId}}",
+                deliveryPolicy: .default,
+                notificationPolicy: .default
+            )
+        ]))
+
+        let chromeProvider = RecordingAgentTriggerProvider(kind: "chrome.bookmarks")
+        var payloads: [ElectronAgentTriggerFirePayload] = []
+        let runtime = AgentTriggerRuntime(
+            registry: AgentTriggerRegistry(factories: [
+                RecordingAgentTriggerProviderFactory(provider: chromeProvider),
+            ]),
+            store: store,
+            emit: { payloads.append($0) }
+        )
+
+        try runtime.reload()
+        chromeProvider.emitEvent(AgentTriggerEvent(
+            triggerInstanceId: "bookmark-review",
+            providerKind: "chrome.bookmarks",
+            occurredAt: "2026-06-23T00:00:00.000Z",
+            summary: "Bookmarked OpenAI",
+            payload: [
+                "url": .string("https://openai.com"),
+                "title": .string("OpenAI"),
+                "folderId": .string("folder-a")
+            ]
+        ))
+
+        XCTAssertEqual(payloads.count, 1)
+        guard case .text(_, let text) = payloads.first?.userInput.items.first else {
+            return XCTFail("Expected text input item")
+        }
+        XCTAssertEqual(text, "Read OpenAI at https://openai.com from folder-a")
+    }
+
     private func makeManifest(id: String, kind: String) -> AgentTriggerPackageManifest {
         AgentTriggerPackageManifest(
             version: 1,
@@ -121,6 +190,7 @@ private final class RecordingAgentTriggerProvider: AgentTriggerProvider {
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
     private(set) var startedInstances: [AgentTriggerInstance] = []
+    private var emit: ((AgentTriggerEvent) -> Void)?
 
     init(kind: String) {
         self.kind = kind
@@ -130,12 +200,17 @@ private final class RecordingAgentTriggerProvider: AgentTriggerProvider {
         instances: [AgentTriggerInstance],
         emit: @escaping (AgentTriggerEvent) -> Void
     ) throws {
-        _ = emit
+        self.emit = emit
         startCallCount += 1
         startedInstances = instances
     }
 
     func stop() throws {
         stopCallCount += 1
+        emit = nil
+    }
+
+    func emitEvent(_ event: AgentTriggerEvent) {
+        emit?(event)
     }
 }

@@ -5,6 +5,12 @@ struct AgentTriggerPackageEntry: Identifiable, Equatable {
     let title: String
     let providerKind: String
     let description: String
+    let defaultPromptTemplate: String
+}
+
+struct AgentTriggerPackageConnectionStatus: Equatable {
+    let isAvailable: Bool
+    let message: String
 }
 
 @Observable
@@ -17,13 +23,24 @@ final class AgentTriggerSettingsViewModel {
 
     @ObservationIgnored private let store: AgentTriggerStore
     @ObservationIgnored private let runtime: (any AgentTriggerRuntimeReloading)?
+    @ObservationIgnored private let packageConnectionStatusProvider: (AgentTriggerPackageEntry) -> AgentTriggerPackageConnectionStatus?
 
     init(
         store: AgentTriggerStore = AgentTriggerStore(),
-        runtime: (any AgentTriggerRuntimeReloading)? = nil
+        runtime: (any AgentTriggerRuntimeReloading)? = nil,
+        packageConnectionStatusProvider: @escaping (AgentTriggerPackageEntry) -> AgentTriggerPackageConnectionStatus? = {
+            package in
+            guard package.providerKind == "chrome.bookmarks" else { return nil }
+            let status = ChromeBookmarksNativeHostInstaller.fromEnvironment().installationStatus()
+            return AgentTriggerPackageConnectionStatus(
+                isAvailable: status.isAvailable,
+                message: status.message
+            )
+        }
     ) {
         self.store = store
         self.runtime = runtime
+        self.packageConnectionStatusProvider = packageConnectionStatusProvider
         reload()
     }
 
@@ -33,7 +50,8 @@ final class AgentTriggerSettingsViewModel {
                 id: $0.id,
                 title: $0.title,
                 providerKind: $0.providerKind,
-                description: $0.description ?? ""
+                description: $0.description ?? "",
+                defaultPromptTemplate: $0.defaultPromptTemplate
             )
         }
         instances = store.loadInstances()
@@ -59,10 +77,15 @@ final class AgentTriggerSettingsViewModel {
         instances.filter { $0.packageId == id }
     }
 
+    func connectionStatus(for package: AgentTriggerPackageEntry) -> AgentTriggerPackageConnectionStatus? {
+        packageConnectionStatusProvider(package)
+    }
+
     @discardableResult
     func createInstanceForCurrentPackage(
         title: String,
-        config: [String: AgentTriggerConfigValue]
+        config: [String: AgentTriggerConfigValue],
+        promptTemplate: String? = nil
     ) -> Bool {
         guard let packageId = selectedPackageId else {
             saveErrorMessage = "未选中触发器"
@@ -77,13 +100,19 @@ final class AgentTriggerSettingsViewModel {
             saveErrorMessage = "标题不能为空"
             return false
         }
+        let resolvedPromptTemplate = (promptTemplate ?? manifest.defaultPromptTemplate)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !resolvedPromptTemplate.isEmpty else {
+            saveErrorMessage = "提示词不能为空"
+            return false
+        }
         let instance = AgentTriggerInstance(
             id: UUID().uuidString,
             packageId: packageId,
             title: trimmedTitle,
             enabled: true,
             config: config,
-            promptTemplate: manifest.defaultPromptTemplate,
+            promptTemplate: resolvedPromptTemplate,
             deliveryPolicy: manifest.defaultDeliveryPolicy,
             notificationPolicy: manifest.defaultNotificationPolicy
         )

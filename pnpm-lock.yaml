@@ -68,6 +68,15 @@ importers:
         specifier: ^2.1.4
         version: 2.1.4
 
+  apps/chrome-bookmarks-extension:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@24.13.1)(jiti@2.7.0)(lightningcss@1.32.0)
+
   apps/electron-shell:
     dependencies:
       '@handagent/core':

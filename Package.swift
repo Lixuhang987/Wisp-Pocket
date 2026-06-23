@@ -8,7 +8,8 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
-        .executable(name: "HandAgentDesktop", targets: ["HandAgentDesktop"])
+        .executable(name: "HandAgentDesktop", targets: ["HandAgentDesktop"]),
+        .executable(name: "HandAgentChromeBookmarksNativeHost", targets: ["HandAgentChromeBookmarksNativeHost"])
     ],
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.0.0"),
@@ -23,10 +24,24 @@ let package = Package(
             path: "apps/desktop",
             exclude: ["TestsSwift", "desktop.md"]
         ),
+        .target(
+            name: "ChromeBookmarksNativeHostCore",
+            path: "apps/chrome-bookmarks-native-host/Sources/Core"
+        ),
+        .executableTarget(
+            name: "HandAgentChromeBookmarksNativeHost",
+            dependencies: ["ChromeBookmarksNativeHostCore"],
+            path: "apps/chrome-bookmarks-native-host/Sources/Host"
+        ),
         .testTarget(
             name: "HandAgentDesktopTests",
             dependencies: ["HandAgentDesktop"],
             path: "apps/desktop/TestsSwift"
+        ),
+        .testTarget(
+            name: "ChromeBookmarksNativeHostCoreTests",
+            dependencies: ["ChromeBookmarksNativeHostCore"],
+            path: "apps/chrome-bookmarks-native-host/Tests"
         )
     ]
 )

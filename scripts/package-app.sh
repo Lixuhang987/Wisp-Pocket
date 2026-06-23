@@ -2,6 +2,7 @@
 set -euo pipefail
 
 APP_NAME="HandAgentDesktop"
+CHROME_BOOKMARKS_NATIVE_HOST_NAME="HandAgentChromeBookmarksNativeHost"
 BUNDLE_ID="com.yourname.HandAgentDesktop"
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT_DIR="${HANDAGENT_PACKAGE_ROOT_DIR:-$SCRIPT_ROOT}"
@@ -100,6 +101,7 @@ if [[ -z "${HANDAGENT_ELECTRON_SHELL_DIST_DIR:-}" ]]; then
 fi
 
 run_quiet "$SWIFT_BIN" build --cache-path "$SWIFTPM_CACHE_DIR" -c release --product "$APP_NAME"
+run_quiet "$SWIFT_BIN" build --cache-path "$SWIFTPM_CACHE_DIR" -c release --product "$CHROME_BOOKMARKS_NATIVE_HOST_NAME"
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
@@ -119,6 +121,8 @@ fi
 
 cp "$BUILD_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
+cp "$BUILD_DIR/$CHROME_BOOKMARKS_NATIVE_HOST_NAME" "$APP_DIR/Contents/Resources/$CHROME_BOOKMARKS_NATIVE_HOST_NAME"
+chmod +x "$APP_DIR/Contents/Resources/$CHROME_BOOKMARKS_NATIVE_HOST_NAME"
 
 rm -rf "$APP_DIR/Contents/Resources/ThreadWindowWeb"
 mkdir -p "$APP_DIR/Contents/Resources/ThreadWindowWeb"

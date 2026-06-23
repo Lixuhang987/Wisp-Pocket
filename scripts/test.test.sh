@@ -73,7 +73,7 @@ if [[ ! -s "$SWIFTLINT_CALLS_LOG" ]]; then
   exit 1
 fi
 
-expected_success_calls=$'pnpm test:theme-tokens\npnpm --filter handagent-thread-window-web test\npnpm --filter handagent-thread-window-web build\npnpm --filter handagent-electron-shell test\npnpm exec vitest run --exclude .worktrees/** apps/agent-server/tests packages/core/tests'
+expected_success_calls=$'pnpm test:theme-tokens\npnpm --filter handagent-chrome-bookmarks-extension test\npnpm --filter handagent-chrome-bookmarks-extension build\npnpm --filter handagent-thread-window-web test\npnpm --filter handagent-thread-window-web build\npnpm --filter handagent-electron-shell test\npnpm exec vitest run --exclude .worktrees/** apps/agent-server/tests packages/core/tests'
 actual_success_calls="$(cat "$PNPM_CALLS_LOG")"
 if [[ "$actual_success_calls" != "$expected_success_calls" ]]; then
   printf 'Expected scripts/test.sh to run the real ThreadWindow Web build during success checks, got:\n%s\n' "$actual_success_calls" >&2
