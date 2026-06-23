@@ -14,19 +14,21 @@ Swift desktop 是默认 dynamic tool provider。原先通过 `/api/platform` 暴
 
 Plugin 生命周期由 Swift 控制。常驻 plugin 可以在 App 启动后持续运行并注册 dynamic tools；只暴露 tool 的 plugin 可以由 Swift 按设置或需要启动。agent-server 不 spawn plugin binary，只负责保存 tool spec、路由 dynamic tool call request、等待 provider response。
 
+Swift 和 React 被视为两个独立 frontend，都直接与 agent-server/core 通信。React ThreadWindow 仍由 Electron 承载并后台预热，但预热后的 React `/api/thread` connection 默认订阅所有新建 thread。Swift 可以直接向 agent-server 发送 `thread.start` / `op.submit`；core 创建成功后广播的 `thread.started` 同时发给 Swift 和 React，让自己创建和他人创建的 thread 使用同一套成功创建语义。
+
 ## Non-Goals
 
 - 第三方 plugin 分发市场、自动更新或签名校验。
 - Plugin 沙盒、安全隔离和权限 UI 的完整设计。
 - MCP `resources` / `prompts` 作为 plugin 对外能力暴露。
 - 将 workspace / file 工具迁移为 dynamic tools；这些 Node/core 侧工具继续保留现有 workspace 沙箱与 thread 权限模型。
-- 让 Swift desktop 直接持有 `/api/thread` client 或直接创建 thread。
+- 在 Swift 和 React 之间同步完整 thread 消息副本；thread 真相只来自 agent-server/core 广播。
 
 ## Use Cases
 
 ### UC1: 默认 macOS 能力作为 dynamic tools 进入 thread
 
-- 触发：用户通过 PromptPanel、ThreadWindow 新建空白 thread，或后台 AgentTrigger 创建 thread。
+- 触发：用户通过 Swift PromptPanel、React ThreadWindow 新建空白 thread，或后台 AgentTrigger 创建 thread。
 - 结果：Swift 宿主提供的默认 host dynamic tools 被写入 `thread.start.payload.dynamicTools`，并随 thread metadata 持久化；未激活前模型仍只看到 `use_tools`。
 
 ### UC2: LLM 激活工具后调用默认 host tool
@@ -48,3 +50,8 @@ Plugin 生命周期由 Swift 控制。常驻 plugin 可以在 App 启动后持�
 
 - 触发：thread 被持久化、恢复或历史回放。
 - 结果：thread metadata 中保存创建时的 `dynamicTools`，恢复后仍能知道该 thread 允许哪些 dynamic tools；动态工具调用过程以 request / response 事件进入审计和历史记录。
+
+### UC6: 双 frontend 订阅统一 thread 创建语义
+
+- 触发：Swift 或 React 任一 frontend 创建新 thread。
+- 结果：agent-server 将 `thread.started` 广播给创建方和后台预热的 React connection；React 不需要 Swift 发送消息副本即可接收新 thread 的后续 notification。交互式 `ServerRequest` 默认只发送给 React；dynamic tool call 按 tool spec 中的 `clientId` 路由给对应 provider。

@@ -19,6 +19,7 @@
 ```typescript
 // packages/core/src/protocol/DynamicTool.ts
 export type DynamicToolSpec = {
+  clientId: string;
   namespace?: string;
   name: string;
   description: string;
@@ -27,6 +28,7 @@ export type DynamicToolSpec = {
 };
 
 export type DynamicToolCallRequestPayload = {
+  clientId: string;
   threadId: string;
   turnId: string;
   callId: string;
@@ -46,6 +48,8 @@ export type DynamicToolCallResponsePayload = {
 ```
 
 `packages/thread-store` 不再维护自己的 `DynamicToolSpec` 形状，改为引用 core DTO，继续复用现有 `dynamic_tools_json` 存储列。
+
+`clientId` 是 dynamic tool 的稳定路由键。Swift host tools 使用 Swift frontend/provider 的 clientId；plugin、浏览器扩展和开发者前端也必须声明各自的 clientId。agent-server 根据 `clientId + namespace + name` 定位 provider，而不是根据当前 thread connection 猜测 provider。
 
 ### Use case map
 
@@ -105,7 +109,7 @@ export type DynamicToolProviderMessage =
   | {
       channel: "dynamic_tools";
       type: "provider_hello";
-      providerId: string;
+      clientId: string;
       tools: DynamicToolSpec[];
     }
   | {
@@ -150,7 +154,7 @@ sequenceDiagram
 - 新增 `apps/agent-server/src/bridges/WebSocketDynamicToolBridge.ts`。
 - 新增 `/api/dynamic-tools` socket handler。
 - 支持 provider hello、provider detach、tool call request、tool call response。
-- 同一 tool spec 必须能定位到 provider；provider 断开后，该 provider 的 pending call 全部失败。
+- 同一 tool spec 必须通过 `clientId + namespace + name` 定位到 provider；provider 断开后，该 provider 的 pending call 全部失败。
 
 **Loop 3: runtime event / audit**
 - dynamic tool call 开始和结束写入 thread audit event，至少包含 `toolName`、`arguments`、`status`、`durationMs`。
@@ -215,11 +219,10 @@ flowchart LR
 **Loop 2: default tools 传递**
 - Swift 生成默认 `DynamicToolSpec[]`。
 - Electron ThreadWindow preload config 增加 `defaultDynamicTools`，来源是 Swift host/provider 当前可用工具集合。
-- `ElectronInitialPromptPayload` 增加 `dynamicTools`。
-- Electron protocol 和 preload initial prompt payload 同步增加 `dynamicTools`。
-- React `InitialPromptPayload` 增加 `dynamicTools`。
-- `ThreadSocketClient.startInitialPrompt` 把 `prompt.dynamicTools` 写入 `thread.start.payload.dynamicTools`。
-- ThreadWindow 新建空白 thread 和后台 AgentTrigger 创建 thread 也必须携带默认 host dynamic tools，避免入口不一致。
+- Swift PromptPanel 提交时直接向 agent-server 发送 `thread.start { dynamicTools }`，再发送首轮 `op.submit`。
+- Swift 发给 Electron 的 ThreadWindow command 只携带 `threadId` / open / focus 意图，不携带完整 prompt 或消息副本。
+- React ThreadWindow 新建空白 thread 时从 preload config 读取 `defaultDynamicTools`，写入 `thread.start.payload.dynamicTools`。
+- 后台 AgentTrigger 创建 thread 时也必须携带默认 host dynamic tools，避免入口不一致。
 
 **Loop 3: remove platform abstractions**
 - core 删除 `PlatformBridge`、`RemotePlatformAdapter` 和 platform 类 builtin 注册。
@@ -230,9 +233,73 @@ flowchart LR
 
 - Swift `DynamicToolProviderConnectionClientTests`：连接后发送 provider hello、收到 request 后回 response。
 - Swift `MacHostDynamicToolsTests`：默认 tool specs 与 provider dispatch table 一致。
-- Electron protocol tests：initial prompt payload 保留 `dynamicTools`。
-- ThreadWindow initial prompt flow tests：`thread.start` 携带 `dynamicTools`。
+- Swift thread client tests：PromptPanel 提交会发送 `thread.start { dynamicTools }` 和首轮 `op.submit`。
+- Electron protocol tests：ThreadWindow open/focus command 只携带 `threadId`，不携带消息副本。
+- ThreadWindow new-thread flow tests：React 新建 thread 时 `thread.start` 携带 `defaultDynamicTools`。
 - agent-server server tests：`/api/platform` 不再挂载，`/api/dynamic-tools` 可连接。
+
+---
+
+## UC3.5: Swift / React 双 frontend thread 订阅语义
+
+### Goal
+
+Swift 和 React 都是 agent-server/core 的 frontend。Swift 可以直接发送 `thread.start` / `op.submit`，React 预热 connection 默认订阅所有新建 thread。`thread.started` 不再只表达“当前连接创建成功”，而是表达“一个新 thread 已成功创建”，所有默认订阅新 thread 的 frontend 都能收到同一个事件。
+
+### Existing Flow Inventory
+
+1. 当前 `thread.started` 只发给发起 `thread.start` 的 connection。
+2. React 预热后已有 `/api/thread` connection，但只有自己 `thread.start` / `thread.resume` 后才订阅具体 thread。
+3. Swift 当前不持有 `/api/thread` client，只通过 Electron 传 initial prompt 给 React。
+4. `ServerRequest` 现有消费者是 React ThreadWindow，适合继续作为默认交互 UI。
+
+### Use case map
+
+```mermaid
+sequenceDiagram
+  participant Swift as Swift frontend
+  participant Server as agent-server/core
+  participant React as React frontend (prewarmed)
+  participant Electron as Electron shell
+
+  React->>Server: /api/thread hello { subscribeNewThreads: true }
+  Swift->>Server: thread.start { dynamicTools }
+  Server-->>Swift: thread.started
+  Server-->>React: thread.started
+  Swift->>Server: op.submit
+  Server-->>React: ThreadNotification stream
+  Swift->>Electron: open/focus threadId
+  Electron-->>React: show existing ThreadWindow
+```
+
+### Implementation loops
+
+**Loop 1: frontend identity**
+- `/api/thread` connection 增加 frontend identity：`clientId`、`frontendKind: "swift" | "react"`、`subscribeNewThreads?: boolean`。
+- React 预热 connection 默认设置 `subscribeNewThreads: true`。
+- Swift direct thread client 使用自己的 `clientId`，但不需要默认接收 `ServerRequest`。
+
+**Loop 2: thread.started 广播**
+- `ThreadNotificationPublisher` 增加“默认订阅新 thread”的 connection 集合。
+- `ThreadCommandRouter.handleCreateThread` 创建 thread 后，将新 thread 绑定到发起 connection 和所有 `subscribeNewThreads` connection。
+- `thread.started` 广播给这些 connection，语义统一为“新 thread 创建成功”，不再只代表发起方回执。
+
+**Loop 3: Swift 提交，React 展示**
+- Swift 直接向 agent-server 发送 `thread.start` 和首轮 `op.submit`。
+- Swift 给 Electron 的 command 只携带 `threadId` / focus 意图，不携带完整消息副本。
+- React 收到 `thread.started` 后创建本地 thread 状态；后续 notification 直接来自 agent-server。
+
+**Loop 4: ServerRequest owner**
+- `ServerRequest` 默认只发送给 React frontend connection。
+- Swift 可以订阅普通 `ThreadNotification`，但不作为 permission/workspace 等交互请求的默认 owner。
+- 后续若需要 Swift 处理某类 request，再按 request type 显式扩展 owner 规则。
+
+### Tests
+
+- React 预热 connection 设置 `subscribeNewThreads` 后，Swift connection 创建 thread，React 也收到同一个 `thread.started`。
+- Swift 创建 thread 后发送 `op.submit`，React 无需 Swift 消息副本即可接收后续 notification。
+- `ServerRequest` 默认只发给 React connection。
+- 没有 React connection 时，默认交互请求返回清晰的 UI unavailable / timeout 错误。
 
 ---
 
@@ -300,7 +367,7 @@ Plugin 进程生命周期归 Swift desktop 管理。agent-server 不读取 plugi
 
 - Swift manifest parser tests。
 - Swift plugin lifecycle manager tests：alwaysOn 启动、onDemand 延迟启动、禁用后停止。
-- PromptPanel tests：选择 plugin 后 initial prompt 带对应 dynamic tools。
+- PromptPanel tests：选择 plugin 后 Swift `thread.start` 携带对应 dynamic tools。
 
 ---
 
@@ -338,10 +405,11 @@ flowchart LR
 
 ## 文档更新范围
 
-- [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md)：删除 `/api/platform` 架构描述，新增 `/api/dynamic-tools`。
-- [apps/apps.md](/Users/mu9/proj/handAgent/apps/apps.md)：Swift 不再处理 platform bridge，改为 dynamic tool provider。
-- [apps/desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md)：新增 Swift host/plugin lifecycle 职责，删除 `/api/platform` 说明。
-- [apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：新增 dynamic tools socket，删除 platform socket。
+- [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md)：删除 `/api/platform` 架构描述，新增 `/api/dynamic-tools`，并说明 Swift / React 双 frontend 都直连 agent-server。
+- [apps/apps.md](/Users/mu9/proj/handAgent/apps/apps.md)：Swift 不再处理 platform bridge，改为 dynamic tool provider 和 `/api/thread` frontend。
+- [apps/desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md)：新增 Swift host/plugin lifecycle 与 Swift thread client 职责，删除 `/api/platform` 说明。
+- [apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：新增 dynamic tools socket，删除 platform socket，说明 `subscribeNewThreads` 和 `ServerRequest` 默认 React owner。
+- [apps/thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：说明 React 预热 connection 默认订阅所有新建 thread，`thread.started` 是统一创建成功事件。
 - [packages/core/core.md](/Users/mu9/proj/handAgent/packages/core/core.md) 与 [packages/core/src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)：说明 dynamic tool runtime 和 platform abstraction 删除。
 - [packages/core/src/tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md)：更新工具来源和 builtin tool 列表。
 - [packages/core/src/platform/platform.md](/Users/mu9/proj/handAgent/packages/core/src/platform/platform.md)：实现时删除或改为历史迁移说明。
@@ -351,9 +419,10 @@ flowchart LR
 
 1. 定义 core `DynamicToolSpec` / request / response DTO，并接入 `thread.start.payload.dynamicTools`。
 2. 打通 thread-store `dynamicTools` 持久化与恢复测试。
-3. 实现 core `DynamicToolAdapter` 和 agent-server `WebSocketDynamicToolBridge`。
-4. 保持 `use_tools` 懒加载语义，激活后注册 dynamic tools。
-5. Swift 新增 host dynamic tool provider，并让所有 thread 创建入口携带默认 host dynamic tools。
-6. 迁移 macOS 平台工具，删除 `/api/platform`。
-7. Swift plugin manager 接管 plugin manifest、生命周期和 provider dispatch。
-8. 更新架构文档和 manual QA。
+3. 调整 `/api/thread` frontend identity、`subscribeNewThreads`、`thread.started` 广播和 `ServerRequest` React owner。
+4. 实现 core `DynamicToolAdapter` 和 agent-server `WebSocketDynamicToolBridge`。
+5. 保持 `use_tools` 懒加载语义，激活后注册 dynamic tools。
+6. Swift 新增 host dynamic tool provider 和 direct thread client，并让所有 thread 创建入口携带默认 host dynamic tools。
+7. 迁移 macOS 平台工具，删除 `/api/platform`。
+8. Swift plugin manager 接管 plugin manifest、生命周期和 provider dispatch。
+9. 更新架构文档和 manual QA。
