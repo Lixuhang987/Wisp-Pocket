@@ -26,6 +26,15 @@ if [[ -n "${SWIFTW_TEST_CALLS_LOG:-}" ]]; then
   printf 'swift %s\n' "$*" >>"$SWIFTW_TEST_CALLS_LOG"
   printf 'clang_cache=%s\n' "${CLANG_MODULE_CACHE_PATH:-}" >>"$SWIFTW_TEST_CALLS_LOG"
   printf 'swift_cache=%s\n' "${SWIFT_MODULECACHE_PATH:-}" >>"$SWIFTW_TEST_CALLS_LOG"
+  if [[ "${1:-}" == "run" ]]; then
+    printf 'chrome_extension_id=%s\n' "${HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID:-}" >>"$SWIFTW_TEST_CALLS_LOG"
+    printf 'chrome_native_host_path=%s\n' "${HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH:-}" >>"$SWIFTW_TEST_CALLS_LOG"
+  fi
+fi
+
+if [[ "$*" == build*"--show-bin-path"* ]]; then
+  printf '%s\n' "${SWIFTW_TEST_BIN_PATH:-/tmp/swiftw-bin}"
+  exit 0
 fi
 
 printf 'swift stdout for %s\n' "$*"
@@ -84,14 +93,14 @@ if [[ "$failure_output" != *"swift stdout for build --cache-path $TEMP_ROOT/.cac
 fi
 
 : >"$CALLS_LOG"
-run_output="$(SWIFTW_TEST_CALLS_LOG="$CALLS_LOG" PATH="$FAKE_BIN_DIR:$PATH" "$TEMP_ROOT/scripts/swiftw" run HandAgentDesktop 2>&1)"
+run_output="$(SWIFTW_TEST_BIN_PATH="$TEMP_ROOT/.build/debug" SWIFTW_TEST_CALLS_LOG="$CALLS_LOG" PATH="$FAKE_BIN_DIR:$PATH" "$TEMP_ROOT/scripts/swiftw" run HandAgentDesktop 2>&1)"
 
 if [[ "$run_output" != *"swift stdout for run --cache-path $TEMP_ROOT/.cache/swiftpm HandAgentDesktop"* ]] || [[ "$run_output" != *"swift stderr for run --cache-path $TEMP_ROOT/.cache/swiftpm HandAgentDesktop"* ]]; then
   printf 'Expected run to pass through Swift output, got:\n%s\n' "$run_output" >&2
   exit 1
 fi
 
-expected_calls=$'pnpm generate:theme-tokens\npnpm --filter handagent-thread-window-web build\npnpm --filter handagent-electron-shell build\nswift run --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' HandAgentDesktop\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"
+expected_calls=$'pnpm generate:theme-tokens\npnpm --filter handagent-thread-window-web build\npnpm --filter handagent-electron-shell build\nswift build --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' --product HandAgentChromeBookmarksNativeHost\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"$'\nswift build --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' --show-bin-path\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"$'\nswift run --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' HandAgentDesktop\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"$'\nchrome_extension_id=iidkhdjaboimibeplbeanlklgakmfebb\nchrome_native_host_path='"$TEMP_ROOT/.build/debug/HandAgentChromeBookmarksNativeHost"
 actual_calls="$(cat "$CALLS_LOG")"
 if [[ "$actual_calls" != "$expected_calls" ]]; then
   printf 'Expected run to generate theme tokens and build thread-window-web before swift run, got:\n%s\n' "$actual_calls" >&2
@@ -100,7 +109,7 @@ fi
 
 : >"$CALLS_LOG"
 rm -rf "$TEMP_ROOT/node_modules"
-install_run_output="$(SWIFTW_TEST_CALLS_LOG="$CALLS_LOG" PATH="$FAKE_BIN_DIR:$PATH" "$TEMP_ROOT/scripts/swiftw" run HandAgentDesktop 2>&1)"
+install_run_output="$(SWIFTW_TEST_BIN_PATH="$TEMP_ROOT/.build/debug" SWIFTW_TEST_CALLS_LOG="$CALLS_LOG" PATH="$FAKE_BIN_DIR:$PATH" "$TEMP_ROOT/scripts/swiftw" run HandAgentDesktop 2>&1)"
 
 if [[ "$install_run_output" == *"[swiftw] node_modules missing"* ]] ||
   [[ "$install_run_output" == *"pnpm stdout"* ]] ||
@@ -109,7 +118,7 @@ if [[ "$install_run_output" == *"[swiftw] node_modules missing"* ]] ||
   exit 1
 fi
 
-expected_install_calls=$'pnpm install\npnpm generate:theme-tokens\npnpm --filter handagent-thread-window-web build\npnpm --filter handagent-electron-shell build\nswift run --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' HandAgentDesktop\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"
+expected_install_calls=$'pnpm install\npnpm generate:theme-tokens\npnpm --filter handagent-thread-window-web build\npnpm --filter handagent-electron-shell build\nswift build --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' --product HandAgentChromeBookmarksNativeHost\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"$'\nswift build --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' --show-bin-path\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"$'\nswift run --cache-path '"$TEMP_ROOT/.cache/swiftpm"$' HandAgentDesktop\nclang_cache='"$TEMP_ROOT/.cache/swift/clang-module-cache"$'\nswift_cache='"$TEMP_ROOT/.cache/swift/swift-module-cache"$'\nchrome_extension_id=iidkhdjaboimibeplbeanlklgakmfebb\nchrome_native_host_path='"$TEMP_ROOT/.build/debug/HandAgentChromeBookmarksNativeHost"
 actual_install_calls="$(cat "$CALLS_LOG")"
 if [[ "$actual_install_calls" != "$expected_install_calls" ]]; then
   printf 'Expected run to install dependencies before token generation and web build, got:\n%s\n' "$actual_install_calls" >&2

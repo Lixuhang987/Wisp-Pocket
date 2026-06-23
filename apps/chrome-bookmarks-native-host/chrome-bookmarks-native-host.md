@@ -27,7 +27,7 @@ Chrome Native Messaging Host manifest 写入：
 ~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.handagent.chrome_bookmarks.json
 ```
 
-desktop 只在启动环境提供 `HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID` 时写 manifest，避免把占位 extension id 写进 Chrome 配置。打包 App 会把 `HandAgentChromeBookmarksNativeHost` 复制到 `Contents/Resources/`，manifest path 默认指向该资源；开发运行可用 `HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH` 覆盖。
+desktop 只在启动环境提供 `HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID` 时写 manifest，避免把占位 extension id 写进 Chrome 配置。打包 App 会把 `HandAgentChromeBookmarksNativeHost` 复制到 `Contents/Resources/`，manifest path 默认指向该资源；开发态 `scripts/swiftw run HandAgentDesktop` 会默认注入固定扩展 ID `iidkhdjaboimibeplbeanlklgakmfebb`，并自动构建 / 指向开发 helper。开发运行仍可用 `HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID` 和 `HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH` 覆盖。
 
 扩展连接状态写入：
 
