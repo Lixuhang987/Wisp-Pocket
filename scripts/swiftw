@@ -26,6 +26,7 @@ SWIFTPM_CACHE_DIR="${HANDAGENT_SWIFTPM_CACHE_DIR:-$SHARED_CACHE_ROOT/.cache/swif
 CLANG_CACHE_DIR="$CACHE_DIR/clang-module-cache"
 SWIFT_CACHE_DIR="$CACHE_DIR/swift-module-cache"
 WORKSPACE_DEPENDENCIES_READY=0
+HANDAGENT_CHROME_BOOKMARKS_DEV_EXTENSION_ID="iidkhdjaboimibeplbeanlklgakmfebb"
 
 mkdir -p "$CLANG_CACHE_DIR" "$SWIFT_CACHE_DIR" "$SWIFTPM_CACHE_DIR"
 
@@ -104,6 +105,19 @@ ensure_electron_shell_build() {
   )
 }
 
+configure_chrome_bookmarks_extension_dev_host() {
+  export HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID="${HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID:-$HANDAGENT_CHROME_BOOKMARKS_DEV_EXTENSION_ID}"
+
+  if [[ -n "${HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH:-}" ]]; then
+    return
+  fi
+
+  run_quiet swift_with_cache build --product HandAgentChromeBookmarksNativeHost
+  local bin_path
+  bin_path="$(swift_with_cache build --show-bin-path 2>/dev/null)"
+  export HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH="$bin_path/HandAgentChromeBookmarksNativeHost"
+}
+
 if [[ "${1:-}" == "test" || "${1:-}" == "build" ]]; then
 
   tmp_log="$(mktemp -t "swiftw-${1:-swift}.XXXXXX")"
@@ -123,6 +137,7 @@ if [[ "${1:-}" == "run" && "${2:-}" == "HandAgentDesktop" ]]; then
   ensure_theme_tokens
   ensure_thread_window_web_build
   ensure_electron_shell_build
+  configure_chrome_bookmarks_extension_dev_host
 fi
 
 swift_with_cache "$@"
