@@ -118,6 +118,7 @@ final class AppServices {
         self.settingsStore = settingsStore
         self.agentTriggerStore = agentTriggerStore
         self.agentTriggerStore.ensureBuiltinPackagesInstalled()
+        ChromeBookmarksNativeHostInstaller.fromEnvironment(environment).ensureInstalled()
         self.agentTriggerRuntime = agentTriggerRuntime ?? AgentTriggerRuntime(
             registry: AgentTriggerRegistry(factories: [
                 ChromeBookmarksAgentTriggerProviderFactory(),

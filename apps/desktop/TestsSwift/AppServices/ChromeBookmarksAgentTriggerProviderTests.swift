@@ -2,155 +2,141 @@ import XCTest
 @testable import HandAgentDesktop
 
 final class ChromeBookmarksAgentTriggerProviderTests: XCTestCase {
-    @MainActor
-    func testEmitsEventWhenObservedBookmarkFolderChanges() async throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-        let bookmarksURL = try makeChromeBookmarksFile(
-            homeURL: homeURL,
-            body: """
-            {
-              "roots": {
-                "bookmark_bar": {
-                  "id": "bar",
-                  "type": "folder",
-                  "name": "Bookmarks Bar",
-                  "children": [
-                    {
-                      "id": "folder-a",
-                      "type": "folder",
-                      "name": "Study",
-                      "children": [
-                        { "id": "url-1", "type": "url", "name": "OpenAI", "url": "https://openai.com" }
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-            """
-        )
-        let provider = ChromeBookmarksAgentTriggerProvider(
-            homeDirectoryURL: homeURL,
-            pollInterval: .milliseconds(50)
-        )
-        let instance = AgentTriggerInstance(
-            id: "bookmark-review",
-            packageId: "chrome-bookmarks",
-            title: "Bookmark Review",
-            enabled: true,
-            config: ["folderIds": .stringList(["folder-a"])],
-            promptTemplate: "Summarize bookmark",
-            deliveryPolicy: .default,
-            notificationPolicy: .default
-        )
-        let emission = expectation(description: "bookmark changed")
+    func testEmitsEventWhenExtensionCreatesBookmarkInConfiguredFolder() throws {
+        let source = FakeChromeBookmarksExtensionEventSource()
+        let provider = ChromeBookmarksAgentTriggerProvider(eventSource: source)
+        let instance = makeInstance(folderIds: ["folder-a"])
+        let emission = expectation(description: "bookmark created event emitted")
         var events: [AgentTriggerEvent] = []
 
         try provider.start(instances: [instance]) {
             events.append($0)
             emission.fulfill()
         }
+        source.send(.created(parentId: "folder-a", title: "OpenAI", url: "https://openai.com"))
 
-        try await Task.sleep(for: .milliseconds(120))
-        try """
-        {
-          "roots": {
-            "bookmark_bar": {
-              "id": "bar",
-              "type": "folder",
-              "name": "Bookmarks Bar",
-              "children": [
-                {
-                  "id": "folder-a",
-                  "type": "folder",
-                  "name": "Study",
-                  "children": [
-                    { "id": "url-1", "type": "url", "name": "OpenAI", "url": "https://openai.com" },
-                    { "id": "url-2", "type": "url", "name": "HandAgent", "url": "https://example.com/handagent" }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-        """.write(to: bookmarksURL, atomically: true, encoding: .utf8)
-
-        await fulfillment(of: [emission], timeout: 2.0)
-
+        wait(for: [emission], timeout: 1.0)
         XCTAssertEqual(events.count, 1)
         XCTAssertEqual(events.first?.providerKind, "chrome.bookmarks")
         XCTAssertEqual(events.first?.triggerInstanceId, "bookmark-review")
-        XCTAssertEqual(events.first?.payload["folderIds"], .stringList(["folder-a"]))
-        try provider.stop()
+        XCTAssertEqual(events.first?.payload["url"], .string("https://openai.com"))
+        XCTAssertEqual(events.first?.payload["title"], .string("OpenAI"))
+        XCTAssertEqual(events.first?.payload["folderId"], .string("folder-a"))
+        XCTAssertEqual(events.first?.payload["profileId"], .string("Default"))
     }
 
-    @MainActor
-    func testDoesNotEmitOnInitialBaselineLoad() async throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-        _ = try makeChromeBookmarksFile(
-            homeURL: homeURL,
-            body: """
-            {
-              "roots": {
-                "bookmark_bar": {
-                  "id": "bar",
-                  "type": "folder",
-                  "name": "Bookmarks Bar",
-                  "children": [
-                    {
-                      "id": "folder-a",
-                      "type": "folder",
-                      "name": "Study",
-                      "children": [
-                        { "id": "url-1", "type": "url", "name": "OpenAI", "url": "https://openai.com" }
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-            """
-        )
-        let provider = ChromeBookmarksAgentTriggerProvider(
-            homeDirectoryURL: homeURL,
-            pollInterval: .milliseconds(50)
-        )
-        let instance = AgentTriggerInstance(
+    func testIgnoresCreatedBookmarkOutsideConfiguredFolder() throws {
+        let source = FakeChromeBookmarksExtensionEventSource()
+        let provider = ChromeBookmarksAgentTriggerProvider(eventSource: source)
+        var events: [AgentTriggerEvent] = []
+
+        try provider.start(instances: [makeInstance(folderIds: ["folder-a"])]) {
+            events.append($0)
+        }
+        source.send(.created(parentId: "folder-b", title: "OpenAI", url: "https://openai.com"))
+        waitForQueue()
+
+        XCTAssertTrue(events.isEmpty)
+    }
+
+    func testIgnoresCreatedFolderWithoutURL() throws {
+        let source = FakeChromeBookmarksExtensionEventSource()
+        let provider = ChromeBookmarksAgentTriggerProvider(eventSource: source)
+        var events: [AgentTriggerEvent] = []
+
+        try provider.start(instances: [makeInstance(folderIds: ["folder-a"])]) {
+            events.append($0)
+        }
+        source.send(ChromeBookmarksExtensionEvent(
+            type: "handagent.bookmarks.created",
+            protocolVersion: 1,
+            eventId: "event-1",
+            bookmarkId: "folder-1",
+            parentId: "folder-a",
+            title: "Reading",
+            url: nil,
+            profileId: "Default",
+            occurredAt: "2026-06-23T00:00:00.000Z",
+            extensionVersion: nil,
+            extensionInstanceId: nil,
+            sentAt: nil
+        ))
+        waitForQueue()
+
+        XCTAssertTrue(events.isEmpty)
+    }
+
+    func testStopDetachesFromEventSource() throws {
+        let source = FakeChromeBookmarksExtensionEventSource()
+        let provider = ChromeBookmarksAgentTriggerProvider(eventSource: source)
+        var events: [AgentTriggerEvent] = []
+
+        try provider.start(instances: [makeInstance(folderIds: ["folder-a"])]) {
+            events.append($0)
+        }
+        try provider.stop()
+        source.send(.created(parentId: "folder-a", title: "OpenAI", url: "https://openai.com"))
+        waitForQueue()
+
+        XCTAssertEqual(source.stopCount, 1)
+        XCTAssertTrue(events.isEmpty)
+    }
+
+    private func makeInstance(folderIds: [String]) -> AgentTriggerInstance {
+        AgentTriggerInstance(
             id: "bookmark-review",
             packageId: "chrome-bookmarks",
             title: "Bookmark Review",
             enabled: true,
-            config: ["folderIds": .stringList(["folder-a"])],
-            promptTemplate: "Summarize bookmark",
+            config: ["folderIds": .stringList(folderIds)],
+            promptTemplate: "Summarize {{url}}",
             deliveryPolicy: .default,
             notificationPolicy: .default
         )
-        var events: [AgentTriggerEvent] = []
-
-        try provider.start(instances: [instance]) {
-            events.append($0)
-        }
-        try await Task.sleep(for: .milliseconds(180))
-
-        XCTAssertTrue(events.isEmpty)
-        try provider.stop()
     }
 
-    private func makeChromeBookmarksFile(homeURL: URL, body: String) throws -> URL {
-        let bookmarksURL = homeURL
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent("Google", isDirectory: true)
-            .appendingPathComponent("Chrome", isDirectory: true)
-            .appendingPathComponent("Default", isDirectory: true)
-            .appendingPathComponent("Bookmarks")
-        try FileManager.default.createDirectory(
-            at: bookmarksURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
+    private func waitForQueue() {
+        let settled = expectation(description: "queue settled")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            settled.fulfill()
+        }
+        wait(for: [settled], timeout: 1.0)
+    }
+}
+
+private final class FakeChromeBookmarksExtensionEventSource: ChromeBookmarksExtensionEventSource {
+    private var handler: ((ChromeBookmarksExtensionEvent) -> Void)?
+    private(set) var stopCount = 0
+
+    func start(_ handler: @escaping (ChromeBookmarksExtensionEvent) -> Void) throws {
+        self.handler = handler
+    }
+
+    func stop() throws {
+        stopCount += 1
+        handler = nil
+    }
+
+    func send(_ event: ChromeBookmarksExtensionEvent) {
+        handler?(event)
+    }
+}
+
+private extension ChromeBookmarksExtensionEvent {
+    static func created(parentId: String, title: String, url: String) -> ChromeBookmarksExtensionEvent {
+        ChromeBookmarksExtensionEvent(
+            type: "handagent.bookmarks.created",
+            protocolVersion: 1,
+            eventId: "event-1",
+            bookmarkId: "bookmark-1",
+            parentId: parentId,
+            title: title,
+            url: url,
+            profileId: "Default",
+            occurredAt: "2026-06-23T00:00:00.000Z",
+            extensionVersion: nil,
+            extensionInstanceId: nil,
+            sentAt: nil
         )
-        try body.write(to: bookmarksURL, atomically: true, encoding: .utf8)
-        return bookmarksURL
     }
 }

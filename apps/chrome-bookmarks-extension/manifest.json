@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "HandAgent Chrome Bookmarks",
+  "description": "Forward Chrome bookmark creation events to HandAgent.",
+  "version": "0.1.0",
+  "permissions": ["bookmarks", "nativeMessaging", "storage"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

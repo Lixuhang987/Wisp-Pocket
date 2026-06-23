@@ -4,18 +4,22 @@
 
 `apps` 层负责可执行产品入口与用户交互壳层，不承载跨平台业务规则。
 
-当前包含三个可执行单元和一个 Web 前端包：
+当前包含五个可执行单元和两个 Web / 扩展前端包：
 
 - [desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md) —— macOS 原生入口（Swift / SwiftUI），负责 PromptPanel、Settings、热键、焦点恢复、平台能力 IPC 和 Electron 生命周期。
 - [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md) —— Electron UI shell，监督 agent-server，承载 Electron ThreadWindow 和 React StatusBubble。
 - [thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md) —— React ThreadWindow 前端，由 Electron `BrowserWindow` 承载。
 - [agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md) —— 本地 WebSocket thread 桥（Node / TypeScript），由 electron-shell 监督。
+- [chrome-bookmarks-extension/chrome-bookmarks-extension.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-extension/chrome-bookmarks-extension.md) —— Chrome MV3 扩展，监听 `chrome.bookmarks.onCreated` 并通过 Native Messaging 转发 URL 书签新增事件。
+- [chrome-bookmarks-native-host/chrome-bookmarks-native-host.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-native-host/chrome-bookmarks-native-host.md) —— Chrome Native Messaging stdio helper，把扩展消息转发给 Swift desktop 的本地 Chrome Bookmarks bridge。
 
 ## 在整体架构中的位置
 
 ```mermaid
 flowchart LR
   A[apps/desktop<br/>macOS 原生入口] -->|Swift command bridge| E[apps/electron-shell<br/>Electron shell]
+  X[apps/chrome-bookmarks-extension<br/>Chrome 扩展] -->|Native Messaging| H[apps/chrome-bookmarks-native-host<br/>stdio helper]
+  H -->|loopback HTTP| A
   E -->|BrowserWindow host| W[apps/thread-window-web<br/>React ThreadWindow]
   E -->|BrowserWindow host| S[React StatusBubble]
   E -->|supervise| B[apps/agent-server<br/>本地 thread 桥]

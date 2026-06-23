@@ -80,6 +80,7 @@ private struct PackageDetailView: View {
     @State private var folderIds = ""
     @State private var scheduleAt = ""
     @State private var timezone = "Asia/Shanghai"
+    @State private var promptTemplate = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -109,7 +110,7 @@ private struct PackageDetailView: View {
 
     private var packageHeader: some View {
         SettingsSection {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: theme.spacing.sm) {
                 Text(package.title)
                     .font(theme.typography.titleFont.weight(.semibold))
                     .foregroundStyle(theme.colors.ink)
@@ -118,9 +119,25 @@ private struct PackageDetailView: View {
                         .font(theme.typography.captionFont)
                         .foregroundStyle(theme.colors.textSecondary)
                 }
+                if let status = viewModel.connectionStatus(for: package) {
+                    connectionStatusRow(status)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func connectionStatusRow(_ status: AgentTriggerPackageConnectionStatus) -> some View {
+        HStack(alignment: .top, spacing: theme.spacing.xs) {
+            Image(systemName: status.isAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(status.isAvailable ? theme.colors.success : theme.colors.warning)
+            Text(status.message)
+                .font(theme.typography.captionFont)
+                .foregroundStyle(theme.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var automationsSection: some View {
@@ -170,7 +187,9 @@ private struct PackageDetailView: View {
                     role: .primary
                 ) {
                     isAdding.toggle()
-                    if !isAdding {
+                    if isAdding {
+                        promptTemplate = package.defaultPromptTemplate
+                    } else {
                         resetForm()
                     }
                 }
@@ -190,6 +209,13 @@ private struct PackageDetailView: View {
                         SettingsRowDivider()
                         SettingsRow("Folders") {
                             SettingsTextField(placeholder: "folder-a,folder-b", text: $folderIds)
+                        }
+                        SettingsRowDivider()
+                        SettingsRow("提示词") {
+                            SettingsTextEditor(
+                                text: $promptTemplate,
+                                placeholder: "Summarize {{title}} at {{url}}"
+                            )
                         }
                     }
                     if package.providerKind == "system.clock" {
@@ -212,7 +238,8 @@ private struct PackageDetailView: View {
                         SettingsActionButton(title: "保存", role: .primary) {
                             let didCreate = viewModel.createInstanceForCurrentPackage(
                                 title: title,
-                                config: currentConfig()
+                                config: currentConfig(),
+                                promptTemplate: promptTemplate
                             )
                             if didCreate {
                                 isAdding = false
@@ -275,5 +302,6 @@ private struct PackageDetailView: View {
         folderIds = ""
         scheduleAt = ""
         timezone = "Asia/Shanghai"
+        promptTemplate = package.defaultPromptTemplate
     }
 }

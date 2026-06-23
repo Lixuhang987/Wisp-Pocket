@@ -49,8 +49,70 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.instances.count, 1)
         XCTAssertEqual(viewModel.instances.first?.packageId, "chrome-bookmarks")
         XCTAssertEqual(viewModel.instances.first?.title, "English Reading")
+        XCTAssertEqual(viewModel.instances.first?.promptTemplate, "Summarize the bookmarked page.")
         XCTAssertEqual(runtime.reloadCount, 1)
         XCTAssertEqual(store.loadInstances().count, 1)
+    }
+
+    @MainActor
+    func testChromeBookmarkPackageConnectionStatusComesFromProvider() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        store.ensureBuiltinPackagesInstalled()
+        let expectedStatus = AgentTriggerPackageConnectionStatus(
+            isAvailable: false,
+            message: "扩展连接不可用：Native Messaging Host manifest 未安装。"
+        )
+        let viewModel = AgentTriggerSettingsViewModel(store: store) { package in
+            package.providerKind == "chrome.bookmarks" ? expectedStatus : nil
+        }
+        let chromePackage = try XCTUnwrap(viewModel.installedPackages.first { $0.providerKind == "chrome.bookmarks" })
+        let clockPackage = try XCTUnwrap(viewModel.installedPackages.first { $0.providerKind == "system.clock" })
+
+        XCTAssertEqual(viewModel.connectionStatus(for: chromePackage), expectedStatus)
+        XCTAssertNil(viewModel.connectionStatus(for: clockPackage))
+    }
+
+    @MainActor
+    func testCreateChromeBookmarkInstancePersistsCustomPromptTemplate() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        store.ensureBuiltinPackagesInstalled()
+        let viewModel = AgentTriggerSettingsViewModel(store: store)
+        viewModel.selectPackage(id: "chrome-bookmarks")
+
+        let didCreate = viewModel.createInstanceForCurrentPackage(
+            title: "English Reading",
+            config: ["folderIds": .stringList(["english"])],
+            promptTemplate: "Summarize {{title}} at {{url}}"
+        )
+
+        XCTAssertTrue(didCreate)
+        XCTAssertEqual(store.loadInstances().first?.promptTemplate, "Summarize {{title}} at {{url}}")
+    }
+
+    @MainActor
+    func testCreateInstanceFailsOnEmptyPromptTemplateWithoutTouchingStore() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        store.ensureBuiltinPackagesInstalled()
+        let runtime = RecordingAgentTriggerRuntime()
+        let viewModel = AgentTriggerSettingsViewModel(store: store, runtime: runtime)
+        viewModel.selectPackage(id: "chrome-bookmarks")
+
+        let didCreate = viewModel.createInstanceForCurrentPackage(
+            title: "English Reading",
+            config: ["folderIds": .stringList(["english"])],
+            promptTemplate: "  "
+        )
+
+        XCTAssertFalse(didCreate)
+        XCTAssertEqual(viewModel.saveErrorMessage, "提示词不能为空")
+        XCTAssertTrue(store.loadInstances().isEmpty)
+        XCTAssertEqual(runtime.reloadCount, 0)
     }
 
     @MainActor

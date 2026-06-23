@@ -54,6 +54,11 @@ cat >"$HANDAGENT_PACKAGE_BUILD_DIR/HandAgentDesktop" <<'APP'
 echo mock app
 APP
 chmod +x "$HANDAGENT_PACKAGE_BUILD_DIR/HandAgentDesktop"
+cat >"$HANDAGENT_PACKAGE_BUILD_DIR/HandAgentChromeBookmarksNativeHost" <<'HOST'
+#!/usr/bin/env bash
+echo mock native host
+HOST
+chmod +x "$HANDAGENT_PACKAGE_BUILD_DIR/HandAgentChromeBookmarksNativeHost"
 printf 'swift:%s\n' "$*" >>"$HANDAGENT_PACKAGE_LOG_FILE"
 printf 'clang_cache:%s\n' "${CLANG_MODULE_CACHE_PATH:-}" >>"$HANDAGENT_PACKAGE_LOG_FILE"
 printf 'swift_cache:%s\n' "${SWIFT_MODULECACHE_PATH:-}" >>"$HANDAGENT_PACKAGE_LOG_FILE"
@@ -109,6 +114,7 @@ MARKER_FILE="$APP_DIR/Contents/Resources/HandAgentRuntimeMode.json"
 ELECTRON_MAIN_FILE="$APP_DIR/Contents/Resources/ElectronShell/dist/main/main.js"
 
 test -x "$APP_DIR/Contents/MacOS/HandAgentDesktop"
+test -x "$APP_DIR/Contents/Resources/HandAgentChromeBookmarksNativeHost"
 test -f "$MARKER_FILE"
 test -f "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 test -f "$ELECTRON_MAIN_FILE"
@@ -116,6 +122,7 @@ grep -q '"llmMode":"mock"' "$MARKER_FILE"
 grep -q 'mock web' "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 grep -q 'mock electron shell' "$ELECTRON_MAIN_FILE"
 grep -q "swift:build --cache-path $SHARED_CACHE_ROOT/.cache/swiftpm -c release --product HandAgentDesktop" "$LOG_FILE"
+grep -q "swift:build --cache-path $SHARED_CACHE_ROOT/.cache/swiftpm -c release --product HandAgentChromeBookmarksNativeHost" "$LOG_FILE"
 grep -q "clang_cache:$ROOT_DIR/.cache/swift/clang-module-cache" "$LOG_FILE"
 grep -q "swift_cache:$ROOT_DIR/.cache/swift/swift-module-cache" "$LOG_FILE"
 grep -q 'codesign:--force --deep --sign - --requirements =designated => identifier "com.yourname.HandAgentDesktop"' "$LOG_FILE"
@@ -138,6 +145,7 @@ package_output="$(
 )"
 
 test -x "$APP_DIR/Contents/MacOS/HandAgentDesktop"
+test -x "$APP_DIR/Contents/Resources/HandAgentChromeBookmarksNativeHost"
 test ! -f "$MARKER_FILE"
 test -f "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 test -f "$ELECTRON_MAIN_FILE"
@@ -147,6 +155,7 @@ grep -q 'pnpm:install' "$LOG_FILE"
 grep -q 'pnpm:--filter handagent-thread-window-web build' "$LOG_FILE"
 grep -q 'pnpm:--filter handagent-electron-shell build' "$LOG_FILE"
 grep -q "swift:build --cache-path $TEST_TMP_DIR/shared-swiftpm-cache -c release --product HandAgentDesktop" "$LOG_FILE"
+grep -q "swift:build --cache-path $TEST_TMP_DIR/shared-swiftpm-cache -c release --product HandAgentChromeBookmarksNativeHost" "$LOG_FILE"
 grep -q "clang_cache:$TEST_TMP_DIR/shared-module-cache/clang-module-cache" "$LOG_FILE"
 grep -q "swift_cache:$TEST_TMP_DIR/shared-module-cache/swift-module-cache" "$LOG_FILE"
 grep -q 'codesign:--force --deep --sign - --requirements =designated => identifier "com.yourname.HandAgentDesktop"' "$LOG_FILE"

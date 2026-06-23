@@ -1,0 +1,187 @@
+import Foundation
+import Network
+
+struct ChromeBookmarksExtensionEvent: Codable, Equatable {
+    let type: String
+    let protocolVersion: Int
+    let eventId: String?
+    let bookmarkId: String?
+    let parentId: String?
+    let title: String?
+    let url: String?
+    let profileId: String?
+    let occurredAt: String?
+    let extensionVersion: String?
+    let extensionInstanceId: String?
+    let sentAt: String?
+}
+
+protocol ChromeBookmarksExtensionEventSource: AnyObject {
+    func start(_ handler: @escaping (ChromeBookmarksExtensionEvent) -> Void) throws
+    func stop() throws
+}
+
+struct ChromeBookmarksBridgeEndpoint: Codable, Equatable {
+    let protocolVersion: Int
+    let host: String
+    let port: Int
+    let token: String
+    let updatedAt: String
+}
+
+final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventSource, @unchecked Sendable {
+    private let homeDirectoryURL: URL
+    private let fileManager: FileManager
+    private let queue = DispatchQueue(label: "handagent.chrome-bookmarks-extension.bridge")
+    private var listener: NWListener?
+    private var token: String?
+    private var handler: ((ChromeBookmarksExtensionEvent) -> Void)?
+
+    init(
+        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
+        fileManager: FileManager = .default
+    ) {
+        self.homeDirectoryURL = homeDirectoryURL
+        self.fileManager = fileManager
+    }
+
+    func start(_ handler: @escaping (ChromeBookmarksExtensionEvent) -> Void) throws {
+        try stop()
+        let token = UUID().uuidString
+        let listener = try NWListener(using: .tcp, on: .any)
+        guard let port = listener.port?.rawValue else {
+            throw ChromeBookmarksExtensionBridgeError.missingPort
+        }
+        self.token = token
+        self.handler = handler
+        listener.newConnectionHandler = { [weak self] connection in
+            self?.handle(connection)
+        }
+        listener.start(queue: queue)
+        self.listener = listener
+        try writeEndpoint(port: Int(port), token: token)
+    }
+
+    func stop() throws {
+        listener?.cancel()
+        listener = nil
+        token = nil
+        handler = nil
+    }
+
+    private func handle(_ connection: NWConnection) {
+        connection.start(queue: queue)
+        receive(on: connection, buffer: Data())
+    }
+
+    private func receive(on connection: NWConnection, buffer: Data) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, isComplete, error in
+            guard let self else { return }
+            var nextBuffer = buffer
+            if let data {
+                nextBuffer.append(data)
+            }
+            if let response = self.makeResponse(for: nextBuffer) {
+                connection.send(content: response, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+                return
+            }
+            if isComplete || error != nil {
+                connection.cancel()
+                return
+            }
+            self.receive(on: connection, buffer: nextBuffer)
+        }
+    }
+
+    private func makeResponse(for data: Data) -> Data? {
+        guard let request = HTTPBookmarkEventRequest(data: data) else { return nil }
+        guard request.path == "/events", request.method == "POST" else {
+            return httpResponse(status: 404)
+        }
+        guard request.authorization == "Bearer \(token ?? "")" else {
+            return httpResponse(status: 401)
+        }
+        do {
+            let event = try JSONDecoder().decode(ChromeBookmarksExtensionEvent.self, from: request.body)
+            guard event.protocolVersion == 1 else {
+                return httpResponse(status: 400)
+            }
+            handler?(event)
+            return httpResponse(status: 204)
+        } catch {
+            return httpResponse(status: 400)
+        }
+    }
+
+    private func writeEndpoint(port: Int, token: String) throws {
+        let endpoint = ChromeBookmarksBridgeEndpoint(
+            protocolVersion: 1,
+            host: "127.0.0.1",
+            port: port,
+            token: token,
+            updatedAt: ISO8601DateFormatter().string(from: Date())
+        )
+        let url = Self.endpointURL(homeDirectoryURL: homeDirectoryURL)
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(endpoint).write(to: url, options: .atomic)
+    }
+
+    static func endpointURL(homeDirectoryURL: URL) -> URL {
+        homeDirectoryURL
+            .appendingPathComponent(".spotAgent", isDirectory: true)
+            .appendingPathComponent("agent-triggers", isDirectory: true)
+            .appendingPathComponent("chrome-bookmarks-extension", isDirectory: true)
+            .appendingPathComponent("bridge.json")
+    }
+}
+
+enum ChromeBookmarksExtensionBridgeError: Error, Equatable {
+    case missingPort
+}
+
+private struct HTTPBookmarkEventRequest {
+    let method: String
+    let path: String
+    let authorization: String?
+    let body: Data
+
+    init?(data: Data) {
+        guard let headerRange = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
+        let headerData = data.subdata(in: data.startIndex..<headerRange.lowerBound)
+        guard let headerText = String(data: headerData, encoding: .utf8) else { return nil }
+        let lines = headerText.split(separator: "\r\n", omittingEmptySubsequences: false)
+        guard let requestLine = lines.first else { return nil }
+        let requestParts = requestLine.split(separator: " ")
+        guard requestParts.count >= 2 else { return nil }
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            guard let separator = line.firstIndex(of: ":") else { continue }
+            let key = line[..<separator].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let value = line[line.index(after: separator)...].trimmingCharacters(in: .whitespacesAndNewlines)
+            headers[key] = value
+        }
+        let bodyStart = headerRange.upperBound
+        let contentLength = Int(headers["content-length"] ?? "0") ?? 0
+        guard data.count >= bodyStart + contentLength else { return nil }
+        method = String(requestParts[0])
+        path = String(requestParts[1])
+        authorization = headers["authorization"]
+        body = data.subdata(in: bodyStart..<(bodyStart + contentLength))
+    }
+}
+
+private func httpResponse(status: Int) -> Data {
+    let reason: String
+    switch status {
+    case 204: reason = "No Content"
+    case 400: reason = "Bad Request"
+    case 401: reason = "Unauthorized"
+    case 404: reason = "Not Found"
+    default: reason = "Error"
+    }
+    return Data("HTTP/1.1 \(status) \(reason)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
+}

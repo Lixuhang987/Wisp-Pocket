@@ -1,0 +1,14 @@
+{
+  "name": "handagent-chrome-bookmarks-extension",
+  "private": true,
+  "type": "module",
+  "main": "dist/background.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-manifest.mjs",
+    "test": "tsc -p tsconfig.json && vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

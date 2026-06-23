@@ -32,6 +32,8 @@ run_quiet bash "$PROJECT_ROOT/scripts/test.test.sh"
 run_quiet bash "$PROJECT_ROOT/scripts/swiftlint.sh"
 
 run_quiet pnpm test:theme-tokens
+run_quiet pnpm --filter handagent-chrome-bookmarks-extension test
+run_quiet pnpm --filter handagent-chrome-bookmarks-extension build
 run_quiet pnpm --filter handagent-thread-window-web test
 run_quiet pnpm --filter handagent-thread-window-web build
 run_quiet pnpm --filter handagent-electron-shell test

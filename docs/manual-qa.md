@@ -34,7 +34,7 @@
 - 手工回归步骤：
   1. 删除 `~/.spotAgent/agent-triggers/` 后启动桌面 App，进入 Settings → 触发器，确认一级直接显示 `Chrome Bookmarks` 与 `System Clock` 两行（左 name + description，右"N 个自动化 >"），无需点"安装内置 Trigger"。
   2. 点击 `Chrome Bookmarks` 行，确认进入二级页面，顶部看到包 name + description 与 `暂无自动化`；顶部"返回"可回一级。
-  3. 在 Chrome Bookmarks 二级点"新增自动化"，只填"标题"和"Folders"两项，保存后回到该二级页面，自动化列表出现一条；空 title 时按"保存"显示"标题不能为空"且不创建。
+  3. 在 Chrome Bookmarks 二级点"新增自动化"，填写"标题"、"Folders"和"提示词"，保存后回到该二级页面，自动化列表出现一条；空 title 时按"保存"显示"标题不能为空"且不创建，空提示词时显示"提示词不能为空"且不创建。
   4. 进入 System Clock 二级，连续创建两条自动化（不同时间点），确认列表显示两条，磁盘 `instances.json` 也包含两条。
   5. 在二级页面对某条自动化点"删除"，确认列表立即移除该条，runtime reload，对应触发器停止。
   6. 手工删除 `~/.spotAgent/agent-triggers/packages/chrome-bookmarks/`，重启桌面 App（设置页内无"恢复内置触发器"按钮），确认 Chrome Bookmarks 行由启动期 `ensureBuiltinPackagesInstalled()` 重新写入并出现，且未影响已存在的 System Clock manifest（包括用户改过 title 的情况）。
@@ -49,10 +49,27 @@
 - 手工回归步骤：
   1. 打开 Settings 的 AgentTrigger 页，确认能看到内置 `Chrome Bookmarks` 与 `System Clock` 两类 package，并可分别创建实例。
   2. 创建一个 `system.clock` 实例，配置未来 1-2 分钟内的触发时间和简单 prompt 模板；到点后确认不会自动弹出 ThreadWindow，但稍后在历史里能看到新增 thread。
-  3. 创建一个 `chrome.bookmarks` 实例，指向本机 Chrome 书签文件中的某个 folder id；修改该文件夹内容后确认会生成新的后台 thread。
+  3. 创建一个 `chrome.bookmarks` 实例，指向 Chrome 中某个 folder id，提示词包含 `{{url}}`；在 Chrome 中把网页收藏到该 folder 后确认会生成新的后台 thread，首条 user input 包含该 URL。
   4. 使用会触发权限确认或工作区选择的 prompt 模板，确认后台 thread 命中 `permission.requested` / `workspace.requested` 时，宿主出现最小提示；点击“查看 Thread”后才打开 ThreadWindow，并聚焦到对应 thread。
   5. 使用一个会稳定失败的 prompt 或 mock 环境，确认后台失败时宿主出现失败提示；忽略提示时不自动开窗，点击查看后才打开历史 thread。
   6. 重启桌面 App，确认已保存的 AgentTrigger 实例会自动 reload，后续书签变化或到点事件仍能继续触发。
+
+### Chrome Bookmarks 扩展事件触发 Agent
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/chrome-bookmarks-extension/`、`apps/chrome-bookmarks-native-host/`、`apps/desktop/Sources/AppServices/AgentTrigger/`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView*`、`scripts/package-app.sh`
+- 修复结论：Chrome Bookmarks provider 从 Swift 轮询 Chrome `Bookmarks` 文件改为扩展事件驱动。Chrome MV3 扩展监听 `chrome.bookmarks.onCreated`，只转发 URL 书签新增事件；Native Messaging helper 读取 `bridge.json` 并 POST 到 Swift loopback bridge，同时把成功转发到当前 Swift bridge 的扩展 `hello` / stdio 断开 / 转发失败写入 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/status.json`；Swift provider 按实例 `folderIds` 匹配后复用现有 `agent_trigger.fire` 后台启动链路。`AgentTriggerInstance.promptTemplate` 已暴露到 Chrome Bookmarks 新增表单，模板支持 `{{url}}`、`{{title}}`、`{{folderId}}`、`{{bookmarkId}}`、`{{profileId}}`。Settings 的 Chrome Bookmarks 详情页会显示真实扩展连接状态，并要求 `status.json.updatedAt` 不早于当前 `bridge.json.updatedAt`；首版不做 Chrome Web Store 跳转。
+- 自动化验证：需执行 `pnpm --filter handagent-chrome-bookmarks-extension test`、`pnpm --filter handagent-chrome-bookmarks-extension build`、`bash ./scripts/swiftw test --filter NativeMessagingCodecTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksNativeHostInstallerTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksAgentTriggerProviderTests`、`bash ./scripts/swiftw test --filter AgentTriggerRuntimeTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/package-app.test.sh`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 安装或加载 `apps/chrome-bookmarks-extension/dist/` 扩展，记录实际 Chrome extension id。
+  2. 以 `HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID=<extension id>` 启动 HandAgent；开发运行时如 helper 不在 app bundle 内，同时设置 `HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH=<HandAgentChromeBookmarksNativeHost 绝对路径>`。
+  3. 确认 `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.handagent.chrome_bookmarks.json` 存在，`allowed_origins` 包含该 extension id，`path` 指向 helper。
+  4. 确认 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/status.json` 存在且 `state` 为 `connected`，并且 `updatedAt` 不早于同目录 `bridge.json.updatedAt`；禁用扩展或关闭 Chrome 后应变为 `disconnected`。
+  5. 进入 Settings → 触发器 → Chrome Bookmarks，确认扩展连接时显示正在监听；若未配置 extension id、helper 路径无效或扩展未连接，应显示不可用原因。
+  6. 创建实例：Folders 填目标 folder id，提示词填 `请阅读 {{title}}：{{url}}`。
+  7. 在 Chrome 把一个 URL 页面收藏到目标 folder，确认 ThreadWindow 历史里出现新的后台 thread，首条 user input 包含收藏 URL。
+  8. 把另一个 URL 收藏到未配置 folder，确认不会创建新的后台 thread。
+  9. 在 Chrome 新建收藏夹而不是 URL 书签，确认不会触发。
 
 ### MCP 官方 SDK client 迁移回归
 

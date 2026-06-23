@@ -1,5 +1,6 @@
 packages:
   - apps/agent-server
+  - apps/chrome-bookmarks-extension
   - apps/thread-window-web
   - apps/electron-shell
   - packages/core

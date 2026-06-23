@@ -25,6 +25,7 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading {
 
     func reload() throws {
         let packagesById = Dictionary(uniqueKeysWithValues: store.listInstalledPackages().map { ($0.id, $0) })
+        let installedProviderKinds = Set(packagesById.values.map(\.providerKind))
         let instancesByProvider = Dictionary(
             grouping: store.loadInstances().filter(\.enabled),
             by: { instance in
@@ -38,9 +39,9 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading {
         activeProviders.removeAll()
 
         for descriptor in registry.descriptors() {
+            guard installedProviderKinds.contains(descriptor.kind) else { continue }
             guard let factory = registry.factory(for: descriptor.kind) else { continue }
             let instances = instancesByProvider[descriptor.kind] ?? []
-            guard !instances.isEmpty else { continue }
             let instancesById = Dictionary(uniqueKeysWithValues: instances.map { ($0.id, $0) })
             let provider = factory.createHostProvider()
             try provider.start(instances: instances) { [emit] event in
@@ -78,10 +79,14 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading {
         event: AgentTriggerEvent,
         instance: AgentTriggerInstance
     ) -> String {
-        template
+        var rendered = template
             .replacingOccurrences(of: "{{summary}}", with: event.summary)
             .replacingOccurrences(of: "{{providerKind}}", with: event.providerKind)
             .replacingOccurrences(of: "{{triggerInstanceId}}", with: instance.id)
+        for (key, value) in event.payload {
+            rendered = rendered.replacingOccurrences(of: "{{\(key)}}", with: renderAgentTriggerValue(value))
+        }
+        return rendered
     }
 
     private func renderAgentTriggerValue(_ value: AgentTriggerConfigValue) -> String {
