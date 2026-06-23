@@ -14,7 +14,7 @@ Swift desktop 是默认 dynamic tool provider。原先通过 `/api/platform` 暴
 
 Plugin 生命周期由 Swift 控制。常驻 plugin 可以在 App 启动后持续运行并注册 dynamic tools；只暴露 tool 的 plugin 可以由 Swift 按设置或需要启动。agent-server 不 spawn plugin binary，只负责保存 tool spec、路由 dynamic tool call request、等待 provider response。
 
-Swift 和 React 被视为两个独立 frontend，都直接与 agent-server/core 通信。React ThreadWindow 仍由 Electron 承载并后台预热，但预热后的 React `/api/thread` connection 默认订阅所有新建 thread。Swift 可以直接向 agent-server 发送 `thread.start` / `op.submit`；core 创建成功后广播的 `thread.started` 同时发给 Swift 和 React，让自己创建和他人创建的 thread 使用同一套成功创建语义。
+Swift 和 React 被视为两个独立 frontend，都直接与 agent-server/core 通信。React ThreadWindow 仍由 Electron 承载并后台预热，但预热后的 React `/api/thread` connection 默认订阅所有新建 thread。Swift 可以直接向 agent-server 发送 `thread.start` / `op.submit`；core 创建成功后广播的 `thread.started` 同时发给 Swift 和 React，让自己创建和他人创建的 thread 使用同一套成功创建语义。Swift 必须在收到 `thread.started.threadId` 后，才能向 Electron 发送打开或聚焦 React ThreadWindow 的 command。
 
 ## Non-Goals
 
@@ -54,4 +54,4 @@ Swift 和 React 被视为两个独立 frontend，都直接与 agent-server/core 
 ### UC6: 双 frontend 订阅统一 thread 创建语义
 
 - 触发：Swift 或 React 任一 frontend 创建新 thread。
-- 结果：agent-server 将 `thread.started` 广播给创建方和后台预热的 React connection；React 不需要 Swift 发送消息副本即可接收新 thread 的后续 notification。交互式 `ServerRequest` 默认只发送给 React；dynamic tool call 按 tool spec 中的 `clientId` 路由给对应 provider。
+- 结果：agent-server 将 `thread.started` 广播给创建方和后台预热的 React connection；React 不需要 Swift 发送消息副本即可接收新 thread 的后续 notification。Swift 只有拿到 `threadId` 后才让 Electron open/focus 对应 thread。交互式 `ServerRequest` 默认只发送给 React；dynamic tool call 按 tool spec 中的 `clientId` 路由给对应 provider。

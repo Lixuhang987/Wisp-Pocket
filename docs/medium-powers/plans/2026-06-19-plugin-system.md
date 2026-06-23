@@ -220,7 +220,7 @@ flowchart LR
 - Swift 生成默认 `DynamicToolSpec[]`。
 - Electron ThreadWindow preload config 增加 `defaultDynamicTools`，来源是 Swift host/provider 当前可用工具集合。
 - Swift PromptPanel 提交时直接向 agent-server 发送 `thread.start { dynamicTools }`，再发送首轮 `op.submit`。
-- Swift 发给 Electron 的 ThreadWindow command 只携带 `threadId` / open / focus 意图，不携带完整 prompt 或消息副本。
+- Swift 只有在收到 `thread.started.threadId` 后才向 Electron 发送 ThreadWindow open/focus command；command 只携带 `threadId` / open / focus 意图，不携带完整 prompt 或消息副本。
 - React ThreadWindow 新建空白 thread 时从 preload config 读取 `defaultDynamicTools`，写入 `thread.start.payload.dynamicTools`。
 - 后台 AgentTrigger 创建 thread 时也必须携带默认 host dynamic tools，避免入口不一致。
 
@@ -264,12 +264,12 @@ sequenceDiagram
 
   React->>Server: /api/thread hello { subscribeNewThreads: true }
   Swift->>Server: thread.start { dynamicTools }
-  Server-->>Swift: thread.started
+  Server-->>Swift: thread.started { threadId }
   Server-->>React: thread.started
-  Swift->>Server: op.submit
-  Server-->>React: ThreadNotification stream
   Swift->>Electron: open/focus threadId
   Electron-->>React: show existing ThreadWindow
+  Swift->>Server: op.submit
+  Server-->>React: ThreadNotification stream
 ```
 
 ### Implementation loops
@@ -286,7 +286,9 @@ sequenceDiagram
 
 **Loop 3: Swift 提交，React 展示**
 - Swift 直接向 agent-server 发送 `thread.start` 和首轮 `op.submit`。
+- Swift 必须先等待自己收到 `thread.started` 并取到 `threadId`，再向 Electron 发送 open/focus command。
 - Swift 给 Electron 的 command 只携带 `threadId` / focus 意图，不携带完整消息副本。
+- 如果 `thread.start` 失败或超时，Swift 不打开/聚焦 React ThreadWindow，并在 PromptPanel 侧展示创建失败状态。
 - React 收到 `thread.started` 后创建本地 thread 状态；后续 notification 直接来自 agent-server。
 
 **Loop 4: ServerRequest owner**
@@ -297,6 +299,8 @@ sequenceDiagram
 ### Tests
 
 - React 预热 connection 设置 `subscribeNewThreads` 后，Swift connection 创建 thread，React 也收到同一个 `thread.started`。
+- Swift 收到 `thread.started.threadId` 前不会发送 Electron open/focus command。
+- Swift 创建 thread 失败或超时时不会打开/聚焦 React ThreadWindow。
 - Swift 创建 thread 后发送 `op.submit`，React 无需 Swift 消息副本即可接收后续 notification。
 - `ServerRequest` 默认只发给 React connection。
 - 没有 React connection 时，默认交互请求返回清晰的 UI unavailable / timeout 错误。
