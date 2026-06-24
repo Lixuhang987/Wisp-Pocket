@@ -36,11 +36,10 @@ export function filterEmptySSEDataEvents(raw: string): string {
       pendingEmptyEvent = event;
       continue;
     }
-    filteredEvents.push(
-      pendingEmptyEvent && !event.event
-        ? { ...event, event: pendingEmptyEvent.event, id: event.id ?? pendingEmptyEvent.id }
-        : event,
-    );
+    const normalizedEvent = pendingEmptyEvent && !event.event
+      ? { ...event, event: pendingEmptyEvent.event, id: event.id ?? pendingEmptyEvent.id }
+      : event;
+    filteredEvents.push(...splitNewlineDelimitedJSONEvent(normalizedEvent));
     pendingEmptyEvent = undefined;
   }
 
@@ -48,6 +47,23 @@ export function filterEmptySSEDataEvents(raw: string): string {
     return "";
   }
   return filteredEvents.map(formatSSEMessage).join("\n\n") + trailingLineBreak(raw);
+}
+
+function splitNewlineDelimitedJSONEvent(event: EventSourceMessage): EventSourceMessage[] {
+  const lines = event.data.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length <= 1 || !lines.every(isJSONObjectPayload)) {
+    return [event];
+  }
+  return lines.map((data) => ({ ...event, data }));
+}
+
+function isJSONObjectPayload(text: string): boolean {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
 }
 
 function filterEmptySSEDataEventStream(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {

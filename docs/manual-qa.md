@@ -17,6 +17,20 @@
 
 ## 测试体系收敛记录
 
+### OpenAI-compatible Responses NDJSON SSE 兼容回归
+
+- 完成日期：待实机 QA
+- 实现位置：`packages/core/src/llm/VercelAdapters.ts`、`packages/core/tests/llm/vercel-client.test.ts`、`packages/core/src/llm/llm.md`、`docs/medium-powers/plans/2026-06-25-websearch-sse-parser-fix.md`
+- 修复结论：`createOpenAICompatibleFetch` 的 Responses SSE 兼容层在保留空 `data:` / `event:*` 合并逻辑外，新增对单个 SSE `data` payload 内多条换行分隔 JSON object 的拆分。若所有非空行都能解析为 JSON object，则输出为多条独立 SSE message；普通多行 data 保持原样，避免破坏合法文本 payload。
+- 自动化验证：需执行 `pnpm exec vitest run packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 准备一个有效的 OpenAI-compatible Responses provider，确保 `~/.spotAgent/settings.json` 使用 `provider=openai-compatible`、`api=responses`，且本地服务的认证 token 未过期。
+  2. 在启动 agent-server 的环境设置 `TAVILY_API_KEY`，启动桌面 App。
+  3. 提交 `WEBSEARCH_QA_FIX_20260625` 同类 prompt，要求先 `web_search` 搜索 OpenAI 官方近期发布说明，再 `fetch_page` 精读一个官方 URL。
+  4. 确认不再出现 `JSONParseError ... response.output_item.done ... response.completed`；SQLite thread items 中出现 `web_search` tool call/result，随后出现 `fetch_page` tool call/result。
+  5. 确认最终 assistant 中文回答引用 URL，ThreadWindow 状态回到 idle，`~/.spotAgent/log/<date>/network-*.jsonl` 中无 SSE JSON 连续事件解析错误。
+  6. 若 provider 返回 401 / invalidated oauth token，应记录为环境阻塞，不得把 Websearch 功能误判为失败。
+
 ### Use-case 驱动测试收敛
 
 - 完成日期：2026-06-18

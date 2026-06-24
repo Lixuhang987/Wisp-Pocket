@@ -100,6 +100,23 @@ describe("VercelClient adapters", () => {
     expect(text).toBe("event:response.created\ndata: {\"type\":\"response.created\"}\n");
   });
 
+  it("splits newline-delimited JSON payloads before AI SDK parses Responses streams", () => {
+    const raw = [
+      "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"name\":\"web_search\"}}",
+      "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}",
+      "",
+      "",
+    ].join("\n");
+
+    expect(filterEmptySSEDataEvents(raw)).toBe([
+      "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"name\":\"web_search\"}}",
+      "",
+      "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}",
+      "",
+      "",
+    ].join("\n"));
+  });
+
   it("converts agent messages to AI SDK model messages", async () => {
     const messages: AgentMessage[] = [
       {
