@@ -30,6 +30,12 @@
   4. 确认不再出现 `JSONParseError ... response.output_item.done ... response.completed`；SQLite thread items 中出现 `web_search` tool call/result，随后出现 `fetch_page` tool call/result。
   5. 确认最终 assistant 中文回答引用 URL，ThreadWindow 状态回到 idle，`~/.spotAgent/log/<date>/network-*.jsonl` 中无 SSE JSON 连续事件解析错误。
   6. 若 provider 返回 401 / invalidated oauth token，应记录为环境阻塞，不得把 Websearch 功能误判为失败。
+- 环境阻塞记录（2026-06-25）：
+  - 环境：主 checkout `/Users/mu9/proj/handAgent`，`main` 分支；`~/.spotAgent/settings.json` 为 `provider=openai-compatible`、`api=responses`、`baseUrl=http://127.0.0.1:8090/v1`；本地 `axonhub` 监听 `8090`；启动 App 时 agent-server stdout 为 `llm mode: settings`。
+  - 已完成自动化验证：`pnpm exec vitest run packages/core/tests/llm/vercel-client.test.ts` 通过（13 files / 214 tests，含 root 20 tests），`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均输出 `success`。
+  - 实机尝试：提交 `WEBSEARCH_QA_FIX_20260625_R2`，要求先 `web_search` 搜索 OpenAI 官方页面再 `fetch_page` 精读；thread `thread-087241d0-05a7-45f6-98d4-6a186792de2f` 在第一轮 Responses 请求返回 401 后进入 failed，未进入 `web_search` / `fetch_page` 工具链。
+  - 证据：ThreadWindow 显示 `Your authentication token has been invalidated. Please try signing in again.`；`~/.spotAgent/log/2026-06-25/network-001.jsonl` 记录 `POST http://127.0.0.1:8090/v1/responses` 返回 `status:401`、`code:"auth_unavailable"`；`~/.spotAgent/threads.sqlite` 中该 thread 的 `thread_items` sequence 4 为 `thread.error`、sequence 5 为 `turn.completed(status:"failed")`、sequence 6 为 `thread.status.changed(value:"failed")`。
+  - 结论：环境阻塞。该结果符合步骤 6 的 provider token 失效分支，不能判定 Websearch SSE parser 回归通过或失败；需要刷新本地 OpenAI-compatible provider token 后重跑。
 
 ### AgentTrigger 设置二级菜单与默认安装内置触发器
 
