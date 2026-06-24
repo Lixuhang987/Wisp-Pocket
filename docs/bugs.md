@@ -141,3 +141,36 @@
   5. 在二级页面对某条自动化点"删除"，确认列表立即移除该条，runtime reload，对应触发器停止。
   6. 手工删除 `~/.spotAgent/agent-triggers/packages/chrome-bookmarks/`，重启桌面 App（设置页内无"恢复内置触发器"按钮），确认 Chrome Bookmarks 行由启动期 `ensureBuiltinPackagesInstalled()` 重新写入并出现，且未影响已存在的 System Clock manifest（包括用户改过 title 的情况）。
   7. 重启桌面 App，确认所有创建的自动化仍存在并继续触发后台 thread。
+
+
+### AgentTrigger bridge endpoint 生命周期回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/HandAgentApp.swift`、`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/desktop/Sources/AppServices/AgentTrigger/AgentTriggerRuntime.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`、`apps/desktop/TestsSwift/AppServices/AppServicesTests.swift`、`apps/desktop/TestsSwift/HandAgentAppTests.swift`、`docs/medium-powers/plans/2026-06-25-agenttrigger-bridge-endpoint-fix.md`
+- 修复结论：`AppServices.init` 不再调用 `agentTriggerRuntime.reload()`，只确保内置 package 和 Chrome Native Messaging manifest 存在；`AppCoordinator.init` 也不自动 `bootstrap()`。真实 app lifecycle 进入 `HandAgentApplicationDelegate.applicationDidFinishLaunching` 后，幂等调用 `AppCoordinator.bootstrap()`，统一安装回调、reload AgentTrigger runtime、启动 Chrome Bookmarks bridge 和 app-server health，避免构造期 provider 写出已经失效的 `bridge.json` 端口/token。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppServicesTests`、`bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test --filter HandAgentAppTests`、`bash ./scripts/swiftw test --filter AgentTriggerRuntimeTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksExtensionBridgeServerTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksAgentTriggerProviderTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 备份并移走 `~/.spotAgent/agent-triggers/`，使用带 Chrome Bookmarks extension id 和 native host helper path 的桌面 App 启动环境启动 HandAgent。
+  2. 读取 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/bridge.json`，确认其中 `port` 是当前 HandAgentDesktop 进程正在监听的 loopback 端口。
+  3. 使用产品 native host 或直接向 `http://127.0.0.1:<port>/events` 携带当前 `token` 发送 `handagent.bookmarks.hello` 与 `handagent.bookmarks.folderTreeSnapshot`，确认返回成功，不再出现 `Could not connect to the server.`。
+  4. 确认 `status.json` 为 `connected`，且 `updatedAt` 不早于当前 `bridge.json.updatedAt`；确认 `folders.json` 已写入本轮文件夹树。
+  5. 打开 Settings → 触发器 → Chrome Bookmarks，确认连接状态不再显示"尚未收到 Chrome 扩展连接"，新增自动化表单可看到文件夹树并可勾选保存。
+  6. 重启桌面 App 后重复读取 `bridge.json` 并再次发送 synthetic `hello` / `folderTreeSnapshot`，确认新 endpoint 仍与当前监听端口一致；旧进程遗留端口不可作为成功依据。
+
+### 缺陷记录
+
+- **严重级别**：P1
+- **发现日期**：2026-06-25
+- **验证环境**：主 checkout `/Users/mu9/proj/handAgent`，`main` 分支；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均已通过；`bash ./scripts/package-app.sh --mock-llm` 打包成功；启动环境显式设置 `HANDAGENT_ELECTRON_BINARY`、`HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID=iidkhdjaboimibeplbeanlklgakmfebb`、`HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH=/Users/mu9/proj/handAgent/dist/HandAgentDesktop.app/Contents/Resources/HandAgentChromeBookmarksNativeHost`。
+- **复现步骤**：
+  1. 备份并移走 `~/.spotAgent/agent-triggers/`，启动打包后的 mock LLM 桌面 App。
+  2. 首次启动后确认 HandAgentDesktop 监听 `bridge.json.port=53505`，产品 native host synthetic `handagent.bookmarks.hello` 与 `handagent.bookmarks.folderTreeSnapshot` 均返回 `{"ok":true}`。
+  3. 确认 `status.json.state=connected`，`folders.json` 包含 `QA Root` 与 `QA Target Folder`。
+  4. 在 Settings → 触发器 → Chrome Bookmarks 中创建并保存实例 `QA Bridge Automation`，选择 `QA Target Folder`；保存后 runtime reload，`bridge.json.port` 变为 `53506`，HandAgentDesktop 监听同一端口，synthetic `hello` / `folderTreeSnapshot` 仍成功。
+  5. 退出并重启桌面 App，确认新 HandAgentDesktop pid 为 `72019`，agent-server pid 为 `72036`，初始 `bridge.json.port=53507`，进程监听 `*:53507`。
+  6. 重启后再次通过产品 native host 发送 `hello` 与 `folderTreeSnapshot`，两者返回 `{"ok":true}`；随后磁盘 `bridge.json` 被改写为 `port=53536`、`token=2140326A-B23E-46FC-963E-3754E89F792E`。
+- **实际结果**：当前 HandAgentDesktop 进程仍只监听 `*:53507`，但 `bridge.json` 指向 `53536`。使用当前 token 请求 `http://127.0.0.1:53536/events` 返回连接失败 / HTTP 502；请求旧监听端口 `http://127.0.0.1:53507/events` 返回 HTTP 401。已保存实例重启后会把 native host 指向不可用 endpoint。
+- **期望结果**：重启后 `bridge.json.port` 始终等于当前 HandAgentDesktop 的 live listener 端口，当前 token 可用于 synthetic `hello` / `folderTreeSnapshot`；`status.json.updatedAt` 不早于当前 `bridge.json.updatedAt`，UI 不应依赖旧连接状态显示已连接。
+- **证据**：失败快照中 `bridge.json` 为 `host=127.0.0.1`、`port=53536`、`token=2140326A-B23E-46FC-963E-3754E89F792E`、`updatedAt=2026-06-24T21:52:26Z`；`status.json` 仍为 `state=connected`、`updatedAt=2026-06-24T21:52:09Z`；`folders.json` 为本轮 `QA Root` / `QA Target Folder` 快照；`instances.json` 包含已保存实例 `QA Bridge Automation`、`folderIds=["qa-target"]`。端口探测显示 pid `72019` 监听 `53507`，`53536` 无对应 live listener。
+- **初步调用链 / 根因边界**：`HandAgentApplicationDelegate.applicationDidFinishLaunching -> AppCoordinator.bootstrap -> AgentTriggerRuntime.reload -> ChromeBookmarksAgentTriggerProvider/ChromeBookmarksExtensionBridgeServer -> bridge.json`。首次启动与保存实例后的 reload 已通过，但“重启 + 已存在 enabled instance”路径仍会出现新的 provider/server 写出 endpoint，而当前 live listener 未同步到该 endpoint；需继续核查 runtime/provider/server 生命周期是否在 reload 或实例恢复时重复启动或保留旧 listener。
+- **清理状态**：QA 残留的 HandAgentDesktop / Electron / agent-server 进程已停止，`4317`、`53507`、`53536` 无监听；QA 前备份 `~/.spotAgent/qa-backup-agent-triggers-20260625-054025` 已恢复为 `~/.spotAgent/agent-triggers/`，失败现场保存在 `~/.spotAgent/agent-triggers.qa-failed-20260625-055628`。

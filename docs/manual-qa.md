@@ -52,20 +52,6 @@
   6. 重启桌面 App，确认已保存的 AgentTrigger 实例会自动 reload，后续书签变化或到点事件仍能继续触发。
   7. 直接请求 `POST http://127.0.0.1:4317/api/agent-trigger/fire` 或连接 `ws://127.0.0.1:4317/api/agent-trigger/attention`，确认旧入口不可用。
 
-### AgentTrigger bridge endpoint 生命周期回归
-
-- 完成日期：待实机 QA
-- 实现位置：`apps/desktop/HandAgentApp.swift`、`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/desktop/Sources/AppServices/AgentTrigger/AgentTriggerRuntime.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`、`apps/desktop/TestsSwift/AppServices/AppServicesTests.swift`、`apps/desktop/TestsSwift/HandAgentAppTests.swift`、`docs/medium-powers/plans/2026-06-25-agenttrigger-bridge-endpoint-fix.md`
-- 修复结论：`AppServices.init` 不再调用 `agentTriggerRuntime.reload()`，只确保内置 package 和 Chrome Native Messaging manifest 存在；`AppCoordinator.init` 也不自动 `bootstrap()`。真实 app lifecycle 进入 `HandAgentApplicationDelegate.applicationDidFinishLaunching` 后，幂等调用 `AppCoordinator.bootstrap()`，统一安装回调、reload AgentTrigger runtime、启动 Chrome Bookmarks bridge 和 app-server health，避免构造期 provider 写出已经失效的 `bridge.json` 端口/token。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppServicesTests`、`bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw test --filter HandAgentAppTests`、`bash ./scripts/swiftw test --filter AgentTriggerRuntimeTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksExtensionBridgeServerTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksAgentTriggerProviderTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
-- 手工回归步骤：
-  1. 备份并移走 `~/.spotAgent/agent-triggers/`，使用带 Chrome Bookmarks extension id 和 native host helper path 的桌面 App 启动环境启动 HandAgent。
-  2. 读取 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/bridge.json`，确认其中 `port` 是当前 HandAgentDesktop 进程正在监听的 loopback 端口。
-  3. 使用产品 native host 或直接向 `http://127.0.0.1:<port>/events` 携带当前 `token` 发送 `handagent.bookmarks.hello` 与 `handagent.bookmarks.folderTreeSnapshot`，确认返回成功，不再出现 `Could not connect to the server.`。
-  4. 确认 `status.json` 为 `connected`，且 `updatedAt` 不早于当前 `bridge.json.updatedAt`；确认 `folders.json` 已写入本轮文件夹树。
-  5. 打开 Settings → 触发器 → Chrome Bookmarks，确认连接状态不再显示"尚未收到 Chrome 扩展连接"，新增自动化表单可看到文件夹树并可勾选保存。
-  6. 重启桌面 App 后重复读取 `bridge.json` 并再次发送 synthetic `hello` / `folderTreeSnapshot`，确认新 endpoint 仍与当前监听端口一致；旧进程遗留端口不可作为成功依据。
-
 ### Chrome Bookmarks 扩展事件触发 Agent
 
 - 完成日期：待实机 QA
