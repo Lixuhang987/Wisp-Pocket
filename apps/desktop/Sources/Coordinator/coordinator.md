@@ -19,7 +19,7 @@
 - Action 是封闭枚举；新增协调事件必须显式声明分支，不要用 `NotificationCenter` 绕开。
 - `AppCoordinator.init` 只保存依赖，不启动进程、provider 或监听器；`HandAgentApplicationDelegate.applicationDidFinishLaunching` 调用幂等的 `bootstrap()` 后，才安装子模块回调并启动真实运行期副作用。
 - 子模块回调统一在 `bootstrap()` 阶段注入闭包；外观系统回调只转给 `AppearanceThemeService.systemAppearanceDidChange()`，其他闭包内只允许 `send(.xxx)` 或打开 PromptPanel。
-- 应用退出由 `HandAgentApplicationDelegate` 接收 macOS termination 回调并调用 `shutdown()`；不要绕过 Coordinator 直接 stop Electron shell 或 AgentTrigger provider。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一 AppDelegate shutdown 链路。
+- 应用退出由 `HandAgentApplicationDelegate` 接收 macOS termination 回调并调用幂等 `shutdown()`；`shutdown()` 必须停止 AgentTrigger runtime、app-server health、窗口 lifecycle 和外观监听，不要绕过 Coordinator 直接 stop Electron shell 或 AgentTrigger provider。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一 AppDelegate shutdown 链路。
 - 测试模式走 `AppServices.testing()` 注入 nop 替身，跳过窗口/进程/激活策略副作用。
 - 窗口生命周期由 lifecycle 控制器闭环：Electron ThreadWindow 由 `ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 管理，`SettingsLifecycle` 管 Settings；Coordinator 不持有 AppKit 对象。
 - 应用内快捷键（如 `showThreadWindow` ⌘L 唤起 ThreadWindow）使用 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)` 在 `setupHotkey()` 中注册，仅当 handAgent 持有焦点时生效。不走 `HotkeyRegistering` 协议和 Carbon Events 全局通道。配置 UI 复用 `KeyboardShortcuts.Recorder`，监听通过 `KeyboardShortcuts.Shortcut(event:)` 比对。`shutdown()` 中 `NSEvent.removeMonitor` 清理。
@@ -31,7 +31,7 @@
 - Settings 打开时会创建模型、外观、builtin tool、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel。Coordinator 只负责注入，不直接读写 `~/.spotAgent/actions` 或 `~/.spotAgent/mcp.json`。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
 - `AppCoordinator` 在 app-server available 后调用 `ActivityWindowCommanding.showActivityWindow()`；show 失败不回退到 Swift StatusBubble。Electron StatusBubble 点击不再回调 Coordinator 打开 PromptPanel，Coordinator 也不解析 `/api/activity` 状态。
-- `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving`、AgentTrigger runtime 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。AgentTrigger runtime reload 也必须留在 bootstrap 内，避免构造期 Chrome Bookmarks provider 写出不属于当前 live listener 的 `bridge.json`。
+- `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving`、AgentTrigger runtime 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。AgentTrigger runtime reload 也必须留在 bootstrap 内，避免构造期 Chrome Bookmarks provider 写出不属于当前 live listener 的 `bridge.json`；shutdown 必须调用 runtime `stop()`，避免退出 / 重启后留下无 live listener 的 Chrome Bookmarks bridge endpoint。
 
 ## 当前 Action 列表
 
@@ -49,7 +49,7 @@ openHistory / threadWindowClosed
 - 持有 `AgentServerHealth`（来自 AppServices 层）。
 - 通过 `AgentServerHealth.onAvailabilityChange` 驱动 [PromptPanel](/Users/mu9/proj/handAgent/apps/desktop/Sources/PromptPanel/prompt-panel.md) 的提交启停状态。
 - 通过 `AppServerManaging.onHostTerminationRequest` 把 Electron clean exit 转成 Swift 宿主退出。
-- 通过 `AgentTriggerRuntimeService.reload()` 启动已安装 AgentTrigger provider；该调用由 `bootstrap()` 幂等保护。
+- 通过 `AgentTriggerRuntimeService.reload()` 启动已安装 AgentTrigger provider，通过 `AgentTriggerRuntimeService.stop()` 停止 provider；启动调用由 `bootstrap()` 幂等保护，停止调用由 `shutdown()` 幂等保护。
 - 通过 `ActivityWindowCommanding` 显示 Electron ActivityWindow；该 command client 只承载 ActivityWindow show 命令回执，不承载 activity 数据。
 - 通过 `AppearanceChangeObserving` 接收 macOS 外观变化，并交给 `AppearanceThemeService` 生成宿主主题 payload。
 - `AppActivationPolicyCoordinator` 实例由 Coordinator 创建；SettingsWindow 由 `SettingsLifecycle` 推送激活策略，Electron ThreadWindow 由 Coordinator 在 open/close ack 回调中推送激活策略。

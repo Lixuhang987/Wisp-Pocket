@@ -52,6 +52,20 @@
   6. 重启桌面 App，确认已保存的 AgentTrigger 实例会自动 reload，后续书签变化或到点事件仍能继续触发。
   7. 直接请求 `POST http://127.0.0.1:4317/api/agent-trigger/fire` 或连接 `ws://127.0.0.1:4317/api/agent-trigger/attention`，确认旧入口不可用。
 
+### AgentTrigger bridge 重启 endpoint 修复回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/AppServices/AgentTrigger/AgentTriggerRuntime.swift`、`apps/desktop/Sources/AppServices/AgentTrigger/ChromeBookmarksExtensionBridge.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`、`apps/desktop/TestsSwift/AppServices/AgentTriggerRuntimeTests.swift`、`apps/desktop/TestsSwift/AppServices/ChromeBookmarksExtensionBridgeServerTests.swift`、`docs/medium-powers/plans/2026-06-25-agenttrigger-bridge-restart-endpoint-fix.md`
+- 修复结论：`AgentTriggerRuntime` 新增显式 `stop()`，`AppCoordinator.shutdown()` 幂等停止 AgentTrigger provider；Chrome Bookmarks bridge server 停止或释放时只删除自己 token 对应的 `bridge.json`，避免退出 / 重启后磁盘保留无 live listener 的 endpoint，也避免旧 listener stop 误删新 listener endpoint。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppCoordinatorTests/testShutdownStopsAgentTriggerRuntimeOnce`、`bash ./scripts/swiftw test --filter AgentTriggerRuntimeTests/testStopStopsActiveProvidersAndAllowsReload`、`bash ./scripts/swiftw test --filter ChromeBookmarksExtensionBridgeServerTests/testStopRemovesOwnedEndpoint`、`bash ./scripts/swiftw test --filter ChromeBookmarksExtensionBridgeServerTests/testStopDoesNotRemoveEndpointOwnedByNewerServer`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 备份并移走 `~/.spotAgent/agent-triggers/`，使用带 Chrome Bookmarks extension id 和 native host helper path 的桌面 App 启动 HandAgent。
+  2. 创建并保存一个 Chrome Bookmarks 自动化实例，选择一个测试收藏夹；确认保存后的 `bridge.json.port` 等于当前 HandAgentDesktop 进程监听端口，synthetic `handagent.bookmarks.hello` / `handagent.bookmarks.folderTreeSnapshot` 均成功。
+  3. 退出桌面 App，确认 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/bridge.json` 不再保留已停止 listener 的 endpoint。
+  4. 重新启动桌面 App，确认已保存实例自动 reload，新的 `bridge.json.port` 等于当前 HandAgentDesktop 进程监听端口。
+  5. 重启后再次通过产品 native host 发送真实扩展 `hello` / `folderTreeSnapshot`，确认返回成功；不得使用旧进程遗留端口作为成功依据。若只直接携带当前 token POST 到 Swift bridge，该步骤只能证明当前 bridge 可达，不能证明 native host 状态写入。
+  6. 在产品 native host 路径下确认 `status.json.updatedAt` 不早于当前 `bridge.json.updatedAt`，Settings → 触发器 → Chrome Bookmarks 显示扩展已连接并能看到文件夹树。
+
 ### Chrome Bookmarks 扩展事件触发 Agent
 
 - 完成日期：待实机 QA

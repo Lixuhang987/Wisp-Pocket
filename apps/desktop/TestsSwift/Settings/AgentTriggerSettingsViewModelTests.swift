@@ -321,4 +321,6 @@ private final class RecordingAgentTriggerRuntime: AgentTriggerRuntimeReloading {
     func reload() throws {
         reloadCount += 1
     }
+
+    func stop() throws {}
 }

@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 protocol AgentTriggerRuntimeReloading: AnyObject {
     func reload() throws
+    func stop() throws
 }
 
 @MainActor
@@ -44,10 +45,7 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmi
             }
         )
 
-        for provider in activeProviders.values {
-            try provider.stop()
-        }
-        activeProviders.removeAll()
+        try stop()
 
         for descriptor in registry.descriptors() {
             guard installedProviderKinds.contains(descriptor.kind) else { continue }
@@ -64,6 +62,13 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmi
             }
             activeProviders[descriptor.kind] = provider
         }
+    }
+
+    func stop() throws {
+        for provider in activeProviders.values {
+            try provider.stop()
+        }
+        activeProviders.removeAll()
     }
 
     private func makePromptSubmission(

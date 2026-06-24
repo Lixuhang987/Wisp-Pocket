@@ -133,6 +133,10 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
         )
     }
 
+    deinit {
+        try? stop()
+    }
+
     func start(_ handler: @escaping (ChromeBookmarksExtensionEvent) -> Void) throws {
         try stop()
         let token = UUID().uuidString
@@ -178,10 +182,14 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
     }
 
     func stop() throws {
+        let ownedToken = token
         listener?.cancel()
         listener = nil
         token = nil
         handler = nil
+        if let ownedToken {
+            removeEndpointIfOwned(token: ownedToken)
+        }
     }
 
     private func handle(_ connection: NWConnection) {
@@ -247,6 +255,17 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(endpoint).write(to: url, options: .atomic)
+    }
+
+    private func removeEndpointIfOwned(token ownedToken: String) {
+        let url = Self.endpointURL(homeDirectoryURL: homeDirectoryURL)
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        guard let data = try? Data(contentsOf: url),
+              let endpoint = try? JSONDecoder().decode(ChromeBookmarksBridgeEndpoint.self, from: data) else {
+            return
+        }
+        guard endpoint.token == ownedToken else { return }
+        try? fileManager.removeItem(at: url)
     }
 
     static func endpointURL(homeDirectoryURL: URL) -> URL {
