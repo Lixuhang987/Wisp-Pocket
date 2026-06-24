@@ -37,20 +37,19 @@ describe("ThreadCommandRouter", () => {
     expect(sent.map((event) => event.type)).toEqual(["thread.started"]);
   });
 
-  it("broadcasts thread.started to connections subscribed to new threads", async () => {
+  it("broadcasts thread.started to all thread connections", async () => {
     const publisher = new ThreadNotificationPublisher();
     const creator: ThreadNotification[] = [];
-    const prewarmedReact: ThreadNotification[] = [];
+    const otherConnection: ThreadNotification[] = [];
     publisher.attachConnection("swift", (event) => creator.push(event as ThreadNotification));
-    publisher.attachConnection("react", (event) => prewarmedReact.push(event as ThreadNotification));
-    publisher.subscribeNewThreads("react");
+    publisher.attachConnection("react", (event) => otherConnection.push(event as ThreadNotification));
     const router = makeRouter({ publisher });
 
     await router.receive(createCommand(), "swift");
 
     expect(creator.map((event) => event.type)).toEqual(["thread.started"]);
-    expect(prewarmedReact.map((event) => event.type)).toEqual(["thread.started"]);
-    expect(prewarmedReact[0].threadId).toBe(creator[0].threadId);
+    expect(otherConnection.map((event) => event.type)).toEqual(["thread.started"]);
+    expect(otherConnection[0].threadId).toBe(creator[0].threadId);
   });
 
   it("persists workspaceId when creating a thread with workspace", async () => {

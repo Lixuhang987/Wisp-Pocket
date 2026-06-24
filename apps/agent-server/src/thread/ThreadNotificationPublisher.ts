@@ -7,7 +7,7 @@ type SendEvent = (event: PublishedThreadMessage) => void;
 type ConnectionState = {
   send: SendEvent;
   subscriptions: Set<string>;
-  subscribeNewThreads: boolean;
+  acceptServerRequests: boolean;
 };
 
 export class ThreadNotificationPublisher {
@@ -19,7 +19,7 @@ export class ThreadNotificationPublisher {
     this.connections.set(connectionId, {
       send,
       subscriptions: this.connections.get(connectionId)?.subscriptions ?? new Set<string>(),
-      subscribeNewThreads: this.connections.get(connectionId)?.subscribeNewThreads ?? false,
+      acceptServerRequests: this.connections.get(connectionId)?.acceptServerRequests ?? false,
     });
   }
 
@@ -31,10 +31,10 @@ export class ThreadNotificationPublisher {
     this.connections.get(connectionId)?.subscriptions.add(threadId);
   }
 
-  subscribeNewThreads(connectionId: string): void {
+  acceptServerRequests(connectionId: string): void {
     const state = this.connections.get(connectionId);
     if (state) {
-      state.subscribeNewThreads = true;
+      state.acceptServerRequests = true;
     }
   }
 
@@ -47,10 +47,10 @@ export class ThreadNotificationPublisher {
 
     if (hasThreadId(event)) {
       for (const state of this.connections.values()) {
-        if (event.type === "thread.started" && state.subscribeNewThreads) {
+        if (event.type === "thread.started") {
           state.subscriptions.add(event.threadId);
         }
-        if (isServerRequest(event) && !state.subscribeNewThreads) {
+        if (isServerRequest(event) && !state.acceptServerRequests) {
           continue;
         }
         if (state.subscriptions.has(event.threadId)) {

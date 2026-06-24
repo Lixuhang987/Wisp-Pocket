@@ -173,7 +173,7 @@ describe("attachThreadSocketHandlers", () => {
     );
   });
 
-  it("sends server requests only through React new-thread subscriber connections", async () => {
+  it("sends server requests only through request owner connections", async () => {
     const socket = new FakeSocket();
     const swiftSocket = new FakeSocket();
     const { commandRouter, eventPublisher } = makeHandlerDependencies();
@@ -181,7 +181,7 @@ describe("attachThreadSocketHandlers", () => {
     attachThreadSocketHandlers(socket as never, {
       commandRouter,
       eventPublisher,
-      subscribeNewThreads: true,
+      acceptServerRequests: true,
     });
     attachThreadSocketHandlers(swiftSocket as never, {
       commandRouter,

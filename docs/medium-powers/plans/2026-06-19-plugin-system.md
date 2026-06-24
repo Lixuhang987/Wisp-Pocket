@@ -244,7 +244,7 @@ flowchart LR
 
 ### Goal
 
-Swift 和 React 都是 agent-server/core 的 frontend。Swift 可以直接发送 `thread.start` / `op.submit`，React 预热 connection 默认订阅所有新建 thread。`thread.started` 不再只表达“当前连接创建成功”，而是表达“一个新 thread 已成功创建”，所有默认订阅新 thread 的 frontend 都能收到同一个事件。
+Swift 和 React 都是 agent-server/core 的 frontend。Swift 可以直接发送 `thread.start` / `op.submit`，React 预热 connection 作为交互请求 owner 连接 `/api/thread?acceptServerRequests=1`。`thread.started` 不再只表达“当前连接创建成功”，而是表达“一个新 thread 已成功创建”，所有 `/api/thread` connection 都能收到同一个事件。
 
 ### Existing Flow Inventory
 
@@ -262,7 +262,7 @@ sequenceDiagram
   participant React as React frontend (prewarmed)
   participant Electron as Electron shell
 
-  React->>Server: /api/thread hello { subscribeNewThreads: true }
+  React->>Server: /api/thread?acceptServerRequests=1
   Swift->>Server: thread.start { dynamicTools }
   Server-->>Swift: thread.started { threadId }
   Server-->>React: thread.started
@@ -275,14 +275,14 @@ sequenceDiagram
 ### Implementation loops
 
 **Loop 1: frontend identity**
-- `/api/thread` connection 增加 frontend identity：`clientId`、`frontendKind: "swift" | "react"`、`subscribeNewThreads?: boolean`。
-- React 预热 connection 默认设置 `subscribeNewThreads: true`。
-- Swift direct thread client 使用自己的 `clientId`，但不需要默认接收 `ServerRequest`。
+- 所有 `/api/thread` connection 默认接收 `thread.started`，并在收到后自动订阅该 thread 的后续普通 notification。
+- React 预热 connection 默认使用 `acceptServerRequests=1`，声明自己是交互式 `ServerRequest` owner。
+- Swift direct thread client 不设置 `acceptServerRequests`，因此只接收普通 notification，不接收 permission / workspace 等交互请求。
 
 **Loop 2: thread.started 广播**
 - `ThreadNotificationPublisher` 增加“默认订阅新 thread”的 connection 集合。
-- `ThreadCommandRouter.handleCreateThread` 创建 thread 后，将新 thread 绑定到发起 connection 和所有 `subscribeNewThreads` connection。
-- `thread.started` 广播给这些 connection，语义统一为“新 thread 创建成功”，不再只代表发起方回执。
+- `ThreadCommandRouter.handleCreateThread` 创建 thread 后，`thread.started` 广播给所有 `/api/thread` connection，并把新 thread 绑定到这些连接。
+- `thread.started` 语义统一为“新 thread 创建成功”，不再只代表发起方回执；非创建方可按需渲染或忽略。
 
 **Loop 3: Swift 提交，React 展示**
 - Swift 直接向 agent-server 发送 `thread.start` 和首轮 `op.submit`。
@@ -292,17 +292,17 @@ sequenceDiagram
 - React 收到 `thread.started` 后创建本地 thread 状态；后续 notification 直接来自 agent-server。
 
 **Loop 4: ServerRequest owner**
-- `ServerRequest` 默认只发送给 React frontend connection。
+- `ServerRequest` 只发送给设置了 `acceptServerRequests=1` 的交互式 owner；当前生产 owner 是 React 预热 connection。
 - Swift 可以订阅普通 `ThreadNotification`，但不作为 permission/workspace 等交互请求的默认 owner。
 - 后续若需要 Swift 处理某类 request，再按 request type 显式扩展 owner 规则。
 
 ### Tests
 
-- React 预热 connection 设置 `subscribeNewThreads` 后，Swift connection 创建 thread，React 也收到同一个 `thread.started`。
+- Swift connection 创建 thread 后，React 和其他 `/api/thread` connection 也收到同一个 `thread.started`。
 - Swift 收到 `thread.started.threadId` 前不会发送 Electron open/focus command。
 - Swift 创建 thread 失败或超时时不会打开/聚焦 React ThreadWindow。
 - Swift 创建 thread 后发送 `op.submit`，React 无需 Swift 消息副本即可接收后续 notification。
-- `ServerRequest` 默认只发给 React connection。
+- `ServerRequest` 只发给 `acceptServerRequests=1` owner；Swift direct thread client 不设置该参数。
 - 没有 React connection 时，默认交互请求返回清晰的 UI unavailable / timeout 错误。
 
 ---
@@ -412,8 +412,8 @@ flowchart LR
 - [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md)：删除 `/api/platform` 架构描述，新增 `/api/dynamic-tools`，并说明 Swift / React 双 frontend 都直连 agent-server。
 - [apps/apps.md](/Users/mu9/proj/handAgent/apps/apps.md)：Swift 不再处理 platform bridge，改为 dynamic tool provider 和 `/api/thread` frontend。
 - [apps/desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md)：新增 Swift host/plugin lifecycle 与 Swift thread client 职责，删除 `/api/platform` 说明。
-- [apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：新增 dynamic tools socket，删除 platform socket，说明 `subscribeNewThreads` 和 `ServerRequest` 默认 React owner。
-- [apps/thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：说明 React 预热 connection 默认订阅所有新建 thread，`thread.started` 是统一创建成功事件。
+- [apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：新增 dynamic tools socket，删除 platform socket，说明 `thread.started` 默认全连接广播和 `ServerRequest` 的 `acceptServerRequests=1` owner 语义。
+- [apps/thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：说明 React 预热 connection 是交互请求 owner，`thread.started` 是所有 `/api/thread` connection 都会收到的统一创建成功事件。
 - [packages/core/core.md](/Users/mu9/proj/handAgent/packages/core/core.md) 与 [packages/core/src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)：说明 dynamic tool runtime 和 platform abstraction 删除。
 - [packages/core/src/tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md)：更新工具来源和 builtin tool 列表。
 - [packages/core/src/platform/platform.md](/Users/mu9/proj/handAgent/packages/core/src/platform/platform.md)：实现时删除或改为历史迁移说明。
@@ -423,7 +423,7 @@ flowchart LR
 
 1. 定义 core `DynamicToolSpec` / request / response DTO，并接入 `thread.start.payload.dynamicTools`。
 2. 打通 thread-store `dynamicTools` 持久化与恢复测试。
-3. 调整 `/api/thread` frontend identity、`subscribeNewThreads`、`thread.started` 广播和 `ServerRequest` React owner。
+3. 调整 `/api/thread` `thread.started` 广播和 `ServerRequest` 的 `acceptServerRequests=1` owner 语义。
 4. 实现 core `DynamicToolAdapter` 和 agent-server `WebSocketDynamicToolBridge`。
 5. 保持 `use_tools` 懒加载语义，激活后注册 dynamic tools。
 6. Swift 新增 host dynamic tool provider 和 direct thread client，并让所有 thread 创建入口携带默认 host dynamic tools。

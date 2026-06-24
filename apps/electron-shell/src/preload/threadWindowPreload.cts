@@ -35,7 +35,7 @@ declare global {
   }
 }
 
-const threadWebSocketURL = "ws://127.0.0.1:4317/api/thread?subscribeNewThreads=1";
+const threadWebSocketURL = "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1";
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 let latestTheme = readInitialTheme();
 const availableSkills = readAvailableSkills();

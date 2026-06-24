@@ -52,12 +52,12 @@ export function attachThreadSocketHandlers(
     commandRouter,
     eventPublisher,
     permissionPolicy,
-    subscribeNewThreads = false,
+    acceptServerRequests = false,
   }: {
     commandRouter: ThreadCommandRouter;
     eventPublisher: ThreadNotificationPublisher;
     permissionPolicy?: FilePermissionPolicy;
-    subscribeNewThreads?: boolean;
+    acceptServerRequests?: boolean;
   },
 ): void {
   const connectionId = `connection-${++nextConnectionId}`;
@@ -66,8 +66,8 @@ export function attachThreadSocketHandlers(
     socket.send(JSON.stringify(outgoing));
   };
   eventPublisher?.attachConnection(connectionId, sendPublished);
-  if (subscribeNewThreads) {
-    eventPublisher.subscribeNewThreads(connectionId);
+  if (acceptServerRequests) {
+    eventPublisher.acceptServerRequests(connectionId);
   }
 
   socket.on("message", async (raw) => {
@@ -439,7 +439,7 @@ export async function startServer({
       commandRouter,
       eventPublisher,
       permissionPolicy,
-      subscribeNewThreads: request.url?.includes("subscribeNewThreads=1") ?? false,
+      acceptServerRequests: request.url?.includes("acceptServerRequests=1") ?? false,
     });
   });
 

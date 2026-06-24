@@ -6,7 +6,7 @@
 
 | 入口 | 消费方 | 消息边界 |
 |------|------|------|
-| `ws://127.0.0.1:4317/api/thread` | React ThreadWindow | 接收 `ThreadCommand` / `ClientResponse`，发送 `ThreadNotification` / `ServerRequest` |
+| `ws://127.0.0.1:4317/api/thread` | React ThreadWindow；Swift PromptPanel 窄口径 client | 接收 `ThreadCommand` / `ClientResponse`，发送 `ThreadNotification`；`ServerRequest` 只发给 `acceptServerRequests=1` 的交互式 owner |
 | `ws://127.0.0.1:4317/api/activity` | Electron StatusBubble；后续桌宠 | 只发送 `AgentActivityEvent`，连接后先发 `activity.snapshot`，状态变化时发 `activity.changed` |
 | `ws://127.0.0.1:4317/api/agent-trigger/attention` | Electron main | 只发送后台 AgentTrigger 的宿主级 attention 事件；命中权限、工作区选择或失败时触发 |
 | `ws://127.0.0.1:4317/api/dynamic-tools` | Swift desktop；后续 plugin / 外部 provider | 只承载 `DynamicToolProviderMessage`，按 `clientId` 路由 dynamic tool call |
@@ -75,7 +75,7 @@ flowchart TD
 - `/api/dynamic-tools` 顶层只接收 `DynamicToolProviderMessage`；`provider_hello` 绑定 provider `clientId`，`tool_call_response` 唤醒 pending dynamic tool call。
 - thread 通知主干统一走 `ThreadNotification`；`thread.snapshot` 是用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口，不是 React 断线恢复入口。
 - activity 状态由 `AgentActivityPublisher` 从 `ThreadNotification` / `ServerRequest` 派生；activity subscriber 发送失败只影响该 subscriber，不影响 `/api/thread` 分发。
-- permission / workspace 的交互式请求统一由 Agent `rx_event` 产出 `server.request`，app-server 发布为 `ServerRequest`；React 回 `ClientResponse` 后由 app-server 包装成 `client_response` Op。
+- permission / workspace 的交互式请求统一由 Agent `rx_event` 产出 `server.request`，app-server 只发布给设置了 `acceptServerRequests=1` 的 `/api/thread` 连接；当前 React 回 `ClientResponse` 后由 app-server 包装成 `client_response` Op。
 - `workspace.listed` 是 `workspace.list` 的连接级响应，不带 `threadId`，只发给发起命令的 `/api/thread` 连接。
 - `op.submit` 是运行期输入 envelope；`input.submit` 与 `turn.interrupt` 不再属于公开 `ThreadCommand`。
 - permission / workspace request-response 都绑定到 thread 当前连接；断线或旧 token 回包不能影响新连接。

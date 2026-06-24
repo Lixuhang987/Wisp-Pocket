@@ -71,7 +71,7 @@ describe("threadWindowPreload", () => {
     mainWorld.handAgentReceiveInitialPrompt?.({ clientRequestId: "prompt-1" });
 
     expect(mainWorld.handAgentThreadWindowConfig?.threadWebSocketURL).toBe(
-      "ws://127.0.0.1:4317/api/thread?subscribeNewThreads=1",
+      "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1",
     );
     expect(mainWorld.handAgentTheme).toEqual({ preference: "system", resolved: "light" });
     expect(mainWorld.handAgentPendingInitialPrompts).toEqual([{ clientRequestId: "prompt-1" }]);

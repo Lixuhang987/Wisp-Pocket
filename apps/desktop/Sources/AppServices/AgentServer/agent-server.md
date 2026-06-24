@@ -22,7 +22,7 @@
 5. `AgentServerHealth` 只观察 `ElectronBackedAppServer` 暴露的 availability/fatal 状态，不直接启动或停止 Node 子进程。
 6. Electron 前台收到 `Command+Q` 后可能先 clean exit；该路径由 `AppServerManaging.onHostTerminationRequest` 交给 Coordinator 调用宿主 `NSApplication.terminate`，不走 fatal alert。
 
-桌面端不订阅 `/api/activity`，也不 mirror React ThreadWindow 状态。Swift `/api/thread` client 只负责 PromptPanel 首轮直连提交；ThreadWindow 的持续 thread 协议由 React 前端通过 `/api/thread?subscribeNewThreads=1` 处理，StatusBubble 的 activity 协议由 Electron ActivityWindow renderer 通过 `/api/activity` 处理。
+桌面端不订阅 `/api/activity`，也不 mirror React ThreadWindow 状态。Swift `/api/thread` client 只负责 PromptPanel 首轮直连提交；ThreadWindow 的持续 thread 协议由 React 前端通过 `/api/thread?acceptServerRequests=1` 处理，StatusBubble 的 activity 协议由 Electron ActivityWindow renderer 通过 `/api/activity` 处理。
 
 ## 编辑此目录的约束
 

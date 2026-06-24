@@ -65,7 +65,7 @@ if ("threadId" in message && typeof message.threadId === "string") {
 }
 ```
 
-当前连接在收到带 `threadId` 的命令后会建立该 thread 的通知路由。`ThreadNotificationPublisher` 负责 `connectionId -> subscribed threadIds` 映射，所以一条 React `/api/thread?subscribeNewThreads=1` 连接可以同时接收多个 thread 的 notification 与 request；Swift 直连创建 thread 的连接只接收普通 notification，不接收交互式 `ServerRequest`。`thread.snapshot` 只作为用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口。React ThreadWindow 非主动断开后不自动重连、不恢复订阅、不拉取 snapshot、不发送恢复命令。
+当前连接在收到带 `threadId` 的命令后会建立该 thread 的通知路由；所有 `/api/thread` 连接收到 `thread.started` 后也会自动订阅新 thread 的后续普通 notification。`ThreadNotificationPublisher` 负责 `connectionId -> subscribed threadIds` 映射，所以一条 React `/api/thread?acceptServerRequests=1` 连接可以同时接收多个 thread 的 notification，并作为 permission / workspace 等交互式 `ServerRequest` owner；Swift 直连创建 thread 的连接只接收普通 notification，不接收交互式 `ServerRequest`。`thread.snapshot` 只作为用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口。React ThreadWindow 非主动断开后不自动重连、不恢复订阅、不拉取 snapshot、不发送恢复命令。
 
 permission / workspace ask 不再在 socket handler 内绑定 bridge token。turn 内部 request 先进入 Agent `rx_event`，server 的 Agent event pump 发布为 `ServerRequest`；React 回 `ClientResponse` 后，socket handler 只调用 `ThreadCommandRouter.handleResponse()`，router 将其包装为 Agent `client_response` Op。socket close 时，server 会异步触发 `commandRouter.interruptThread(threadId)` 并清理该 thread 的临时权限规则。
 

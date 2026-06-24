@@ -40,7 +40,7 @@ flowchart LR
 - 用户提交 prompt 后，Swift 通过窄口径 `/api/thread` client 发送带默认 `dynamicTools` 的 `thread.start`，收到 `thread.started.threadId` 后发送首轮 `op.submit(UserInput)`，再通过 command bridge 让 Electron open/focus 对应 React ThreadWindow。
 - 打开历史和聚焦仍分别发送 `thread_window.open_history` / `thread_window.focus`。
 - 用户在 Swift Settings 修改主题后，Swift 通过 command bridge 发送 `theme.changed`，Electron 保存当前 host theme 并广播给 ThreadWindow 与 ActivityWindow renderer。
-- React ThreadWindow 的预热 `/api/thread?subscribeNewThreads=1` 连接会收到 Swift 或 React 创建 thread 的 `thread.started` 广播；用户打开历史时发送 `thread.resume`，后续 composer 追问统一发送 `op.submit(UserInput)`，运行态停止发送 `op.submit(Interrupt)`。
+- React ThreadWindow 的预热 `/api/thread?acceptServerRequests=1` 连接会收到 Swift 或 React 创建 thread 的 `thread.started` 广播，并作为 permission / workspace 等交互式请求 owner；用户打开历史时发送 `thread.resume`，后续 composer 追问统一发送 `op.submit(UserInput)`，运行态停止发送 `op.submit(Interrupt)`。
 - React ThreadWindow 负责 `ThreadCommand` / `ClientResponse` 编码、`ThreadNotification` / `ServerRequest` 接收，以及历史、后台 thread 状态缓存、当前右侧展示 thread、消息、请求面板和 composer 状态；`ClientResponse` 到 Agent `client_response` Op 的转换由 app-server 负责。
 - ThreadWindow 左侧历史列表通过 thread 协议读取 `~/.spotAgent/threads.sqlite` 派生的历史摘要，用于搜索、预览、恢复和删除持久化 thread。
 
