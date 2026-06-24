@@ -9,7 +9,6 @@ import {
 } from "../../src/protocol/threadProtocol.ts";
 import {
   getAvailableSkills,
-  getDefaultDynamicTools,
   installInitialPromptReceiver,
 } from "../../src/native/nativeConfig.ts";
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "../../src/native/themeConfig.ts";
@@ -25,35 +24,6 @@ describe("thread protocol helpers", () => {
       commandId: "cmd-1",
       timestamp: "2026-06-06T00:00:00.000Z",
       payload: { workspaceId: null },
-    });
-  });
-
-  it("encodes thread.start with default dynamic tools", () => {
-    expect(JSON.parse(encodeThreadStart({
-      commandId: "cmd-1",
-      timestamp: "2026-06-06T00:00:00.000Z",
-      workspaceId: null,
-      dynamicTools: [
-        {
-          clientId: "swift-host",
-          namespace: "host_macos",
-          name: "screen_capture",
-          description: "Capture screen",
-          inputSchema: { type: "object", properties: {} },
-        },
-      ],
-    }))).toMatchObject({
-      type: "thread.start",
-      payload: {
-        workspaceId: null,
-        dynamicTools: [
-          {
-            clientId: "swift-host",
-            namespace: "host_macos",
-            name: "screen_capture",
-          },
-        ],
-      },
     });
   });
 
@@ -274,13 +244,6 @@ describe("native config boundaries", () => {
           prompt: string;
           description?: string;
         }>;
-        defaultDynamicTools?: Array<{
-          clientId: string;
-          namespace?: string;
-          name: string;
-          description: string;
-          inputSchema: Record<string, unknown>;
-        }>;
       };
       handAgentPendingInitialPrompts?: Array<{
         clientRequestId: string;
@@ -320,36 +283,6 @@ describe("native config boundaries", () => {
       { actionId: "review/code", title: "Review", prompt: "Review this code" },
     ]);
     expect(skills).not.toBe(original);
-  });
-
-  it("reads default dynamic tools from host config", () => {
-    nativeWindow().handAgentThreadWindowConfig = {
-      defaultDynamicTools: [
-        {
-          clientId: "swift-host",
-          namespace: "host_macos",
-          name: "screen_capture",
-          description: "Capture screen",
-          inputSchema: { type: "object", properties: {} },
-        },
-        {
-          clientId: "bad",
-          name: "bad",
-          description: "bad",
-          inputSchema: null as never,
-        },
-      ],
-    };
-
-    expect(getDefaultDynamicTools()).toEqual([
-      {
-        clientId: "swift-host",
-        namespace: "host_macos",
-        name: "screen_capture",
-        description: "Capture screen",
-        inputSchema: { type: "object", properties: {} },
-      },
-    ]);
   });
 
   it("falls back to system/light when preload did not provide a theme", () => {

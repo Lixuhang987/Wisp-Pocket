@@ -9,13 +9,11 @@ type MainWorldScript = {
     url: string,
     theme: HostTheme,
     skills: Array<{ actionId: string; title: string; prompt: string; description?: string }>,
-    dynamicTools: DynamicToolSpec[],
   ) => void;
   args: [
     string,
     HostTheme,
     Array<{ actionId: string; title: string; prompt: string; description?: string }>,
-    DynamicToolSpec[],
   ];
 };
 
@@ -24,19 +22,10 @@ type HostTheme = {
   resolved: "light" | "dark";
 };
 
-type DynamicToolSpec = {
-  clientId: string;
-  namespace?: string;
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-};
-
 type ThreadWindowGlobals = {
     handAgentThreadWindowConfig?: {
       threadWebSocketURL?: string;
       availableSkills?: Array<{ actionId: string; title: string; prompt: string; description?: string }>;
-      defaultDynamicTools?: DynamicToolSpec[];
     };
   handAgentTheme?: HostTheme;
   handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
@@ -50,6 +39,7 @@ describe("threadWindowPreload", () => {
     delete nodeRequire.cache[preloadPath];
     delete (globalThis as { window?: ThreadWindowGlobals }).window;
     process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-theme="));
+    process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-available-skills="));
     process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-default-dynamic-tools="));
   });
 
@@ -147,7 +137,7 @@ describe("threadWindowPreload", () => {
     ]);
   });
 
-  it("reads default dynamic tools from preload arguments", async () => {
+  it("does not expose default dynamic tools from preload arguments", async () => {
     const contextBridge = {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
@@ -171,15 +161,11 @@ describe("threadWindowPreload", () => {
 
     script.func(...script.args);
 
-    expect(mainWorld.handAgentThreadWindowConfig?.defaultDynamicTools).toEqual([
-      {
-        clientId: "swift-host",
-        namespace: "host_macos",
-        name: "screen_capture",
-        description: "Capture screen",
-        inputSchema: { type: "object", properties: {} },
-      },
-    ]);
+    expect(mainWorld.handAgentThreadWindowConfig).toEqual({
+      threadWebSocketURL: "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1",
+      availableSkills: [],
+    });
+    expect(mainWorld.handAgentThreadWindowConfig).not.toHaveProperty("defaultDynamicTools");
   });
 
   it("exposes a validated theme change subscription", async () => {

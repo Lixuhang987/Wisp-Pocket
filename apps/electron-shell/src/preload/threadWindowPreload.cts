@@ -12,21 +12,11 @@ type AvailableSkill = {
   description?: string;
 };
 
-type DynamicToolSpec = {
-  clientId: string;
-  namespace?: string;
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  deferLoading?: boolean;
-};
-
 declare global {
   interface Window {
     handAgentThreadWindowConfig?: {
       threadWebSocketURL?: string;
       availableSkills?: AvailableSkill[];
-      defaultDynamicTools?: DynamicToolSpec[];
     };
     handAgentTheme?: HostTheme;
     handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
@@ -39,7 +29,6 @@ const threadWebSocketURL = "ws://127.0.0.1:4317/api/thread?acceptServerRequests=
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 let latestTheme = readInitialTheme();
 const availableSkills = readAvailableSkills();
-const defaultDynamicTools = readDefaultDynamicTools();
 const themeHandlers = new Set<(theme: HostTheme) => void>();
 
 ipcRenderer.on("handagent:theme-changed", (_event: unknown, theme: HostTheme) => {
@@ -57,12 +46,10 @@ contextBridge.executeInMainWorld({
     url: string,
     theme: HostTheme,
     skills: AvailableSkill[],
-    dynamicTools: DynamicToolSpec[],
   ) => {
     window.handAgentThreadWindowConfig = {
       threadWebSocketURL: url,
       availableSkills: skills,
-      defaultDynamicTools: dynamicTools,
     };
     window.handAgentTheme = theme;
     window.handAgentPendingInitialPrompts = Array.isArray(window.handAgentPendingInitialPrompts)
@@ -74,7 +61,7 @@ contextBridge.executeInMainWorld({
       };
     }
   },
-  args: [threadWebSocketURL, latestTheme, availableSkills, defaultDynamicTools],
+  args: [threadWebSocketURL, latestTheme, availableSkills],
 });
 
 contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (theme: HostTheme) => void) => {
@@ -117,20 +104,6 @@ function readAvailableSkills(): AvailableSkill[] {
   }
 }
 
-function readDefaultDynamicTools(): DynamicToolSpec[] {
-  const raw = process.argv.find((arg) => arg.startsWith("--handagent-default-dynamic-tools="));
-  if (!raw) {
-    return [];
-  }
-  try {
-    const decoded = decodeURIComponent(raw.slice("--handagent-default-dynamic-tools=".length));
-    const parsed = JSON.parse(decoded) as unknown;
-    return Array.isArray(parsed) ? parsed.filter(isDynamicToolSpec) : [];
-  } catch {
-    return [];
-  }
-}
-
 function isHostTheme(value: unknown): value is HostTheme {
   return typeof value === "object"
     && value !== null
@@ -145,21 +118,4 @@ function isAvailableSkill(value: unknown): value is AvailableSkill {
     && typeof (value as AvailableSkill).title === "string"
     && typeof (value as AvailableSkill).prompt === "string"
     && ((value as AvailableSkill).description === undefined || typeof (value as AvailableSkill).description === "string");
-}
-
-function isDynamicToolSpec(value: unknown): value is DynamicToolSpec {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const tool = value as DynamicToolSpec;
-  return typeof tool.clientId === "string"
-    && (tool.namespace === undefined || typeof tool.namespace === "string")
-    && typeof tool.name === "string"
-    && typeof tool.description === "string"
-    && isRecord(tool.inputSchema)
-    && (tool.deferLoading === undefined || typeof tool.deferLoading === "boolean");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

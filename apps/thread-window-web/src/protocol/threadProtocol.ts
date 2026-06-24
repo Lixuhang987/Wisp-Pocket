@@ -4,7 +4,6 @@ import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
 import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
-import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
 
 export type {
   RunStatus,
@@ -18,7 +17,6 @@ export type { InputItem, RuntimeOp, UserInput } from "@handagent/core/protocol/O
 export type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
 export type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 export type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-export type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
 
 export type InitialPromptPayload = {
   clientRequestId: string;
@@ -36,7 +34,6 @@ export function encodeThreadStart(input: {
   commandId: string;
   timestamp: string;
   workspaceId: string | null;
-  dynamicTools?: DynamicToolSpec[];
 }): string {
   const command: ThreadCommand = {
     type: "thread.start",
@@ -44,7 +41,6 @@ export function encodeThreadStart(input: {
     timestamp: input.timestamp,
     payload: {
       workspaceId: input.workspaceId,
-      ...(input.dynamicTools ? { dynamicTools: input.dynamicTools } : {}),
     },
   };
   return encode(command);

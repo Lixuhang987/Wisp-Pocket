@@ -21,7 +21,7 @@
 ## 运行边界
 
 - React 直接持有 `/api/thread?acceptServerRequests=1` WebSocket，负责完整 ThreadWindow UI 状态、历史、请求面板和 composer 输入；`acceptServerRequests=1` 表示它接收 permission / workspace 等交互式请求。Swift 只在 PromptPanel 首轮和 AgentTrigger 命中路径发送 `thread.start` / `op.submit(UserInput)` 并等待 `thread.started` / `thread.error`，不处理持续 `ThreadNotification` 或 `ServerRequest`。
-- Electron preload 注入 `window.handAgentThreadWindowConfig`、`window.handAgentTheme`、`window.handAgentSubscribeThemeChange` 和 `window.handAgentReceiveInitialPrompt`。其中 `handAgentThreadWindowConfig` 同时提供 `/api/thread?acceptServerRequests=1` URL、宿主只读 `availableSkills` 与默认 `dynamicTools`；React 不持久化主题，只把宿主 resolved theme 写到 `data-theme`；thread 数据仍直接连接 `/api/thread`。host tool 由 thread metadata 中的 dynamic tools 激活后暴露。
+- Electron preload 注入 `window.handAgentThreadWindowConfig`、`window.handAgentTheme`、`window.handAgentSubscribeThemeChange` 和 `window.handAgentReceiveInitialPrompt`。其中 `handAgentThreadWindowConfig` 只提供 `/api/thread?acceptServerRequests=1` URL 与宿主只读 `availableSkills`；React 不读取、保存或发送 `DynamicToolSpec[]`。React 不持久化主题，只把宿主 resolved theme 写到 `data-theme`；thread 数据仍直接连接 `/api/thread`。host / plugin tool 只会在 thread metadata 已包含 dynamic tools 时由 runtime 暴露。
 - `ThreadSocketClient` 只处理收发、发送队列和通知副作用，不直接写 UI；UI 状态由 store action 更新。React 和 app-server 之间本次视为稳定长连接，非主动断开后只把连接状态置为 `disconnected`，不重连、不恢复订阅、不拉取 snapshot、不发送任何恢复命令。
 - 组件只通过明确 props、store action 或根组件 callback 触发行为，不应绕过根组件直接操作 WebSocket。
 - 当前不把 ThreadWindow thread 缓存、消息或历史同步给 Swift；StatusBubble 状态由 Electron ActivityWindow renderer 订阅 `/api/activity`。
@@ -54,7 +54,7 @@ Electron `thread_window.open_initial_prompt` 和 preload receiver 仍保留给 f
 fallback initial prompt 流程仍是先建 thread，再提交首轮输入：
 
 1. `App` 收到 `InitialPromptPayload` 后先写入 store 的 `pendingInitialPrompts`。
-2. `ThreadSocketClient.startInitialPrompt` 发送 `thread.start`，`commandId` 使用 `clientRequestId`；action/skill 信息已经在后续首轮 `op.submit(UserInput)` 的 `items` 中。ThreadWindow composer 自己的 slash skill 候选只来自 preload 注入的 `availableSkills`，不通过 `/api/thread` 单独请求。
+2. `ThreadSocketClient.startInitialPrompt` 发送不带 `payload.dynamicTools` 的 `thread.start`，`commandId` 使用 `clientRequestId`；action/skill 信息已经在后续首轮 `op.submit(UserInput)` 的 `items` 中。React 新建空白 thread 同样不发送 `payload.dynamicTools`。ThreadWindow composer 自己的 slash skill 候选只来自 preload 注入的 `availableSkills`，不通过 `/api/thread` 单独请求。
 3. 收到匹配 `commandId` 的 `thread.started` 后，store 创建对应 `ThreadState`，`App` 把该 `threadId` 设为右侧当前展示 thread；socket client 发送 `thread.resume` 拉取初始 snapshot，再发送首轮 `op.submit(UserInput)`。
 4. 若收到匹配 `commandId` 的 `thread.error`，socket client 清理 pending prompt，store 暴露窗口级错误，不再补发 `op.submit`。
 
