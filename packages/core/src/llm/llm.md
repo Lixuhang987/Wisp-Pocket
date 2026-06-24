@@ -25,7 +25,7 @@ AgentRuntime
             ├─ toVercelMessages(messages, {blobStore}) ← AgentMessage → ModelMessage
             ├─ toVercelTools(tools)              ← RegisteredTool → ToolSet（点号转下划线）
             ├─ provider.chat/completion/responses(model)
-            ├─ createOpenAICompatibleFetch(...)  ← 过滤 / 合并空 data SSE 事件
+            ├─ createOpenAICompatibleFetch(...)  ← 合并空 data SSE 事件 / 拆分 Responses NDJSON SSE payload
             ├─ streamText({ model, messages, tools })  ← 可注入
             └─ fullStream → LLMStreamEvent
                  ├─ text-delta → text_delta
@@ -39,7 +39,7 @@ AgentRuntime
 - **真实 streaming**：`AgentRuntime` 主路径消费 `stream()`，把每个 `text_delta` 直接转成 `assistant_message_delta`。`tool_call` 事件会进入 runtime 的 tool 调用队列，`message_end` 给出最终 assistant message 与 toolCalls 快照。测试 fake 可只实现 `stream()`；旧的 `complete()` fake 仍由 helper 兼容。`MockLLMClient` 也实现 `stream()`，让 mock 模式可以验证 agent-server 到 desktop 的多段 delta 渲染链路。
 - **settings mtime cache**：生产路径走 `agent-server/SettingsBackedLLMClient`，每次 `stream()` / `complete()` 先检查 `~/.spotAgent/settings.json` 的 `mtimeMs + size` stamp；stamp 未变复用现有 provider client，stamp 变化后重读 settings，并只在有效 LLM 配置变化时经 `LLMClientFactory` 新建 client。用户改 settings 写盘后，下一次 LLM 请求可见。
 - **provider capability**：factory 返回 `{client, capabilities}`。当前 `openai-compatible` 的 `responses/chat` 与 `anthropic` 均声明支持 streaming、tool calling、多模态；`openai-compatible + api=completion` 声明不支持 tool calling 与多模态。多模态不支持时会在 provider 调用前抛明确错误；tool calling 不支持时传空 tools，让 runtime 退化为纯文本请求。
-- **OpenAI-compatible SSE 兼容**：`VercelClient` 总是把 provider fetch 包一层 `createOpenAICompatibleFetch`。若本地兼容服务把 Responses SSE 写成 `event:response.output_text.delta` + 空 `data:` 独立事件，再把 JSON 放到下一个 `data:` 事件，包装层会用 `eventsource-parser` 解析完整 SSE message，并把 event 元数据与后续 JSON data 合并。若同一个 `data` payload 内包含多条换行分隔 JSON object，也会拆成多条 SSE message 后再交给 AI SDK，避免 AI SDK 把空 `data:` 或连续 JSON 当成单个 JSON 解析。
+- **OpenAI-compatible SSE 兼容**：`VercelClient` 总是把 provider fetch 包一层 `createOpenAICompatibleFetch`。若本地兼容服务把 Responses SSE 写成 `event:response.output_text.delta` + 空 `data:` 独立事件，再把 JSON 放到下一个 `data:` 事件，包装层会用 `eventsource-parser` 解析完整 SSE message，并把 event 元数据与后续 JSON data 合并。若同一个 `data` payload 内包含多条换行分隔 JSON object，也会拆成多条 SSE message 后再交给 AI SDK。streaming 路径必须按 SSE 空行边界输出完整 message，不能按普通换行切分，否则跨网络 chunk 的连续 `data:` 行仍会被 AI SDK 合并为单个 JSON 解析。
 - **多模态图片**：`AgentMessage.user.content` 支持字符串或 `text/image` content parts。agent-server 持久化时仍保存 image STUB，调用 runtime 前才转为 `{ type: "image"; blobId; mimeType }`；`VercelAdapters` 需要 `options.blobStore` 才能读取 bytes 并生成 AI SDK image part。
 - **tool 命名**：core 内部 tool 名一律点号风格（`file.read`），`VercelAdapters` 在适配层做 `file_read` 转换；冲突时抛 `Tool name collision after sanitization`。
 - **legacy `provider.completion()`**：当前默认 `defaultModelSettings.api = "responses"`；`VercelClient` 构造默认 `api = "chat"`。两个默认不一致，但生产路径全程透传 settings，无实际冲突。

@@ -29,24 +29,41 @@ export function createOpenAICompatibleFetch(baseFetch?: typeof fetch): typeof fe
 export function filterEmptySSEDataEvents(raw: string): string {
   const events = parseSSEMessages(raw);
   const filteredEvents: EventSourceMessage[] = [];
-  let pendingEmptyEvent: EventSourceMessage | undefined;
-
+  const normalizer = createSSEEventNormalizer((event) => filteredEvents.push(event));
   for (const event of events) {
-    if (event.data.trim() === "") {
-      pendingEmptyEvent = event;
-      continue;
-    }
-    const normalizedEvent = pendingEmptyEvent && !event.event
-      ? { ...event, event: pendingEmptyEvent.event, id: event.id ?? pendingEmptyEvent.id }
-      : event;
-    filteredEvents.push(...splitNewlineDelimitedJSONEvent(normalizedEvent));
-    pendingEmptyEvent = undefined;
+    normalizer.accept(event);
   }
 
   if (filteredEvents.length === 0) {
     return "";
   }
   return filteredEvents.map(formatSSEMessage).join("\n\n") + trailingLineBreak(raw);
+}
+
+function createSSEEventNormalizer(
+  emit: (event: EventSourceMessage) => void,
+): { accept: (event: EventSourceMessage) => void } {
+  let pendingEmptyEvent: EventSourceMessage | undefined;
+
+  return {
+    accept(event) {
+      if (event.data.trim() === "") {
+        pendingEmptyEvent = event;
+        return;
+      }
+      const normalizedEvent = pendingEmptyEvent && !event.event
+        ? {
+            ...event,
+            event: pendingEmptyEvent.event,
+            id: event.id ?? pendingEmptyEvent.id,
+          }
+        : event;
+      for (const splitEvent of splitNewlineDelimitedJSONEvent(normalizedEvent)) {
+        emit(splitEvent);
+      }
+      pendingEmptyEvent = undefined;
+    },
+  };
 }
 
 function splitNewlineDelimitedJSONEvent(event: EventSourceMessage): EventSourceMessage[] {
@@ -69,28 +86,32 @@ function isJSONObjectPayload(text: string): boolean {
 function filterEmptySSEDataEventStream(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  let pending = "";
+  let feedSSEChunk: (text: string) => void = () => undefined;
 
   return body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      pending += decoder.decode(chunk, { stream: true });
-      const lastLineBreak = Math.max(pending.lastIndexOf("\n"), pending.lastIndexOf("\r"));
-      if (lastLineBreak === -1) {
-        return;
-      }
-      const complete = pending.slice(0, lastLineBreak + 1);
-      pending = pending.slice(lastLineBreak + 1);
-      const filtered = filterEmptySSEDataEvents(complete);
-      if (filtered) {
-        controller.enqueue(encoder.encode(filtered));
+    start(controller) {
+      const normalizer = createSSEEventNormalizer((event) => {
+        controller.enqueue(encoder.encode(`${formatSSEMessage(event)}\n\n`));
+      });
+      const parser = createParser({
+        onEvent(event) {
+          normalizer.accept(event);
+        },
+      });
+      feedSSEChunk = (text) => parser.feed(text);
+    },
+    transform(chunk) {
+      const text = decoder.decode(chunk, { stream: true });
+      if (text) {
+        feedSSEChunk(text);
       }
     },
-    flush(controller) {
-      const finalText = pending + decoder.decode();
-      const filtered = filterEmptySSEDataEvents(finalText);
-      if (filtered) {
-        controller.enqueue(encoder.encode(filtered));
+    flush() {
+      const finalText = decoder.decode();
+      if (finalText) {
+        feedSSEChunk(finalText);
       }
+      feedSSEChunk("\n\n");
     },
   }));
 }

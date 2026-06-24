@@ -49,6 +49,26 @@ class MemoryBlobStore implements BlobStore {
 }
 
 describe("VercelClient adapters", () => {
+  async function readOpenAICompatibleEventStream(chunks: string[]): Promise<string> {
+    const baseFetch = vi.fn(async () =>
+      new Response(new ReadableStream({
+        start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(new TextEncoder().encode(chunk));
+          }
+          controller.close();
+        },
+      }), {
+        status: 200,
+        headers: { "content-type": "text/event-stream; charset=utf-8" },
+      }),
+    ) as unknown as typeof fetch;
+    const wrappedFetch = createOpenAICompatibleFetch(baseFetch);
+
+    const response = await wrappedFetch("https://api.example.com/v1/responses");
+    return response.text();
+  }
+
   it("filters empty SSE data events before AI SDK parses provider streams", () => {
     const raw = [
       "event:response.created",
@@ -81,23 +101,35 @@ describe("VercelClient adapters", () => {
       "data: {\"type\":\"response.created\"}",
       "",
     ].join("\n");
-    const baseFetch = vi.fn(async () =>
-      new Response(new ReadableStream({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode(raw));
-          controller.close();
-        },
-      }), {
-        status: 200,
-        headers: { "content-type": "text/event-stream; charset=utf-8" },
-      }),
-    ) as unknown as typeof fetch;
-    const wrappedFetch = createOpenAICompatibleFetch(baseFetch);
+    const text = await readOpenAICompatibleEventStream([raw]);
 
-    const response = await wrappedFetch("https://api.example.com/v1/responses");
-    const text = await response.text();
+    expect(text).toBe("event:response.created\ndata: {\"type\":\"response.created\"}\n\n");
+  });
 
-    expect(text).toBe("event:response.created\ndata: {\"type\":\"response.created\"}\n");
+  it("carries empty SSE event metadata across streaming chunks", async () => {
+    const chunks = [
+      "event:response.created\ndata: \n\n",
+      "data: {\"type\":\"response.created\"}\n\n",
+    ];
+    const text = await readOpenAICompatibleEventStream(chunks);
+
+    expect(text).toBe("event:response.created\ndata: {\"type\":\"response.created\"}\n\n");
+  });
+
+  it("splits newline-delimited JSON payloads across streaming chunks", async () => {
+    const chunks = [
+      "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"name\":\"web_search\"}}\n",
+      "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n",
+    ];
+    const text = await readOpenAICompatibleEventStream(chunks);
+
+    expect(text).toBe([
+      "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"name\":\"web_search\"}}",
+      "",
+      "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}",
+      "",
+      "",
+    ].join("\n"));
   });
 
   it("splits newline-delimited JSON payloads before AI SDK parses Responses streams", () => {
@@ -115,6 +147,27 @@ describe("VercelClient adapters", () => {
       "",
       "",
     ].join("\n"));
+  });
+
+  it("keeps non-object multiline SSE data payloads intact", () => {
+    const payloads = [
+      [
+        "data: {\"type\":\"response.output_text.delta\"}",
+        "data: plain text",
+        "",
+        "",
+      ].join("\n"),
+      [
+        "data: [1]",
+        "data: {\"type\":\"response.output_text.delta\"}",
+        "",
+        "",
+      ].join("\n"),
+    ];
+
+    for (const raw of payloads) {
+      expect(filterEmptySSEDataEvents(raw)).toBe(raw);
+    }
   });
 
   it("converts agent messages to AI SDK model messages", async () => {

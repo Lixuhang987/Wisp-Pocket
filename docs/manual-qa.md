@@ -21,7 +21,7 @@
 
 - 完成日期：待实机 QA
 - 实现位置：`packages/core/src/llm/VercelAdapters.ts`、`packages/core/tests/llm/vercel-client.test.ts`、`packages/core/src/llm/llm.md`、`docs/medium-powers/plans/2026-06-25-websearch-sse-parser-fix.md`
-- 修复结论：`createOpenAICompatibleFetch` 的 Responses SSE 兼容层在保留空 `data:` / `event:*` 合并逻辑外，新增对单个 SSE `data` payload 内多条换行分隔 JSON object 的拆分。若所有非空行都能解析为 JSON object，则输出为多条独立 SSE message；普通多行 data 保持原样，避免破坏合法文本 payload。
+- 修复结论：`createOpenAICompatibleFetch` 的 Responses SSE 兼容层在保留空 `data:` / `event:*` 合并逻辑外，新增对单个 SSE `data` payload 内多条换行分隔 JSON object 的拆分。streaming 包装层通过 `eventsource-parser` 按完整 SSE message 边界输出，跨网络 chunk 保留空 data metadata，再把每个 JSON object 输出为独立 SSE message；普通多行 data 保持原样，避免破坏合法文本 payload。
 - 自动化验证：需执行 `pnpm exec vitest run packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
 - 手工回归步骤：
   1. 准备一个有效的 OpenAI-compatible Responses provider，确保 `~/.spotAgent/settings.json` 使用 `provider=openai-compatible`、`api=responses`，且本地服务的认证 token 未过期。
