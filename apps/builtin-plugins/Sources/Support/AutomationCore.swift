@@ -131,14 +131,94 @@ public struct AutomationPolicyPatch: Codable, Equatable {
     public var evidence: [String: String]
 }
 
+public enum AutomationJSONValue: Codable, Equatable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case object([String: AutomationJSONValue])
+    case array([AutomationJSONValue])
+    case null
+
+    public init(any value: Any?) {
+        guard let value else {
+            self = .null
+            return
+        }
+        if let value = value as? String {
+            self = .string(value)
+        } else if let value = value as? Bool {
+            self = .bool(value)
+        } else if let value = value as? Int {
+            self = .number(Double(value))
+        } else if let value = value as? Double {
+            self = .number(value)
+        } else if let value = value as? NSNumber {
+            if CFGetTypeID(value) == CFBooleanGetTypeID() {
+                self = .bool(value.boolValue)
+            } else {
+                self = .number(value.doubleValue)
+            }
+        } else if let value = value as? [String: Any] {
+            self = .object(value.mapValues { AutomationJSONValue(any: $0) })
+        } else if let value = value as? [Any] {
+            self = .array(value.map { AutomationJSONValue(any: $0) })
+        } else {
+            self = .string(String(describing: value))
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+        } else if let value = try? container.decode(Double.self) {
+            self = .number(value)
+        } else if let value = try? container.decode(String.self) {
+            self = .string(value)
+        } else if let value = try? container.decode([String: AutomationJSONValue].self) {
+            self = .object(value)
+        } else if let value = try? container.decode([AutomationJSONValue].self) {
+            self = .array(value)
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported automation JSON value")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value):
+            try container.encode(value)
+        case .number(let value):
+            try container.encode(value)
+        case .bool(let value):
+            try container.encode(value)
+        case .object(let value):
+            try container.encode(value)
+        case .array(let value):
+            try container.encode(value)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+}
+
 public struct AutomationRunRecord: Codable, Equatable {
     public var id: String
     public var policyId: String
     public var policyVersion: Int
+    public var targetBundleId: String?
+    public var branchId: String?
+    public var matchedConditions: [AutomationCondition]?
+    public var startedAt: String?
     public var status: String
     public var steps: [AutomationStepRecord]
+    public var evidence: [String: AutomationJSONValue]?
     public var failureReason: String?
     public var patchId: String?
+    public var repairEvidence: [String: String]?
 }
 
 public protocol AutomationCapabilityCalling {
@@ -510,6 +590,7 @@ public final class AutomationRuntime: @unchecked Sendable {
     public func run(policyId: String) async throws -> AutomationRunRecord {
         var policy = try store.loadPolicy(id: policyId)
         let runId = UUID().uuidString
+        let startedAt = iso8601(Date())
         var records: [AutomationStepRecord] = []
         guard !policy.branches.isEmpty else {
             throw AutomationRuntimeError.emptyPolicy
@@ -526,14 +607,21 @@ public final class AutomationRuntime: @unchecked Sendable {
                 records.append(AutomationStepRecord(stepIndex: index, kind: step.kind, status: "completed"))
             }
             try await assert(matchedBranch.assertions)
+            let evidence = await collectEvidence()
             let run = AutomationRunRecord(
                 id: runId,
                 policyId: policy.id,
                 policyVersion: policy.version,
+                targetBundleId: policy.targetBundleId,
+                branchId: matchedBranch.id,
+                matchedConditions: matchedBranch.conditions,
+                startedAt: startedAt,
                 status: "completed",
                 steps: records,
+                evidence: automationJSONDictionary(evidence),
                 failureReason: nil,
-                patchId: nil
+                patchId: nil,
+                repairEvidence: nil
             )
             try store.saveRun(run)
             return run
@@ -543,6 +631,7 @@ public final class AutomationRuntime: @unchecked Sendable {
                 policy: policy,
                 completedStepCount: records.count
             )
+            let failureEvidence = await collectEvidence()
             let request = AutomationRepairRequest(
                 policy: policy,
                 runId: runId,
@@ -550,9 +639,9 @@ public final class AutomationRuntime: @unchecked Sendable {
                 failedStepIndex: failedStepIndex,
                 completedSteps: records,
                 failureReason: error.localizedDescription,
-                appWindow: (try? await capabilityClient.call(namespace: "app_window", tool: "frontmost", arguments: [:])) ?? [:],
-                axSnapshot: (try? await capabilityClient.call(namespace: "ax", tool: "snapshot", arguments: [:])) ?? [:],
-                screenshot: (try? await capabilityClient.call(namespace: "screenshot", tool: "capture", arguments: [:])) ?? [:]
+                appWindow: failureEvidence["appWindow"] as? [String: Any] ?? [:],
+                axSnapshot: failureEvidence["axSnapshot"] as? [String: Any] ?? [:],
+                screenshot: failureEvidence["screenshot"] as? [String: Any] ?? [:]
             )
             let repair = try await repairer.repair(request: request)
             let patch = AutomationPolicyPatch(
@@ -571,10 +660,16 @@ public final class AutomationRuntime: @unchecked Sendable {
                 id: runId,
                 policyId: policy.id,
                 policyVersion: patch.basePolicyVersion,
+                targetBundleId: policy.targetBundleId,
+                branchId: branch?.id,
+                matchedConditions: branch?.conditions ?? [],
+                startedAt: startedAt,
                 status: "repaired",
                 steps: records,
+                evidence: automationJSONDictionary(failureEvidence),
                 failureReason: error.localizedDescription,
-                patchId: patch.id
+                patchId: patch.id,
+                repairEvidence: repair.evidence
             )
             try store.saveRun(run)
             return run
@@ -677,6 +772,21 @@ public final class AutomationRuntime: @unchecked Sendable {
         for assertion in assertions where !matches(selector: assertion.selector, node: root) {
             throw AutomationRuntimeError.assertionFailed
         }
+    }
+
+    private func collectEvidence() async -> [String: Any] {
+        async let appWindow = optionalCall(namespace: "app_window", tool: "frontmost", arguments: [:])
+        async let axSnapshot = optionalCall(namespace: "ax", tool: "snapshot", arguments: [:])
+        async let screenshot = optionalCall(namespace: "screenshot", tool: "capture", arguments: [:])
+        return [
+            "appWindow": await appWindow,
+            "axSnapshot": await axSnapshot,
+            "screenshot": await screenshot,
+        ]
+    }
+
+    private func optionalCall(namespace: String, tool: String, arguments: [String: Any]) async -> [String: Any] {
+        (try? await capabilityClient.call(namespace: namespace, tool: tool, arguments: arguments)) ?? [:]
     }
 }
 
@@ -837,6 +947,10 @@ private func matches(selector: AXSelector, node: [String: Any]) -> Bool {
 private func encodeDictionary<T: Encodable>(_ value: T) throws -> [String: Any] {
     let data = try JSONEncoder().encode(value)
     return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+}
+
+private func automationJSONDictionary(_ value: [String: Any]) -> [String: AutomationJSONValue] {
+    value.mapValues { AutomationJSONValue(any: $0) }
 }
 
 private func decodeJSONObject<T: Decodable>(_ type: T.Type, from value: Any?) throws -> T {

@@ -45,10 +45,16 @@ struct AutomationRunRecord: Codable {
     let id: String
     let policyId: String
     let policyVersion: Int
-    let startedAt: Date
+    let targetBundleId: String?
+    let branchId: String?
+    let matchedConditions: [AutomationCondition]?
+    let startedAt: String?
+    let status: String
     var steps: [AutomationStepRecord]
-    var failure: AutomationFailure?
-    var repair: AutomationRepairResult?
+    var evidence: [String: AutomationJSONValue]?
+    var failureReason: String?
+    var patchId: String?
+    var repairEvidence: [String: String]?
 }
 
 struct AutomationPolicyPatch: Codable {

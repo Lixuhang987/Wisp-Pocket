@@ -37,9 +37,17 @@ final class AutomationRuntimeTests: XCTestCase {
         let run = try await runtime.run(policyId: "policy-1")
 
         XCTAssertEqual(run.status, "completed")
+        XCTAssertEqual(run.targetBundleId, "com.example.app")
+        XCTAssertEqual(run.branchId, "main")
+        XCTAssertEqual(run.matchedConditions, [])
+        XCTAssertNotNil(run.startedAt)
+        XCTAssertNotNil(run.evidence?["appWindow"])
+        XCTAssertNotNil(run.evidence?["axSnapshot"])
+        XCTAssertNotNil(run.evidence?["screenshot"])
         XCTAssertEqual(run.steps.map(\.kind), [.activateApp, .click, .setValue, .typeText, .hotkey, .waitFor])
+        XCTAssertEqual(try store.listRuns().first?.evidence?["screenshot"], run.evidence?["screenshot"])
         XCTAssertEqual(repairer.requests.count, 0)
-        XCTAssertEqual(capabilityClient.calls.map { "\($0.namespace).\($0.tool)" }, [
+        XCTAssertEqual(capabilityClient.calls.prefix(7).map { "\($0.namespace).\($0.tool)" }, [
             "app_window.activate",
             "ax.action",
             "ax.action",
@@ -128,6 +136,8 @@ final class AutomationRuntimeTests: XCTestCase {
         let run = try await runtime.run(policyId: "policy-conditions")
 
         XCTAssertEqual(run.status, "completed")
+        XCTAssertEqual(run.branchId, "saved-state")
+        XCTAssertEqual(run.matchedConditions?.first?.selector.title, "Saved")
         XCTAssertEqual(run.steps.map(\.kind), [.click])
         let actionCalls = capabilityClient.calls.filter { $0.namespace == "ax" && $0.tool == "action" }
         XCTAssertEqual(actionCalls.count, 1)
@@ -164,6 +174,11 @@ final class AutomationRuntimeTests: XCTestCase {
         let run = try await runtime.run(policyId: "policy-unmatched-conditions")
 
         XCTAssertEqual(run.status, "repaired")
+        XCTAssertNil(run.branchId)
+        XCTAssertEqual(run.matchedConditions, [])
+        XCTAssertNotNil(run.evidence?["appWindow"])
+        XCTAssertNotNil(run.evidence?["axSnapshot"])
+        XCTAssertNotNil(run.evidence?["screenshot"])
         let request = try XCTUnwrap(repairer.requests.first)
         XCTAssertEqual(request.failedStep.selector?.title, "Fallback")
         XCTAssertEqual(request.failedStepIndex, 0)
@@ -201,6 +216,12 @@ final class AutomationRuntimeTests: XCTestCase {
         let patch = try XCTUnwrap(run.patchId.flatMap { try? store.loadPatch(id: $0) })
 
         XCTAssertEqual(run.status, "repaired")
+        XCTAssertEqual(run.branchId, "main")
+        XCTAssertNotNil(run.startedAt)
+        XCTAssertNotNil(run.evidence?["appWindow"])
+        XCTAssertNotNil(run.evidence?["axSnapshot"])
+        XCTAssertNotNil(run.evidence?["screenshot"])
+        XCTAssertEqual(run.repairEvidence?["repair"], "agent-computer-use-request")
         XCTAssertEqual(updatedPolicy.version, 2)
         XCTAssertEqual(updatedPolicy.branches.count, 2)
         XCTAssertEqual(patch.basePolicyVersion, 1)
@@ -254,6 +275,18 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertEqual(run["status"] as? String, "repaired")
 
         let history = decodeToolJSON(await router.handle(namespace: "automation", tool: "history", arguments: [:]))
+        let historyRuns = try XCTUnwrap(history["runs"] as? [[String: Any]])
+        let historyRun = try XCTUnwrap(historyRuns.first)
+        XCTAssertEqual(historyRun["targetBundleId"] as? String, "com.example.app")
+        XCTAssertEqual(historyRun["branchId"] as? String, "main")
+        XCTAssertNotNil(historyRun["startedAt"])
+        XCTAssertEqual(historyRun["patchId"] as? String, run["patchId"] as? String)
+        let historyEvidence = try XCTUnwrap(historyRun["evidence"] as? [String: Any])
+        XCTAssertNotNil(historyEvidence["appWindow"] as? [String: Any])
+        XCTAssertNotNil(historyEvidence["axSnapshot"] as? [String: Any])
+        XCTAssertNotNil(historyEvidence["screenshot"] as? [String: Any])
+        let repairEvidence = try XCTUnwrap(historyRun["repairEvidence"] as? [String: Any])
+        XCTAssertEqual(repairEvidence["repair"] as? String, "agent-computer-use-request")
         let repairRequests = try XCTUnwrap(history["repairRequests"] as? [[String: Any]])
         let repairRequest = try XCTUnwrap(repairRequests.first)
         let repairRequestId = try XCTUnwrap(repairRequest["id"] as? String)
