@@ -106,7 +106,39 @@ final class AutomationRuntimeTests: XCTestCase {
         let stop = decodeToolJSON(await router.handle(
             namespace: "automation",
             tool: "record_stop",
-            arguments: ["traceId": "trace-1", "targetBundleId": "com.example.app"]
+            arguments: [
+                "traceId": "trace-1",
+                "targetBundleId": "com.example.app",
+                "events": [
+                    [
+                        "kind": "click",
+                        "selector": ["role": "AXButton", "title": "Save"],
+                    ],
+                    [
+                        "kind": "setValue",
+                        "selector": ["role": "AXTextField"],
+                        "value": "hello",
+                    ],
+                    [
+                        "kind": "typeText",
+                        "selector": ["role": "AXTextField"],
+                        "text": "typed",
+                    ],
+                    [
+                        "kind": "hotkey",
+                        "keys": ["command", "s"],
+                    ],
+                    [
+                        "kind": "waitFor",
+                        "selector": ["role": "AXStaticText", "title": "Saved"],
+                        "timeoutMs": 500,
+                    ],
+                    [
+                        "kind": "assertion",
+                        "selector": ["role": "AXStaticText", "title": "Saved"],
+                    ],
+                ],
+            ]
         ))
         XCTAssertEqual(stop["traceId"] as? String, "trace-1")
 
@@ -118,6 +150,21 @@ final class AutomationRuntimeTests: XCTestCase {
         let policy = try XCTUnwrap(create["policy"] as? [String: Any])
         XCTAssertEqual(policy["id"] as? String, "policy-from-trace")
         XCTAssertEqual(policy["targetBundleId"] as? String, "com.example.app")
+        let branches = try XCTUnwrap(policy["branches"] as? [[String: Any]])
+        let steps = try XCTUnwrap(branches[0]["steps"] as? [[String: Any]])
+        let assertions = try XCTUnwrap(branches[0]["assertions"] as? [[String: Any]])
+        XCTAssertEqual(steps.map { $0["kind"] as? String }, [
+            "activateApp",
+            "click",
+            "setValue",
+            "typeText",
+            "hotkey",
+            "waitFor",
+        ])
+        XCTAssertEqual(steps[3]["value"] as? String, "typed")
+        XCTAssertEqual(steps[4]["value"] as? String, "command+s")
+        XCTAssertEqual(steps[5]["timeoutMs"] as? Int, 500)
+        XCTAssertEqual(assertions.count, 1)
 
         let history = decodeToolJSON(await router.handle(namespace: "automation", tool: "history", arguments: [:]))
         XCTAssertNotNil(history["runs"] as? [[String: Any]])

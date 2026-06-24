@@ -406,13 +406,12 @@ public final class AutomationToolRouter: @unchecked Sendable {
                 let policyId = stringArgument(arguments, "policyId", fallback: UUID().uuidString)
                 let traceId = stringArgument(arguments, "traceId", fallback: "")
                 let trace = traceId.isEmpty ? [:] : (try? store.loadTrace(id: traceId)) ?? [:]
+                let branch = automationBranch(from: trace)
                 let policy = AutomationPolicy(
                     id: policyId,
                     title: stringArgument(arguments, "title", fallback: "Recorded Automation"),
                     targetBundleId: trace["targetBundleId"] as? String,
-                    branches: [
-                        AutomationBranch(id: "main", steps: [], assertions: []),
-                    ]
+                    branches: [branch]
                 )
                 try store.savePolicy(policy)
                 return .json(["policy": try encodeDictionary(policy)])
@@ -479,4 +478,85 @@ private func stringArgument(_ arguments: Any?, _ key: String, fallback: String =
 
 private func dictionaryArgument(_ arguments: Any?) -> [String: Any] {
     arguments as? [String: Any] ?? [:]
+}
+
+private func automationBranch(from trace: [String: Any]) -> AutomationBranch {
+    let events = (trace["events"] as? [[String: Any]]) ?? (trace["steps"] as? [[String: Any]]) ?? []
+    var steps: [AutomationStep] = []
+    var assertions: [AutomationAssertion] = []
+
+    if let bundleId = trace["targetBundleId"] as? String, !bundleId.isEmpty {
+        steps.append(AutomationStep(kind: .activateApp, bundleId: bundleId))
+    }
+
+    for event in events {
+        let kind = (event["kind"] as? String ?? event["type"] as? String ?? "").lowercased()
+        switch kind {
+        case "activateapp", "activate_app", "activate":
+            steps.append(AutomationStep(
+                kind: .activateApp,
+                bundleId: stringValue(event["bundleId"]) ?? stringValue(event["targetBundleId"])
+            ))
+        case "click", "press":
+            steps.append(AutomationStep(kind: .click, selector: axSelector(event["selector"])))
+        case "setvalue", "set_value":
+            steps.append(AutomationStep(
+                kind: .setValue,
+                selector: axSelector(event["selector"]),
+                value: stringValue(event["value"])
+            ))
+        case "typetext", "type_text", "type":
+            steps.append(AutomationStep(
+                kind: .typeText,
+                selector: axSelector(event["selector"]),
+                value: stringValue(event["value"]) ?? stringValue(event["text"])
+            ))
+        case "hotkey":
+            steps.append(AutomationStep(kind: .hotkey, value: hotkeyValue(event["keys"] ?? event["value"])))
+        case "waitfor", "wait_for", "wait":
+            if let selector = axSelector(event["selector"]) {
+                steps.append(AutomationStep(
+                    kind: .waitFor,
+                    condition: AutomationCondition(selector: selector),
+                    timeoutMs: intValue(event["timeoutMs"]) ?? intValue(event["timeout"])
+                ))
+            }
+        case "assert", "assertion":
+            if let selector = axSelector(event["selector"]) {
+                assertions.append(AutomationAssertion(selector: selector))
+            }
+        default:
+            continue
+        }
+    }
+
+    return AutomationBranch(id: "main", steps: steps, assertions: assertions)
+}
+
+private func axSelector(_ value: Any?) -> AXSelector? {
+    guard let object = value as? [String: Any] else { return nil }
+    return AXSelector(
+        role: stringValue(object["role"]),
+        title: stringValue(object["title"])
+    )
+}
+
+private func stringValue(_ value: Any?) -> String? {
+    if let string = value as? String { return string }
+    guard let value else { return nil }
+    return String(describing: value)
+}
+
+private func intValue(_ value: Any?) -> Int? {
+    if let int = value as? Int { return int }
+    if let double = value as? Double { return Int(double) }
+    if let string = value as? String { return Int(string) }
+    return nil
+}
+
+private func hotkeyValue(_ value: Any?) -> String? {
+    if let keys = value as? [String] {
+        return keys.joined(separator: "+")
+    }
+    return stringValue(value)
 }
