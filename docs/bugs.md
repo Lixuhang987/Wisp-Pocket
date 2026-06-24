@@ -125,3 +125,39 @@
 - **发现日期**：2026-06-25
 - **修复进展**：`websearch-sse-parser-fix` worktree 已在 `packages/core/src/llm/VercelAdapters.ts` 中补充 NDJSON payload 拆分，并将 streaming 包装层改为按完整 SSE message 边界归一化，避免跨网络 chunk 的连续 `data:` 行再次被 AI SDK 合并为单个 JSON payload；`packages/core/tests/llm/vercel-client.test.ts` 已增加对应红灯用例；`pnpm exec vitest run packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build` 已通过。
 - **当前阻塞**：修复后实机重跑 `WEBSEARCH_QA_FIX_20260625` 已不再出现 `JSONParseError`，但本地 `http://127.0.0.1:8090/v1/responses` 返回 401 `Encountered invalidated oauth token for user, failing request`，因此无法完成 `web_search` / `fetch_page` 全链路归档。回归 thread：`thread-4a6b253a-bb6d-4ec3-8a9b-f9d4186204ff`；cleanup 后 `127.0.0.1:4317` 无监听。
+
+
+### AgentTrigger 设置二级菜单与默认安装内置触发器
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/AppServices/AgentTrigger/AgentTriggerStore.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsViewModel.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView.swift`、`apps/desktop/TestsSwift/AppServices/AgentTriggerStoreTests.swift`、`apps/desktop/TestsSwift/Settings/AgentTriggerSettingsViewModelTests.swift`、`apps/desktop/Sources/Settings/settings.md`
+- 修复结论：`AgentTriggerStore` 持有内置 `chrome-bookmarks` / `system-clock` manifest 并提供幂等 `ensureBuiltinPackagesInstalled()`；`AppServices.init` 在构造 `AgentTriggerRuntime` 前调用，使首次启动 reload 即可看到内置 package。Settings → 触发器为两级：一级是已安装 package 行（左侧 name + description，右侧"N 个自动化 >"进入二级），不再有"恢复内置触发器"入口；二级顶部展示 name + description，并按 `providerKind` 渲染对应表单，新增 / 删除 / 多自动化操作均通过 `AgentTriggerSettingsViewModel.createInstanceForCurrentPackage` / `deleteInstance(id:)` 落到 store 并 reload runtime。内置 manifest 的恢复仅由 `AppServices.init` 启动期 `ensureBuiltinPackagesInstalled()` 保证（设置页内无手动恢复按钮）。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 删除 `~/.spotAgent/agent-triggers/` 后启动桌面 App，进入 Settings → 触发器，确认一级直接显示 `Chrome Bookmarks` 与 `System Clock` 两行（左 name + description，右"N 个自动化 >"），无需点"安装内置 Trigger"。
+  2. 点击 `Chrome Bookmarks` 行，确认进入二级页面，顶部看到包 name + description 与 `暂无自动化`；顶部"返回"可回一级。
+  3. 在 Chrome Bookmarks 二级点"新增自动化"，填写"标题"，在文件夹树中勾选目标收藏夹文件夹，填写"提示词"，保存后回到该二级页面，自动化列表出现一条；空 title 时按"保存"显示"标题不能为空"且不创建，未选择文件夹时显示"至少选择一个收藏夹文件夹"且不创建，空提示词时显示"提示词不能为空"且不创建。
+  4. 进入 System Clock 二级，连续创建两条自动化（不同时间点），确认列表显示两条，磁盘 `instances.json` 也包含两条。
+  5. 在二级页面对某条自动化点"删除"，确认列表立即移除该条，runtime reload，对应触发器停止。
+  6. 手工删除 `~/.spotAgent/agent-triggers/packages/chrome-bookmarks/`，重启桌面 App（设置页内无"恢复内置触发器"按钮），确认 Chrome Bookmarks 行由启动期 `ensureBuiltinPackagesInstalled()` 重新写入并出现，且未影响已存在的 System Clock manifest（包括用户改过 title 的情况）。
+  7. 重启桌面 App，确认所有创建的自动化仍存在并继续触发后台 thread。
+
+### Chrome Bookmarks bridge endpoint 与实际监听端口不一致，阻塞 AgentTrigger 设置页创建 Chrome 自动化
+
+- **严重级别**：P1。Chrome Bookmarks 扩展无法通过当前 `bridge.json` 连接 Swift bridge，Settings 的 Chrome Bookmarks 二级页无法获得 `folders.json`，因此无法完成文件夹选择和自动化创建。
+- **发现日期**：2026-06-25。
+- **复现步骤**：
+  1. 主 checkout `/Users/mu9/proj/handAgent`、`main` 分支，先备份并删除 `~/.spotAgent/agent-triggers/`。
+  2. 执行 `bash ./scripts/package-app.sh --mock-llm`，再带 `HANDAGENT_ELECTRON_BINARY=/Users/mu9/proj/handAgent/node_modules/.pnpm/electron@42.3.3/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron`、`HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID=iidkhdjaboimibeplbeanlklgakmfebb`、`HANDAGENT_CHROME_BOOKMARKS_NATIVE_HOST_PATH=/Users/mu9/proj/handAgent/dist/HandAgentDesktop.app/Contents/Resources/HandAgentChromeBookmarksNativeHost` 启动 `/Users/mu9/proj/handAgent/dist/HandAgentDesktop.app/Contents/MacOS/HandAgentDesktop`。
+  3. 通过 App 菜单 `设置…` 打开 Settings，进入 `触发器` 页，再进入 `Chrome Bookmarks` 二级页。
+  4. 使用产品的 `HandAgentChromeBookmarksNativeHost` 发送 native messaging `handagent.bookmarks.hello` 与 `handagent.bookmarks.folderTreeSnapshot` 帧，模拟扩展连接并上报文件夹树。
+- **实际结果**：一级页能看到 `Chrome Bookmarks` 与 `System Clock` 两行，说明启动期内置 manifest 安装有效；Chrome Bookmarks 二级页显示 `扩展连接不可用：尚未收到 Chrome 扩展连接。`。native host 两次返回 `{"ok":false,"error":"Could not connect to the server."}`；`status.json` 变为 `state:"disconnected"`；`folders.json` 未生成。
+- **期望结果**：`bridge.json` 指向当前 Swift bridge 正在监听的端口和 token；native host 转发 `hello` / `folderTreeSnapshot` 成功，`status.json` 为 `connected`，`folders.json` 写入文件夹树，Settings 表单可以勾选文件夹并保存 Chrome Bookmarks 自动化。
+- **证据**：
+  - 自动化基线均为新鲜 `success`：`bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+  - Computer Use 观察到 Settings → 触发器一级页：`Chrome Bookmarks, 监听指定书签文件夹新增的书签。, 暂无自动化` 与 `System Clock, 在本机时间到达指定时刻时触发任务。, 暂无自动化`。
+  - Computer Use 观察到 Chrome Bookmarks 二级页顶部 name/description、`暂无自动化`、`新增自动化`，并显示 `扩展连接不可用：尚未收到 Chrome 扩展连接。`。
+  - `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/bridge.json` 记录 `port:53317`、`token:C796A033-CC49-4F54-A650-E44576D0963A`，但 `lsof -nP -a -p 26115 -iTCP -sTCP:LISTEN` 只显示 HandAgentDesktop 监听 `*:53288`。
+  - 直接探针：向旧监听端口 `53288` 携带当前 token POST `/events` 返回 `401`；向 `bridge.json` 中的新端口 `53317` POST 返回连接失败（curl HTTP code `502`）。
+- **初步调用链 / 根因边界**：Settings UI 和 `ChromeBookmarksNativeHostInstaller` 只是读取 `status.json` / `bridge.json` 后展示不可用原因；native host 按 `bridge.json` 转发失败。问题边界在 Swift `AgentTriggerRuntime` / `ChromeBookmarksAgentTriggerProvider` / `ChromeBookmarksExtensionBridgeServer` 的 provider lifecycle 或 bridge listener endpoint 写入：磁盘 endpoint 已更新到一个未监听端口，旧 listener 仍存活且持有旧 token，导致扩展无法连接当前 bridge。
+- **清理状态**：已停止 QA helper、HandAgentDesktop、Electron、agent-server 残留进程；确认 `127.0.0.1:4317`、`53288`、`53317` 无监听；已恢复 QA 前备份的 `~/.spotAgent/agent-triggers/`。

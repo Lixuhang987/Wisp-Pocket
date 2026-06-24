@@ -37,20 +37,7 @@
   - 证据：ThreadWindow 显示 `Your authentication token has been invalidated. Please try signing in again.`；`~/.spotAgent/log/2026-06-25/network-001.jsonl` 记录 `POST http://127.0.0.1:8090/v1/responses` 返回 `status:401`、`code:"auth_unavailable"`；`~/.spotAgent/threads.sqlite` 中该 thread 的 `thread_items` sequence 4 为 `thread.error`、sequence 5 为 `turn.completed(status:"failed")`、sequence 6 为 `thread.status.changed(value:"failed")`。
   - 结论：环境阻塞。该结果符合步骤 6 的 provider token 失效分支，不能判定 Websearch SSE parser 回归通过或失败；需要刷新本地 OpenAI-compatible provider token 后重跑。
 
-### AgentTrigger 设置二级菜单与默认安装内置触发器
-
-- 完成日期：待实机 QA
-- 实现位置：`apps/desktop/Sources/AppServices/AgentTrigger/AgentTriggerStore.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsViewModel.swift`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView.swift`、`apps/desktop/TestsSwift/AppServices/AgentTriggerStoreTests.swift`、`apps/desktop/TestsSwift/Settings/AgentTriggerSettingsViewModelTests.swift`、`apps/desktop/Sources/Settings/settings.md`
-- 修复结论：`AgentTriggerStore` 持有内置 `chrome-bookmarks` / `system-clock` manifest 并提供幂等 `ensureBuiltinPackagesInstalled()`；`AppServices.init` 在构造 `AgentTriggerRuntime` 前调用，使首次启动 reload 即可看到内置 package。Settings → 触发器为两级：一级是已安装 package 行（左侧 name + description，右侧"N 个自动化 >"进入二级），不再有"恢复内置触发器"入口；二级顶部展示 name + description，并按 `providerKind` 渲染对应表单，新增 / 删除 / 多自动化操作均通过 `AgentTriggerSettingsViewModel.createInstanceForCurrentPackage` / `deleteInstance(id:)` 落到 store 并 reload runtime。内置 manifest 的恢复仅由 `AppServices.init` 启动期 `ensureBuiltinPackagesInstalled()` 保证（设置页内无手动恢复按钮）。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
-- 手工回归步骤：
-  1. 删除 `~/.spotAgent/agent-triggers/` 后启动桌面 App，进入 Settings → 触发器，确认一级直接显示 `Chrome Bookmarks` 与 `System Clock` 两行（左 name + description，右"N 个自动化 >"），无需点"安装内置 Trigger"。
-  2. 点击 `Chrome Bookmarks` 行，确认进入二级页面，顶部看到包 name + description 与 `暂无自动化`；顶部"返回"可回一级。
-  3. 在 Chrome Bookmarks 二级点"新增自动化"，填写"标题"，在文件夹树中勾选目标收藏夹文件夹，填写"提示词"，保存后回到该二级页面，自动化列表出现一条；空 title 时按"保存"显示"标题不能为空"且不创建，未选择文件夹时显示"至少选择一个收藏夹文件夹"且不创建，空提示词时显示"提示词不能为空"且不创建。
-  4. 进入 System Clock 二级，连续创建两条自动化（不同时间点），确认列表显示两条，磁盘 `instances.json` 也包含两条。
-  5. 在二级页面对某条自动化点"删除"，确认列表立即移除该条，runtime reload，对应触发器停止。
-  6. 手工删除 `~/.spotAgent/agent-triggers/packages/chrome-bookmarks/`，重启桌面 App（设置页内无"恢复内置触发器"按钮），确认 Chrome Bookmarks 行由启动期 `ensureBuiltinPackagesInstalled()` 重新写入并出现，且未影响已存在的 System Clock manifest（包括用户改过 title 的情况）。
-  7. 重启桌面 App，确认所有创建的自动化仍存在并继续触发后台 thread。
+### AgentTrigger 后台触发平台回归
 
 - 完成日期：待实机 QA
 - 实现位置：`apps/desktop/Sources/AppServices/AgentTrigger/`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView*`、`apps/desktop/Sources/AppServices/AgentServer/SwiftThreadClient.swift`、`apps/agent-server/src/server/server.ts`、`packages/core/src/protocol/ThreadCommand.ts`
