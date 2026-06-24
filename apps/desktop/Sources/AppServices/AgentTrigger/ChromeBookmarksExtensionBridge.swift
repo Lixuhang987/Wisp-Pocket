@@ -14,6 +14,89 @@ struct ChromeBookmarksExtensionEvent: Codable, Equatable {
     let extensionVersion: String?
     let extensionInstanceId: String?
     let sentAt: String?
+    let folders: [ChromeBookmarksFolderTreeNode]?
+    let updatedAt: String?
+
+    init(
+        type: String,
+        protocolVersion: Int,
+        eventId: String? = nil,
+        bookmarkId: String? = nil,
+        parentId: String? = nil,
+        title: String? = nil,
+        url: String? = nil,
+        profileId: String? = nil,
+        occurredAt: String? = nil,
+        extensionVersion: String? = nil,
+        extensionInstanceId: String? = nil,
+        sentAt: String? = nil,
+        folders: [ChromeBookmarksFolderTreeNode]? = nil,
+        updatedAt: String? = nil
+    ) {
+        self.type = type
+        self.protocolVersion = protocolVersion
+        self.eventId = eventId
+        self.bookmarkId = bookmarkId
+        self.parentId = parentId
+        self.title = title
+        self.url = url
+        self.profileId = profileId
+        self.occurredAt = occurredAt
+        self.extensionVersion = extensionVersion
+        self.extensionInstanceId = extensionInstanceId
+        self.sentAt = sentAt
+        self.folders = folders
+        self.updatedAt = updatedAt
+    }
+}
+
+struct ChromeBookmarksFolderTreeNode: Codable, Equatable, Identifiable {
+    let id: String
+    let title: String
+    let childCount: Int
+    let children: [ChromeBookmarksFolderTreeNode]
+}
+
+struct ChromeBookmarksFolderTreeSnapshot: Codable, Equatable {
+    let protocolVersion: Int
+    let profileId: String
+    let folders: [ChromeBookmarksFolderTreeNode]
+    let updatedAt: String
+}
+
+struct ChromeBookmarksFolderTreeStore {
+    private let homeDirectoryURL: URL
+    private let fileManager: FileManager
+
+    init(
+        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
+        fileManager: FileManager = .default
+    ) {
+        self.homeDirectoryURL = homeDirectoryURL
+        self.fileManager = fileManager
+    }
+
+    func load() -> ChromeBookmarksFolderTreeSnapshot? {
+        let url = Self.snapshotURL(homeDirectoryURL: homeDirectoryURL)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(ChromeBookmarksFolderTreeSnapshot.self, from: data)
+    }
+
+    func save(_ snapshot: ChromeBookmarksFolderTreeSnapshot) throws {
+        let url = Self.snapshotURL(homeDirectoryURL: homeDirectoryURL)
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(snapshot).write(to: url, options: .atomic)
+    }
+
+    static func snapshotURL(homeDirectoryURL: URL) -> URL {
+        homeDirectoryURL
+            .appendingPathComponent(".spotAgent", isDirectory: true)
+            .appendingPathComponent("agent-triggers", isDirectory: true)
+            .appendingPathComponent("chrome-bookmarks-extension", isDirectory: true)
+            .appendingPathComponent("folders.json")
+    }
 }
 
 protocol ChromeBookmarksExtensionEventSource: AnyObject {
@@ -32,6 +115,7 @@ struct ChromeBookmarksBridgeEndpoint: Codable, Equatable {
 final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventSource, @unchecked Sendable {
     private let homeDirectoryURL: URL
     private let fileManager: FileManager
+    private let folderTreeStore: ChromeBookmarksFolderTreeStore
     private let queue = DispatchQueue(label: "handagent.chrome-bookmarks-extension.bridge")
     private var listener: NWListener?
     private var token: String?
@@ -43,23 +127,54 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
     ) {
         self.homeDirectoryURL = homeDirectoryURL
         self.fileManager = fileManager
+        self.folderTreeStore = ChromeBookmarksFolderTreeStore(
+            homeDirectoryURL: homeDirectoryURL,
+            fileManager: fileManager
+        )
     }
 
     func start(_ handler: @escaping (ChromeBookmarksExtensionEvent) -> Void) throws {
         try stop()
         let token = UUID().uuidString
         let listener = try NWListener(using: .tcp, on: .any)
-        guard let port = listener.port?.rawValue else {
-            throw ChromeBookmarksExtensionBridgeError.missingPort
-        }
         self.token = token
         self.handler = handler
         listener.newConnectionHandler = { [weak self] connection in
             self?.handle(connection)
         }
-        listener.start(queue: queue)
         self.listener = listener
-        try writeEndpoint(port: Int(port), token: token)
+
+        let readyState = ChromeBookmarksListenerReadyState()
+        listener.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                if let port = listener.port?.rawValue, port > 0 {
+                    readyState.complete(.success(port))
+                } else {
+                    readyState.complete(.failure(.missingPort))
+                }
+            case .failed:
+                readyState.complete(.failure(.listenerFailed))
+            default:
+                return
+            }
+        }
+        listener.start(queue: queue)
+
+        guard readyState.wait(timeout: .now() + 2) else {
+            try? stop()
+            throw ChromeBookmarksExtensionBridgeError.listenerTimedOut
+        }
+        switch readyState.result {
+        case .success(let port):
+            try writeEndpoint(port: Int(port), token: token)
+        case .failure(let error):
+            try? stop()
+            throw error
+        case .none:
+            try? stop()
+            throw ChromeBookmarksExtensionBridgeError.listenerTimedOut
+        }
     }
 
     func stop() throws {
@@ -108,6 +223,10 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
             guard event.protocolVersion == 1 else {
                 return httpResponse(status: 400)
             }
+            if event.type == "handagent.bookmarks.folderTreeSnapshot",
+               let snapshot = event.folderTreeSnapshot {
+                try folderTreeStore.save(snapshot)
+            }
             handler?(event)
             return httpResponse(status: 204)
         } catch {
@@ -139,8 +258,54 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
     }
 }
 
+private extension ChromeBookmarksExtensionEvent {
+    var folderTreeSnapshot: ChromeBookmarksFolderTreeSnapshot? {
+        guard let profileId,
+              let folders,
+              let updatedAt else {
+            return nil
+        }
+        return ChromeBookmarksFolderTreeSnapshot(
+            protocolVersion: protocolVersion,
+            profileId: profileId,
+            folders: folders,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 enum ChromeBookmarksExtensionBridgeError: Error, Equatable {
     case missingPort
+    case listenerFailed
+    case listenerTimedOut
+}
+
+private final class ChromeBookmarksListenerReadyState: @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var storedResult: Result<UInt16, ChromeBookmarksExtensionBridgeError>?
+
+    var result: Result<UInt16, ChromeBookmarksExtensionBridgeError>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedResult
+    }
+
+    func complete(_ result: Result<UInt16, ChromeBookmarksExtensionBridgeError>) {
+        lock.lock()
+        let shouldSignal = storedResult == nil
+        if shouldSignal {
+            storedResult = result
+        }
+        lock.unlock()
+        if shouldSignal {
+            semaphore.signal()
+        }
+    }
+
+    func wait(timeout: DispatchTime) -> Bool {
+        semaphore.wait(timeout: timeout) == .success
+    }
 }
 
 private struct HTTPBookmarkEventRequest {

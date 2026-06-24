@@ -125,13 +125,17 @@ final class AgentTriggerRuntimeTests: XCTestCase {
         ]))
 
         let chromeProvider = RecordingAgentTriggerProvider(kind: "chrome.bookmarks")
+        let fired = expectation(description: "agent trigger payload emitted")
         var payloads: [ElectronAgentTriggerFirePayload] = []
         let runtime = AgentTriggerRuntime(
             registry: AgentTriggerRegistry(factories: [
                 RecordingAgentTriggerProviderFactory(provider: chromeProvider),
             ]),
             store: store,
-            emit: { payloads.append($0) }
+            emit: {
+                payloads.append($0)
+                fired.fulfill()
+            }
         )
 
         try runtime.reload()
@@ -147,11 +151,71 @@ final class AgentTriggerRuntimeTests: XCTestCase {
             ]
         ))
 
+        wait(for: [fired], timeout: 1.0)
         XCTAssertEqual(payloads.count, 1)
         guard case .text(_, let text) = payloads.first?.userInput.items.first else {
             return XCTFail("Expected text input item")
         }
         XCTAssertEqual(text, "Read OpenAI at https://openai.com from folder-a")
+    }
+
+    @MainActor
+    func testProviderEventsEmittedOffMainQueueStillFirePayloadOnMainActor() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        XCTAssertTrue(store.installPackage(makeManifest(id: "chrome-bookmarks", kind: "chrome.bookmarks")))
+        XCTAssertTrue(store.saveInstances([
+            AgentTriggerInstance(
+                id: "bookmark-review",
+                packageId: "chrome-bookmarks",
+                title: "Bookmark Review",
+                enabled: true,
+                config: ["folderIds": .stringList(["folder-a"])],
+                promptTemplate: "Summarize {{url}}",
+                deliveryPolicy: .default,
+                notificationPolicy: .default
+            )
+        ]))
+
+        let chromeProvider = RecordingAgentTriggerProvider(kind: "chrome.bookmarks")
+        let fired = expectation(description: "agent trigger payload emitted")
+        var payloads: [ElectronAgentTriggerFirePayload] = []
+        let runtime = AgentTriggerRuntime(
+            registry: AgentTriggerRegistry(factories: [
+                RecordingAgentTriggerProviderFactory(provider: chromeProvider),
+            ]),
+            store: store,
+            emit: { payload in
+                XCTAssertTrue(Thread.isMainThread)
+                payloads.append(payload)
+                fired.fulfill()
+            }
+        )
+
+        try runtime.reload()
+        let event = AgentTriggerEvent(
+            triggerInstanceId: "bookmark-review",
+            providerKind: "chrome.bookmarks",
+            occurredAt: "2026-06-23T00:00:00.000Z",
+            summary: "Bookmarked OpenAI",
+            payload: [
+                "url": .string("https://openai.com"),
+                "title": .string("OpenAI"),
+                "folderId": .string("folder-a")
+            ]
+        )
+        let providerEmit = { chromeProvider.emitEvent(event) }
+        DispatchQueue(label: "test.chrome-bookmarks.provider").async {
+            providerEmit()
+        }
+
+        wait(for: [fired], timeout: 1.0)
+        XCTAssertEqual(payloads.count, 1)
+        guard case .text(_, let text) = payloads.first?.userInput.items.first else {
+            return XCTFail("Expected text input item")
+        }
+        XCTAssertEqual(text, "Summarize https://openai.com")
     }
 
     private func makeManifest(id: String, kind: String) -> AgentTriggerPackageManifest {

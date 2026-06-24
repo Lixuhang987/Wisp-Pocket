@@ -44,9 +44,12 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading {
             let instances = instancesByProvider[descriptor.kind] ?? []
             let instancesById = Dictionary(uniqueKeysWithValues: instances.map { ($0.id, $0) })
             let provider = factory.createHostProvider()
-            try provider.start(instances: instances) { [emit] event in
-                guard let instance = instancesById[event.triggerInstanceId] else { return }
-                emit(self.makeFirePayload(from: event, instance: instance))
+            try provider.start(instances: instances) { [weak self, emit] event in
+                DispatchQueue.main.async {
+                    guard let self,
+                          let instance = instancesById[event.triggerInstanceId] else { return }
+                    emit(self.makeFirePayload(from: event, instance: instance))
+                }
             }
             activeProviders[descriptor.kind] = provider
         }

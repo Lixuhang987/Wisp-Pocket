@@ -75,6 +75,40 @@ final class NativeMessagingCodecTests: XCTestCase {
         XCTAssertEqual(message.sentAt, "2026-06-23T00:00:00.000Z")
     }
 
+    func testDecodesFolderTreeSnapshotMessage() throws {
+        let payload = """
+        {
+          "type": "handagent.bookmarks.folderTreeSnapshot",
+          "protocolVersion": 1,
+          "profileId": "Default",
+          "updatedAt": "2026-06-23T00:00:00.000Z",
+          "folders": [
+            {
+              "id": "1",
+              "title": "书签栏",
+              "childCount": 2,
+              "children": [
+                {
+                  "id": "6",
+                  "title": "a",
+                  "childCount": 1,
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+        let frame = try makeFrame(payload)
+
+        let message = try NativeMessagingCodec.decodeMessageFrame(frame)
+
+        XCTAssertEqual(message.type, "handagent.bookmarks.folderTreeSnapshot")
+        XCTAssertEqual(message.profileId, "Default")
+        XCTAssertEqual(message.folders?.first?.id, "1")
+        XCTAssertEqual(message.folders?.first?.children.first?.title, "a")
+    }
+
     func testConnectionStatusStoreWritesConnectedAndDisconnectedStatus() throws {
         let homeURL = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }

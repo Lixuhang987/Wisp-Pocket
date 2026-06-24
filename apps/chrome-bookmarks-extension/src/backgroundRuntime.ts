@@ -6,6 +6,14 @@ export type ChromeBookmarkNode = {
   parentId?: string;
   title?: string;
   url?: string;
+  children?: ChromeBookmarkNode[];
+};
+
+export type ChromeBookmarksFolderTreeNode = {
+  id: string;
+  title: string;
+  childCount: number;
+  children: ChromeBookmarksFolderTreeNode[];
 };
 
 export type ChromeBookmarksNativeMessage =
@@ -16,6 +24,13 @@ export type ChromeBookmarksNativeMessage =
       extensionInstanceId: string;
       profileId: string;
       sentAt: string;
+    }
+  | {
+      type: "handagent.bookmarks.folderTreeSnapshot";
+      protocolVersion: 1;
+      profileId: string;
+      folders: ChromeBookmarksFolderTreeNode[];
+      updatedAt: string;
     }
   | {
       type: "handagent.bookmarks.created";
@@ -43,6 +58,7 @@ type ChromeStorageArea = {
 
 export type ChromeBookmarksRuntimeChrome = {
   bookmarks: {
+    getTree(): Promise<ChromeBookmarkNode[]>;
     onCreated: {
       addListener(listener: (id: string, bookmark: ChromeBookmarkNode) => void): void;
     };
@@ -148,6 +164,7 @@ export class ChromeBookmarksBackgroundRuntime {
       });
       void this.writeStatus("connected");
       this.sendHello();
+      void this.sendFolderTreeSnapshot();
     } catch (error) {
       this.port = null;
       void this.writeStatus("disconnected", error instanceof Error ? error.message : String(error));
@@ -167,6 +184,25 @@ export class ChromeBookmarksBackgroundRuntime {
       profileId: this.profileId,
       sentAt: this.now(),
     });
+  }
+
+  private async sendFolderTreeSnapshot(): Promise<void> {
+    if (!this.port || !this.profileId) {
+      return;
+    }
+    try {
+      const roots = await this.chrome.bookmarks.getTree();
+      const folders = roots.flatMap((root) => buildFolderTree(root));
+      this.port.postMessage({
+        type: "handagent.bookmarks.folderTreeSnapshot",
+        protocolVersion,
+        profileId: this.profileId,
+        folders,
+        updatedAt: this.now(),
+      });
+    } catch (error) {
+      await this.writeStatus("disconnected", error instanceof Error ? error.message : String(error));
+    }
   }
 
   private scheduleReconnect(): void {
@@ -194,4 +230,23 @@ export class ChromeBookmarksBackgroundRuntime {
 
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function buildFolderTree(node: ChromeBookmarkNode): ChromeBookmarksFolderTreeNode[] {
+  const children = node.children ?? [];
+  const childFolders = children.flatMap((child) => buildFolderTree(child));
+  if (node.url) {
+    return childFolders;
+  }
+  if (!node.title) {
+    return childFolders;
+  }
+  return [
+    {
+      id: node.id,
+      title: node.title,
+      childCount: children.length,
+      children: childFolders,
+    },
+  ];
 }
