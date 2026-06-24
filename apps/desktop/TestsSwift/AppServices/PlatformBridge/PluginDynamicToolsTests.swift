@@ -3,6 +3,85 @@ import XCTest
 
 @MainActor
 final class PluginDynamicToolsTests: XCTestCase {
+    func testBuiltinInstallerWritesContextHistoryAndAtomicPluginsWithContextHistoryDisabledByDefault() throws {
+        let root = try makePluginsDirectory()
+
+        BuiltinPluginInstaller(pluginsDirectoryURL: root).ensureInstalled()
+        let result = PluginManifestStore(pluginsDirectoryURL: root).load()
+
+        XCTAssertEqual(result.disabled, [])
+        XCTAssertTrue(Set(result.plugins.map(\.id)).isSuperset(of: [
+            "handagent-atomic-app-window",
+            "handagent-atomic-screenshot",
+            "handagent-atomic-ax",
+            "handagent-context-history",
+        ]))
+        let contextHistory = try XCTUnwrap(result.plugins.first { $0.id == "handagent-context-history" })
+        XCTAssertEqual(contextHistory.lifecycle, .alwaysOn)
+        XCTAssertEqual(contextHistory.kind, .dynamicTool)
+        XCTAssertEqual(contextHistory.enabled, false)
+        XCTAssertEqual(contextHistory.requires, ["app_window", "screenshot", "ax"])
+        XCTAssertEqual(Set(contextHistory.tools.map(\.namespace)), ["context_history"])
+
+        let atomicPlugins = result.plugins.filter { $0.kind == .atomicCapability }
+        XCTAssertEqual(atomicPlugins.count, 3)
+        XCTAssertTrue(atomicPlugins.allSatisfy(\.enabled))
+        let appWindow = try XCTUnwrap(result.plugins.first { $0.id == "handagent-atomic-app-window" })
+        XCTAssertEqual(Set(appWindow.tools.map(\.name)), ["frontmost", "list_windows", "activate"])
+    }
+
+    func testBuiltinInstallerWritesAutomationRuntimeDisabledByDefault() throws {
+        let root = try makePluginsDirectory()
+
+        BuiltinPluginInstaller(pluginsDirectoryURL: root).ensureInstalled()
+        let result = PluginManifestStore(pluginsDirectoryURL: root).load()
+        let automation = try XCTUnwrap(result.plugins.first { $0.id == "handagent-automation-runtime" })
+
+        XCTAssertEqual(automation.lifecycle, .alwaysOn)
+        XCTAssertEqual(automation.kind, .automation)
+        XCTAssertEqual(automation.enabled, false)
+        XCTAssertEqual(automation.requires, ["app_window", "screenshot", "ax"])
+        XCTAssertEqual(Set(automation.tools.map(\.namespace)), ["automation"])
+        XCTAssertEqual(Set(automation.tools.map(\.name)), [
+            "record_start",
+            "record_stop",
+            "policy_create",
+            "run",
+            "history",
+            "apply_patch",
+        ])
+    }
+
+    func testBuiltinInstallerRepairsManifestWithoutOverwritingEnabledChoice() throws {
+        let root = try makePluginsDirectory()
+        try writePluginManifest(
+            root: root,
+            id: "handagent-context-history",
+            lifecycle: "alwaysOn",
+            enabled: true,
+            tools: [
+                [
+                    "namespace": "broken",
+                    "name": "old",
+                    "description": "Old tool.",
+                    "inputSchema": ["type": "object"],
+                ],
+            ]
+        )
+
+        BuiltinPluginInstaller(pluginsDirectoryURL: root).ensureInstalled()
+        let result = PluginManifestStore(pluginsDirectoryURL: root).load()
+        let contextHistory = try XCTUnwrap(result.plugins.first { $0.id == "handagent-context-history" })
+
+        XCTAssertEqual(contextHistory.enabled, true)
+        XCTAssertEqual(Set(contextHistory.tools.map(\.name)), [
+            "activity_index",
+            "sample_details",
+            "thumbnails",
+            "screenshot_original",
+        ])
+    }
+
     func testManifestStoreLoadsPluginToolsAsSwiftProviderDynamicTools() throws {
         let root = try makePluginsDirectory()
         try writePluginManifest(
@@ -45,7 +124,10 @@ final class PluginDynamicToolsTests: XCTestCase {
                 ],
             ]
         )
-        let lifecycle = RecordingPluginLifecycleManager()
+        let lifecycle = RecordingPluginLifecycleManager(result: PluginToolInvocationResult(
+            success: true,
+            contentItems: [["type": "inputText", "text": "running plugin result"]]
+        ))
         let executor = RecordingPluginToolExecutor(result: PluginToolInvocationResult(
             success: true,
             contentItems: [["type": "inputText", "text": "plugin result"]]
@@ -64,11 +146,76 @@ final class PluginDynamicToolsTests: XCTestCase {
             arguments: ["target": "frontmost"]
         )
 
-        XCTAssertEqual(lifecycle.started, ["screen-reader"])
+        XCTAssertEqual(Set(lifecycle.started), ["screen-reader"])
         XCTAssertEqual(result?.success, true)
-        XCTAssertEqual(executor.invocations.count, 1)
-        XCTAssertEqual(executor.invocations[0].manifestId, "screen-reader")
-        XCTAssertEqual(executor.invocations[0].toolName, "snapshot")
+        XCTAssertEqual(lifecycle.runningInvocations.count, 1)
+        XCTAssertEqual(lifecycle.runningInvocations[0].manifestId, "screen-reader")
+        XCTAssertEqual(lifecycle.runningInvocations[0].payload["tool"] as? String, "snapshot")
+        let contentItems = result?.contentItems
+        XCTAssertEqual(contentItems?.first?["text"] as? String, "running plugin result")
+        XCTAssertEqual(executor.invocations.count, 0)
+    }
+
+    func testEnabledContextHistoryPluginStartsAtomicPluginsAndRoutesQueriesThroughRunningRPC() async throws {
+        let root = try makePluginsDirectory()
+        BuiltinPluginInstaller(pluginsDirectoryURL: root).ensureInstalled()
+        try setManifestEnabled(root: root, id: "handagent-context-history", enabled: true)
+        let lifecycle = RecordingPluginLifecycleManager(result: PluginToolInvocationResult(
+            success: true,
+            contentItems: [["type": "inputText", "text": "{\"samples\":[]}"]]
+        ))
+        let executor = RecordingPluginToolExecutor(result: PluginToolInvocationResult(
+            success: true,
+            contentItems: [["type": "inputText", "text": "one-shot"]]
+        ))
+        let manager = PluginDynamicToolManager(
+            store: PluginManifestStore(pluginsDirectoryURL: root),
+            lifecycleManager: lifecycle,
+            executor: executor
+        )
+
+        manager.reload()
+        let result = await manager.handleTool(
+            namespace: "context_history",
+            tool: "activity_index",
+            callId: "call-context",
+            arguments: ["limit": 5]
+        )
+
+        XCTAssertEqual(Set(lifecycle.started), [
+            "handagent-atomic-app-window",
+            "handagent-atomic-screenshot",
+            "handagent-atomic-ax",
+            "handagent-context-history",
+        ])
+        XCTAssertEqual(result?.success, true)
+        XCTAssertEqual(lifecycle.runningInvocations.count, 1)
+        XCTAssertEqual(lifecycle.runningInvocations[0].manifestId, "handagent-context-history")
+        XCTAssertEqual(lifecycle.runningInvocations[0].payload["namespace"] as? String, "context_history")
+        XCTAssertEqual(lifecycle.runningInvocations[0].payload["tool"] as? String, "activity_index")
+        XCTAssertEqual(executor.invocations.count, 0)
+    }
+
+    func testReloadStopsAlwaysOnPluginWhenManifestIsDisabled() throws {
+        let root = try makePluginsDirectory()
+        BuiltinPluginInstaller(pluginsDirectoryURL: root).ensureInstalled()
+        try setManifestEnabled(root: root, id: "handagent-context-history", enabled: true)
+        let lifecycle = RecordingPluginLifecycleManager()
+        let manager = PluginDynamicToolManager(
+            store: PluginManifestStore(pluginsDirectoryURL: root),
+            lifecycleManager: lifecycle,
+            executor: RecordingPluginToolExecutor(result: PluginToolInvocationResult(
+                success: true,
+                contentItems: [["type": "inputText", "text": "unused"]]
+            ))
+        )
+
+        manager.reload()
+        try setManifestEnabled(root: root, id: "handagent-context-history", enabled: false)
+        manager.reload()
+
+        XCTAssertTrue(lifecycle.stopped.contains("handagent-context-history"))
+        XCTAssertFalse(manager.dynamicToolSpecs.contains { $0["namespace"] as? String == "context_history" })
     }
 
     func testDynamicToolProviderHelloIncludesPluginToolsAndRoutesPluginRequests() async throws {
@@ -148,11 +295,12 @@ final class PluginDynamicToolsTests: XCTestCase {
         root: URL,
         id: String,
         lifecycle: String,
+        enabled: Bool? = nil,
         tools: [[String: Any]]
     ) throws {
         let directory = root.appendingPathComponent(id, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let manifest: [String: Any] = [
+        var manifest: [String: Any] = [
             "version": 1,
             "id": id,
             "title": "Screen Reader",
@@ -162,8 +310,22 @@ final class PluginDynamicToolsTests: XCTestCase {
             "args": [],
             "tools": tools,
         ]
+        if let enabled {
+            manifest["enabled"] = enabled
+        }
         let data = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: directory.appendingPathComponent("plugin.json"))
+    }
+
+    private func setManifestEnabled(root: URL, id: String, enabled: Bool) throws {
+        let manifestURL = root
+            .appendingPathComponent(id, isDirectory: true)
+            .appendingPathComponent("plugin.json")
+        let data = try Data(contentsOf: manifestURL)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object["enabled"] = enabled
+        let nextData = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+        try nextData.write(to: manifestURL)
     }
 
     private func decodeObject(_ text: String) -> [String: Any] {
@@ -178,8 +340,22 @@ final class PluginDynamicToolsTests: XCTestCase {
 
 @MainActor
 private final class RecordingPluginLifecycleManager: PluginLifecycleProcessManaging {
+    struct RunningInvocation {
+        let manifestId: String
+        let payload: [String: Any]
+    }
+
     private(set) var started: [String] = []
     private(set) var stopped: [String] = []
+    private(set) var runningInvocations: [RunningInvocation] = []
+    let result: PluginToolInvocationResult
+
+    init(result: PluginToolInvocationResult = PluginToolInvocationResult(
+        success: true,
+        contentItems: [["type": "inputText", "text": "running"]]
+    )) {
+        self.result = result
+    }
 
     func start(_ manifest: PluginManifestDefinition) throws {
         started.append(manifest.id)
@@ -187,6 +363,14 @@ private final class RecordingPluginLifecycleManager: PluginLifecycleProcessManag
 
     func stop(pluginId: String) {
         stopped.append(pluginId)
+    }
+
+    func invokeRunningPlugin(
+        manifest: PluginManifestDefinition,
+        payload: [String: Any]
+    ) async throws -> PluginToolInvocationResult {
+        runningInvocations.append(RunningInvocation(manifestId: manifest.id, payload: payload))
+        return result
     }
 }
 

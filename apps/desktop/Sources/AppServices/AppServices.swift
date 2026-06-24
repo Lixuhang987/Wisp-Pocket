@@ -195,6 +195,7 @@ final class AppServices {
         dynamicToolServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
         threadServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/thread")!
     ) -> AppServicesRuntime {
+        BuiltinPluginInstaller().ensureInstalled()
         let pluginManager = PluginDynamicToolManager()
         pluginManager.reload()
         let providerService = DynamicToolProviderService(pluginManager: pluginManager)

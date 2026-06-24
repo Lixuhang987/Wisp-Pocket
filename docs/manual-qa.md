@@ -17,6 +17,23 @@
 
 ## 测试体系收敛记录
 
+### Context History 与自进化 Automation 官方 plugin
+
+- 完成日期：2026-06-25
+- 关键 commit：待提交
+- 实现位置：`apps/desktop/Sources/AppServices/PlatformBridge/PluginDynamicTools.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/builtin-plugins/`、`Package.swift`、`apps/desktop/TestsSwift/AppServices/PlatformBridge/PluginDynamicToolsTests.swift`、`apps/builtin-plugins/Tests/ContextHistoryPluginCoreTests.swift`、`apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
+- 验收结果：新增官方 Swift plugin 安装/修复流程；AX、screenshot、app/window 原子 plugin 默认启用，其中 app/window plugin 提供 frontmost、list_windows、activate；Context History 与 Automation runtime 默认关闭，启用 manifest 后由 Swift desktop 启动 always-on plugin，并通过常驻 stdin/stdout RPC 响应 dynamic tool 调用。Context History core 已覆盖 activity sample、截图记录和 activity index / sample details / thumbnails / original screenshot 分层查询；Automation 第一阶段已覆盖 record_start / record_stop / policy_create / run / history / apply_patch 的 tool 路由、结构化存储、受限 AX Policy 执行、waitFor、断言、失败 fallback repair patch 自动合入和 run/patch history 写入。真实用户操作录制、agent 归纳 policy、computer use repair 闭环仍需实机 QA 验证。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PluginDynamicToolsTests`、`bash ./scripts/swiftw test --filter ContextHistoryPluginCoreTests`、`bash ./scripts/swiftw test --filter AutomationRuntimeTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 启动桌面 App 后确认 `~/.spotAgent/plugins/handagent-atomic-app-window/plugin.json`、`handagent-atomic-screenshot/plugin.json`、`handagent-atomic-ax/plugin.json`、`handagent-context-history/plugin.json`、`handagent-automation-runtime/plugin.json` 被写入。
+  2. 确认三个原子 plugin 的 `enabled` 为 `true`，Context History 与 Automation runtime 的 `enabled` 为 `false`。
+  3. 手工把 `handagent-context-history/plugin.json` 的 `enabled` 改为 `true` 后重启桌面 App，新建 thread，确认 dynamic tool 列表包含 `context_history.activity_index`、`sample_details`、`thumbnails`、`screenshot_original`。
+  4. 调用 `context_history.activity_index`，确认 tool call 由同一个 always-on Context History plugin 进程响应，且 index 不返回完整 AX 树或原图。
+  5. 手工把 `handagent-automation-runtime/plugin.json` 的 `enabled` 改为 `true` 后重启桌面 App，新建 thread，确认 dynamic tool 列表包含 `automation.record_start`、`record_stop`、`policy_create`、`run`、`history`、`apply_patch`。
+  6. 准备一个最小 policy 写入 `~/.spotAgent/automation/policies/`，调用 `automation.run`；若执行失败，确认 runtime 会写入 run 记录、生成 fallback policy patch 并自动合入，且 provider 连接不崩溃或卡住。
+  7. 再次编辑官方 manifest 的其他字段为错误值但保留 `enabled`，重启 App，确认 installer 会修复官方 manifest，同时保留用户的 `enabled` 选择。
+  8. 将已启用的 Context History 或 Automation manifest 改回 `enabled: false` 并重启 App，确认对应 always-on plugin 停止，dynamic tool 列表不再包含对应 namespace。
+
 ### 默认 Websearch 工具
 
 - 完成日期：待实机 QA
