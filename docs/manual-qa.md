@@ -31,19 +31,6 @@
   5. 确认最终 assistant 中文回答引用 URL，ThreadWindow 状态回到 idle，`~/.spotAgent/log/<date>/network-*.jsonl` 中无 SSE JSON 连续事件解析错误。
   6. 若 provider 返回 401 / invalidated oauth token，应记录为环境阻塞，不得把 Websearch 功能误判为失败。
 
-### `/api/thread` 统一 thread.started 广播
-
-- 完成日期：待实机 QA
-- 实现位置：`apps/agent-server/src/thread/ThreadNotificationPublisher.ts`、`apps/agent-server/src/server/server.ts`、`apps/electron-shell/src/preload/threadWindowPreload.cts`、`apps/agent-server/tests/thread/ThreadNotificationPublisher.test.ts`、`apps/agent-server/tests/thread/ThreadCommandRouter.test.ts`、`apps/agent-server/tests/use-cases/thread-lifecycle.test.ts`、`apps/electron-shell/tests/preload/threadWindowPreload.test.ts`
-- 修复结论：`thread.started` 统一广播给所有 `/api/thread` 连接，并让这些连接自动订阅该 thread 的后续普通 notification；`acceptServerRequests=1` 只表示该连接接收 permission / workspace 等交互式 `ServerRequest`。Swift PromptPanel 直连 `/api/thread` 不设置 `acceptServerRequests`，因此可收到普通 notification，但不会成为交互式请求 owner。
-- 自动化验证：需执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
-- 手工回归步骤：
-  1. 启动桌面 App，确认 Electron ThreadWindow 已预热且 preload 注入的 URL 为 `/api/thread?acceptServerRequests=1`。
-  2. 通过 Swift PromptPanel 提交普通 prompt，确认 Swift 收到 `thread.started.threadId` 后打开 / 聚焦 React ThreadWindow，React 同时收到同一个 `thread.started` 并展示该 thread。
-  3. 在该 thread 后续 assistant streaming 或普通 notification 到达时，确认 React 能继续接收并渲染，不依赖 Swift 发送消息副本。
-  4. 使用会触发 permission 或 workspace 选择的 prompt，确认交互式请求只出现在 React ThreadWindow，不发送给 Swift PromptPanel 的直连 thread client。
-  5. 从 React ThreadWindow composer 创建或继续一个 thread，确认其他 `/api/thread` 连接收到 `thread.started` 后可选择忽略或渲染，不影响当前 UI 状态。
-
 ### AgentTrigger 设置二级菜单与默认安装内置触发器
 
 - 完成日期：待实机 QA

@@ -1460,3 +1460,30 @@
 - **验证过程**：复核该条目为测试体系收敛证据项，不依赖可见 UI；在主 checkout 重新执行仓库验证命令。
 - **证据**：`pnpm exec vitest run packages/core/tests/llm/vercel-client.test.ts` 返回 13 files / 214 tests passed（含 root 20 tests）；`bash ./scripts/test.sh` 返回 `success`；`bash ./scripts/swiftw test` 返回 `success`；`bash ./scripts/swiftw build` 返回 `success`。
 - **结论**：通过
+
+
+### `/api/thread` 统一 thread.started 广播
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/agent-server/src/thread/ThreadNotificationPublisher.ts`、`apps/agent-server/src/server/server.ts`、`apps/electron-shell/src/preload/threadWindowPreload.cts`、`apps/agent-server/tests/thread/ThreadNotificationPublisher.test.ts`、`apps/agent-server/tests/thread/ThreadCommandRouter.test.ts`、`apps/agent-server/tests/use-cases/thread-lifecycle.test.ts`、`apps/electron-shell/tests/preload/threadWindowPreload.test.ts`
+- 修复结论：`thread.started` 统一广播给所有 `/api/thread` 连接，并让这些连接自动订阅该 thread 的后续普通 notification；`acceptServerRequests=1` 只表示该连接接收 permission / workspace 等交互式 `ServerRequest`。Swift PromptPanel 直连 `/api/thread` 不设置 `acceptServerRequests`，因此可收到普通 notification，但不会成为交互式请求 owner。
+- 自动化验证：需执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，确认 Electron ThreadWindow 已预热且 preload 注入的 URL 为 `/api/thread?acceptServerRequests=1`。
+  2. 通过 Swift PromptPanel 提交普通 prompt，确认 Swift 收到 `thread.started.threadId` 后打开 / 聚焦 React ThreadWindow，React 同时收到同一个 `thread.started` 并展示该 thread。
+  3. 在该 thread 后续 assistant streaming 或普通 notification 到达时，确认 React 能继续接收并渲染，不依赖 Swift 发送消息副本。
+  4. 使用会触发 permission 或 workspace 选择的 prompt，确认交互式请求只出现在 React ThreadWindow，不发送给 Swift PromptPanel 的直连 thread client。
+  5. 从 React ThreadWindow composer 创建或继续一个 thread，确认其他 `/api/thread` 连接收到 `thread.started` 后可选择忽略或渲染，不影响当前 UI 状态。
+
+### `/api/thread` 统一 `thread.started` 广播
+
+- **验证日期**：2026-06-25
+- **验证环境**：主 checkout `/Users/mu9/proj/handAgent`，`main` 分支；`HANDAGENT_LLM_MODE=mock bash ./scripts/swiftw run HandAgentDesktop`；agent-server PID `90146` 监听 `127.0.0.1:4317`，Electron PID `90129`，Swift 宿主 PID `89928`。
+- **验证过程**：
+  1. 清理旧 worktree / packaged app 残留进程后确认只剩主 checkout 实例；重新执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`，均输出 `success`。
+  2. 启动 mock App 后确认 agent-server stdout 包含 `llm mode: mock`，进程命令均来自 `/Users/mu9/proj/handAgent`。Electron helper renderer 已由 ThreadWindow 预热创建；代码事实确认 `apps/electron-shell/src/preload/threadWindowPreload.cts` 注入 `ws://127.0.0.1:4317/api/thread?acceptServerRequests=1`，`apps/agent-server/src/server/server.ts` 按 query 设置 `acceptServerRequests`，`ThreadNotificationPublisher` 对所有连接广播 `thread.started` 并自动订阅后续普通 notification。
+  3. 使用真实全局热键打开 Swift PromptPanel，提交 `THREAD_STARTED_SWIFT_QA_20260625 [mock:assistant-ok] reply in one short sentence`。ThreadWindow 自动聚焦到新 thread，历史选中该条，消息区显示用户消息与 `Mock assistant response: main chain is reachable.`，composer 回到 idle，证明 Swift `/api/thread` client 收到 `thread.started.threadId` 后能打开 / 聚焦 React ThreadWindow，React 同时能渲染同一 thread 的后续 streaming 结果。
+  4. 启动独立 observer：`ws://127.0.0.1:4317/api/thread`，不带 `acceptServerRequests=1`。通过主 Electron command socket 发送 `THREAD_STARTED_WORKSPACE_QA_20260625 [mock:workspace-ask] choose workspace`。observer 收到 `thread.started`、`user.message.recorded`、`turn.started` 和普通 `tool.started/tool.finished/assistant.delta/turn.completed/thread.status.changed(idle)`；React ThreadWindow 显示 `workspace.askUser` 权限请求、随后显示 workspace 选择面板。observer 未收到 `permission.requested` 或 `workspace.requested`，证明交互式 request 只投递给 React owner，不投递给普通 `/api/thread` 连接。
+  5. 在 React ThreadWindow 中点击“新建对话”，observer 收到新的 `thread.started`：`thread-ac1ca53b-6765-4338-ac01-2c1b0b87e523`，UI 切到“新对话 / 等待输入”。随后在 composer 提交 `THREAD_STARTED_REACT_COMPOSER_QA_20260625 [mock:assistant-ok] composer submit`，observer 收到 `user.message.recorded`、`turn.started`、多条 `assistant.delta`、`turn.completed`、`thread.status.changed(idle)`，React UI 显示用户消息、mock assistant 回复并回到 idle。
+- **证据**：`/api/thread` observer 输出包含 `thread-7c6ef78c-db09-4962-ac02-8e5b1ba88b36` 的 `thread.started` 与后续普通 notification，以及 `thread-ac1ca53b-6765-4338-ac01-2c1b0b87e523` 的 React 新建 thread `thread.started`；Computer Use 可见 ThreadWindow URL 为 `127.0.0.1:4317/thread-window/index.html`，消息区显示 `THREAD_STARTED_SWIFT_QA_20260625`、`THREAD_STARTED_WORKSPACE_QA_20260625`、`THREAD_STARTED_REACT_COMPOSER_QA_20260625` 三条验证输入及对应 mock 结果。
+- **结论**：通过。`thread.started` 对所有 `/api/thread` 连接广播并自动订阅后续普通 notification；`acceptServerRequests=1` 仅控制 permission / workspace 等交互式请求 owner；Swift PromptPanel、React ThreadWindow、observer 三类连接的职责边界符合预期。
