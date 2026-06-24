@@ -6,7 +6,7 @@
 
 当前包含五个可执行单元和两个 Web / 扩展前端包：
 
-- [desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md) —— macOS 原生入口（Swift / SwiftUI），负责 PromptPanel、Settings、热键、焦点恢复、平台能力 IPC 和 Electron 生命周期。
+- [desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md) —— macOS 原生入口（Swift / SwiftUI），负责 PromptPanel、Settings、热键、焦点恢复、host dynamic tools 和 Electron 生命周期。
 - [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md) —— Electron UI shell，监督 agent-server，承载 Electron ThreadWindow 和 React StatusBubble。
 - [thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md) —— React ThreadWindow 前端，由 Electron `BrowserWindow` 承载。
 - [agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md) —— 本地 WebSocket thread 桥（Node / TypeScript），由 electron-shell 监督。
@@ -26,7 +26,7 @@ flowchart LR
   W -->|/api/thread WebSocket| B
   S -->|/api/activity WebSocket| B
   E -->|/api/agent-trigger/attention WebSocket| B
-  A -->|/api/platform WebSocket| B
+  A -->|/api/thread + /api/dynamic-tools WebSocket| B
   B --> C[packages/core<br/>runtime / tool / LLM]
   B --> T[packages/thread-store<br/>SQLite thread store]
 ```
@@ -41,16 +41,18 @@ flowchart LR
 ### 2. Thread 交互
 
 - Electron main 在 agent-server ready 后主动预热隐藏 `BrowserWindow`；PromptPanel show/toggle 不触发 ThreadWindow 预热。
-- 用户提交 prompt 后，Swift 通过 command bridge 发送 `thread_window.open_initial_prompt`；打开历史和聚焦分别发送 `thread_window.open_history` / `thread_window.focus`。
+- 用户提交 prompt 后，Swift 通过窄口径 `/api/thread` client 发送带默认 `dynamicTools` 的 `thread.start`，收到 `thread.started.threadId` 后发送首轮 `op.submit(UserInput)`，再通过 command bridge 让 Electron open/focus 对应 React ThreadWindow。
+- 打开历史和聚焦仍分别发送 `thread_window.open_history` / `thread_window.focus`。
 - 用户在 Swift Settings 修改主题后，Swift 通过 command bridge 发送 `theme.changed`，Electron 保存当前 host theme 并广播给 ThreadWindow 与 ActivityWindow renderer。
-- React ThreadWindow 接收初始 prompt 后，通过 `/api/thread` 发送 `thread.start`，收到 `thread.started` 后发送首轮 `op.submit(UserInput)`；后续 composer 追问也统一发送 `op.submit(UserInput)`，运行态停止发送 `op.submit(Interrupt)`。
+- React ThreadWindow 的预热 `/api/thread?acceptServerRequests=1` 连接会收到 Swift 或 React 创建 thread 的 `thread.started` 广播，并作为 permission / workspace 等交互式请求 owner；用户打开历史时发送 `thread.resume`，后续 composer 追问统一发送 `op.submit(UserInput)`，运行态停止发送 `op.submit(Interrupt)`。
 - React ThreadWindow 负责 `ThreadCommand` / `ClientResponse` 编码、`ThreadNotification` / `ServerRequest` 接收，以及历史、后台 thread 状态缓存、当前右侧展示 thread、消息、请求面板和 composer 状态；`ClientResponse` 到 Agent `client_response` Op 的转换由 app-server 负责。
 - ThreadWindow 左侧历史列表通过 thread 协议读取 `~/.spotAgent/threads.sqlite` 派生的历史摘要，用于搜索、预览、恢复和删除持久化 thread。
 
-### 3. 平台能力反向 IPC
+### 3. Host Dynamic Tools
 
-- `agent-server` 通过 `RemotePlatformAdapter` 调 `PlatformBridge.call`。
-- 桌面端 `PlatformBridgeConnectionClient` 连接 `/api/platform`，接收 `platform_request`，交给 `PlatformBridgeService` 派发给 `MacPlatformProvider`，再通过 `/api/platform` 回写 `platform_response`。
+- Swift desktop 作为默认 dynamic tool provider 连接 `/api/dynamic-tools`，用 `provider_hello` 注册 `host_macos.*` 工具。
+- `thread.start.payload.dynamicTools` 保存 thread 创建时允许的动态工具候选；LLM 调用 `use_tools` 后，agent-server 将 builtin workspace/file tools、MCP tools 与 dynamic tools 一起暴露。
+- LLM 调用 `host_macos.screen_capture` 等 dynamic tool 时，agent-server 按 `clientId` 转发给 Swift provider，Swift 复用 `MacPlatformProvider` 执行并回写 `tool_call_response`。
 
 ### 4. 状态反馈
 
@@ -66,10 +68,10 @@ flowchart LR
 - `ThreadCommand` / `ThreadNotification` / `ServerRequest` / `ClientResponse`
 - `AgentActivityEvent`
 - `AgentTriggerFireRequest` / `AgentTriggerFireResult` / `AgentTriggerAttention`
-- `PlatformBridgeMessage`（含 platform_bridge_hello / platform_request / platform_response）
+- `DynamicToolSpec` / `DynamicToolProviderMessage`
 
 ## 模块边界
 
 - 宿主层不负责编排 LLM/tool 循环。
 - `agent-server` 不负责宿主 UI；只用 `~/.spotAgent/settings.json` 与 desktop 交换配置，不直接读宿主进程状态。
-- Runtime、tool、平台抽象统一下沉到 `packages/core`。
+- Runtime、tool、dynamic tool 与协议抽象统一下沉到 `packages/core`；macOS 原生实现留在 Swift host dynamic tools。

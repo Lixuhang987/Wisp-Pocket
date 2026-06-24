@@ -75,6 +75,54 @@ describe("ThreadStore use cases", () => {
     store.close();
   });
 
+  it("persists dynamic tool specs in session metadata and restored thread metadata", async () => {
+    const { root, dbPath } = await tempSqlitePath();
+    tempRoot = root;
+    const store = new ThreadStore({ dbPath, now: fixedNow });
+
+    await unwrap(store.createThread({
+      threadId: "thread-dynamic-tools",
+      threadSource: "user",
+      dynamicTools: [
+        {
+          clientId: "swift-host",
+          namespace: "host_macos",
+          name: "screen_capture",
+          description: "Capture a screen image",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+    }));
+    await unwrap(store.persistThread("thread-dynamic-tools"));
+    await unwrap(store.shutdownThread("thread-dynamic-tools"));
+    await unwrap(store.resumeThread({ threadId: "thread-dynamic-tools" }));
+
+    const history = await unwrap(store.loadHistory({ threadId: "thread-dynamic-tools" }));
+    expect(history.rolloutItems[0]).toMatchObject({
+      kind: "session_meta",
+      payload: {
+        dynamicTools: [
+          expect.objectContaining({
+            clientId: "swift-host",
+            namespace: "host_macos",
+            name: "screen_capture",
+          }),
+        ],
+      },
+    });
+    expect(
+      (await unwrap(store.getPersistedThread("thread-dynamic-tools")))?.metadata.dynamicTools,
+    ).toEqual([
+      expect.objectContaining({
+        clientId: "swift-host",
+        namespace: "host_macos",
+        name: "screen_capture",
+      }),
+    ]);
+
+    store.close();
+  });
+
   it("serializes current thread append calls through the underlying SQLite store", async () => {
     const { root, dbPath } = await tempSqlitePath();
     tempRoot = root;

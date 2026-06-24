@@ -2,15 +2,14 @@
 
 ## 目录职责
 
-`actions/` 管理 thread 可用工具集合。它连接 settings 生成的 builtin tools、`~/.spotAgent/mcp.json` 中的全局 MCP server，以及 HandAgent 原生 Computer Use MCP 兼容层。
+`actions/` 管理 thread 可用工具集合。它连接 settings 生成的 builtin workspace/file tools、`~/.spotAgent/mcp.json` 中的全局 MCP server，以及 thread metadata 中保存的 dynamic tools。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
 | `MCPServerRegistry.ts` | 按 `serverId` 缓存 MCP client 和适配后的 tools；代理 prompts/resources 能力 |
-| `ComputerUseMCPClient.ts` | `computer_use` / `computer-use` server id 的原生兼容实现；暴露 `list_apps` 与 `get_app_state`，底层走 `PlatformAdapter` |
-| `ThreadScopedToolRegistry.ts` | 为每个 thread 维护独立 `ToolRegistry`；处理 `use_tools` 懒加载、全局 MCP、mock LLM 特例和删除清理 |
+| `ThreadScopedToolRegistry.ts` | 为每个 thread 维护独立 `ToolRegistry`；处理 `use_tools` 懒加载、全局 MCP、dynamic tools、mock LLM 特例和删除清理 |
 
 ## 工具组合流
 
@@ -21,7 +20,7 @@ flowchart TD
   D --> E{"thread activated?"}
   E -- "否" --> F["只暴露 use_tools"]
   E -- "mock 模式" --> G["use_tools + builtin tools"]
-  E -- "是" --> H["builtin + 全局 MCP tools，不再暴露 use_tools"]
+  E -- "是" --> H["builtin + 全局 MCP + dynamic tools，不再暴露 use_tools"]
   H --> I["core AgentRuntime registryForThread(threadId)"]
 ```
 
@@ -35,9 +34,9 @@ flowchart TD
 
 未激活 thread 默认只暴露 `use_tools`，减少普通聊天请求里的工具噪音。模型调用 meta-tool 后，core runtime 触发 `activate(threadId)`，下一轮工具表扩展为 builtin + 全局 MCP，并移除 `use_tools`。
 
-## Computer Use 兼容层
+## Dynamic tools
 
-`ComputerUseMCPClient` 不 spawn 外部 Codex 私有 MCP server。它把 Computer Use 形态包装成 MCP client，但实际通过 HandAgent 的 `PlatformAdapter` 走 desktop 原生平台桥。
+`ThreadScopedToolRegistry` 在 thread 激活后把 `metadata.dynamicTools` 转换为 `DynamicToolAdapter`。adapter 的模型可见名称为 `namespace.name`，例如 `host_macos.screen_capture`；调用时 agent-server 通过 `WebSocketDynamicToolBridge` 按 `clientId` 转发给 provider。
 
 ## 编辑约束
 

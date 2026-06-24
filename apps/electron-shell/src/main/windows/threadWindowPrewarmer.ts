@@ -1,6 +1,7 @@
 import type { BrowserWindowConstructorOptions } from "electron";
 import type { HostTheme, InitialPromptPayload } from "../protocol/electronShellProtocol.js";
 import type { AvailableSkill } from "../availableSkills.js";
+import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
 
 type ThreadWindowClosedEvent = {
   wasPrepared: boolean;
@@ -23,6 +24,7 @@ type Options = {
   threadWindowURL: string;
   preloadPath: string;
   availableSkills: AvailableSkill[];
+  defaultDynamicTools: DynamicToolSpec[];
   initialTheme?: HostTheme;
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
   onClosed?: (event: ThreadWindowClosedEvent) => void;
@@ -62,6 +64,7 @@ export class ThreadWindowPrewarmer {
           additionalArguments: [
             `--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`,
             `--handagent-available-skills=${encodeURIComponent(JSON.stringify(this.options.availableSkills))}`,
+            `--handagent-default-dynamic-tools=${encodeURIComponent(JSON.stringify(this.options.defaultDynamicTools))}`,
           ],
         },
       });

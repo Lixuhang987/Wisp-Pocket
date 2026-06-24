@@ -10,7 +10,7 @@
 | `serverSupervisor/` | [serverSupervisor/serverSupervisor.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/serverSupervisor/serverSupervisor.md) | agent-server 后台进程 supervisor，包含 utilityProcess 候选与 Node fallback |
 | `swiftBridge/` | [swiftBridge/swiftBridge.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/swiftBridge/swiftBridge.md) | stdio newline-delimited JSON bridge |
 | `windows/` | [windows/windows.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/windows/windows.md) | ThreadWindow hidden prewarm 与 ActivityWindow 控制器 |
-| `main.ts` | 无独立文档 | Electron process 入口，组装 bridge、runtime、supervisor、window controllers 和 IPC |
+| `main.ts` | 无独立文档 | Electron process 入口，组装 bridge、runtime、supervisor、window controllers 和 IPC；从 `HANDAGENT_DEFAULT_DYNAMIC_TOOLS` 读取 Swift 注入的默认 dynamic tools，解析失败时回退到 core host tools |
 | `electronShellRuntime.ts` | 无独立文档 | 可测试的 command / health / prewarm 状态机 |
 | `initialHostTheme.ts` | 无独立文档 | 解析 `HANDAGENT_INITIAL_THEME`，为 Electron window controllers 提供启动期 host theme 初值 |
 | `activityWindowIpc.ts` | 无独立文档 | 只接收 ActivityWindow renderer 发出的 `focusThread` IPC |
@@ -27,7 +27,7 @@
 
 - `agent_server.health available=true` 到达后，runtime 才主动调用 `prewarmer.prepare()`；Swift 不发送 `thread_window.prepare`。
 - `theme.changed` command 必须同时调用 ThreadWindow prewarmer 和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。启动期同样使用 Swift 传入的 `{ preference, resolved }`，不要在 Electron main 固定 dark/light 或自行解析系统外观。
-- ThreadWindow 预热时还要把当前只读 `availableSkills` 一并传给 prewarmer；这些技能由宿主本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）读取并保持只读，不经 agent-server 下发。
+- ThreadWindow 预热时还要把当前只读 `availableSkills` 与默认 `dynamicTools` 一并传给 prewarmer；skills 由本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）读取，dynamic tools 由 Swift 通过 `HANDAGENT_DEFAULT_DYNAMIC_TOOLS` 注入。Electron 只做配置传递，不读取 plugin binary、不管理 plugin 生命周期。
 - `prewarmAfterServerReadyPromise` 用来合并并发预热；改动预热流程时必须保持只发一次对应的 prepared / prepare_failed 结果。
 - visible ThreadWindow 关闭会先无缝替换 ActivityWindow 的 native window identity，再发 `thread_window.closed wasVisible=true`；如果窗口曾 prepared 且 agent-server 仍 available，runtime 会再次主动预热。
 - ActivityWindow 点击只尝试聚焦 visible ThreadWindow。没有可聚焦 ThreadWindow 时，main 不创建 PromptPanel，也不回告 Swift 打开 PromptPanel；native focus / native mouse down 兜底同样只做聚焦尝试。

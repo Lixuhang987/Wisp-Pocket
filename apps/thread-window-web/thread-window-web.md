@@ -20,8 +20,8 @@
 
 ## 运行边界
 
-- React 直接持有 `/api/thread` WebSocket；Swift 不解析 `ThreadNotification`，也不发送 `ThreadCommand`。
-- Electron preload 注入 `window.handAgentThreadWindowConfig`、`window.handAgentTheme`、`window.handAgentSubscribeThemeChange` 和 `window.handAgentReceiveInitialPrompt`。其中 `handAgentThreadWindowConfig` 同时提供 `/api/thread` URL 与宿主只读 `availableSkills`；React 不持久化主题，只把宿主 resolved theme 写到 `data-theme`；thread 数据仍直接连接 `/api/thread`。平台 tool 走独立 `/api/platform`。
+- React 直接持有 `/api/thread?acceptServerRequests=1` WebSocket，负责完整 ThreadWindow UI 状态、历史、请求面板和 composer 输入；`acceptServerRequests=1` 表示它接收 permission / workspace 等交互式请求。Swift 只在 PromptPanel 首轮路径发送 `thread.start` / `op.submit(UserInput)` 并等待 `thread.started` / `thread.error`，不处理持续 `ThreadNotification` 或 `ServerRequest`。
+- Electron preload 注入 `window.handAgentThreadWindowConfig`、`window.handAgentTheme`、`window.handAgentSubscribeThemeChange` 和 `window.handAgentReceiveInitialPrompt`。其中 `handAgentThreadWindowConfig` 同时提供 `/api/thread?acceptServerRequests=1` URL、宿主只读 `availableSkills` 与默认 `dynamicTools`；React 不持久化主题，只把宿主 resolved theme 写到 `data-theme`；thread 数据仍直接连接 `/api/thread`。host tool 由 thread metadata 中的 dynamic tools 激活后暴露。
 - `ThreadSocketClient` 只处理收发、发送队列和通知副作用，不直接写 UI；UI 状态由 store action 更新。React 和 app-server 之间本次视为稳定长连接，非主动断开后只把连接状态置为 `disconnected`，不重连、不恢复订阅、不拉取 snapshot、不发送任何恢复命令。
 - 组件只通过明确 props、store action 或根组件 callback 触发行为，不应绕过根组件直接操作 WebSocket。
 - 当前不把 ThreadWindow thread 缓存、消息或历史同步给 Swift；StatusBubble 状态由 Electron ActivityWindow renderer 订阅 `/api/activity`。
@@ -39,7 +39,7 @@ Web 侧命令和通知类型以 `packages/core/src/protocol/` 为真相，`src/p
 
 `workspace.listed` 已在协议守卫和 store 中覆盖：socket 连接成功后发送 `workspace.list`，store 收到后写入 `workspaces`，历史侧栏再按 `ThreadListEntry.workspaceId` 分组。修改 workspace 相关 UI 或协议时，必须同步检查 `src/protocol/threadProtocol.ts`、`src/store/threadWindowStore.ts`、`src/utils/groupThreads.ts` 和对应测试。
 
-## 初始 Prompt 流程
+## Thread 创建流程
 
 Electron preload 会在 renderer 启动早期注入：
 
@@ -47,9 +47,11 @@ Electron preload 会在 renderer 启动早期注入：
 - 临时 `window.handAgentReceiveInitialPrompt`
 - `window.handAgentPendingInitialPrompts`
 
-React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver，并 flush 早到的 pending prompt。
+生产 PromptPanel 提交流程由 Swift 直连 `/api/thread` 完成：Swift 发送带默认 `dynamicTools` 的 `thread.start`，收到 `thread.started.threadId` 后发送首轮 `op.submit(UserInput)`，再让 Electron open/focus 对应 React ThreadWindow。所有 `/api/thread` 连接都会收到 `thread.started`；React 收到后创建本地 `ThreadState` 并切换右侧当前 thread，后续 live notification 继续由同一连接分发。
 
-首轮消息流程先建 thread，再提交首轮输入：
+Electron `thread_window.open_initial_prompt` 和 preload receiver 仍保留给 fallback / 测试路径。React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver，并 flush 早到的 pending prompt。
+
+fallback initial prompt 流程仍是先建 thread，再提交首轮输入：
 
 1. `App` 收到 `InitialPromptPayload` 后先写入 store 的 `pendingInitialPrompts`。
 2. `ThreadSocketClient.startInitialPrompt` 发送 `thread.start`，`commandId` 使用 `clientRequestId`；action/skill 信息已经在后续首轮 `op.submit(UserInput)` 的 `items` 中。ThreadWindow composer 自己的 slash skill 候选只来自 preload 注入的 `availableSkills`，不通过 `/api/thread` 单独请求。

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { OfflinePlatformAdapter } from "../../src/platform/OfflinePlatformAdapter.ts";
 import type { AgentTool } from "../../src/tools/AgentTool.ts";
 import {
   registerTools,
@@ -11,7 +10,6 @@ describe("registerTools", () => {
     const externalLoaderOption = "external" + "Loaders";
     const externalToolName = "external" + ".echo";
     const options = {
-      platform: new OfflinePlatformAdapter(),
       [externalLoaderOption]: [
         async () => ({
           tools: [makeTool(externalToolName)],

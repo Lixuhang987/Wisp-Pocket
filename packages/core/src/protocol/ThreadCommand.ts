@@ -1,4 +1,5 @@
 import type { RuntimeOp } from "./Op.ts";
+import type { DynamicToolSpec } from "./DynamicTool.ts";
 
 export type ThreadStartCommand = {
   type: "thread.start";
@@ -6,6 +7,7 @@ export type ThreadStartCommand = {
   timestamp: string;
   payload: {
     workspaceId: string | null;
+    dynamicTools?: DynamicToolSpec[];
   };
 };
 

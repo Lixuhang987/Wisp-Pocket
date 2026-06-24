@@ -72,7 +72,7 @@ describe("MessageTranslator", () => {
         {
           type: "tool_call",
           toolCallId: "tc-1",
-          toolName: "clipboard.read",
+          toolName: "file.read",
           input: {},
         },
         "2026-05-18T00:00:00.000Z",
@@ -84,7 +84,7 @@ describe("MessageTranslator", () => {
       turnId: "turn-tool",
       itemId: "Thread-tool-tc-1",
       timestamp: "2026-05-18T00:00:00.000Z",
-      payload: { name: "clipboard.read", input: {} },
+      payload: { name: "file.read", input: {} },
     });
     expect(
       toThreadNotification(
@@ -93,7 +93,7 @@ describe("MessageTranslator", () => {
         {
           type: "tool_result",
           toolCallId: "tc-1",
-          toolName: "clipboard.read",
+          toolName: "file.read",
           status: "success",
           output: "hello",
           durationMs: 5,
@@ -108,7 +108,7 @@ describe("MessageTranslator", () => {
       itemId: "Thread-tool-tc-1",
       timestamp: "2026-05-18T00:00:00.000Z",
       payload: {
-        name: "clipboard.read",
+        name: "file.read",
         output: "hello",
         status: "completed",
         durationMs: 5,

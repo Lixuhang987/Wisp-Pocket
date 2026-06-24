@@ -3,7 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { HistorySidebar } from "./components/HistorySidebar.tsx";
 import { ThreadWorkspacePane } from "./components/ThreadWorkspacePane.tsx";
 import { openHistoryThread } from "./history/openHistoryThread.ts";
-import { getThreadWebSocketURL, installInitialPromptReceiver } from "./native/nativeConfig.ts";
+import {
+  getDefaultDynamicTools,
+  getThreadWebSocketURL,
+  installInitialPromptReceiver,
+} from "./native/nativeConfig.ts";
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "./native/themeConfig.ts";
 import {
   encodePermissionAnswer,
@@ -50,6 +54,7 @@ export function App() {
   useEffect(() => {
     const socket = new ThreadSocketClient({
       url: getThreadWebSocketURL(),
+      defaultDynamicTools: getDefaultDynamicTools(),
       onConnectionState: (connectionState) => createThreadWindowStore.getState().setConnectionState(connectionState),
       onNotification: (notification) => {
         createThreadWindowStore.getState().handleNotification(notification);
@@ -98,6 +103,7 @@ export function App() {
         commandId,
         timestamp,
         workspaceId: null,  // 默认 workspace
+        dynamicTools: getDefaultDynamicTools(),
       })
     );
   };

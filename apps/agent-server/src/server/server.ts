@@ -4,7 +4,7 @@ import { extname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import { contentType } from "mime-types";
-import type { PlatformBridgeMessage } from "@handagent/core/protocol/PlatformBridgeMessage.ts";
+import type { DynamicToolProviderMessage } from "@handagent/core/protocol/DynamicTool.ts";
 import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 import type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
 import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
@@ -16,7 +16,6 @@ import type { AgentTriggerAttention } from "@handagent/core/protocol/AgentTrigge
 import type { Op } from "@handagent/core/protocol/Op.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import type { MCPServerConfig, StdioMCPServerConfig, StreamableHttpMCPServerConfig } from "@handagent/core/mcp/MCPConfig.ts";
-import type { PlatformAdapter } from "@handagent/core/platform/PlatformAdapter.ts";
 import { parseMCPConfig } from "@handagent/core/mcp/MCPConfig.ts";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
@@ -34,10 +33,7 @@ import { ThreadCommandRouter } from "../thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../thread/ThreadNotificationPublisher.ts";
 import { ThreadRuntimeOrchestrator } from "../thread/ThreadRuntimeOrchestrator.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
-import {
-  WebSocketPlatformBridge,
-  type BridgeToken,
-} from "../bridges/WebSocketPlatformBridge.ts";
+import { WebSocketDynamicToolBridge } from "../bridges/WebSocketDynamicToolBridge.ts";
 import type { FilePermissionPolicy } from "@handagent/core/permission/FilePermissionPolicy.ts";
 import { AgentEventQueue } from "../agent/AgentEventQueue.ts";
 import { AgentRequestBroker } from "../agent/AgentRequestBroker.ts";
@@ -56,10 +52,12 @@ export function attachThreadSocketHandlers(
     commandRouter,
     eventPublisher,
     permissionPolicy,
+    acceptServerRequests = false,
   }: {
     commandRouter: ThreadCommandRouter;
     eventPublisher: ThreadNotificationPublisher;
     permissionPolicy?: FilePermissionPolicy;
+    acceptServerRequests?: boolean;
   },
 ): void {
   const connectionId = `connection-${++nextConnectionId}`;
@@ -68,6 +66,9 @@ export function attachThreadSocketHandlers(
     socket.send(JSON.stringify(outgoing));
   };
   eventPublisher?.attachConnection(connectionId, sendPublished);
+  if (acceptServerRequests) {
+    eventPublisher.acceptServerRequests(connectionId);
+  }
 
   socket.on("message", async (raw) => {
     const message = parseSocketMessage(raw);
@@ -101,35 +102,35 @@ export function attachThreadSocketHandlers(
   });
 }
 
-export function attachPlatformSocketHandlers(
+export function attachDynamicToolSocketHandlers(
   socket: ThreadSocket,
   {
     bridge,
   }: {
-    bridge?: WebSocketPlatformBridge;
+    bridge?: WebSocketDynamicToolBridge;
   },
 ): void {
-  let bridgeToken: BridgeToken | null = null;
-  const sendPlatform = (outgoing: PlatformBridgeMessage) => {
+  let providerToken: number | null = null;
+  const sendDynamicToolMessage = (outgoing: DynamicToolProviderMessage) => {
     socket.send(JSON.stringify(outgoing));
   };
 
   socket.on("message", (raw) => {
     const message = parseSocketMessage(raw);
-    if (!isPlatformBridgeMessage(message)) {
+    if (!isDynamicToolProviderMessage(message)) {
       return;
     }
 
-    if (message.type === "platform_bridge_hello" && bridge) {
-      bridgeToken ??= bridge.attach(sendPlatform);
-    } else if (message.type === "platform_response") {
-      bridge?.handleResponse(message.payload, bridgeToken);
+    if (message.type === "provider_hello" && bridge) {
+      providerToken = bridge.attach(message.clientId, sendDynamicToolMessage);
+    } else if (message.type === "tool_call_response") {
+      bridge?.handleResponse(message.payload, providerToken);
     }
   });
 
   socket.on("close", () => {
-    if (bridgeToken !== null && bridge) {
-      bridge.detach(bridgeToken);
+    if (providerToken !== null && bridge) {
+      bridge.detach(providerToken);
     }
   });
 }
@@ -171,8 +172,10 @@ export function attachAgentTriggerAttentionSocketHandlers(
   });
 }
 
-function isPlatformBridgeMessage(message: unknown): message is PlatformBridgeMessage {
-  return PlatformBridgeMessageSchema.safeParse(message).success;
+function isDynamicToolProviderMessage(
+  message: unknown,
+): message is DynamicToolProviderMessage {
+  return DynamicToolProviderMessageSchema.safeParse(message).success;
 }
 
 function isThreadCommand(message: unknown): message is ThreadCommand {
@@ -237,6 +240,43 @@ const InterruptOpSchema = z.object({
 
 const RuntimeOpSchema = z.discriminatedUnion("type", [UserInputOpSchema, InterruptOpSchema]);
 
+const DynamicToolIdentifierSchema = z
+  .string()
+  .min(1)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
+const DynamicToolSpecSchema = z.object({
+  clientId: z.string().min(1),
+  namespace: DynamicToolIdentifierSchema.optional(),
+  name: DynamicToolIdentifierSchema,
+  description: z.string().min(1),
+  inputSchema: z.record(z.string(), z.unknown()),
+  deferLoading: z.boolean().optional(),
+});
+
+const DynamicToolsSchema = z.array(DynamicToolSpecSchema).superRefine((tools, ctx) => {
+  const seen = new Set<string>();
+  for (const [index, tool] of tools.entries()) {
+    if (tool.namespace === "mcp" || tool.namespace === "use_tools") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, "namespace"],
+        message: `Reserved dynamic tool namespace: ${tool.namespace}`,
+      });
+    }
+
+    const key = `${tool.namespace ?? ""}/${tool.name}`;
+    if (seen.has(key)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, "name"],
+        message: `Duplicate dynamic tool: ${tool.namespace ? `${tool.namespace}.` : ""}${tool.name}`,
+      });
+    }
+    seen.add(key);
+  }
+});
+
 const AgentTriggerFireRequestSchema = z.object({
   triggerInstanceId: z.string(),
   threadTitleHint: z.string().nullable(),
@@ -260,7 +300,10 @@ const ThreadCommandSchema = z.discriminatedUnion("type", [
     type: z.literal("thread.start"),
     commandId: z.string(),
     timestamp: z.string(),
-    payload: z.object({ workspaceId: z.string().nullable() }),
+    payload: z.object({
+      workspaceId: z.string().nullable(),
+      dynamicTools: DynamicToolsSchema.optional(),
+    }),
   }),
   z.object({
     type: z.literal("thread.resume"),
@@ -315,48 +358,47 @@ const ClientResponseSchema = z.discriminatedUnion("type", [
   }),
 ]) satisfies z.ZodType<ClientResponse>;
 
-const PlatformResponsePayloadSchema = z.discriminatedUnion("status", [
+const DynamicToolResponseContentItemSchema = z.discriminatedUnion("type", [
   z.object({
-    requestId: z.string(),
-    status: z.literal("ok"),
-    result: z.unknown(),
+    type: z.literal("inputText"),
+    text: z.string(),
   }),
   z.object({
-    requestId: z.string(),
-    status: z.literal("error"),
-    message: z.string(),
-    code: z.string().optional(),
+    type: z.literal("inputImage"),
+    imageUrl: z.string(),
   }),
 ]);
 
-const PlatformBridgeMessageSchema = z.discriminatedUnion("type", [
+const DynamicToolProviderMessageSchema = z.discriminatedUnion("type", [
   z.object({
-    channel: z.literal("platform"),
-    type: z.literal("platform_bridge_hello"),
-    messageId: z.string(),
-    timestamp: z.string(),
-    payload: z.object({ agent: z.string() }),
+    channel: z.literal("dynamic_tools"),
+    type: z.literal("provider_hello"),
+    clientId: z.string().min(1),
+    tools: DynamicToolsSchema,
   }),
   z.object({
-    channel: z.literal("platform"),
-    type: z.literal("platform_request"),
-    messageId: z.string(),
-    timestamp: z.string(),
+    channel: z.literal("dynamic_tools"),
+    type: z.literal("tool_call_request"),
     payload: z.object({
-      requestId: z.string(),
-      method: z.string(),
-      args: z.unknown(),
-      timeoutMs: z.number().optional(),
+      clientId: z.string().min(1),
+      threadId: z.string(),
+      turnId: z.string(),
+      callId: z.string(),
+      namespace: DynamicToolIdentifierSchema.optional(),
+      tool: DynamicToolIdentifierSchema,
+      arguments: z.unknown(),
     }),
   }),
   z.object({
-    channel: z.literal("platform"),
-    type: z.literal("platform_response"),
-    messageId: z.string(),
-    timestamp: z.string(),
-    payload: PlatformResponsePayloadSchema,
+    channel: z.literal("dynamic_tools"),
+    type: z.literal("tool_call_response"),
+    payload: z.object({
+      callId: z.string(),
+      success: z.boolean(),
+      contentItems: z.array(DynamicToolResponseContentItemSchema),
+    }),
   }),
-]) satisfies z.ZodType<PlatformBridgeMessage>;
+]) satisfies z.ZodType<DynamicToolProviderMessage>;
 
 export async function startServer({
   commandRouter,
@@ -364,7 +406,7 @@ export async function startServer({
   activityPublisher,
   agentTriggerAttentionPublisher,
   agentTriggerLaunchService,
-  bridge,
+  dynamicToolBridge,
   permissionPolicy,
   staticFilesDir,
   port = 4317,
@@ -374,7 +416,7 @@ export async function startServer({
   activityPublisher?: AgentActivityPublisher;
   agentTriggerAttentionPublisher?: AgentTriggerAttentionPublisher;
   agentTriggerLaunchService?: AgentTriggerLaunchService;
-  bridge?: WebSocketPlatformBridge;
+  dynamicToolBridge?: WebSocketDynamicToolBridge;
   permissionPolicy?: FilePermissionPolicy;
   staticFilesDir?: string;
   port?: number;
@@ -382,7 +424,7 @@ export async function startServer({
   const { createServer } = await import("node:http");
   const { WebSocketServer } = await import("ws");
   const threadWebSocketServer = new WebSocketServer({ noServer: true });
-  const platformWebSocketServer = new WebSocketServer({ noServer: true });
+  const dynamicToolWebSocketServer = new WebSocketServer({ noServer: true });
   const activityWebSocketServer = new WebSocketServer({ noServer: true });
   const agentTriggerAttentionWebSocketServer = new WebSocketServer({ noServer: true });
   const server = createServer((request, response) => {
@@ -397,11 +439,12 @@ export async function startServer({
       commandRouter,
       eventPublisher,
       permissionPolicy,
+      acceptServerRequests: request.url?.includes("acceptServerRequests=1") ?? false,
     });
   });
 
-  platformWebSocketServer.on("connection", (socket) => {
-    attachPlatformSocketHandlers(socket, { bridge });
+  dynamicToolWebSocketServer.on("connection", (socket) => {
+    attachDynamicToolSocketHandlers(socket, { bridge: dynamicToolBridge });
   });
 
   activityWebSocketServer.on("connection", (socket) => {
@@ -438,9 +481,9 @@ export async function startServer({
       return;
     }
 
-    if (path === "/api/platform") {
-      platformWebSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
-        platformWebSocketServer.emit("connection", webSocket, request);
+    if (path === "/api/dynamic-tools") {
+      dynamicToolWebSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
+        dynamicToolWebSocketServer.emit("connection", webSocket, request);
       });
       return;
     }
@@ -475,7 +518,6 @@ export async function startServer({
 export async function startDefaultServer(port = 4317) {
   const [
     { AgentRuntime },
-    { RemotePlatformAdapter },
     { FileWorkspaceRegistry },
     { FilePermissionPolicy },
     { SettingsBackedLLMClient },
@@ -484,14 +526,12 @@ export async function startDefaultServer(port = 4317) {
     { MCPServerRegistry },
     { StdioMCPClient },
     { StreamableHttpMCPClient },
-    { ComputerUseMCPClient },
     { FileNetworkLogger },
     { FilesystemBlobStore },
     { TurnSummarizer },
     { MockLLMClient },
   ] = await Promise.all([
     import("@handagent/core/runtime/AgentRuntime.ts"),
-    import("@handagent/core/platform/RemotePlatformAdapter.ts"),
     import("@handagent/core/workspace/FileWorkspaceRegistry.ts"),
     import("@handagent/core/permission/FilePermissionPolicy.ts"),
     import("../settings/SettingsBackedLLMClient.ts"),
@@ -500,7 +540,6 @@ export async function startDefaultServer(port = 4317) {
     import("../actions/MCPServerRegistry.ts"),
     import("@handagent/core/mcp/StdioMCPClient.ts"),
     import("@handagent/core/mcp/StreamableHttpMCPClient.ts"),
-    import("../actions/ComputerUseMCPClient.ts"),
     import("@handagent/core/logging/FileNetworkLogger.ts"),
     import("@handagent/core/blob/FilesystemBlobStore.ts"),
     import("@handagent/core/runtime/TurnSummarizer.ts"),
@@ -520,11 +559,9 @@ export async function startDefaultServer(port = 4317) {
   });
   await workspaceRegistry.getDefault();
 
-  const platformBridge = new WebSocketPlatformBridge();
+  const dynamicToolBridge = new WebSocketDynamicToolBridge();
   const requestBroker = new AgentRequestBroker();
-  const platform = new RemotePlatformAdapter({ bridge: platformBridge });
   const toolRegistry = new SettingsBackedToolRegistry({
-    platform,
     workspaceRegistry,
     workspaceAskResolver: requestBroker.askWorkspace,
   });
@@ -540,9 +577,6 @@ export async function startDefaultServer(port = 4317) {
       return createMCPClientFromConfig(config, {
         StdioMCPClient,
         StreamableHttpMCPClient,
-        ComputerUseMCPClient,
-      }, {
-        platform,
       });
     },
   });
@@ -552,6 +586,7 @@ export async function startDefaultServer(port = 4317) {
       builtinRegistry: toolRegistry.registry,
       globalMcpServerIds,
       listMcpTools: (serverId: string) => mcpRegistry.listTools(serverId),
+      dynamicToolBridge,
       exposeBuiltinToolsBeforeActivation: llmMode === "mock",
     },
     {
@@ -599,6 +634,8 @@ export async function startDefaultServer(port = 4317) {
     undefined,
     async (threadId) => {
       await toolRegistry.refresh();
+      const thread = await persistence.getThread(threadId);
+      threadScopedTools.setDynamicTools(threadId, thread?.metadata.dynamicTools ?? []);
 
       if (!threadScopedTools.isActivated(threadId)) {
         const history = await persistence.getMessages(threadId);
@@ -675,6 +712,9 @@ export async function startDefaultServer(port = 4317) {
     {},
     workspaceRegistry,
     createAgent,
+    (threadId, dynamicTools) => {
+      threadScopedTools.setDynamicTools(threadId, dynamicTools);
+    },
   );
   const agentTriggerLaunchService = new AgentTriggerLaunchService(
     persistence,
@@ -682,6 +722,12 @@ export async function startDefaultServer(port = 4317) {
     createAgent,
     eventPublisher,
     agentTriggerAttentionPublisher,
+    () => new Date().toISOString(),
+    {
+      onThreadDynamicTools: (threadId, dynamicTools) => {
+        threadScopedTools.setDynamicTools(threadId, dynamicTools);
+      },
+    },
   );
 
   return startServer({
@@ -690,7 +736,7 @@ export async function startDefaultServer(port = 4317) {
     activityPublisher,
     agentTriggerAttentionPublisher,
     agentTriggerLaunchService,
-    bridge: platformBridge,
+    dynamicToolBridge,
     permissionPolicy,
     staticFilesDir: resolveThreadWindowWebDistDir(),
     port,
@@ -789,33 +835,11 @@ export function createMCPClientFromConfig(
     StreamableHttpMCPClient: new (
       config: StreamableHttpMCPServerConfig,
     ) => MCPClient;
-    ComputerUseMCPClient?: new (options: {
-      serverId: string;
-      platform: PlatformAdapter;
-    }) => MCPClient;
-  },
-  dependencies?: {
-    platform?: PlatformAdapter;
   },
 ): MCPClient {
-  if (
-    isComputerUseServer(config) &&
-    clients.ComputerUseMCPClient &&
-    dependencies?.platform
-  ) {
-    return new clients.ComputerUseMCPClient({
-      serverId: config.id,
-      platform: dependencies.platform,
-    });
-  }
-
   return config.transport === "stdio"
     ? new clients.StdioMCPClient(config)
     : new clients.StreamableHttpMCPClient(config);
-}
-
-function isComputerUseServer(config: MCPServerConfig): boolean {
-  return config.id === "computer_use" || config.id === "computer-use";
 }
 
 export function resolveLLMMode(env: Record<string, string | undefined> = process.env): LLMMode {

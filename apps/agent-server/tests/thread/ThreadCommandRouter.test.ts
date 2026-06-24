@@ -37,6 +37,21 @@ describe("ThreadCommandRouter", () => {
     expect(sent.map((event) => event.type)).toEqual(["thread.started"]);
   });
 
+  it("broadcasts thread.started to all thread connections", async () => {
+    const publisher = new ThreadNotificationPublisher();
+    const creator: ThreadNotification[] = [];
+    const otherConnection: ThreadNotification[] = [];
+    publisher.attachConnection("swift", (event) => creator.push(event as ThreadNotification));
+    publisher.attachConnection("react", (event) => otherConnection.push(event as ThreadNotification));
+    const router = makeRouter({ publisher });
+
+    await router.receive(createCommand(), "swift");
+
+    expect(creator.map((event) => event.type)).toEqual(["thread.started"]);
+    expect(otherConnection.map((event) => event.type)).toEqual(["thread.started"]);
+    expect(otherConnection[0].threadId).toBe(creator[0].threadId);
+  });
+
   it("persists workspaceId when creating a thread with workspace", async () => {
     const store = testStore(() => "2026-06-04T00:00:00.000Z");
     const publisher = new ThreadNotificationPublisher();
@@ -62,6 +77,57 @@ describe("ThreadCommandRouter", () => {
 
     const thread = await persistence.getThread(sent[0].threadId);
     expect(thread?.metadata.workspaceId).toBe("workspace-123");
+  });
+
+  it("persists dynamicTools from thread.start and exposes them to the registry hook", async () => {
+    const store = testStore(() => "2026-06-04T00:00:00.000Z");
+    const publisher = new ThreadNotificationPublisher();
+    const sent: ThreadNotification[] = [];
+    publisher.attachConnection("c1", (event) => sent.push(event as ThreadNotification));
+    const persistence = new ThreadPersistence(
+      store,
+      () => "2026-06-04T00:00:00.000Z",
+    );
+    const onThreadDynamicTools = vi.fn();
+    const router = makeRouter({ persistence, publisher, onThreadDynamicTools });
+
+    await router.receive(
+      {
+        type: "thread.start",
+        commandId: "create-dynamic-tools-1",
+        timestamp: "2026-06-04T00:00:00.000Z",
+        payload: {
+          workspaceId: null,
+          dynamicTools: [
+            {
+              clientId: "swift-host",
+              namespace: "host_macos",
+              name: "screen_capture",
+              description: "Capture the display",
+              inputSchema: { type: "object", properties: {} },
+            },
+          ],
+        },
+      },
+      "c1",
+    );
+
+    const threadId = sent[0].threadId;
+    const thread = await persistence.getThread(threadId);
+    expect(thread?.metadata.dynamicTools).toEqual([
+      expect.objectContaining({
+        clientId: "swift-host",
+        namespace: "host_macos",
+        name: "screen_capture",
+      }),
+    ]);
+    expect(onThreadDynamicTools).toHaveBeenCalledWith(threadId, [
+      expect.objectContaining({
+        clientId: "swift-host",
+        namespace: "host_macos",
+        name: "screen_capture",
+      }),
+    ]);
   });
 
   it("resumes and immediately emits a thread snapshot without submitting runtime input", async () => {
@@ -263,11 +329,13 @@ function makeRouter({
   ),
   publisher = new ThreadNotificationPublisher(),
   onThreadDeleted,
+  onThreadDynamicTools,
 }: {
   manager?: AgentManager;
   persistence?: ThreadPersistence;
   publisher?: ThreadNotificationPublisher;
   onThreadDeleted?: (threadId: string) => void;
+  onThreadDynamicTools?: ConstructorParameters<typeof ThreadCommandRouter>[8];
 } = {}): ThreadCommandRouter {
   return new ThreadCommandRouter(
     manager,
@@ -278,6 +346,7 @@ function makeRouter({
     {},
     undefined,
     (threadId) => makeAgent(threadId),
+    onThreadDynamicTools,
   );
 }
 

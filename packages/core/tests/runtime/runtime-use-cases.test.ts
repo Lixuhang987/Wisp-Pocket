@@ -308,13 +308,13 @@ describe("AgentRuntime", () => {
     const events: unknown[] = [];
     const toolCalls = [
       {
-        id: "call-frontmost",
-        name: "app.frontmost",
+        id: "call-workspace",
+        name: "workspace.list",
         arguments: {},
       },
       {
-        id: "call-clipboard",
-        name: "clipboard.read",
+        id: "call-file-read",
+        name: "file.read",
         arguments: {},
       },
     ];
@@ -324,7 +324,7 @@ describe("AgentRuntime", () => {
         const lastMessage = messages[messages.length - 1];
         if (lastMessage.role === "user") {
           return {
-            message: { role: "assistant" as const, content: "我会读取前台 App 和剪贴板。" },
+            message: { role: "assistant" as const, content: "我会读取workspace 和文件。" },
             toolCalls,
           };
         }
@@ -338,8 +338,8 @@ describe("AgentRuntime", () => {
     const runtime = new AgentRuntime(
       client,
       new ToolRegistry([
-        new NamedResultTool("app.frontmost", { name: "Finder", bundleId: "com.apple.finder" }),
-        new NamedResultTool("clipboard.read", { text: "clipboard text" }),
+        new NamedResultTool("workspace.list", [{ id: "ws-1", name: "Workspace" }]),
+        new NamedResultTool("file.read", { content: "file text" }),
       ]),
     );
 
@@ -352,20 +352,20 @@ describe("AgentRuntime", () => {
     expect(seenTurns[1].slice(-3)).toEqual([
       {
         role: "assistant",
-        content: "我会读取前台 App 和剪贴板。",
+        content: "我会读取workspace 和文件。",
         toolCalls,
       },
       {
         role: "tool",
-        toolCallId: "call-frontmost",
-        name: "app.frontmost",
-        content: JSON.stringify({ name: "Finder", bundleId: "com.apple.finder" }),
+        toolCallId: "call-workspace",
+        name: "workspace.list",
+        content: JSON.stringify([{ id: "ws-1", name: "Workspace" }]),
       },
       {
         role: "tool",
-        toolCallId: "call-clipboard",
-        name: "clipboard.read",
-        content: JSON.stringify({ text: "clipboard text" }),
+        toolCallId: "call-file-read",
+        name: "file.read",
+        content: JSON.stringify({ content: "file text" }),
       },
     ]);
     expect(events).toEqual([
@@ -377,7 +377,7 @@ describe("AgentRuntime", () => {
       {
         type: "assistant_message_delta",
         messageId: "assistant-1",
-        payload: { text: "我会读取前台 App 和剪贴板。" },
+        payload: { text: "我会读取workspace 和文件。" },
       },
       {
         type: "assistant_message_end",
@@ -386,30 +386,30 @@ describe("AgentRuntime", () => {
       },
       {
         type: "tool_call",
-        toolCallId: "call-frontmost",
-        toolName: "app.frontmost",
+        toolCallId: "call-workspace",
+        toolName: "workspace.list",
         input: {},
       },
       {
         type: "tool_result",
-        toolCallId: "call-frontmost",
-        toolName: "app.frontmost",
+        toolCallId: "call-workspace",
+        toolName: "workspace.list",
         status: "success",
-        output: JSON.stringify({ name: "Finder", bundleId: "com.apple.finder" }),
+        output: JSON.stringify([{ id: "ws-1", name: "Workspace" }]),
         durationMs: expect.any(Number),
       },
       {
         type: "tool_call",
-        toolCallId: "call-clipboard",
-        toolName: "clipboard.read",
+        toolCallId: "call-file-read",
+        toolName: "file.read",
         input: {},
       },
       {
         type: "tool_result",
-        toolCallId: "call-clipboard",
-        toolName: "clipboard.read",
+        toolCallId: "call-file-read",
+        toolName: "file.read",
         status: "success",
-        output: JSON.stringify({ text: "clipboard text" }),
+        output: JSON.stringify({ content: "file text" }),
         durationMs: expect.any(Number),
       },
       {

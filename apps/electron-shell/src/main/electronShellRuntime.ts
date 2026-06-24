@@ -111,7 +111,7 @@ export class ElectronShellRuntime {
         if (this.options.prewarmer.focus()) {
           this.ack(command, true);
         } else {
-          this.ack(command, false, "thread window is not visible");
+          await this.runCommand(command, () => this.options.prewarmer.openHistory());
         }
         return;
       case "activity_window.show":

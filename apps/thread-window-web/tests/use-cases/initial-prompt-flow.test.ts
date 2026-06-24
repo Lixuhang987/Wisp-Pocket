@@ -116,6 +116,57 @@ describe("ThreadSocketClient", () => {
     ]);
   });
 
+  it("includes default dynamic tools when starting an initial prompt thread", () => {
+    const client = new ThreadSocketClient({
+      url: "ws://127.0.0.1:4317/api/thread",
+      WebSocketImpl: FakeWebSocket as never,
+      now: () => "2026-06-06T00:00:00.000Z",
+      id: vi.fn()
+        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("list-1"),
+      defaultDynamicTools: [
+        {
+          clientId: "swift-host",
+          namespace: "host_macos",
+          name: "screen_capture",
+          description: "Capture screen",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+      onConnectionState: () => {},
+      onNotification: () => {},
+      onRequest: () => {},
+    });
+
+    client.connect();
+    const socket = FakeWebSocket.instances[0];
+    socket.open();
+    client.startInitialPrompt({
+      clientRequestId: "prompt-1",
+      userInput: {
+        items: [{ type: "text", id: "text-1", text: "hello" }],
+      },
+    });
+
+    expect(socket.sent.map((raw) => JSON.parse(raw))).toContainEqual({
+      type: "thread.start",
+      commandId: "prompt-1",
+      timestamp: "2026-06-06T00:00:00.000Z",
+      payload: {
+        workspaceId: null,
+        dynamicTools: [
+          {
+            clientId: "swift-host",
+            namespace: "host_macos",
+            name: "screen_capture",
+            description: "Capture screen",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+      },
+    });
+  });
+
   it("marks unexpected close as disconnected without opening another socket or sending recovery commands", () => {
     vi.useFakeTimers();
     try {

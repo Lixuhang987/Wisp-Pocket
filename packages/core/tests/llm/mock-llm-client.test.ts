@@ -196,7 +196,7 @@ describe("MockLLMClient", () => {
     await expect(
       client.complete([{ role: "user", content: "run [mock:clipboard-read]" }], []),
     ).resolves.toMatchObject({
-      toolCalls: [{ id: "mock-clipboard-read-1", name: "clipboard.read", arguments: {} }],
+      toolCalls: [{ id: "mock-clipboard-read-1", name: "host_macos.clipboard_read", arguments: {} }],
     });
 
     await expect(
@@ -205,7 +205,7 @@ describe("MockLLMClient", () => {
       toolCalls: [
         {
           id: "mock-screen-display-1",
-          name: "screen.capture",
+          name: "host_macos.screen_capture",
           arguments: { target: { kind: "display" } },
         },
       ],
@@ -217,7 +217,7 @@ describe("MockLLMClient", () => {
       toolCalls: [
         {
           id: "mock-screen-window-1",
-          name: "screen.capture",
+          name: "host_macos.screen_capture",
           arguments: { target: { kind: "window", windowId: 123 } },
         },
       ],
@@ -277,7 +277,7 @@ describe("MockLLMClient", () => {
       toolCalls: [
         {
           id: "mock-ocr-sample-1",
-          name: "ocr.read",
+          name: "host_macos.ocr_read",
           arguments: {
             mimeType: "image/png",
             language: "en-US",
@@ -293,7 +293,7 @@ describe("MockLLMClient", () => {
       toolCalls: [
         {
           id: "mock-accessibility-frontmost-1",
-          name: "accessibility.snapshot",
+          name: "host_macos.accessibility_snapshot",
           arguments: { kind: "frontmost_app" },
         },
       ],
@@ -305,7 +305,7 @@ describe("MockLLMClient", () => {
       toolCalls: [
         {
           id: "mock-accessibility-set-frontmost-1",
-          name: "accessibility.action",
+          name: "host_macos.accessibility_action",
           arguments: {
             target: { kind: "frontmost_app" },
             action: { kind: "set_value", value: "HANDAGENT_ACCESSIBILITY_SET_VALUE_20260521" },

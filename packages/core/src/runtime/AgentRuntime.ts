@@ -84,6 +84,7 @@ export type AgentRuntimeEvent =
 
 export type AgentRuntimeRunOptions = {
   threadId?: string;
+  turnId?: string;
   signal?: AbortSignal;
 };
 
@@ -267,6 +268,7 @@ export class AgentRuntime {
       throwIfAborted(runOptions.signal);
       const result = await tool.call(toolCall.arguments, {
         threadId,
+        turnId: runOptions.turnId,
         toolCallId: toolCall.id,
       });
       throwIfAborted(runOptions.signal);
@@ -355,6 +357,7 @@ export class AgentRuntime {
     try {
       const result = await tool.call(toolCall.arguments, {
         threadId: runOptions.threadId,
+        turnId: runOptions.turnId,
         toolCallId: toolCall.id,
       });
       throwIfAborted(runOptions.signal);

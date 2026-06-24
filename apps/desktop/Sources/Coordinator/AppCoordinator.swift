@@ -243,8 +243,37 @@ final class AppCoordinator {
             attachments: attachments
         ) else { return }
         promptPanelController.hide(restoringFocus: false)
+
+        if let swiftThreadClient = services.swiftThreadClient {
+            Task { @MainActor in
+                do {
+                    let threadId = try await swiftThreadClient.submitInitialPrompt(prompt)
+                    self.focusThreadWindowAfterSwiftThreadStart(threadId: threadId)
+                } catch {
+                    self.handleThreadWindowOpenFailure(error.localizedDescription)
+                }
+            }
+            return
+        }
+
         threadWindowLifecycle.createTabWithInitialPrompt(
             prompt,
+            onOpened: { [weak self] in
+                guard let self else { return }
+                self.handleThreadWindowOpened()
+            },
+            onFailed: { [weak self] message in
+                self?.handleThreadWindowOpenFailure(message)
+            },
+            onClosed: { [weak self] in
+                self?.send(.threadWindowClosed)
+            }
+        )
+    }
+
+    private func focusThreadWindowAfterSwiftThreadStart(threadId: String) {
+        threadWindowLifecycle.openOrFocusThread(
+            threadID: threadId,
             onOpened: { [weak self] in
                 guard let self else { return }
                 self.handleThreadWindowOpened()

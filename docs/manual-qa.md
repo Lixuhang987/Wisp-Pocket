@@ -25,6 +25,19 @@
 - 自动化验证：本轮合并收敛后已执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`；均返回 `success`。
 - 手工回归步骤：后续如继续调整测试边界，应优先从新增 `use-cases/` 入口补用例，再删除对应旧测试文件，并同步更新相应模块文档与本文件。
 
+### `/api/thread` 统一 thread.started 广播
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/agent-server/src/thread/ThreadNotificationPublisher.ts`、`apps/agent-server/src/server/server.ts`、`apps/electron-shell/src/preload/threadWindowPreload.cts`、`apps/agent-server/tests/thread/ThreadNotificationPublisher.test.ts`、`apps/agent-server/tests/thread/ThreadCommandRouter.test.ts`、`apps/agent-server/tests/use-cases/thread-lifecycle.test.ts`、`apps/electron-shell/tests/preload/threadWindowPreload.test.ts`
+- 修复结论：`thread.started` 统一广播给所有 `/api/thread` 连接，并让这些连接自动订阅该 thread 的后续普通 notification；`acceptServerRequests=1` 只表示该连接接收 permission / workspace 等交互式 `ServerRequest`。Swift PromptPanel 直连 `/api/thread` 不设置 `acceptServerRequests`，因此可收到普通 notification，但不会成为交互式请求 owner。
+- 自动化验证：需执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 手工回归步骤：
+  1. 启动桌面 App，确认 Electron ThreadWindow 已预热且 preload 注入的 URL 为 `/api/thread?acceptServerRequests=1`。
+  2. 通过 Swift PromptPanel 提交普通 prompt，确认 Swift 收到 `thread.started.threadId` 后打开 / 聚焦 React ThreadWindow，React 同时收到同一个 `thread.started` 并展示该 thread。
+  3. 在该 thread 后续 assistant streaming 或普通 notification 到达时，确认 React 能继续接收并渲染，不依赖 Swift 发送消息副本。
+  4. 使用会触发 permission 或 workspace 选择的 prompt，确认交互式请求只出现在 React ThreadWindow，不发送给 Swift PromptPanel 的直连 thread client。
+  5. 从 React ThreadWindow composer 创建或继续一个 thread，确认其他 `/api/thread` 连接收到 `thread.started` 后可选择忽略或渲染，不影响当前 UI 状态。
+
 ### AgentTrigger 设置二级菜单与默认安装内置触发器
 
 - 完成日期：待实机 QA
@@ -525,6 +538,15 @@
 
 ### 对于每个可交互的点，都验证一遍，看是否符合预期，这里不当做硬性bug，而是记录下可能不符合的行为，事无巨细
 
+- 2026-06-24 plugin system / dynamic tools 迁移已完成自动化验证，仍需补实机 QA：
+  1. 使用 mock LLM packaged app 启动桌面端，确认 agent-server 只监听 `/api/thread`、`/api/activity`、`/api/agent-trigger/attention`、`/api/dynamic-tools`，旧 `/api/platform` WebSocket 不再可用。
+  2. 通过 PromptPanel 提交 `DYNAMIC_TOOLS_CLIPBOARD_QA_20260624 [mock:clipboard-read]`，确认 Swift 直连 `/api/thread` 创建 thread，React ThreadWindow 自动收到 `thread.started` 并打开对应 thread；tool 名显示为 `host_macos.clipboard_read`，结果来自当前剪贴板。
+  3. 提交 `DYNAMIC_TOOLS_SCREEN_QA_20260624 [mock:screen-display]`，允许屏幕录制相关权限后确认 tool 名为 `host_macos.screen_capture`，结果包含截图尺寸和 PNG 内容；若系统权限缺失，应返回明确 `permission_denied` 文案。
+  4. 在同一运行中触发 `file.write` 权限请求，确认 `permission.requested` 只显示在 React ThreadWindow，Swift 直连 thread client 不弹出或处理该交互式请求。
+  5. 重启 App 后打开历史 thread，确认 thread metadata 中的 `dynamicTools` 可恢复；调用 `use_tools` 后仍能看到 `host_macos.*` 工具。
+  6. 打开 Settings → 工具，确认只显示 `workspace.list`、`file.read`、`file.write` 等 core builtin 工具，不再显示旧 `clipboard.read`、`screen.capture` 等平台内置工具。
+  7. 在 `~/.spotAgent/plugins/qa-plugin/plugin.json` 放置 lifecycle 为 `toolsOnly` 的 plugin manifest，声明 `qa_plugin.echo` tool；重启 App 后通过 React 新建空白 thread 和 Swift PromptPanel 各创建一次 thread，确认 `thread.start.payload.dynamicTools` 都包含 `qa_plugin.echo`，调用后结果由 Swift plugin manager 回写，agent-server 进程树中不出现由 agent-server 直接 spawn 的 plugin 子进程。
+  - 自动化验证：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 已通过。
 - 2026-06-19 plugin 残留清理完成后需补实机 QA：打开 Settings → 追加，点击“添加示例”或手动新建 Append Prompt，确认写入路径为 `~/.spotAgent/actions/append-prompts/action.json`；重启桌面 App 后 PromptPanel 仍能显示 `explain` / `sum` 等 action，并以 skill chip 追加到 `UserInput.items`。同时在 `~/.spotAgent/plugins/append-prompts/plugin.json` 放置旧 action manifest，确认当前 PromptPanel / ThreadWindow availableSkills 不再读取旧路径，避免与 2026-06-19 plugin system 的 `~/.spotAgent/plugins/<id>/plugin.json` 入口冲突。
 - 2026-06-09 观察：在历史侧栏搜索出 `HANDAGENT_REAL_PERMISSION_REPLAY_OCR5...` 后，Computer Use 直接触发该 AX row button 会打开删除确认；用鼠标点击 row 左侧正文区域可以正常打开 thread。该现象先记录为可访问性 / hit area 待观察点，不影响普通指针路径。
 - 本文件中对应条目的用户可见行为、持久化记录、错误文案和隔离边界均符合预期。

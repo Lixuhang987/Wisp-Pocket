@@ -100,12 +100,12 @@ bash ./scripts/swiftw build
 - `apps/electron-shell/` 承载 Electron ThreadWindow、React StatusBubble 与 agent-server supervisor。
 - `apps/thread-window-web/` 承载 React ThreadWindow；Tailwind v4 theme token 由 `design/tokens.json` 生成。
 - `packages/core/` 只放跨平台的 Agent Core、tool 协议和通用测试。
-- macOS 平台能力放在 `apps/desktop/Sources/AppServices/PlatformBridge/MacPlatformProvider.swift`，通过 `PlatformBridgeService` 暴露反向 IPC。
+- macOS 平台能力放在 `apps/desktop/Sources/AppServices/PlatformBridge/MacPlatformProvider.swift`，由 Swift host dynamic tools 注册为 `host_macos.*` 并通过 `/api/dynamic-tools` 回写结果。
 
 ### 依赖边界
 
 - Core 代码不要直接依赖宿主 UI。
-- 平台实现只通过 `PlatformAdapter` 暴露能力，不要把 macOS 细节泄漏到 core。
+- 平台实现只通过 dynamic tool spec / provider response 暴露能力，不要把 macOS 细节泄漏到 core。
 - LLM provider 通过 `LLMClient` 抽象接入，不要把具体 provider 绑死在 runtime。
 
 ### 行为边界

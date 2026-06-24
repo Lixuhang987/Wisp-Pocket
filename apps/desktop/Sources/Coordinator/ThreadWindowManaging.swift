@@ -13,6 +13,12 @@ protocol ThreadWindowManaging: AnyObject {
         onFailed: @escaping @MainActor (String) -> Void,
         onClosed: @escaping @MainActor () -> Void
     )
+    func openOrFocusThread(
+        threadID: String,
+        onOpened: @escaping @MainActor () -> Void,
+        onFailed: @escaping @MainActor (String) -> Void,
+        onClosed: @escaping @MainActor () -> Void
+    )
     func focus(threadID: String?, onFailure: @escaping @MainActor () -> Void) -> Bool
     func close()
 }

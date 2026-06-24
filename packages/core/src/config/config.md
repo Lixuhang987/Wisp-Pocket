@@ -28,7 +28,7 @@
   },
   "tools": {
     "allowlist": ["file.read", "file.write", "workspace.list"],
-    "denylist": ["clipboard.read"]
+    "denylist": ["file.write"]
   }
 }
 ```

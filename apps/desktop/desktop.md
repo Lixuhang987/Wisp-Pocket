@@ -1,6 +1,6 @@
 # desktop
 
-`apps/desktop` 是 macOS 原生入口层：应用生命周期、PromptPanel、Settings、全局热键、焦点恢复、平台能力桥，以及 Swift 到 Electron 的 command bridge。ThreadWindow、StatusBubble 和 agent-server supervision 都由 `apps/electron-shell` 承载。
+`apps/desktop` 是 macOS 原生入口层：应用生命周期、PromptPanel、Settings、全局热键、焦点恢复、host dynamic tools，以及 Swift 到 Electron 的 command bridge。ThreadWindow、StatusBubble 和 agent-server supervision 都由 `apps/electron-shell` 承载。
 
 ## 架构红线（编辑此目录前必读）
 
@@ -29,7 +29,7 @@ Swift 原生 UI 只保留 PromptPanel 和 Settings：
 ### 4. 输入边界（产品红线）
 
 - 只有用户主动输入和用户主动选区可以作为 thread 初始上下文；屏幕 / 窗口 / 文件 / 剪贴板 / App 状态一律通过 tool 按需读取。
-- 宿主层不组装 LLM 消息、不读取 runtime 内部状态、不直接执行 tool 编排。ThreadWindow 的 thread 协议由 React 前端通过 `/api/thread` 处理；Swift 宿主只通过 `/api/platform` 处理平台能力 RPC。
+- 宿主层不组装 LLM 消息、不读取 runtime 内部状态、不直接执行 tool 编排。React ThreadWindow 的 thread 协议由 React 前端通过 `/api/thread` 处理；Swift 宿主只用窄口径 `/api/thread` client 创建 PromptPanel thread，并通过 `/api/dynamic-tools` 处理默认 host dynamic tools 与 plugin dynamic tools。
 - 快捷键配置只保存在宿主层本地（UserDefaults，由 `KeyboardShortcuts` 库管理），不下沉到 runtime。外观主题偏好由 Swift 宿主持久化到 `~/.spotAgent/settings.json`，并把解析后的主题通过 Electron command bridge 传给 React。
 
 ### 5. 测试与验证
@@ -93,8 +93,11 @@ sequenceDiagram
   Coord->>Panel: show()
   User->>Panel: 输入并提交
   Panel->>Coord: send(.submitPrompt)
-  Coord->>Electron: thread_window.open_initial_prompt
-  Electron->>React: show BrowserWindow + deliver initial prompt
+  Coord->>Server: /api/thread thread.start(dynamicTools)
+  Server-->>Coord: thread.started(threadId)
+  Coord->>Server: /api/thread op.submit(UserInput)
+  Coord->>Electron: thread_window.focus(threadId)
+  Electron->>React: show/focus BrowserWindow
   React->>Server: /api/thread ThreadCommand / ClientResponse
   Server-->>React: ThreadNotification / ServerRequest
 ```
@@ -107,16 +110,16 @@ desktop 与 agent-server 共享的模型、builtin tool 和外观主题配置文
 
 ### `PromptAttachmentResult` / `ActionDefinition`
 
-`PromptAttachmentResult` 是 PromptPanel 提交时能进入 initial prompt 的用户主动附件，只包含 5 类：`.noAttachment`、`.textToken`、`.textSelection`、`.imageRegion`、`.selectionError`。屏幕、剪贴板、App 状态不能在这里默认注入。
+`PromptAttachmentResult` 是 PromptPanel 提交时能进入首轮 `UserInput.items` 的用户主动附件，只包含 5 类：`.noAttachment`、`.textToken`、`.textSelection`、`.imageRegion`、`.selectionError`。屏幕、剪贴板、App 状态不能在这里默认注入。
 
-`ActionDefinition` 来自 `~/.spotAgent/actions/*/action.json` 的 `prompts[]`。desktop 负责 trigger、标题、描述、prompt 文本和快捷键；Tab、点击 action 或 Action 全局快捷键只会把 action 追加为输入框内的 skill chip。提交时 Swift 发送完整 `UserInput.items`，不再发送 `actionBinding`，也不在 desktop 侧渲染参数。
+`ActionDefinition` 来自 `~/.spotAgent/actions/*/action.json` 的 `prompts[]`。desktop 负责 trigger、标题、描述、prompt 文本和快捷键；Tab、点击 action 或 Action 全局快捷键只会把 action 追加为输入框内的 skill chip。提交时 Swift 通过 `/api/thread` 发送完整 `UserInput.items`，不再发送 `actionBinding`，也不在 desktop 侧渲染参数。
 
 ## 注意事项
 
 - 修改 TS 源码必须重启 desktop app 才能让受监督 agent-server 重新加载。
 - 设置窗口与 Electron ThreadWindow 共享 `AppActivationPolicyCoordinator`；全部关闭后 app 切回 `.accessory`。
-- desktop 不持有 thread client。`ElectronThreadWindowLifecycle` 只通过 `ThreadWindowCommanding` 发送 Electron command，并把初始 prompt payload 交给 Electron main。
+- desktop 持有窄口径 thread client，仅用于 PromptPanel 直连创建 thread 与提交初始输入。`ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 按 threadId 打开或聚焦 Electron ThreadWindow。
 - PromptPanel show/toggle 只打开原生输入面板，不触发 Electron ThreadWindow 预热。
 - React ThreadWindow 负责 `/api/thread` 上的 command / notification / request / response 编解码和 UI 状态。
 - ActivityWindow 负责 React StatusBubble；Swift 只发送 `activity_window.show`，show 失败不再回退到 Swift StatusBubble。
-- `PlatformBridgeConnectionClient` 连接 `/api/platform`，发送 `platform_bridge_hello`，并把 `platform_request` 分派给 `PlatformBridgeService`。
+- `DynamicToolProviderConnectionClient` 连接 `/api/dynamic-tools`，发送 host / plugin `provider_hello`，并把 `tool_call_request` 分派给 `DynamicToolProviderService`。

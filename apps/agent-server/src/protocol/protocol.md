@@ -15,7 +15,7 @@
 - 上游：Agent 内部的 `thread/ThreadRuntimeOrchestrator.ts` 在 runtime event 回调中调用 `toThreadNotification()` 和 `toAuditEvent()`。
 - 下游：React ThreadWindow store 消费 `assistant.delta`、`tool.started`、`tool.finished`、`thread.error` 等 `ThreadNotification`；`ThreadPersistence` 把通知写成 `event_msg`，把审计写成 `turn_context.auditEvents`。
 - 旁路：`thread/ThreadPersistence.ts` 调 `composeUserContent()` 和 `agentMessagesToConversation()`。
-- 不处理：`permission.requested` / `workspace.requested` 由 `agent/AgentRequestBroker` 包装为 Agent `server.request` event，再由 app-server 从 `rx_event` 发布；`workspace.listed` 由 `thread/ThreadCommandRouter` 构造；`PlatformBridgeMessage` 由 `server/` 与 `bridges/WebSocketPlatformBridge.ts` 处理。
+- 不处理：`permission.requested` / `workspace.requested` 由 `agent/AgentRequestBroker` 包装为 Agent `server.request` event，再由 app-server 从 `rx_event` 发布；`workspace.listed` 由 `thread/ThreadCommandRouter` 构造；`DynamicToolProviderMessage` 由 `server/` 与 `bridges/WebSocketDynamicToolBridge.ts` 处理。
 
 ## 关键机制
 
@@ -98,7 +98,7 @@ parts.push(renderStub({
 - `ConversationMessage` 是快照视角；`AgentMessage` 是 LLM/runtime 视角。
 - core 协议里的 `ThreadNotification` 是 thread 通知主干；`@handagent/thread-store` 里的 `ThreadAuditEvent` 是审计事件，两者职责不同。
 - STUB 是持久化占位，不是 LLM 最终输入；真正 LLM 请求前才展开成多模态 content part。
-- `ThreadNotification`、`ServerRequest`、`ClientResponse`、`PlatformBridgeMessage` 的类型真相在 `packages/core/src/protocol/`；本目录只引用和适配。
+- `ThreadNotification`、`ServerRequest`、`ClientResponse`、`DynamicToolProviderMessage` 的类型真相在 `packages/core/src/protocol/`；本目录只引用和适配。
 
 ## 编辑约束
 

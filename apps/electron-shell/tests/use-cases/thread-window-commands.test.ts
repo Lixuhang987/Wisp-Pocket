@@ -9,6 +9,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: (options) => {
         expect(options.show).toBe(false);
         expect(options.webPreferences?.contextIsolation).toBe(true);
@@ -32,6 +33,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: (options) => {
         expect(options.webPreferences?.additionalArguments).toContain(
           `--handagent-theme=${encodeURIComponent(JSON.stringify({ preference: "system", resolved: "dark" }))}`,
@@ -52,6 +54,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/repo/apps/electron-shell/dist/preload/threadWindowPreload.cjs",
       availableSkills: [],
+      defaultDynamicTools: [],
       initialTheme: { preference: "light", resolved: "light" },
       createWindow: (options) => {
         expect(options.webPreferences?.additionalArguments).toContain(
@@ -72,6 +75,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
     });
 
@@ -91,6 +95,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
     });
 
@@ -112,6 +117,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
     });
     const prepared = prewarmer.prepare();
@@ -136,6 +142,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
     });
 
@@ -168,6 +175,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => {
         createCount += 1;
         const window = windows.shift();
@@ -209,6 +217,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
     });
 
@@ -227,6 +236,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
     });
 
@@ -246,6 +256,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
       onClosed: (event) => closes.push(event.wasVisible),
     });
@@ -264,6 +275,7 @@ describe("ThreadWindowPrewarmer", () => {
       threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
       preloadPath: "/preload.js",
       availableSkills: [],
+      defaultDynamicTools: [],
       createWindow: () => window,
     });
 

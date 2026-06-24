@@ -6,10 +6,10 @@
 
 | 入口 | 消费方 | 消息边界 |
 |------|------|------|
-| `ws://127.0.0.1:4317/api/thread` | React ThreadWindow | 接收 `ThreadCommand` / `ClientResponse`，发送 `ThreadNotification` / `ServerRequest` |
+| `ws://127.0.0.1:4317/api/thread` | React ThreadWindow；Swift PromptPanel 窄口径 client | 接收 `ThreadCommand` / `ClientResponse`，发送 `ThreadNotification`；`ServerRequest` 只发给 `acceptServerRequests=1` 的交互式 owner |
 | `ws://127.0.0.1:4317/api/activity` | Electron StatusBubble；后续桌宠 | 只发送 `AgentActivityEvent`，连接后先发 `activity.snapshot`，状态变化时发 `activity.changed` |
 | `ws://127.0.0.1:4317/api/agent-trigger/attention` | Electron main | 只发送后台 AgentTrigger 的宿主级 attention 事件；命中权限、工作区选择或失败时触发 |
-| `ws://127.0.0.1:4317/api/platform` | Swift desktop | 只承载 `PlatformBridgeMessage`，用于 core platform tool 反向请求 desktop |
+| `ws://127.0.0.1:4317/api/dynamic-tools` | Swift desktop；后续 plugin / 外部 provider | 只承载 `DynamicToolProviderMessage`，按 `clientId` 路由 dynamic tool call |
 | `http://127.0.0.1:4317/thread-window/*` | Electron ThreadWindow `BrowserWindow` | 返回 React 静态资源，不参与 thread 协议 |
 
 ## 直接子节点
@@ -33,13 +33,13 @@ node --experimental-transform-types --experimental-specifier-resolution=node app
 
 1. 构造 `ThreadStore({ dbPath: ~/.spotAgent/threads.sqlite })`、`FilesystemBlobStore`、`FileNetworkLogger`、`FileWorkspaceRegistry`。
 2. 读取 `~/.spotAgent/mcp.json` 并创建 `MCPServerRegistry`。
-3. 创建 `WebSocketPlatformBridge` 与 `AgentRequestBroker`；permission/workspace ask 先进入 Agent `rx_event`。
+3. 创建 `WebSocketDynamicToolBridge` 与 `AgentRequestBroker`；permission/workspace ask 先进入 Agent `rx_event`。
 4. 通过 `SettingsBackedToolRegistry` 注册 builtin tools。
 5. 通过 `SettingsBackedLLMClient` 或 `MockLLMClient` 选择 LLM 模式。
 6. 按 thread 缓存 `AgentRuntime`，注入 thread 级 tool registry、permission policy、blob store 和 turn summarizer；mock 模式使用 `MockLLMClient` 且不启用 summarizer。
 7. 创建 `AgentManager` 作为持久 Agent owner；每个 Agent 暴露 `tx_sub`、`rx_event`、`agent_status`、`session`，并在内部复用 `ThreadRuntimeOrchestrator` 执行 ReAct turn。
 8. 创建 `AgentActivityPublisher`、`AgentTriggerAttentionPublisher`、`ThreadPersistence`、`ThreadNotificationPublisher`、`ThreadCommandRouter`、`AgentTriggerLaunchService`。
-9. 启动同端口 HTTP + WebSocket 服务：`/api/thread` 挂载 thread command/response handler，`/api/activity` 挂载 activity subscriber handler，`/api/agent-trigger/attention` 挂载后台 trigger attention subscriber，`/api/platform` 挂载 platform bridge handler，`/thread-window/*` 提供 React 静态资源，`POST /api/agent-trigger/fire` 作为后台启动入口，未知 path 直接关闭或返回 404。
+9. 启动同端口 HTTP + WebSocket 服务：`/api/thread` 挂载 thread command/response handler，`/api/activity` 挂载 activity subscriber handler，`/api/agent-trigger/attention` 挂载后台 trigger attention subscriber，`/api/dynamic-tools` 挂载 dynamic tool provider handler，`/thread-window/*` 提供 React 静态资源，`POST /api/agent-trigger/fire` 作为后台启动入口，未知 path 直接关闭或返回 404。
 
 ## 主消息流
 
@@ -47,8 +47,8 @@ node --experimental-transform-types --experimental-specifier-resolution=node app
 flowchart TD
   A["React /api/thread socket"] --> B["server/attachThreadSocketHandlers"]
   ACT["Electron StatusBubble /api/activity socket"] --> AP["server/attachActivitySocketHandlers"]
-  P["Swift /api/platform socket"] --> D["server/attachPlatformSocketHandlers"]
-  D --> PB["bridges/WebSocketPlatformBridge"]
+  P["Swift /api/dynamic-tools socket"] --> D["server/attachDynamicToolSocketHandlers"]
+  D --> PB["bridges/WebSocketDynamicToolBridge"]
   B --> C{"ClientResponse / ThreadCommand"}
   C -- "ClientResponse" --> E["ThreadCommandRouter.handleResponse<br/>wrap client_response Op"]
   E --> AM
@@ -72,10 +72,10 @@ flowchart TD
 
 - `/api/thread` 顶层只接收 `ThreadCommand`、`ClientResponse`。
 - `/api/activity` 顶层只发送 `AgentActivityEvent`，新连接立即收到 `activity.snapshot`，后续状态变化收到 `activity.changed`。
-- `/api/platform` 顶层只接收 `PlatformBridgeMessage`。
+- `/api/dynamic-tools` 顶层只接收 `DynamicToolProviderMessage`；`provider_hello` 绑定 provider `clientId`，`tool_call_response` 唤醒 pending dynamic tool call。
 - thread 通知主干统一走 `ThreadNotification`；`thread.snapshot` 是用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口，不是 React 断线恢复入口。
 - activity 状态由 `AgentActivityPublisher` 从 `ThreadNotification` / `ServerRequest` 派生；activity subscriber 发送失败只影响该 subscriber，不影响 `/api/thread` 分发。
-- permission / workspace 的交互式请求统一由 Agent `rx_event` 产出 `server.request`，app-server 发布为 `ServerRequest`；React 回 `ClientResponse` 后由 app-server 包装成 `client_response` Op。
+- permission / workspace 的交互式请求统一由 Agent `rx_event` 产出 `server.request`，app-server 只发布给设置了 `acceptServerRequests=1` 的 `/api/thread` 连接；当前 React 回 `ClientResponse` 后由 app-server 包装成 `client_response` Op。
 - `workspace.listed` 是 `workspace.list` 的连接级响应，不带 `threadId`，只发给发起命令的 `/api/thread` 连接。
 - `op.submit` 是运行期输入 envelope；`input.submit` 与 `turn.interrupt` 不再属于公开 `ThreadCommand`。
 - permission / workspace request-response 都绑定到 thread 当前连接；断线或旧 token 回包不能影响新连接。
@@ -106,10 +106,10 @@ open dist/HandAgentDesktop.app
 
 ## 编辑约束
 
-- 不在 `agent-server` 内定义跨进程 DTO；thread 命令走 `@handagent/core/protocol/ThreadCommand.ts`，thread 通知走 `@handagent/core/protocol/ThreadNotification.ts`，请求回流走 `ServerRequest` / `ClientResponse`，Agent 内部事件走 `AgentEvent` / `Op`，平台帧走 `@handagent/core/protocol/PlatformBridgeMessage.ts`。
-- 不 import macOS、Swift、AppKit、SwiftUI 或 browser-only 模块；平台能力一律经 `PlatformAdapter` / `PlatformBridge`。
+- 不在 `agent-server` 内定义跨进程 DTO；thread 命令走 `@handagent/core/protocol/ThreadCommand.ts`，thread 通知走 `@handagent/core/protocol/ThreadNotification.ts`，请求回流走 `ServerRequest` / `ClientResponse`，Agent 内部事件走 `AgentEvent` / `Op`，dynamic tool provider 帧走 `@handagent/core/protocol/DynamicTool.ts`。
+- 不 import macOS、Swift、AppKit、SwiftUI 或 browser-only 模块；原生能力一律经 dynamic tool provider 转发。
 - 不在这里实现 UI 状态；ThreadWindow 后台 thread 状态缓存、当前展示 thread、composer、请求面板和消息展示属于 React 前端。
-- 不在这里实现平台原生能力；`/api/platform` 只把 core `RemotePlatformAdapter` 的请求转给 desktop。
+- 不在这里实现平台原生能力；`/api/dynamic-tools` 只按 `clientId` 转发 dynamic tool 请求给 provider。
 - 新增源码子目录时，更新 [src/src.md](/Users/mu9/proj/handAgent/apps/agent-server/src/src.md)；新增测试子目录时，更新 [tests/tests.md](/Users/mu9/proj/handAgent/apps/agent-server/tests/tests.md)。
 - 修改 TypeScript 后必须重启 desktop app 才能生效，无 hot reload。
 - 验证命令：`bash ./scripts/test.sh`；涉及 desktop 启动路径时同时跑 `bash ./scripts/swiftw test` 与 `bash ./scripts/swiftw build`。
@@ -118,4 +118,4 @@ open dist/HandAgentDesktop.app
 
 - thread / notification 问题先看 `~/.spotAgent/threads.sqlite` 中的 `threads` / `thread_items`。
 - LLM provider 或 tool calling 问题先看 `~/.spotAgent/log/<YYYY-MM-DD>/network-NNN.jsonl`。
-- 平台能力无响应先看 `bridges/` 是否有 active desktop bridge，再看 desktop `PlatformBridgeService`。
+- Host dynamic tool 无响应先看 `/api/dynamic-tools` provider 是否已 hello，再看 desktop `DynamicToolProviderService`。

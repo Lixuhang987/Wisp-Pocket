@@ -56,6 +56,26 @@ final class ElectronThreadWindowLifecycle: ThreadWindowManaging {
         }
     }
 
+    func openOrFocusThread(
+        threadID: String,
+        onOpened: @escaping @MainActor () -> Void,
+        onFailed: @escaping @MainActor (String) -> Void,
+        onClosed: @escaping @MainActor () -> Void
+    ) {
+        self.onClosed = onClosed
+        do {
+            let commandId = try client.focus(threadId: threadID)
+            pendingOpenCallbacks[commandId] = PendingOpenCallbacks(
+                onOpened: onOpened,
+                onFailed: onFailed
+            )
+        } catch {
+            isOpen = false
+            onFailed(error.localizedDescription)
+        }
+    }
+
+
     func focus(threadID: String?, onFailure: @escaping @MainActor () -> Void = {}) -> Bool {
         guard isOpen else { return false }
         do {
@@ -98,6 +118,16 @@ final class ElectronThreadWindowLifecycle: ThreadWindowManaging {
                 callbacks.onFailed(result.error ?? "Electron ThreadWindow command failed")
             }
         case .focus:
+            if let callbacks = pendingOpenCallbacks.removeValue(forKey: result.commandId) {
+                if result.ok {
+                    isOpen = true
+                    callbacks.onOpened()
+                } else {
+                    isOpen = false
+                    callbacks.onFailed(result.error ?? "Electron ThreadWindow command failed")
+                }
+                return
+            }
             guard let onFailure = pendingFocusFailures.removeValue(forKey: result.commandId) else {
                 return
             }

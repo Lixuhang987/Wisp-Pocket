@@ -48,7 +48,7 @@ PromptPanelGrowingTextView command
 - Return 提交完整 `inputItems + attachments`；如果只有 skill chip 没有文本，也可以提交。
 - 手写 trigger 或 `[name: value]` 不再有特殊语义，只是普通文本。
 
-提交后由 Coordinator 通过 Electron initial prompt payload 发送 `PromptUserInput.items`。React 收到后创建 thread，并发送首轮 `op.submit(UserInput)`。`thread.start` 不携带 action binding。
+提交后由 Coordinator 调用 Swift `/api/thread` client，先发送带默认 dynamic tools 的 `thread.start`，收到 `thread.started` 后发送首轮 `op.submit(UserInput)`，再让 Electron open/focus 对应 React ThreadWindow。`thread.start` 不携带 action binding。
 
 ## 编辑此目录的约束
 
@@ -58,7 +58,7 @@ PromptPanelGrowingTextView command
 - **后台热键展示语义**：`show()` 负责所有“后台宿主 -> PromptPanel”入口的前台展示，包括 `showPromptPanel`、用户主动 capture 和 Action 全局快捷键。宿主仍是 `.accessory` 时，Controller 必须先做最小宿主激活，再展示 `.nonactivatingPanel`；宿主已经是 `.regular` 时，不得再次激活整个 App，避免把 Settings 等无关窗口一起带到前台。
 - **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加输入框下方 chip row 中的 skill chip 并显示 PromptPanel。
 - **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
-- **焦点语义**：凡是从 PromptPanel 把控制权切给 Electron ThreadWindow 的路径，都必须避免恢复旧前台应用。提交 prompt 时，Coordinator 必须在发送 `thread_window.open_initial_prompt` 前调用 `hide(restoringFocus: false)`；PromptPanel 仍可见时若触发 `openHistory`，也必须先 `hide(restoringFocus: false)` 再发送 `thread_window.open_history`。
+- **焦点语义**：凡是从 PromptPanel 把控制权切给 Electron ThreadWindow 的路径，都必须避免恢复旧前台应用。提交 prompt 时，Coordinator 必须先调用 `hide(restoringFocus: false)`，再发起 Swift `/api/thread` 首轮提交并在拿到 `threadId` 后聚焦 Electron ThreadWindow；PromptPanel 仍可见时若触发 `openHistory`，也必须先 `hide(restoringFocus: false)` 再发送 `thread_window.open_history`。
 - **首次 handoff 是高频回归点**：上面这条不能退化成”最终调用过 hide 就行”，而必须保证顺序是”先 hide(restoringFocus: false)，再 open/focus ThreadWindow”。这个 bug 已多次出现；以后改 PromptPanel 焦点恢复或失焦自动隐藏时，必须把它当强制回归项。
 - **server 不可用时不丢草稿**：`submissionDisabledMessage != nil` 时输入框禁用并显示提示，`submit()` 直接返回，不清空 `inputItems` / `attachments`。
 - **滚动条样式走 Shared**：PromptPanel 输入框内部 `NSScrollView` 与 action 列表 `ScrollView` 都复用 `Sources/Shared/OverlayScrollbar.swift`；不要在 `PromptPanelStyles.swift` 再维护一份局部滚动条实现。`OverlayScrollbar` 需要同时把 `NSScrollView` 和其 `contentView` 设为透明，并按 overlay 所在区域与各 `NSScrollView` 的几何重叠选择目标；对 SwiftUI `HostingScrollView` 还要在首次更新后做一次短延迟重试，覆盖系统 scroller 的后置装配。
@@ -69,6 +69,6 @@ PromptPanelGrowingTextView command
 ## 与其他模块的关系
 
 - 由 [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 持有并注入 actions。
-- 提交 prompt 后由 Coordinator 通过 [ElectronThreadWindowLifecycle](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/ElectronThreadWindowLifecycle.swift) 发送 `thread_window.open_initial_prompt`。
+- 提交 prompt 后由 Coordinator 通过 [SwiftThreadClient](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/AgentServer/SwiftThreadClient.swift) 直连 `/api/thread` 创建并提交首轮输入，再通过 [ElectronThreadWindowLifecycle](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/ElectronThreadWindowLifecycle.swift) 按 `threadId` 聚焦 Electron ThreadWindow。
 - [AgentServer](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/AgentServer/agent-server.md) 可用性变化会同步到 `setSubmissionEnabled`。
 - 全局热键来自 [AppServices/Hotkey](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/Hotkey/hotkey.md)。

@@ -54,7 +54,7 @@
 
 - `mcp.json` 中配置的所有 server 默认作为**全局** MCP server，会被注入每个 thread 的 tool registry。
 - MCP exposed tool name 统一为 `mcp.<serverId>.<toolName>`，避免与 builtin tool 冲突。
-- `computer_use` / `computer-use` server id 是兼容例外：agent-server 保留 `mcp.<serverId>.*` 的注入形态，但 client 由 HandAgent 原生 `ComputerUseMCPClient` 接管，底层通过 PlatformBridge 调用本机能力。这样可以兼容 Codex bundled Computer Use 的配置，同时避免直接 spawn Codex 私有 Computer Use MCP 后在 `tools/call` 阶段挂起。
+- `computer_use` / `computer-use` 不再有 HandAgent 原生兼容 client；如需使用，必须在 `~/.spotAgent/mcp.json` 中配置真实 MCP transport。macOS host 能力走 Swift dynamic tools，不走 MCP 兼容层。
 - stdio server 可配置 `cwd`；也可配置 `requestTimeoutMs`，默认 60s，避免外部 server 卡死时拖挂当前 thread run。
 - stdio server 可配置 `elicitation.autoAcceptEmptyForm: true`。该选项只自动接受 `requestedSchema` 为空对象且无必填字段的 form-mode `elicitation/create`，用于 Computer Use 这类本地 App 授权握手；带字段表单或 URL mode 仍返回 decline，不代替用户填写敏感信息或打开外部 URL。
 - stdio 与 Streamable HTTP 的 JSON-RPC 编码、初始化握手、session header、SSE 响应处理和 transport lifecycle 由官方 `@modelcontextprotocol/sdk` 承担；本模块只保留 HandAgent 配置、DTO 转换和 timeout 文案。

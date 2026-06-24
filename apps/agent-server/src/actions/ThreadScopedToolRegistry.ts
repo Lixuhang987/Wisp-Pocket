@@ -1,17 +1,24 @@
 import type { AgentTool } from "@handagent/core/tools/AgentTool.ts";
 import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
 import { MetaToolUseTool } from "@handagent/core/tools/MetaToolUseTool.ts";
+import type {
+  DynamicToolBridge,
+  DynamicToolSpec,
+} from "@handagent/core/protocol/DynamicTool.ts";
+import { DynamicToolAdapter } from "@handagent/core/tools/DynamicToolAdapter.ts";
 
 export class ThreadScopedToolRegistry {
   private readonly metaTool: AgentTool = MetaToolUseTool.create();
   private readonly activated = new Set<string>();
   private readonly registries = new Map<string, ToolRegistry>();
+  private readonly dynamicToolsByThread = new Map<string, DynamicToolSpec[]>();
 
   constructor(
     private readonly options: {
       builtinRegistry: ToolRegistry;
       globalMcpServerIds: string[];
       listMcpTools: (serverId: string) => Promise<AgentTool[]>;
+      dynamicToolBridge?: DynamicToolBridge;
       exposeBuiltinToolsBeforeActivation?: boolean;
     },
     private readonly dependencies: {
@@ -40,6 +47,10 @@ export class ThreadScopedToolRegistry {
     await this.refreshActivated(threadId, this.registryForThread(threadId));
   }
 
+  setDynamicTools(threadId: string, tools: DynamicToolSpec[]): void {
+    this.dynamicToolsByThread.set(threadId, tools.map((tool) => ({ ...tool })));
+  }
+
   isActivated(threadId: string): boolean {
     return this.activated.has(threadId);
   }
@@ -56,13 +67,13 @@ export class ThreadScopedToolRegistry {
   forgetThread(threadId: string): void {
     this.activated.delete(threadId);
     this.registries.delete(threadId);
+    this.dynamicToolsByThread.delete(threadId);
   }
 
   private async refreshActivated(
     threadId: string,
     registry: ToolRegistry,
   ): Promise<void> {
-    void threadId;
     const tools: AgentTool[] = [...this.options.builtinRegistry.all()];
 
     const serverIds = new Set(this.options.globalMcpServerIds);
@@ -78,7 +89,15 @@ export class ThreadScopedToolRegistry {
       }
     }
 
+    tools.push(...this.dynamicToolAdaptersForThread(threadId));
     this.replaceWithUniqueTools(registry, tools);
+  }
+
+  private dynamicToolAdaptersForThread(threadId: string): AgentTool[] {
+    const specs = this.dynamicToolsByThread.get(threadId) ?? [];
+    if (specs.length === 0) return [];
+    const bridge = this.options.dynamicToolBridge ?? offlineDynamicToolBridge;
+    return specs.map((spec) => new DynamicToolAdapter(spec, bridge));
   }
 
   private replaceWithUniqueTools(registry: ToolRegistry, tools: AgentTool[]): void {
@@ -91,3 +110,18 @@ export class ThreadScopedToolRegistry {
     registry.replaceAll([...byName.values()]);
   }
 }
+
+const offlineDynamicToolBridge: DynamicToolBridge = {
+  async call(payload) {
+    return {
+      callId: payload.callId,
+      success: false,
+      contentItems: [
+        {
+          type: "inputText",
+          text: `Dynamic tool provider is offline: ${payload.clientId}`,
+        },
+      ],
+    };
+  },
+};

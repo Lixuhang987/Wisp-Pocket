@@ -5,8 +5,18 @@ const nodeRequire = createRequire(import.meta.url);
 const preloadPath = nodeRequire.resolve("../../dist/preload/threadWindowPreload.cjs");
 
 type MainWorldScript = {
-  func: (url: string, theme: HostTheme, skills: Array<{ actionId: string; title: string; prompt: string; description?: string }>) => void;
-  args: [string, HostTheme, Array<{ actionId: string; title: string; prompt: string; description?: string }>];
+  func: (
+    url: string,
+    theme: HostTheme,
+    skills: Array<{ actionId: string; title: string; prompt: string; description?: string }>,
+    dynamicTools: DynamicToolSpec[],
+  ) => void;
+  args: [
+    string,
+    HostTheme,
+    Array<{ actionId: string; title: string; prompt: string; description?: string }>,
+    DynamicToolSpec[],
+  ];
 };
 
 type HostTheme = {
@@ -14,11 +24,20 @@ type HostTheme = {
   resolved: "light" | "dark";
 };
 
+type DynamicToolSpec = {
+  clientId: string;
+  namespace?: string;
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+};
+
 type ThreadWindowGlobals = {
-  handAgentThreadWindowConfig?: {
-    threadWebSocketURL?: string;
-    availableSkills?: Array<{ actionId: string; title: string; prompt: string; description?: string }>;
-  };
+    handAgentThreadWindowConfig?: {
+      threadWebSocketURL?: string;
+      availableSkills?: Array<{ actionId: string; title: string; prompt: string; description?: string }>;
+      defaultDynamicTools?: DynamicToolSpec[];
+    };
   handAgentTheme?: HostTheme;
   handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
   handAgentPendingInitialPrompts?: unknown[];
@@ -31,6 +50,7 @@ describe("threadWindowPreload", () => {
     delete nodeRequire.cache[preloadPath];
     delete (globalThis as { window?: ThreadWindowGlobals }).window;
     process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-theme="));
+    process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-default-dynamic-tools="));
   });
 
   it("installs thread window globals in the renderer main world", async () => {
@@ -51,7 +71,7 @@ describe("threadWindowPreload", () => {
     mainWorld.handAgentReceiveInitialPrompt?.({ clientRequestId: "prompt-1" });
 
     expect(mainWorld.handAgentThreadWindowConfig?.threadWebSocketURL).toBe(
-      "ws://127.0.0.1:4317/api/thread",
+      "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1",
     );
     expect(mainWorld.handAgentTheme).toEqual({ preference: "system", resolved: "light" });
     expect(mainWorld.handAgentPendingInitialPrompts).toEqual([{ clientRequestId: "prompt-1" }]);
@@ -124,6 +144,41 @@ describe("threadWindowPreload", () => {
 
     expect(mainWorld.handAgentThreadWindowConfig?.availableSkills).toEqual([
       { actionId: "review/code", title: "Review", prompt: "Review this code" },
+    ]);
+  });
+
+  it("reads default dynamic tools from preload arguments", async () => {
+    const contextBridge = {
+      executeInMainWorld: vi.fn(),
+      exposeInMainWorld: vi.fn(),
+    };
+    process.argv.push(`--handagent-default-dynamic-tools=${encodeURIComponent(JSON.stringify([
+      {
+        clientId: "swift-host",
+        namespace: "host_macos",
+        name: "screen_capture",
+        description: "Capture screen",
+        inputSchema: { type: "object", properties: {} },
+      },
+    ]))}`);
+    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => {
+      nodeRequire(preloadPath);
+    });
+
+    const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
+    const mainWorld: ThreadWindowGlobals = {};
+    (globalThis as { window?: ThreadWindowGlobals }).window = mainWorld;
+
+    script.func(...script.args);
+
+    expect(mainWorld.handAgentThreadWindowConfig?.defaultDynamicTools).toEqual([
+      {
+        clientId: "swift-host",
+        namespace: "host_macos",
+        name: "screen_capture",
+        description: "Capture screen",
+        inputSchema: { type: "object", properties: {} },
+      },
     ]);
   });
 

@@ -1,5 +1,8 @@
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
+
+export type { DynamicToolSpec };
 
 export type ThreadId = string;
 
@@ -22,12 +25,6 @@ export type ThreadStoreError = {
 export type ThreadStoreResult<T = void> =
   | { ok: true; value: T }
   | { ok: false; error: ThreadStoreError };
-
-export type DynamicToolSpec = {
-  name: string;
-  description?: string;
-  inputSchema?: Record<string, unknown>;
-};
 
 export type CreateThreadParams = {
   threadId: ThreadId;
@@ -94,6 +91,7 @@ export type ThreadMetadata = {
   updatedAt: string;
   messageCount: number;
   workspaceId: string | null;
+  dynamicTools?: DynamicToolSpec[];
 };
 
 export type ThreadSummary = Pick<

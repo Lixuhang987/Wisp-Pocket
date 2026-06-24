@@ -3,7 +3,8 @@ import Foundation
 @MainActor
 final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, ActivityWindowCommanding, AgentTriggerCommanding {
     private let shell: any ElectronShellProcessing
-    private let platformClient: PlatformBridgeConnectionClient?
+    private let dynamicToolClient: DynamicToolProviderConnectionClient?
+    private let swiftThreadClient: (any SwiftThreadSubmitting)?
     private var hasAgentServerHealth = false
     private var hasPreparedThreadWindow = false
     private var lastPublishedAvailability = false
@@ -33,10 +34,12 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
 
     init(
         shell: any ElectronShellProcessing,
-        platformClient: PlatformBridgeConnectionClient?
+        dynamicToolClient: DynamicToolProviderConnectionClient? = nil,
+        swiftThreadClient: (any SwiftThreadSubmitting)? = nil
     ) {
         self.shell = shell
-        self.platformClient = platformClient
+        self.dynamicToolClient = dynamicToolClient
+        self.swiftThreadClient = swiftThreadClient
     }
 
     func start() {
@@ -74,8 +77,8 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
         pendingAgentTriggerCommandKinds.removeAll()
-        pendingAgentTriggerCommandKinds.removeAll()
-        platformClient?.disconnect()
+        dynamicToolClient?.disconnect()
+        swiftThreadClient?.disconnect()
         shell.stop()
         hasAgentServerHealth = false
         hasPreparedThreadWindow = false
@@ -145,11 +148,13 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             hasAgentServerHealth = available
             if available {
                 agentServerErrorMessage = nil
-                platformClient?.connect()
+                dynamicToolClient?.connect()
+                swiftThreadClient?.connect()
                 publishAvailability()
             } else {
                 agentServerErrorMessage = message ?? "Electron agent-server 不可用"
-                platformClient?.disconnect()
+                dynamicToolClient?.disconnect()
+                swiftThreadClient?.disconnect()
                 publishAvailability(force: true)
             }
 
@@ -178,7 +183,8 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         case .rendererCrashed(.thread, let reason):
             threadWindowErrorMessage = reason
             hasAgentServerHealth = false
-            platformClient?.disconnect()
+            dynamicToolClient?.disconnect()
+            swiftThreadClient?.disconnect()
             onFatalError?(reason)
             publishAvailability(force: true)
 
@@ -208,10 +214,11 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             isRunning = false
             hasAgentServerHealth = false
             hasPreparedThreadWindow = false
-            platformClient?.disconnect()
+            dynamicToolClient?.disconnect()
+            swiftThreadClient?.disconnect()
             pendingCommandKinds.removeAll()
             pendingActivityCommandKinds.removeAll()
-        pendingAgentTriggerCommandKinds.removeAll()
+            pendingAgentTriggerCommandKinds.removeAll()
             publishAvailability(force: lastPublishedAvailability)
             onHostTerminationRequest?()
             return
@@ -220,7 +227,8 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         agentServerErrorMessage = message
         hasAgentServerHealth = false
         hasPreparedThreadWindow = false
-        platformClient?.disconnect()
+        dynamicToolClient?.disconnect()
+        swiftThreadClient?.disconnect()
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
         pendingAgentTriggerCommandKinds.removeAll()

@@ -29,13 +29,13 @@ captureRegion 热键
             └─ error(message)   → PromptPanelController.appendAttachment(.selectionError(...))
 ```
 
-附件提交后由 Coordinator 通过 `PromptSubmission.compose(...)` 组装为 `UserInput.items` 与摘要，再通过 `thread_window.open_initial_prompt` command 交给 Electron main。React ThreadWindow 收到 initial prompt 后先通过 `/api/thread` 发送 `thread.start`，收到 `thread.started` 后再发送首轮 `op.submit(UserInput)`；其中 `text_selection` / `image` 均作为 `InputItem` 进入 `UserInput.items`。
+附件提交后由 Coordinator 通过 `PromptSubmission.compose(...)` 组装为 `UserInput.items` 与摘要。生产 PromptPanel 路径由 Swift `/api/thread` client 先发送带默认 dynamic tools 的 `thread.start`，收到 `thread.started` 后发送首轮 `op.submit(UserInput)`，再让 Electron open/focus 对应 React ThreadWindow；其中 `text_selection` / `image` 均作为 `InputItem` 进入 `UserInput.items`。
 
 ## 设计备注
 
 - 当前两条用户主动采集路径都使用 macOS 命令行能力，原因如下：
   - **文本选区**：macOS 没有公开「读当前应用的当前选区」API，可用方案是 Accessibility API（需 a11y 权限 + 应用支持）或合成 Cmd-C。当前选 osascript Cmd-C，因为不需要额外权限弹窗，适合 MVP。后续可在用户授予 Accessibility 权限后切到 AX 路径以避免污染剪贴板。
-  - **区域截图**：用户主动触发的圈选保留 `screencapture -i`。这是系统提供的交互式区域选择入口，取消时能自然返回 `RegionCaptureResult.cancelled`，且不会把屏幕内容默认注入 LLM。LLM 通过 tool 主动请求的 `screen.capture` 仍归属 [PlatformBridge](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)，使用 ScreenCaptureKit 路径。
+  - **区域截图**：用户主动触发的圈选保留 `screencapture -i`。这是系统提供的交互式区域选择入口，取消时能自然返回 `RegionCaptureResult.cancelled`，且不会把屏幕内容默认注入 LLM。LLM 通过 tool 主动请求的 `host_macos.screen_capture` 仍归属 [Host Dynamic Tools](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)，使用 ScreenCaptureKit 路径。
 - 两个 Provider 都是 `Sendable` 协议、可注入；测试用 stub 实现替代即可。
 - 临时文件失败不抛异常，统一映射成 `RegionCaptureResult.error`。
 - 文本选区路径 120ms 等待是经验值；过短会读不到剪贴板，过长用户能感知到延迟。
@@ -43,6 +43,6 @@ captureRegion 热键
 
 ## 编辑此目录的约束
 
-- 不要在此目录新增 tool 化的「screen.capture」或「accessibility.read」实现，那是 [PlatformBridge](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md) 的职责。
+- 不要在此目录新增 tool 化的「host_macos.screen_capture」或「host_macos.accessibility_snapshot」实现，那是 [Host Dynamic Tools](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md) 的职责。
 - 不要把 Provider 的结果直接发给 agent-server，必须让 PromptPanel 展示 chip。
 - 新增采集路径请同时新增对应的 `PromptAttachmentResult` case 与 `InputItem` case，并保持两者一一映射。

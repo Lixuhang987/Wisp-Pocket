@@ -3,6 +3,7 @@ import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
 import { FilesystemBlobStore } from "@handagent/core/blob/FilesystemBlobStore.ts";
 import type { UserInput } from "@handagent/core/protocol/Op.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
 import {
   CurrentThread,
   ThreadStore,
@@ -20,6 +21,12 @@ import {
   deriveTitle,
 } from "../protocol/MessageTranslator.ts";
 
+export type CreatePersistedThreadInput = {
+  preview?: string | null;
+  workspaceId?: string | null;
+  dynamicTools?: DynamicToolSpec[];
+};
+
 export class ThreadPersistence {
   private readonly currentThreads = new Map<string, CurrentThread>();
 
@@ -29,15 +36,13 @@ export class ThreadPersistence {
     private readonly blobStore: BlobStore = new FilesystemBlobStore(),
   ) {}
 
-  async createThread(
-    preview?: string,
-    workspaceId?: string | null,
-  ): Promise<PersistedThread> {
+  async createThread(input: CreatePersistedThreadInput = {}): Promise<PersistedThread> {
     const id = generateThreadId();
     const current = await this.createCurrentThread({
       threadId: id,
-      preview,
-      workspaceId,
+      preview: input.preview,
+      workspaceId: input.workspaceId,
+      dynamicTools: input.dynamicTools,
       timestamp: this.now(),
       threadSource: "user",
       originator: "user",

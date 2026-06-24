@@ -5,6 +5,13 @@ import type { ThreadPersistence } from "./ThreadPersistence.ts";
 import type { AgentManager, Agent } from "../agent/AgentManager.ts";
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { AgentTriggerAttentionPublisher } from "./AgentTriggerAttentionPublisher.ts";
+import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
+import { DEFAULT_HOST_MACOS_DYNAMIC_TOOLS } from "@handagent/core/protocol/HostDynamicTools.ts";
+
+type AgentTriggerLaunchServiceOptions = {
+  defaultDynamicTools?: DynamicToolSpec[];
+  onThreadDynamicTools?: (threadId: string, dynamicTools: DynamicToolSpec[]) => void;
+};
 
 export class AgentTriggerLaunchService {
   constructor(
@@ -14,11 +21,19 @@ export class AgentTriggerLaunchService {
     private readonly publisher: ThreadNotificationPublisher,
     private readonly attentionPublisher: AgentTriggerAttentionPublisher,
     private readonly now: () => string = () => new Date().toISOString(),
+    private readonly options: AgentTriggerLaunchServiceOptions = {},
   ) {}
 
   async fire(request: AgentTriggerFireRequest): Promise<AgentTriggerFireResult> {
-    const thread = await this.persistence.createThread(request.threadTitleHint ?? request.sourceEvent.summary);
+    const dynamicTools = cloneDynamicTools(
+      this.options.defaultDynamicTools ?? DEFAULT_HOST_MACOS_DYNAMIC_TOOLS,
+    );
+    const thread = await this.persistence.createThread({
+      preview: request.threadTitleHint ?? request.sourceEvent.summary,
+      dynamicTools,
+    });
     const threadId = thread.metadata.id;
+    this.options.onThreadDynamicTools?.(threadId, dynamicTools);
     this.attentionPublisher.registerTriggerThread(
       threadId,
       request.triggerInstanceId,
@@ -50,4 +65,11 @@ export class AgentTriggerLaunchService {
     };
     this.publisher.publish(event);
   }
+}
+
+function cloneDynamicTools(tools: DynamicToolSpec[]): DynamicToolSpec[] {
+  return tools.map((tool) => ({
+    ...tool,
+    inputSchema: { ...tool.inputSchema },
+  }));
 }

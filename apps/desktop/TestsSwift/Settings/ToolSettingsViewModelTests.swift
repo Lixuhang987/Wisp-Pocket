@@ -12,7 +12,7 @@ final class ToolSettingsViewModelTests: XCTestCase {
             """
             {
               "tools": {
-                "denylist": ["screen.capture"]
+                "denylist": ["file.read"]
               }
             }
             """
@@ -21,8 +21,8 @@ final class ToolSettingsViewModelTests: XCTestCase {
         let store = AgentSettingsStore(homeDirectoryURL: homeURL)
         let viewModel = ToolSettingsViewModel(store: store)
 
-        XCTAssertFalse(viewModel.isEnabled("screen.capture"))
-        XCTAssertTrue(viewModel.isEnabled("clipboard.read"))
+        XCTAssertFalse(viewModel.isEnabled("file.read"))
+        XCTAssertTrue(viewModel.isEnabled("file.write"))
     }
 
     @MainActor
@@ -47,8 +47,8 @@ final class ToolSettingsViewModelTests: XCTestCase {
             """
             {
               "tools": {
-                "allowlist": ["clipboard.read"],
-                "denylist": ["screen.capture"]
+                "allowlist": ["file.write"],
+                "denylist": ["file.read"]
               }
             }
             """
@@ -57,11 +57,10 @@ final class ToolSettingsViewModelTests: XCTestCase {
         let store = AgentSettingsStore(homeDirectoryURL: homeURL)
         let viewModel = ToolSettingsViewModel(store: store)
 
-        viewModel.setEnabled("screen.capture", enabled: true)
         viewModel.setEnabled("file.read", enabled: true)
 
         XCTAssertEqual(store.toolSettings.denylist, [])
-        XCTAssertEqual(store.toolSettings.allowlist, ["clipboard.read", "file.read", "screen.capture"])
+        XCTAssertEqual(store.toolSettings.allowlist, ["file.read", "file.write"])
     }
 
     @MainActor
@@ -70,13 +69,6 @@ final class ToolSettingsViewModelTests: XCTestCase {
         let viewModel = ToolSettingsViewModel(store: store)
 
         XCTAssertEqual(viewModel.tools.map(\.name), [
-            "clipboard.read",
-            "app.frontmost",
-            "window.list",
-            "screen.capture",
-            "ocr.read",
-            "accessibility.snapshot",
-            "accessibility.action",
             "workspace.list",
             "file.read",
             "file.write",

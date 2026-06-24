@@ -30,7 +30,7 @@
   - 历史保存顺序：明确 thread history 初始输入、hook 注入内容与后续消息的持久化顺序。
   - MCP server 激活来源：除全局配置外，后续可由动态 tool / skill 声明启用。
 - 补一轮端到端实机验证：thread 创建、thread 恢复、thread 列表、thread 删除、turn 中断、permission / workspace 回流。
-- 补一轮端到端实机验证：React ThreadWindow 只通过 `/api/thread` 承载 thread/turn 主协议，Swift 宿主只通过 `/api/platform` 承载 `PlatformBridgeMessage`，确认两条 WebSocket 独立且互不污染。
+- 补一轮端到端实机验证：React ThreadWindow 只通过 `/api/thread?acceptServerRequests=1` 承载 thread/turn 主协议与交互式请求，Swift PromptPanel 直连 `/api/thread` 创建 thread 并提交首轮输入，Swift host provider 只通过 `/api/dynamic-tools` 承载 dynamic tool request / response，确认旧 `/api/platform` 不再可用。
 
 ---
 

@@ -79,6 +79,7 @@ describe("ThreadRuntimeOrchestrator", () => {
     const pushed: ThreadNotification[] = [];
     const runtimeCalls: AgentMessage[][] = [];
     const runSignals: AbortSignal[] = [];
+    const runTurnIds: Array<string | undefined> = [];
     const firstRunGate = createDeferred();
     const persistence = new ThreadPersistence(
       testStore(),
@@ -88,6 +89,7 @@ describe("ThreadRuntimeOrchestrator", () => {
       {
         async runWithMessages(messages, _onEvent, runOptions) {
           runtimeCalls.push(stripUserInputItems(messages.map((message) => ({ ...message }))));
+          runTurnIds.push(runOptions?.turnId);
           if (runOptions?.signal) {
             runSignals.push(runOptions.signal);
           }
@@ -119,6 +121,7 @@ describe("ThreadRuntimeOrchestrator", () => {
       (message) => pushed.push(message),
     );
     await waitUntil(() => runtimeCalls.length === 1, "first runtime call");
+    expect(runTurnIds[0]).toBe("user-1");
 
     await orchestrator.submitInput(
       createUserMessage("thread-steer", "second", "user-2"),

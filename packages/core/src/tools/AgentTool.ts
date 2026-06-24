@@ -2,6 +2,7 @@ export type AgentToolInputSchema = Record<string, unknown>;
 
 export type AgentToolCallContext = {
   threadId?: string;
+  turnId?: string;
   toolCallId?: string;
 };
 
