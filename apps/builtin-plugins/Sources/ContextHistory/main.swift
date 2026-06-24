@@ -12,16 +12,12 @@ let collector = ContextHistoryCollector(
     store: ContextHistoryStore(directoryURL: directory),
     capabilityClient: LocalManifestPluginPeerClient()
 )
+let scheduler = ContextHistorySamplingScheduler(collector: collector)
 
 Task.detached {
-    var tick = 0
     while !Task.isCancelled {
-        let sample = try? await collector.collectActivitySample()
-        tick += 1
-        if tick % 2 == 0 {
-            _ = try? await collector.collectScreenshot(sampleId: sample?.id)
-        }
-        try? await Task.sleep(for: .seconds(30))
+        _ = try? await scheduler.tick()
+        try? await Task.sleep(for: .seconds(5))
     }
 }
 

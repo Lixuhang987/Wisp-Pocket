@@ -2,6 +2,41 @@ import XCTest
 @testable import HandAgentPluginSupport
 
 final class ContextHistoryPluginCoreTests: XCTestCase {
+    func testSamplingSchedulerRecordsChangesPeriodicSamplesAndMinuteScreenshots() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("context-history-scheduler-tests-\(UUID().uuidString)", isDirectory: true)
+        let store = ContextHistoryStore(directoryURL: directory)
+        let collector = ContextHistoryCollector(
+            store: store,
+            capabilityClient: SequenceContextHistoryCapabilityClient(frontmostResponses: [
+                frontmost(bundleId: "com.apple.Safari", windowId: 1, title: "One"),
+                frontmost(bundleId: "com.apple.Safari", windowId: 1, title: "One"),
+                frontmost(bundleId: "com.apple.Safari", windowId: 2, title: "Two"),
+                frontmost(bundleId: "com.apple.Safari", windowId: 2, title: "Two"),
+                frontmost(bundleId: "com.apple.Safari", windowId: 2, title: "Two"),
+            ])
+        )
+        let scheduler = ContextHistorySamplingScheduler(collector: collector)
+
+        let first = try await scheduler.tick(now: Date(timeIntervalSince1970: 0))
+        let unchanged = try await scheduler.tick(now: Date(timeIntervalSince1970: 5))
+        let changed = try await scheduler.tick(now: Date(timeIntervalSince1970: 10))
+        let beforePeriod = try await scheduler.tick(now: Date(timeIntervalSince1970: 35))
+        let periodic = try await scheduler.tick(now: Date(timeIntervalSince1970: 61))
+
+        XCTAssertNotNil(first.activitySampleId)
+        XCTAssertNil(unchanged.activitySampleId)
+        XCTAssertNotNil(changed.activitySampleId)
+        XCTAssertNil(beforePeriod.activitySampleId)
+        XCTAssertNotNil(periodic.activitySampleId)
+        XCTAssertNotNil(periodic.screenshotId)
+        let activities = try store.loadActivities()
+        let screenshots = try store.loadScreenshots()
+        XCTAssertEqual(activities.count, 3)
+        XCTAssertEqual(screenshots.count, 1)
+        XCTAssertEqual(screenshots[0].sampleId, periodic.activitySampleId)
+    }
+
     func testCollectorWritesActivityAndScreenshotThenToolsReturnLayeredResults() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("context-history-tests-\(UUID().uuidString)", isDirectory: true)
@@ -71,6 +106,57 @@ final class ContextHistoryPluginCoreTests: XCTestCase {
         return object
     }
 }
+
+private func frontmost(bundleId: String, windowId: Int, title: String) -> [String: Any] {
+    [
+        "app": [
+            "name": "Safari",
+            "bundleId": bundleId,
+            "pid": 123,
+        ],
+        "window": [
+            "id": windowId,
+            "title": title,
+            "appName": "Safari",
+        ],
+    ]
+}
+
+private final class SequenceContextHistoryCapabilityClient: ContextHistoryCapabilityCalling {
+    private var frontmostResponses: [[String: Any]]
+
+    init(frontmostResponses: [[String: Any]]) {
+        self.frontmostResponses = frontmostResponses
+    }
+
+    func call(namespace: String, tool: String, arguments: [String: Any]) async throws -> [String: Any] {
+        switch (namespace, tool) {
+        case ("app_window", "frontmost"):
+            if frontmostResponses.count > 1 {
+                return frontmostResponses.removeFirst()
+            }
+            return frontmostResponses[0]
+        case ("ax", "snapshot"):
+            return [
+                "role": "AXWindow",
+                "title": "Example",
+                "children": [
+                    ["role": "AXButton", "title": "Save"],
+                ],
+            ]
+        case ("screenshot", "capture"):
+            return [
+                "imageBase64": "original",
+                "thumbnailBase64": "thumbnail",
+                "width": 1440,
+                "height": 900,
+            ]
+        default:
+            throw NSError(domain: "SequenceContextHistoryCapabilityClient", code: 1)
+        }
+    }
+}
+
 private final class FakeContextHistoryCapabilityClient: ContextHistoryCapabilityCalling {
     func call(namespace: String, tool: String, arguments: [String: Any]) async throws -> [String: Any] {
         switch (namespace, tool) {

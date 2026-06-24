@@ -18,5 +18,6 @@
 - Context History 和 Automation runtime 需要原子能力时，通过 `LocalManifestPluginPeerClient` 读取 `~/.spotAgent/plugins` 中 enabled 的原子 plugin manifest，并用同一 JSON RPC envelope 调用对应 plugin。
 - `Context History` 与 `Automation` 默认关闭；原子 plugin 默认启用。用户启用对应 manifest 后，Swift desktop 才启动 always-on runtime 并把 tools 放入 dynamic tool 列表。
 - Context History 的数据写入 `~/.spotAgent/context-history`；Automation 的 policy、run、patch 写入 `~/.spotAgent/automation`。
+- Context History 采集调度会轮询前台 app/window：前台 app/window 变化时写 activity sample；未变化时按 30 秒周期补 sample；截图按 60 秒周期写入并关联最近 activity sample。
 - Automation 的 `record_start` / `record_stop` / `policy_create` 当前是 runtime API 与结构化存储骨架：可保存 trace payload、生成最小 policy、执行受限 AX policy 并记录 repair patch；尚不等同于真实用户操作录制或由 agent 自动归纳策略。
 - 当前原子 plugin 是 host capability 迁移起点；`host_macos.*` 仍保留，后续可在原子 plugin 稳定后逐步删除重复能力。

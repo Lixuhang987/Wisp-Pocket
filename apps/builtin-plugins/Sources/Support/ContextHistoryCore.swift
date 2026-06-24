@@ -233,6 +233,21 @@ public final class ContextHistoryCollector: @unchecked Sendable {
             tool: "frontmost",
             arguments: [:]
         )
+        return try await collectActivitySample(frontmost: frontmost, now: now)
+    }
+
+    func readFrontmost() async throws -> [String: Any] {
+        try await capabilityClient.call(
+            namespace: "app_window",
+            tool: "frontmost",
+            arguments: [:]
+        )
+    }
+
+    func collectActivitySample(
+        frontmost: [String: Any],
+        now: Date = Date()
+    ) async throws -> ContextHistoryActivitySample {
         let ax = try await capabilityClient.call(
             namespace: "ax",
             tool: "snapshot",
@@ -260,6 +275,85 @@ public final class ContextHistoryCollector: @unchecked Sendable {
             height: screenshot["height"] as? Int ?? 0,
             sampleId: sampleId
         )
+    }
+}
+
+public struct ContextHistorySamplingTickResult: Equatable {
+    public var activitySampleId: String?
+    public var screenshotId: String?
+
+    public init(activitySampleId: String?, screenshotId: String?) {
+        self.activitySampleId = activitySampleId
+        self.screenshotId = screenshotId
+    }
+}
+
+public final class ContextHistorySamplingScheduler: @unchecked Sendable {
+    private let collector: ContextHistoryCollector
+    private let periodicActivityInterval: TimeInterval
+    private let screenshotInterval: TimeInterval
+    private var lastActivitySignature: String?
+    private var lastActivityDate: Date?
+    private var lastActivitySampleId: String?
+    private var lastScreenshotDate: Date?
+
+    public init(
+        collector: ContextHistoryCollector,
+        periodicActivityInterval: TimeInterval = 30,
+        screenshotInterval: TimeInterval = 60
+    ) {
+        self.collector = collector
+        self.periodicActivityInterval = periodicActivityInterval
+        self.screenshotInterval = screenshotInterval
+    }
+
+    public func tick(now: Date = Date()) async throws -> ContextHistorySamplingTickResult {
+        let frontmost = try await collector.readFrontmost()
+        let signature = activitySignature(frontmost)
+        var activitySampleId: String?
+        var screenshotId: String?
+        if shouldCollectActivity(signature: signature, now: now) {
+            let sample = try await collector.collectActivitySample(frontmost: frontmost, now: now)
+            lastActivitySignature = signature
+            lastActivityDate = now
+            lastActivitySampleId = sample.id
+            activitySampleId = sample.id
+        }
+
+        if shouldCollectScreenshot(now: now) {
+            let screenshot = try await collector.collectScreenshot(now: now, sampleId: lastActivitySampleId)
+            lastScreenshotDate = now
+            screenshotId = screenshot.id
+        } else if lastScreenshotDate == nil {
+            lastScreenshotDate = now
+        }
+
+        return ContextHistorySamplingTickResult(
+            activitySampleId: activitySampleId,
+            screenshotId: screenshotId
+        )
+    }
+
+    private func shouldCollectActivity(signature: String, now: Date) -> Bool {
+        guard let lastActivitySignature, let lastActivityDate else { return true }
+        if signature != lastActivitySignature { return true }
+        return now.timeIntervalSince(lastActivityDate) >= periodicActivityInterval
+    }
+
+    private func shouldCollectScreenshot(now: Date) -> Bool {
+        guard let lastScreenshotDate else { return false }
+        return now.timeIntervalSince(lastScreenshotDate) >= screenshotInterval
+    }
+
+    private func activitySignature(_ frontmost: [String: Any]) -> String {
+        let app = stringDictionary(frontmost["app"])
+        let window = stringDictionary(frontmost["window"])
+        return [
+            app["bundleId"] ?? "",
+            app["pid"] ?? "",
+            window["id"] ?? "",
+            window["title"] ?? "",
+        ].joined(separator: "|")
     }
 }
 
