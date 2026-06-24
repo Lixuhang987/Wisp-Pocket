@@ -183,6 +183,55 @@ final class SwiftThreadClientTests: XCTestCase {
         let op = submitPayload?["op"] as? [String: Any]
         XCTAssertEqual(op?["type"] as? String, "user_input")
     }
+
+    func testSubmitInitialPromptIncludesPluginDynamicToolsFromProvider() async throws {
+        let transport = RecordingAppServerConnectionTransport()
+        let connection = AppServerConnection(
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/thread")!,
+            transport: transport,
+            reconnectDelay: 0
+        )
+        let client = SwiftThreadClient(
+            connection: connection,
+            dynamicToolsProvider: {
+                MacHostDynamicTools.toolSpecs + [[
+                    "clientId": "swift-host",
+                    "namespace": "screen_reader",
+                    "name": "snapshot",
+                    "description": "Read the current screen.",
+                    "inputSchema": ["type": "object"],
+                ]]
+            }
+        )
+        client.connect()
+
+        let task = Task { @MainActor in
+            try await client.submitInitialPrompt(makePromptSubmission("hello"))
+        }
+        await Task.yield()
+
+        let start = transport.tasks[0].sentObjects[0]
+        let startPayload = start["payload"] as? [String: Any]
+        let dynamicTools = startPayload?["dynamicTools"] as? [[String: Any]]
+        XCTAssertEqual(dynamicTools?.count, 9)
+        XCTAssertTrue(dynamicTools?.contains {
+            $0["namespace"] as? String == "screen_reader" && $0["name"] as? String == "snapshot"
+        } == true)
+
+        transport.tasks[0].succeedReceive(
+            """
+            {
+              "type": "thread.started",
+              "threadId": "thread-1",
+              "notificationId": "n1",
+              "commandId": "\(start["commandId"] as? String ?? "")",
+              "timestamp": "2026-06-24T00:00:00.000Z",
+              "payload": { "preview": null }
+            }
+            """
+        )
+        _ = try await task.value
+    }
 }
 
 @MainActor

@@ -60,6 +60,7 @@ struct AppServicesRuntime {
 @MainActor
 final class AppServices {
     static let initialThemeEnvironmentKey = "HANDAGENT_INITIAL_THEME"
+    static let defaultDynamicToolsEnvironmentKey = "HANDAGENT_DEFAULT_DYNAMIC_TOOLS"
 
     let appServer: any AppServerManaging
     let threadWindowCommandClient: any ThreadWindowCommanding
@@ -194,17 +195,22 @@ final class AppServices {
         dynamicToolServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
         threadServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/thread")!
     ) -> AppServicesRuntime {
+        let pluginManager = PluginDynamicToolManager()
+        pluginManager.reload()
+        let providerService = DynamicToolProviderService(pluginManager: pluginManager)
         let dynamicToolClient = DynamicToolProviderConnectionClient(
             connection: AppServerConnection(serverURL: dynamicToolServerURL),
-            providerService: DynamicToolProviderService()
+            providerService: providerService
         )
         let swiftThreadClient = SwiftThreadClient(
-            connection: AppServerConnection(serverURL: threadServerURL)
+            connection: AppServerConnection(serverURL: threadServerURL),
+            dynamicToolsProvider: { providerService.dynamicToolSpecs }
         )
 
         let configuration = defaultElectronShellLaunchConfiguration(
             environment: environment,
-            initialTheme: initialTheme
+            initialTheme: initialTheme,
+            defaultDynamicTools: providerService.dynamicToolSpecs
         )
         let shell = ElectronShellProcess(
             launchPath: configuration.launchPath,
@@ -229,6 +235,7 @@ final class AppServices {
     static func defaultElectronShellLaunchConfiguration(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         initialTheme: HostThemePayload? = nil,
+        defaultDynamicTools: [[String: Any]] = MacHostDynamicTools.toolSpecs,
         currentDirectoryURL: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
         bundleExecutableURL: URL? = Bundle.main.executableURL,
         bundleResourceURL: URL? = Bundle.main.resourceURL,
@@ -265,6 +272,11 @@ final class AppServices {
         if let initialThemeData = initialTheme.flatMap({ try? JSONEncoder().encode($0) }),
            let initialThemeJSON = String(data: initialThemeData, encoding: .utf8) {
             launchEnvironment[initialThemeEnvironmentKey] = initialThemeJSON
+        }
+        if JSONSerialization.isValidJSONObject(defaultDynamicTools),
+           let dynamicToolsData = try? JSONSerialization.data(withJSONObject: defaultDynamicTools),
+           let dynamicToolsJSON = String(data: dynamicToolsData, encoding: .utf8) {
+            launchEnvironment[defaultDynamicToolsEnvironmentKey] = dynamicToolsJSON
         }
 
         if let electronBinary = environment["HANDAGENT_ELECTRON_BINARY"].flatMap({ $0.isEmpty ? nil : $0 }) {

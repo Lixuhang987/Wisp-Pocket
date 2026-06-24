@@ -24,10 +24,15 @@ enum SwiftThreadClientError: Error, LocalizedError {
 @MainActor
 final class SwiftThreadClient: SwiftThreadSubmitting {
     private let connection: AppServerConnection
+    private let dynamicToolsProvider: @MainActor () -> [[String: Any]]
     private var pendingStarts: [String: CheckedContinuation<String, Error>] = [:]
 
-    init(connection: AppServerConnection) {
+    init(
+        connection: AppServerConnection,
+        dynamicToolsProvider: @escaping @MainActor () -> [[String: Any]] = { MacHostDynamicTools.toolSpecs }
+    ) {
         self.connection = connection
+        self.dynamicToolsProvider = dynamicToolsProvider
         connection.onTextMessage = { [weak self] text in
             Task { @MainActor in
                 self?.handleIncoming(raw: text)
@@ -64,7 +69,7 @@ final class SwiftThreadClient: SwiftThreadSubmitting {
                 "timestamp": timestamp,
                 "payload": [
                     "workspaceId": NSNull(),
-                    "dynamicTools": MacHostDynamicTools.toolSpecs,
+                    "dynamicTools": dynamicToolsProvider(),
                 ],
             ]))
         }

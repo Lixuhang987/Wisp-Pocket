@@ -513,6 +513,7 @@
   4. 在同一运行中触发 `file.write` 权限请求，确认 `permission.requested` 只显示在 React ThreadWindow，Swift 直连 thread client 不弹出或处理该交互式请求。
   5. 重启 App 后打开历史 thread，确认 thread metadata 中的 `dynamicTools` 可恢复；调用 `use_tools` 后仍能看到 `host_macos.*` 工具。
   6. 打开 Settings → 工具，确认只显示 `workspace.list`、`file.read`、`file.write` 等 core builtin 工具，不再显示旧 `clipboard.read`、`screen.capture` 等平台内置工具。
+  7. 在 `~/.spotAgent/plugins/qa-plugin/plugin.json` 放置 lifecycle 为 `toolsOnly` 的 plugin manifest，声明 `qa_plugin.echo` tool；重启 App 后通过 React 新建空白 thread 和 Swift PromptPanel 各创建一次 thread，确认 `thread.start.payload.dynamicTools` 都包含 `qa_plugin.echo`，调用后结果由 Swift plugin manager 回写，agent-server 进程树中不出现由 agent-server 直接 spawn 的 plugin 子进程。
   - 自动化验证：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 已通过。
 - 2026-06-19 plugin 残留清理完成后需补实机 QA：打开 Settings → 追加，点击“添加示例”或手动新建 Append Prompt，确认写入路径为 `~/.spotAgent/actions/append-prompts/action.json`；重启桌面 App 后 PromptPanel 仍能显示 `explain` / `sum` 等 action，并以 skill chip 追加到 `UserInput.items`。同时在 `~/.spotAgent/plugins/append-prompts/plugin.json` 放置旧 action manifest，确认当前 PromptPanel / ThreadWindow availableSkills 不再读取旧路径，避免与 2026-06-19 plugin system 的 `~/.spotAgent/plugins/<id>/plugin.json` 入口冲突。
 - 2026-06-09 观察：在历史侧栏搜索出 `HANDAGENT_REAL_PERMISSION_REPLAY_OCR5...` 后，Computer Use 直接触发该 AX row button 会打开删除确认；用鼠标点击 row 左侧正文区域可以正常打开 thread。该现象先记录为可访问性 / hit area 待观察点，不影响普通指针路径。

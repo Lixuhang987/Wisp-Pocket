@@ -1,11 +1,10 @@
 import Foundation
 
-@MainActor
 enum MacHostDynamicTools {
     static let clientId = "swift-host"
     static let namespace = "host_macos"
 
-    static let toolSpecs: [[String: Any]] = [
+    nonisolated(unsafe) static let toolSpecs: [[String: Any]] = [
         spec("clipboard_read", "Read text from the macOS clipboard."),
         spec("app_list", "List running macOS applications."),
         spec("app_frontmost", "Get the frontmost macOS application."),
@@ -48,9 +47,18 @@ final class DynamicToolProviderService {
     typealias Send = (String) -> Void
 
     private let provider: PlatformProvider
+    private let pluginManager: (any PluginDynamicToolManaging)?
 
-    init(provider: PlatformProvider = MacPlatformProvider()) {
+    init(
+        provider: PlatformProvider = MacPlatformProvider(),
+        pluginManager: (any PluginDynamicToolManaging)? = nil
+    ) {
         self.provider = provider
+        self.pluginManager = pluginManager
+    }
+
+    var dynamicToolSpecs: [[String: Any]] {
+        MacHostDynamicTools.toolSpecs + (pluginManager?.dynamicToolSpecs ?? [])
     }
 
     func makeHelloMessage() -> String {
@@ -58,7 +66,7 @@ final class DynamicToolProviderService {
             "channel": "dynamic_tools",
             "type": "provider_hello",
             "clientId": MacHostDynamicTools.clientId,
-            "tools": MacHostDynamicTools.toolSpecs,
+            "tools": dynamicToolSpecs,
         ])
     }
 
@@ -76,23 +84,55 @@ final class DynamicToolProviderService {
             let clientId = payload["clientId"] as? String,
             clientId == MacHostDynamicTools.clientId,
             let callId = payload["callId"] as? String,
-            let tool = payload["tool"] as? String,
-            let method = MacHostDynamicTools.platformMethod(for: tool)
+            let tool = payload["tool"] as? String
         else {
             return
         }
 
         let namespace = payload["namespace"] as? String
-        guard namespace == nil || namespace == MacHostDynamicTools.namespace else {
+        if namespace == nil || namespace == MacHostDynamicTools.namespace {
+            await handleHostTool(tool: tool, payload: payload, callId: callId, send: send)
+            return
+        }
+
+        if let result = await pluginManager?.handleTool(
+            namespace: namespace,
+            tool: tool,
+            callId: callId,
+            arguments: payload["arguments"]
+        ) {
             sendResponse(
                 callId: callId,
-                success: false,
-                text: "Unsupported dynamic tool namespace: \(namespace ?? "")",
+                success: result.success,
+                contentItems: result.contentItems,
                 send: send
             )
             return
         }
 
+        sendResponse(
+            callId: callId,
+            success: false,
+            text: "Unsupported dynamic tool namespace: \(namespace ?? "")",
+            send: send
+        )
+    }
+
+    private func handleHostTool(
+        tool: String,
+        payload: [String: Any],
+        callId: String,
+        send: @escaping Send
+    ) async {
+        guard let method = MacHostDynamicTools.platformMethod(for: tool) else {
+            sendResponse(
+                callId: callId,
+                success: false,
+                text: "Unsupported host dynamic tool: \(tool)",
+                send: send
+            )
+            return
+        }
         do {
             let result = try await provider.handle(method: method, args: payload["arguments"])
             sendResponse(
@@ -130,12 +170,24 @@ final class DynamicToolProviderService {
             "payload": [
                 "callId": callId,
                 "success": success,
-                "contentItems": [
-                    [
-                        "type": "inputText",
-                        "text": text,
-                    ],
-                ],
+                "contentItems": [["type": "inputText", "text": text]],
+            ],
+        ]))
+    }
+
+    private func sendResponse(
+        callId: String,
+        success: Bool,
+        contentItems: [[String: Any]],
+        send: Send
+    ) {
+        send(encodeJSON([
+            "channel": "dynamic_tools",
+            "type": "tool_call_response",
+            "payload": [
+                "callId": callId,
+                "success": success,
+                "contentItems": contentItems,
             ],
         ]))
     }
