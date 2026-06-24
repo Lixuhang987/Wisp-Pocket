@@ -13,7 +13,6 @@
 - 在 `agent_server.health available=true` 与 `thread_window.prepared` 同时成立后，向 `AgentServerHealth` 暴露可提交状态。
 - 作为 `ThreadWindowCommanding` 实现，只接收 Coordinator 的 openInitialPrompt/openHistory/focus/themeChanged 意图；`theme.changed` 不参与 ThreadWindow 可用性 gate。启动初值由 `HANDAGENT_INITIAL_THEME` 提供，运行中变化仍由 `theme.changed` command 提供。
 - 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`。
-- 作为 `AgentTriggerCommanding` 实现，接收 Swift `agent_trigger.fire` 后台启动请求，并把 agent-server 回推的 `agent_trigger.attention` 事件转成宿主可消费的最小提示信号。
 - 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行 macOS host dynamic tools，并把 plugin namespace 请求分派给 Swift plugin manager。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
 - Electron StatusBubble 点击只尝试聚焦已有 ThreadWindow；无法聚焦时不再让 Coordinator 打开 Swift PromptPanel。
@@ -27,7 +26,7 @@
 | `ElectronShellProtocol.swift` | Swift 端 command/event DTO，必须与 TS `electronShellProtocol.ts` 字段一致 |
 | `ElectronBackedAppServer.swift` | app-server health gate、ThreadWindow command client、ActivityWindow command client、dynamic tool provider client 和 Swift thread client 连接管理 |
 | `ThreadWindowDiagnostics.swift` | 仅供宿主侧排查 ThreadWindow 首次打开/关闭竞态的 stderr 诊断开关；`HANDAGENT_THREADWINDOW_TRACE=1` 时输出 `openHistory`、`hide(restoringFocus:false)`、`command.ack`、`thread_window_closed` 等关键时序 |
-| `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 与 AgentTrigger 的 command 抽象：open initial prompt、open history、focus、theme changed、后台 trigger fire / attention 回调 |
+| `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 的 command 抽象：open initial prompt、open history、focus、theme changed |
 | `ActivityWindowCommanding.swift` | Coordinator 面向 Electron ActivityWindow 的 show command 抽象 |
 | `UserMessageAttachmentPayload.swift` | 旧 attachment DTO 兼容辅助；当前 initial prompt command 主载荷是 `PromptUserInput.items` |
 
@@ -44,14 +43,14 @@
 
 - 不持有 ThreadWindow thread 缓存、消息或历史状态。
 - 不解析 `/api/thread` 的 `ThreadNotification`。
-- 不消费完整 `/api/thread` 状态；但会为后台 AgentTrigger 单独接收宿主级 attention 事件，用于权限/工作区/失败提示。
+- 不消费完整 `/api/thread` 状态；AgentTrigger 命中由 SwiftThreadClient 直连 `/api/thread`，权限/工作区请求由 React ThreadWindow 的 `acceptServerRequests=1` 连接处理。
 - 新增 host dynamic tool 时，先在 `MacHostDynamicTools` 与 `MacPlatformProvider` 同步 spec / method 映射。
 - 不承载 PromptPanel、Settings、Hotkey 或焦点恢复；这些仍由 Swift 宿主负责。
 
 ## 修改约束
 
 - 新增或改名 Electron command/event 时，先改 `ElectronShellProtocol.swift`，再同步 `apps/electron-shell/src/main/protocol/electronShellProtocol.ts` 和双方测试。主题同步 command 固定为 `theme.changed`，payload 为 `{ preference, resolved }`。
-- 不把持续 `ThreadNotification` / `ServerRequest` 引入本目录；生产 PromptPanel 提交由 `AgentServer/SwiftThreadClient` 直连 `/api/thread` 完成，本目录只处理 Electron 窗口 command。`thread_window.open_initial_prompt` 仍作为 fallback / 测试协议保留。
+- 不把持续 `ThreadNotification` / `ServerRequest` 引入本目录；生产 PromptPanel 与 AgentTrigger 首轮提交由 `AgentServer/SwiftThreadClient` 直连 `/api/thread` 完成，本目录只处理 Electron 窗口 command。`thread_window.open_initial_prompt` 仍作为 fallback / 测试协议保留。
 - `ElectronShellProcess` 的 stdout 只能解析 event；stderr 作为 diagnostic 日志原样转发到宿主 stderr，支持 packaged app stdout/stderr 重定向观察。不要把 Electron diagnostic 写到 stdout。
 - Swift->Electron command socket 路径必须保持短路径；macOS `sockaddr_un.sun_path` 长度有限，当前使用 `/tmp/hae-<uuid>.sock`。
 - `stop()` 必须清理 callbacks、pending command kind、dynamic tool provider client、Swift thread client、宿主退出请求回调和 shell handlers，避免旧 Electron 事件影响下一次 start。

@@ -10,7 +10,7 @@
 | `serverSupervisor/` | [serverSupervisor/serverSupervisor.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/serverSupervisor/serverSupervisor.md) | agent-server 后台进程 supervisor，包含 utilityProcess 候选与 Node fallback |
 | `swiftBridge/` | [swiftBridge/swiftBridge.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/swiftBridge/swiftBridge.md) | stdio newline-delimited JSON bridge |
 | `windows/` | [windows/windows.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/windows/windows.md) | ThreadWindow hidden prewarm 与 ActivityWindow 控制器 |
-| `main.ts` | 无独立文档 | Electron process 入口，组装 bridge、runtime、supervisor、window controllers 和 IPC；从 `HANDAGENT_DEFAULT_DYNAMIC_TOOLS` 读取 Swift 注入的默认 dynamic tools，解析失败时回退到 core host tools |
+| `main.ts` | 无独立文档 | Electron process 入口，组装 bridge、runtime、supervisor、window controllers 和 IPC；从 `HANDAGENT_DEFAULT_DYNAMIC_TOOLS` 读取 Swift 注入的默认 dynamic tools，解析失败时使用空列表 |
 | `electronShellRuntime.ts` | 无独立文档 | 可测试的 command / health / prewarm 状态机 |
 | `initialHostTheme.ts` | 无独立文档 | 解析 `HANDAGENT_INITIAL_THEME`，为 Electron window controllers 提供启动期 host theme 初值 |
 | `activityWindowIpc.ts` | 无独立文档 | 只接收 ActivityWindow renderer 发出的 `focusThread` IPC |

@@ -2,7 +2,7 @@
 
 ## 目录职责
 
-`server/` 是 agent-server 的进程入口与组合根。它负责启动同端口 HTTP + WebSocket 服务，按 request path 拆分 `/api/thread`、`/api/activity`、`/api/agent-trigger/attention`、`/api/dynamic-tools` 与 `/thread-window/*`，并把 core 与本目录其他模块组装成生产运行图。
+`server/` 是 agent-server 的进程入口与组合根。它负责启动同端口 HTTP + WebSocket 服务，按 request path 拆分 `/api/thread`、`/api/activity`、`/api/dynamic-tools` 与 `/thread-window/*`，并把 core 与本目录其他模块组装成生产运行图。
 
 本目录可以读取本地配置路径、创建长驻依赖和绑定 socket；不要在这里写 runtime event 翻译、tool 业务逻辑或平台原生实现。
 
@@ -32,10 +32,6 @@ if (path === "/api/activity") {
   attachActivitySocketHandlers(socket, { activityPublisher });
   return;
 }
-if (path === "/api/agent-trigger/attention") {
-  attachAgentTriggerAttentionSocketHandlers(socket, { attentionPublisher });
-  return;
-}
 if (path === "/api/dynamic-tools") {
   attachDynamicToolSocketHandlers(socket, { bridge: dynamicToolBridge });
   return;
@@ -47,13 +43,12 @@ if (path === "/api/thread") {
 socket.close();
 ```
 
-`/api/thread`、`/api/activity`、`/api/agent-trigger/attention` 和 `/api/dynamic-tools` 是四条独立 WebSocket，不共享消息 union。`/thread-window/*` 由同一个 HTTP server 直接返回 React 静态资源，供 Electron ThreadWindow `BrowserWindow` 使用；Content-Type 由 `mime-types` 根据扩展名推断。未知 path 或缺失 path 会被关闭或返回 404，不默认为 thread socket。
+`/api/thread`、`/api/activity` 和 `/api/dynamic-tools` 是三条独立 WebSocket，不共享消息 union。`/thread-window/*` 由同一个 HTTP server 直接返回 React 静态资源，供 Electron ThreadWindow `BrowserWindow` 使用；Content-Type 由 `mime-types` 根据扩展名推断。未知 path 或缺失 path 会被关闭或返回 404，不默认为 thread socket。
 
 按当前协议约束：
 
 - `/api/thread` 接收 `ClientResponse` 和 `ThreadCommand`，其中 `ThreadCommand` 包含 `thread.start`、`thread.resume`、`thread.list`、`thread.delete`、`op.submit`、`workspace.list`；`ClientResponse` 会被交给 router 包装为 Agent `client_response` Op。
 - `/api/activity` 只向 subscriber 发送 `AgentActivityEvent`；连接建立后由 `AgentActivityPublisher.attachConnection()` 立即发送 `activity.snapshot`，后续状态变化发送 `activity.changed`。如果启动测试未注入 activity publisher，该 path 会被关闭。
-- `/api/agent-trigger/attention` 只向 Electron main 发送 `AgentTriggerAttention`；只有通过 `POST /api/agent-trigger/fire` 启动、并在运行中命中权限请求、工作区请求或失败的后台 thread 才会产出事件。
 - `/api/dynamic-tools` 接收 `DynamicToolProviderMessage`，其中 `provider_hello` 会为当前 `clientId` 生成 fencing token；同一 client 的新连接会替换旧 provider 并让旧 pending call 失败。之后的 `tool_call_response` 必须来自当前 token 才能唤醒 pending call，避免旧 socket 的晚到响应污染新连接。
 
 ### thread 订阅与关闭清理
@@ -114,7 +109,7 @@ const runtimeForThread = (threadId: string) => {
 ## 实现约束
 
 - **静态资源服务**：`/thread-window/*` 由同一个 HTTP server 手写静态文件服务，MIME 类型通过 `mime-types` 包推断。不使用 `sirv` 或 `serve-static` 等静态服务中间件。
-- **WebSocket 路由**：单个 HTTP server 同时承载四条 WebSocket（`/api/thread`、`/api/activity`、`/api/agent-trigger/attention`、`/api/dynamic-tools`）和静态资源，通过手写 `upgrade` handler 按 `request.url` 分派。不使用 `ws` 库的 `path` 选项或创建多个 `WebSocketServer` 实例。
+- **WebSocket 路由**：单个 HTTP server 同时承载三条 WebSocket（`/api/thread`、`/api/activity`、`/api/dynamic-tools`）和静态资源，通过手写 `upgrade` handler 按 `request.url` 分派。不使用 `ws` 库的 `path` 选项或创建多个 `WebSocketServer` 实例。
 
 ## 下一步阅读
 

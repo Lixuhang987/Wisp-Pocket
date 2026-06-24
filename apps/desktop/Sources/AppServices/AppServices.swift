@@ -37,7 +37,6 @@ protocol HotkeyRegistering {
 @MainActor
 protocol FatalAlertPresenting {
     func showFatal(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?)
-    func showAgentTriggerAttention(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?)
 }
 
 @MainActor
@@ -54,7 +53,6 @@ struct AppServicesRuntime {
     let swiftThreadClient: (any SwiftThreadSubmitting)?
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
-    let agentTriggerCommandClient: (any AgentTriggerCommanding)?
 }
 
 @MainActor
@@ -65,7 +63,6 @@ final class AppServices {
     let appServer: any AppServerManaging
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
-    let agentTriggerCommandClient: (any AgentTriggerCommanding)?
     let settingsStore: AgentSettingsStore
     let agentTriggerStore: AgentTriggerStore
     let agentTriggerRuntime: AgentTriggerRuntime
@@ -118,11 +115,11 @@ final class AppServices {
                 threadServerURL: threadServerURL
             )
             : nil
+        let resolvedSwiftThreadClient = swiftThreadClient ?? runtime?.swiftThreadClient
         self.appServer = appServer ?? runtime!.appServer
-        self.swiftThreadClient = swiftThreadClient ?? runtime?.swiftThreadClient
+        self.swiftThreadClient = resolvedSwiftThreadClient
         self.threadWindowCommandClient = threadWindowCommandClient ?? runtime?.threadWindowCommandClient ?? NopThreadWindowCommandClient()
         self.activityWindowCommandClient = activityWindowCommandClient ?? runtime?.activityWindowCommandClient
-        self.agentTriggerCommandClient = runtime?.agentTriggerCommandClient
         self.settingsStore = settingsStore
         self.agentTriggerStore = agentTriggerStore
         self.agentTriggerStore.ensureBuiltinPackagesInstalled()
@@ -133,8 +130,10 @@ final class AppServices {
                 SystemClockAgentTriggerProviderFactory(),
             ]),
             store: agentTriggerStore,
-            emit: { [weak runtimeTriggerClient = runtime?.agentTriggerCommandClient] payload in
-                _ = try? runtimeTriggerClient?.fireAgentTrigger(payload)
+            submit: { [weak swiftThreadClient = resolvedSwiftThreadClient] prompt in
+                Task { @MainActor in
+                    _ = try? await swiftThreadClient?.submitInitialPrompt(prompt)
+                }
             }
         )
         try? self.agentTriggerRuntime.reload()
@@ -228,8 +227,7 @@ final class AppServices {
             appServer: appServer,
             swiftThreadClient: swiftThreadClient,
             threadWindowCommandClient: appServer,
-            activityWindowCommandClient: appServer,
-            agentTriggerCommandClient: appServer
+            activityWindowCommandClient: appServer
         )
     }
 
@@ -369,17 +367,6 @@ final class NopThreadWindowCommandClient: ThreadWindowCommanding {
 }
 
 @MainActor
-final class NopAgentTriggerCommandClient: AgentTriggerCommanding {
-    var onAgentTriggerCommandResult: ((AgentTriggerCommandResult) -> Void)?
-    var onAgentTriggerAttention: ((AgentTriggerAttentionResult) -> Void)?
-
-    func fireAgentTrigger(_ payload: ElectronAgentTriggerFirePayload) throws -> String {
-        _ = payload
-        return "noop-agent-trigger-fire"
-    }
-}
-
-@MainActor
 final class NopAppearanceChangeObserver: AppearanceChangeObserving {
     var onSystemAppearanceChange: (() -> Void)?
 
@@ -423,5 +410,4 @@ final class NopSettingsWindowPresenter: SettingsWindowPresenting {
 @MainActor
 final class NopFatalAlertPresenter: FatalAlertPresenting {
     func showFatal(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?) {}
-    func showAgentTriggerAttention(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?) {}
 }

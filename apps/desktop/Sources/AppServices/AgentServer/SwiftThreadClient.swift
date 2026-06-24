@@ -61,7 +61,10 @@ final class SwiftThreadClient: SwiftThreadSubmitting {
     }
 
     private func startThread(commandId: String, timestamp: String) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
+        guard connection.connectionState == .connected else {
+            throw SwiftThreadClientError.startFailed("Thread connection disconnected")
+        }
+        return try await withCheckedThrowingContinuation { continuation in
             pendingStarts[commandId] = continuation
             connection.send(text: encodeJSON([
                 "type": "thread.start",

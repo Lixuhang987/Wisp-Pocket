@@ -10,7 +10,6 @@ flowchart TD
   E -->|supervise| B[apps/agent-server<br/>本地 thread 桥与 runtime 驱动]
   W -->|/api/thread WebSocket| B
   S -->|/api/activity WebSocket| B
-  E -->|/api/agent-trigger/attention WebSocket| B
   A -->|/api/thread + /api/dynamic-tools WebSocket| B
   B --> C[packages/core<br/>thread、turn、消息、LLM/tool 循环]
   B --> T[packages/thread-store<br/>SQLite thread rollout 持久化]
@@ -56,9 +55,9 @@ flowchart TD
 ## 跨层合约
 
 - 初始上下文只来自用户主动输入和主动附件。PromptPanel 的 attachment 只作为 `UserInput.items` 经 `/api/thread` 进入 thread；屏幕、剪贴板、App 状态和文件读取都必须走 tool。
-- Thread 主协议只跑在 `/api/thread`：所有 `/api/thread` 连接默认收到 `thread.started` 并自动订阅该 thread 后续普通 notification；React 负责完整 UI thread 命令与 `ClientResponse`，Swift 仅在 PromptPanel 首轮提交路径发送 `thread.start` / `op.submit(UserInput)` 并等待 `thread.started` 或 `thread.error`；`acceptServerRequests=1` 只表示该连接是 permission / workspace 等交互式 `ServerRequest` owner。app-server 内部会把 `ClientResponse` 包装为 `client_response` Op 投回 Agent `tx_sub`。
+- Thread 主协议只跑在 `/api/thread`：所有 `/api/thread` 连接默认收到 `thread.started` 并自动订阅该 thread 后续普通 notification；React 负责完整 UI thread 命令与 `ClientResponse`，Swift 在 PromptPanel 首轮提交和 AgentTrigger 命中路径发送 `thread.start` / `op.submit(UserInput)` 并等待 `thread.started` 或 `thread.error`；`acceptServerRequests=1` 只表示该连接是 permission / workspace 等交互式 `ServerRequest` owner。app-server 内部会把 `ClientResponse` 包装为 `client_response` Op 投回 Agent `tx_sub`。
 - Activity 轻量状态只跑在 `/api/activity`：agent-server 只发送 `AgentActivityEvent`；新连接先收到 `activity.snapshot`，状态变化时收到 `activity.changed`。该流由 `ThreadNotification` / `ServerRequest` 派生，不承载完整 thread 消息。
-- 后台 AgentTrigger attention 只跑在 `/api/agent-trigger/attention`：agent-server 只发送 `AgentTriggerAttention`；Electron main 订阅该流，在后台 thread 命中权限、工作区选择或失败时引导用户注意。后台 trigger 启动入口是 `POST /api/agent-trigger/fire`。
+- 后台 AgentTrigger 命中后由 Swift `AgentTriggerRuntime` 渲染为 `PromptSubmission`，并复用 SwiftThreadClient 的 `/api/thread` `thread.start(dynamicTools)` + 首轮 `op.submit(UserInput)` 提交流程。agent-server、core 与 thread-store 不保存 trigger 来源；权限 / 工作区请求按普通 thread 协议交给 React 的 `/api/thread?acceptServerRequests=1` owner。
 - 主题偏好由 Swift 宿主持久化和解析：用户只在 Swift Settings 中选择 `light` / `dark` / `system`。Swift 启动 Electron 时先通过 `HANDAGENT_INITIAL_THEME` 环境变量传入当前真实 `{ preference, resolved }`，避免 Electron 首个 renderer 用固定浅色或固定深色启动；运行中主题变化再通过 `theme.changed` command 同步给 Electron。Electron main 同步给 ThreadWindow 和 ActivityWindow renderer，React 侧只应用 resolved theme，不持久化偏好。
 - Dynamic tool provider 只跑在 `/api/dynamic-tools`：provider 发送 `provider_hello` 注册 `clientId` 与工具候选，agent-server 按 `DynamicToolSpec.clientId` 转发 `tool_call_request` 并等待 `tool_call_response`。Swift 默认 provider 的 namespace 是 `host_macos`。
 - `thread.snapshot` 是用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口；React 和 app-server 之间不做断线恢复，非主动断开后不重连、不恢复订阅、不拉取 snapshot、不发送恢复命令。`workspace.listed` 是 `workspace.list` 的连接级响应，不带 `threadId`。
@@ -70,7 +69,7 @@ flowchart TD
 
 ## 当前架构不变量
 
-- Swift desktop 持有窄口径 thread client，仅用于 PromptPanel 直连创建 thread、提交初始 `UserInput`，收到 `thread.started.threadId` 后再让 Electron 打开或聚焦 React ThreadWindow；Swift 不订阅 `/api/activity`，也不 mirror React thread 状态。
+- Swift desktop 持有窄口径 thread client，用于 PromptPanel 和 AgentTrigger 创建 thread、提交初始 `UserInput`；PromptPanel 路径收到 `thread.started.threadId` 后再让 Electron 打开或聚焦 React ThreadWindow，AgentTrigger 路径保持后台创建。Swift 不订阅 `/api/activity`，也不 mirror React thread 状态。
 - Swift 不发送 `thread_window.prepare`；Electron main 是 hidden ThreadWindow 预热的唯一 owner。agent-server 是唯一承载 core runtime 的后台进程，关闭 Electron UI 窗口不停止该进程。
 - React ThreadWindow 是历史、后台 thread 状态缓存、消息、运行态、permission/workspace 请求面板和 composer 的 UI 状态源；右侧当前展示的 thread 由 React `App` 本地 state 编排，不进入 store。
 - agent-server 是组合根和本地桥：负责 socket 路径拆分、thread 生命周期路由、持久 Agent owner、runtime 驱动、持久化封装、Agent request broker 和 dynamic tool provider 转发；外部运行期输入统一是 `op.submit(UserInput | Interrupt)`，UI 回执在 server 内部抽象为 `client_response` Op。

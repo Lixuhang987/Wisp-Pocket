@@ -139,6 +139,24 @@ final class DynamicToolProviderConnectionClientTests: XCTestCase {
 
 @MainActor
 final class SwiftThreadClientTests: XCTestCase {
+    func testSubmitInitialPromptFailsWhenThreadSocketIsNotConnected() async throws {
+        let transport = RecordingAppServerConnectionTransport()
+        let connection = AppServerConnection(
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/thread")!,
+            transport: transport,
+            reconnectDelay: 0
+        )
+        let client = SwiftThreadClient(connection: connection)
+
+        do {
+            _ = try await client.submitInitialPrompt(makePromptSubmission("hello"))
+            XCTFail("Expected disconnected thread client to fail")
+        } catch let error as SwiftThreadClientError {
+            XCTAssertEqual(error.errorDescription, "Thread connection disconnected")
+        }
+        XCTAssertTrue(transport.tasks.isEmpty)
+    }
+
     func testSubmitInitialPromptStartsThreadWithHostDynamicToolsThenSubmitsOp() async throws {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(

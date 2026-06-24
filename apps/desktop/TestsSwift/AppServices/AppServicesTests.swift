@@ -32,6 +32,18 @@ final class AppServicesTests: XCTestCase {
     }
 
     @MainActor
+    func testAgentTriggerRuntimeSubmitsThroughSwiftThreadClient() async throws {
+        let threadClient = RecordingSwiftThreadClient(threadId: "trigger-thread")
+        let services = AppServices.testing(swiftThreadClient: threadClient)
+        let prompt = try XCTUnwrap(PromptSubmission.compose(draft: "from trigger", attachments: []))
+
+        services.agentTriggerRuntime.submit(prompt)
+        await Task.yield()
+
+        XCTAssertEqual(threadClient.submittedPrompts.map(\.summary), ["from trigger"])
+    }
+
+    @MainActor
     func testDefaultElectronShellLaunchUsesPnpmWorkspaceElectron() throws {
         let repoRoot = URL(fileURLWithPath: "/repo/worktree", isDirectory: true)
         let electronMain = repoRoot.appendingPathComponent("apps/electron-shell/dist/main/main.js").path
@@ -235,5 +247,23 @@ final class AppServicesTests: XCTestCase {
         let dataValue = raw.data(using: .utf8)
         let data = try XCTUnwrap(dataValue)
         return try JSONDecoder().decode(HostThemePayload.self, from: data)
+    }
+}
+
+@MainActor
+private final class RecordingSwiftThreadClient: SwiftThreadSubmitting {
+    private let threadId: String
+    private(set) var submittedPrompts: [PromptSubmission] = []
+
+    init(threadId: String) {
+        self.threadId = threadId
+    }
+
+    func connect() {}
+    func disconnect() {}
+
+    func submitInitialPrompt(_ prompt: PromptSubmission) async throws -> String {
+        submittedPrompts.append(prompt)
+        return threadId
     }
 }

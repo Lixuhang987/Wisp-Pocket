@@ -152,26 +152,6 @@ final class ProductionFatalAlertPresenter: FatalAlertPresenting {
         }
     }
 
-    func showAgentTriggerAttention(
-        title: String,
-        message: String,
-        primaryButtonTitle: String,
-        secondaryButtonTitle: String?,
-        onSecondary: (() -> Void)?
-    ) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: primaryButtonTitle)
-        if let secondaryButtonTitle {
-            alert.addButton(withTitle: secondaryButtonTitle)
-        }
-        let response = alert.runModal()
-        if response == .alertSecondButtonReturn, let onSecondary {
-            onSecondary()
-        }
-    }
 }
 
 private struct SendableClosure: @unchecked Sendable {

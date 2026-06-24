@@ -73,7 +73,7 @@
 - Electron StatusBubble 和后续桌宠订阅 `/api/activity` WebSocket，只接收 `AgentActivityEvent` 轻量状态，不接收完整 thread 消息。
 - `ThreadCommand` 只表示 UI 主动提交的命令；公开运行期输入统一封装为 `op.submit(UserInput | Interrupt)`；app-server 内部会把 `ClientResponse` 包装为 `client_response` Op 投回 Agent。`ThreadNotification` 只表示 agent-server 向 UI 推送的结果通知。
 - `ServerRequest` / `ClientResponse` 只覆盖少量“server 提问，UI 回执”的跨进程交互，如权限审批与 workspace 选择；Agent 内部对应为 `server.request` event 与 `client_response` Op。
-- Swift desktop 持有窄口径 `/api/thread` client 用于 PromptPanel 直连创建和提交初始输入，同时通过 `/api/dynamic-tools` 处理 `host_macos.*` dynamic tools。
+- Swift desktop 持有窄口径 `/api/thread` client 用于 PromptPanel / AgentTrigger 创建和提交初始输入，同时通过 `/api/dynamic-tools` 处理 `host_macos.*` dynamic tools。
 - 字段说明详见 [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)。
 
 ## 当前实现特点与已知改进项

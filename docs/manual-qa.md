@@ -56,22 +56,23 @@
 
 
 - 完成日期：待实机 QA
-- 实现位置：`apps/desktop/Sources/AppServices/AgentTrigger/`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView*`、`apps/electron-shell/src/main/`、`apps/agent-server/src/thread/AgentTrigger*`、`packages/core/src/protocol/AgentTrigger*.ts`
-- 修复结论：新增独立于现有手动 trigger 的 `AgentTrigger` 平台。首版内置 `chrome.bookmarks` 与 `system.clock` 两种 provider；设置页支持安装 package、创建实例、配置动态参数和 prompt 模板。命中后由 Swift 直接发送 `agent_trigger.fire` 给 Electron，再由 agent-server 创建后台 thread，不走 PromptPanel / React 提交流程，也不在启动时自动唤起 ThreadWindow。后台 thread 默认静默落库，只有权限确认、工作区选择或运行失败时，Electron main 才会通过宿主级 `agent_trigger.attention` 提示用户，并允许打开对应历史 thread。
+- 实现位置：`apps/desktop/Sources/AppServices/AgentTrigger/`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView*`、`apps/desktop/Sources/AppServices/AgentServer/SwiftThreadClient.swift`、`apps/agent-server/src/server/server.ts`、`packages/core/src/protocol/ThreadCommand.ts`
+- 修复结论：新增独立于现有手动 trigger 的 `AgentTrigger` 平台。首版内置 `chrome.bookmarks` 与 `system.clock` 两种 provider；设置页支持安装 package、创建实例、配置动态参数和 prompt 模板。命中后由 Swift `AgentTriggerRuntime` 渲染为 `PromptSubmission`，复用 PromptPanel 的 SwiftThreadClient `/api/thread` `thread.start(dynamicTools)` + 首轮 `op.submit(UserInput)` 提交流程创建后台 thread，不在启动时自动唤起 ThreadWindow。agent-server 和 core 不再保留 `/api/agent-trigger/fire`、`agent_trigger.fire`、trigger attention DTO 或默认 host dynamic tool fallback；权限确认和工作区选择按普通 thread 协议交给 React `/api/thread?acceptServerRequests=1` owner 展示。
 - 自动化验证：需执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
 - 手工回归步骤：
   1. 打开 Settings 的 AgentTrigger 页，确认能看到内置 `Chrome Bookmarks` 与 `System Clock` 两类 package，并可分别创建实例。
   2. 创建一个 `system.clock` 实例，配置未来 1-2 分钟内的触发时间和简单 prompt 模板；到点后确认不会自动弹出 ThreadWindow，但稍后在历史里能看到新增 thread。
   3. 创建一个 `chrome.bookmarks` 实例，在文件夹树中选择 Chrome 目标收藏夹文件夹，提示词包含 `{{url}}`；在 Chrome 中把网页收藏到该文件夹后确认会生成新的后台 thread，首条 user input 包含该 URL。
-  4. 使用会触发权限确认或工作区选择的 prompt 模板，确认后台 thread 命中 `permission.requested` / `workspace.requested` 时，宿主出现最小提示；点击“查看 Thread”后才打开 ThreadWindow，并聚焦到对应 thread。
-  5. 使用一个会稳定失败的 prompt 或 mock 环境，确认后台失败时宿主出现失败提示；忽略提示时不自动开窗，点击查看后才打开历史 thread。
+  4. 使用会触发权限确认或工作区选择的 prompt 模板，确认后台 thread 命中 `permission.requested` / `workspace.requested` 时，请求出现在 React ThreadWindow 的请求面板；Swift 直连 client 不接收或处理交互式请求，宿主不额外弹 trigger 专用提示。
+  5. 使用一个会稳定失败的 prompt 或 mock 环境，确认失败状态按普通 thread 历史落库；直连 trigger 路径不额外弹宿主级失败提示。
   6. 重启桌面 App，确认已保存的 AgentTrigger 实例会自动 reload，后续书签变化或到点事件仍能继续触发。
+  7. 直接请求 `POST http://127.0.0.1:4317/api/agent-trigger/fire` 或连接 `ws://127.0.0.1:4317/api/agent-trigger/attention`，确认旧入口不可用。
 
 ### Chrome Bookmarks 扩展事件触发 Agent
 
 - 完成日期：待实机 QA
 - 实现位置：`apps/chrome-bookmarks-extension/`、`apps/chrome-bookmarks-native-host/`、`apps/desktop/Sources/AppServices/AgentTrigger/`、`apps/desktop/Sources/Settings/AgentTriggerSettingsView*`、`scripts/package-app.sh`
-- 修复结论：Chrome Bookmarks provider 从 Swift 轮询 Chrome `Bookmarks` 文件改为扩展事件驱动。Chrome MV3 扩展监听 `chrome.bookmarks.onCreated`，只转发 URL 书签新增事件；扩展连接 native host 后还会读取 `chrome.bookmarks.getTree()` 并发送当前收藏夹文件夹树快照，Swift bridge 写入 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/folders.json`。开发态 manifest 带固定 `key`，本地加载后扩展 ID 固定为 `iidkhdjaboimibeplbeanlklgakmfebb`，`scripts/swiftw run HandAgentDesktop` 会默认使用该 ID 并自动指向开发 native host helper；Native Messaging helper 读取 `bridge.json` 并 POST 到 Swift loopback bridge，同时把成功转发到当前 Swift bridge 的扩展 `hello` / stdio 断开 / 转发失败写入 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/status.json`；Swift provider 按实例 `folderIds` 匹配后复用现有 `agent_trigger.fire` 后台启动链路。provider 事件统一回到 main queue 后再调用 Electron command client，避免 Chrome bridge 后台队列事件被静默丢弃；Chrome Bookmarks 内置默认提示词会把 `{{title}}` 与 `{{url}}` 渲染进首条 user input。`AgentTriggerInstance.promptTemplate` 已暴露到 Chrome Bookmarks 新增表单，模板支持 `{{url}}`、`{{title}}`、`{{folderId}}`、`{{bookmarkId}}`、`{{profileId}}`。Settings 的 Chrome Bookmarks 详情页会显示真实扩展连接状态，并要求 `status.json.updatedAt` 不早于当前 `bridge.json.updatedAt`；新增自动化表单展示收藏夹文件夹树，用户只看到名称、层级和内部数量，不需要填写或查看内部 folder id；首版不做 Chrome Web Store 跳转。
+- 修复结论：Chrome Bookmarks provider 从 Swift 轮询 Chrome `Bookmarks` 文件改为扩展事件驱动。Chrome MV3 扩展监听 `chrome.bookmarks.onCreated`，只转发 URL 书签新增事件；扩展连接 native host 后还会读取 `chrome.bookmarks.getTree()` 并发送当前收藏夹文件夹树快照，Swift bridge 写入 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/folders.json`。开发态 manifest 带固定 `key`，本地加载后扩展 ID 固定为 `iidkhdjaboimibeplbeanlklgakmfebb`，`scripts/swiftw run HandAgentDesktop` 会默认使用该 ID 并自动指向开发 native host helper；Native Messaging helper 读取 `bridge.json` 并 POST 到 Swift loopback bridge，同时把成功转发到当前 Swift bridge 的扩展 `hello` / stdio 断开 / 转发失败写入 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/status.json`；Swift provider 按实例 `folderIds` 匹配后复用 SwiftThreadClient `/api/thread` 后台提交流程。provider 事件统一回到 main queue 后再提交 `PromptSubmission`，避免 Chrome bridge 后台队列事件被静默丢弃；Chrome Bookmarks 内置默认提示词会把 `{{title}}` 与 `{{url}}` 渲染进首条 user input。`AgentTriggerInstance.promptTemplate` 已暴露到 Chrome Bookmarks 新增表单，模板支持 `{{url}}`、`{{title}}`、`{{folderId}}`、`{{bookmarkId}}`、`{{profileId}}`。Settings 的 Chrome Bookmarks 详情页会显示真实扩展连接状态，并要求 `status.json.updatedAt` 不早于当前 `bridge.json.updatedAt`；新增自动化表单展示收藏夹文件夹树，用户只看到名称、层级和内部数量，不需要填写或查看内部 folder id；首版不做 Chrome Web Store 跳转。
 - 自动化验证：需执行 `pnpm --filter handagent-chrome-bookmarks-extension test`、`pnpm --filter handagent-chrome-bookmarks-extension build`、`bash ./scripts/swiftw test --filter NativeMessagingCodecTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksNativeHostInstallerTests`、`bash ./scripts/swiftw test --filter ChromeBookmarksAgentTriggerProviderTests`、`bash ./scripts/swiftw test --filter AgentTriggerRuntimeTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/package-app.test.sh`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
 - 手工回归步骤：
   1. 执行 `pnpm --filter handagent-chrome-bookmarks-extension build`，安装或加载 `apps/chrome-bookmarks-extension/dist/` 扩展，确认 Chrome 显示的 extension id 为 `iidkhdjaboimibeplbeanlklgakmfebb`。
@@ -539,7 +540,7 @@
 ### 对于每个可交互的点，都验证一遍，看是否符合预期，这里不当做硬性bug，而是记录下可能不符合的行为，事无巨细
 
 - 2026-06-24 plugin system / dynamic tools 迁移已完成自动化验证，仍需补实机 QA：
-  1. 使用 mock LLM packaged app 启动桌面端，确认 agent-server 只监听 `/api/thread`、`/api/activity`、`/api/agent-trigger/attention`、`/api/dynamic-tools`，旧 `/api/platform` WebSocket 不再可用。
+  1. 使用 mock LLM packaged app 启动桌面端，确认 agent-server 只监听 `/api/thread`、`/api/activity`、`/api/dynamic-tools`，旧 `/api/platform` 与 `/api/agent-trigger/attention` WebSocket 不再可用。
   2. 通过 PromptPanel 提交 `DYNAMIC_TOOLS_CLIPBOARD_QA_20260624 [mock:clipboard-read]`，确认 Swift 直连 `/api/thread` 创建 thread，React ThreadWindow 自动收到 `thread.started` 并打开对应 thread；tool 名显示为 `host_macos.clipboard_read`，结果来自当前剪贴板。
   3. 提交 `DYNAMIC_TOOLS_SCREEN_QA_20260624 [mock:screen-display]`，允许屏幕录制相关权限后确认 tool 名为 `host_macos.screen_capture`，结果包含截图尺寸和 PNG 内容；若系统权限缺失，应返回明确 `permission_denied` 文案。
   4. 在同一运行中触发 `file.write` 权限请求，确认 `permission.requested` 只显示在 React ThreadWindow，Swift 直连 thread client 不弹出或处理该交互式请求。

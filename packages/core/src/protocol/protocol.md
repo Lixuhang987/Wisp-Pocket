@@ -20,16 +20,13 @@
 | `ThreadProtocolShared.ts` | 共享类型：`RunStatus` / `ThreadListEntry` / `WorkspaceAskCandidate` / `ThreadAttachment` |
 | `AgentActivity.ts` | `/api/activity` 轻量活动流：`activity.snapshot` / `activity.changed` |
 | `DynamicTool.ts` | `DynamicToolSpec`、`DynamicToolProviderMessage` 与 `DynamicToolBridge` |
-| `HostDynamicTools.ts` | 默认 host dynamic tool spec，供 Electron / React preload 注入 |
-| `AgentTrigger.ts` | 后台 AgentTrigger 启动协议：`AgentTriggerFireRequest` / `AgentTriggerFireResult` / `AgentTriggerSourceEvent` / `AgentTriggerNotificationPolicy` |
-| `AgentTriggerAttention.ts` | 后台 AgentTrigger attention 事件：`AgentTriggerAttention` / `AgentTriggerAttentionReason`，供宿主在命中权限、工作区选择或失败时聚焦用户注意 |
 
 ## 单向边界
 
 ```mermaid
 flowchart LR
   A[React ThreadWindow] -->|/api/thread ThreadCommand / ClientResponse| B[agent-server]
-  S[Swift PromptPanel] -->|/api/thread thread.start / op.submit| B
+  S[Swift PromptPanel / AgentTrigger] -->|/api/thread thread.start / op.submit| B
   B -->|submit| C[core runtime]
   C -->|AgentRuntimeEvent| B
   B -->|/api/thread ThreadNotification| A
@@ -37,12 +34,11 @@ flowchart LR
   B -->|/api/thread ServerRequest<br/>acceptServerRequests=1 only| A
   A -->|/api/thread ClientResponse| B
   B -->|/api/activity AgentActivityEvent| E[Electron StatusBubble / 桌宠]
-  B -->|/api/agent-trigger/attention AgentTriggerAttention| EA[Electron main]
   B -->|/api/dynamic-tools DynamicToolProviderMessage| D[Swift desktop / provider]
 ```
 
 - React ThreadWindow 不直接驱动 `AgentRuntime`，只发命令、收事件，并用 `/api/thread?acceptServerRequests=1` 承担交互式 `ServerRequest` owner。
-- Swift desktop 只用窄口径 thread client 创建 PromptPanel thread 和提交首轮输入；该连接不设置 `acceptServerRequests`，host/tool provider 语义走 `/api/dynamic-tools`。
+- Swift desktop 只用窄口径 thread client 创建 PromptPanel / AgentTrigger thread 和提交首轮输入；该连接不设置 `acceptServerRequests`，host/tool provider 语义走 `/api/dynamic-tools`。
 - agent-server 负责 socket、订阅路由、持久化、Agent request broker，以及把 Agent `rx_event` 中的 notification/request 归一化发布到 `/api/thread`。
 - `/api/activity` 不承载 `ThreadCommand`、`ClientResponse`、`ThreadNotification` 或 `ServerRequest`，只发送 `AgentActivityEvent`。
 - core 只定义协议 DTO 与 runtime 事件，不负责 WebSocket 生命周期或连接分发。
@@ -88,15 +84,10 @@ flowchart LR
 
 这组消息只用于状态气泡、桌宠等轻量运行态展示。它由 agent-server 从 thread 通知和待回执请求派生，不暴露完整消息内容。`/api/activity` subscriber 连接后先收到 `activity.snapshot`，只有状态变化时才收到 `activity.changed`。
 
-### AgentTrigger
-
-- `AgentTriggerFireRequest` / `AgentTriggerFireResult`：后台 trigger 通过 `POST /api/agent-trigger/fire` 启动新 thread 的请求与回执。
-- `AgentTriggerAttention`：后台 thread 运行中命中权限、工作区选择或失败时，agent-server 通过 `/api/agent-trigger/attention` WebSocket 向宿主发送的注意力事件，通知模式由 `AgentTriggerNotificationPolicy` 控制（`silent` / `on_failure` / `on_attention`）。
-
 ## Thread Socket 状态入口
 
 - React ThreadWindow 持有到 `/api/thread?acceptServerRequests=1` 的长连接，作为 permission / workspace 等交互式 `ServerRequest` owner。
-- Swift PromptPanel 窄口径 client 也连接 `/api/thread`，但不设置 `acceptServerRequests`。
+- Swift PromptPanel / AgentTrigger 窄口径 client 也连接 `/api/thread`，但不设置 `acceptServerRequests`。
 - 所有 `/api/thread` 连接默认收到新建 thread 的 `thread.started`，并自动订阅该 thread 后续普通 notification。
 - 用户打开历史 thread，或初始 prompt 创建 thread 后需要拉取初始状态时，发送 `thread.resume(threadId)`。
 - `thread.resume` 的结果是 `thread.snapshot`，不是新建 socket，也不是额外握手通道。

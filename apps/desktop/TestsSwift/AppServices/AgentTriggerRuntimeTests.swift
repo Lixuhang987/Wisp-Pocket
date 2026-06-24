@@ -125,16 +125,16 @@ final class AgentTriggerRuntimeTests: XCTestCase {
         ]))
 
         let chromeProvider = RecordingAgentTriggerProvider(kind: "chrome.bookmarks")
-        let fired = expectation(description: "agent trigger payload emitted")
-        var payloads: [ElectronAgentTriggerFirePayload] = []
+        let submitted = expectation(description: "agent trigger prompt submitted")
+        var prompts: [PromptSubmission] = []
         let runtime = AgentTriggerRuntime(
             registry: AgentTriggerRegistry(factories: [
                 RecordingAgentTriggerProviderFactory(provider: chromeProvider),
             ]),
             store: store,
-            emit: {
-                payloads.append($0)
-                fired.fulfill()
+            submit: {
+                prompts.append($0)
+                submitted.fulfill()
             }
         )
 
@@ -151,12 +151,13 @@ final class AgentTriggerRuntimeTests: XCTestCase {
             ]
         ))
 
-        wait(for: [fired], timeout: 1.0)
-        XCTAssertEqual(payloads.count, 1)
-        guard case .text(_, let text) = payloads.first?.userInput.items.first else {
+        wait(for: [submitted], timeout: 1.0)
+        XCTAssertEqual(prompts.count, 1)
+        guard case .text(_, let text) = prompts.first?.userInput.items.first else {
             return XCTFail("Expected text input item")
         }
         XCTAssertEqual(text, "Read OpenAI at https://openai.com from folder-a")
+        XCTAssertEqual(prompts.first?.summary, "Bookmark Review")
     }
 
     @MainActor
@@ -179,17 +180,17 @@ final class AgentTriggerRuntimeTests: XCTestCase {
         ]))
 
         let chromeProvider = RecordingAgentTriggerProvider(kind: "chrome.bookmarks")
-        let fired = expectation(description: "agent trigger payload emitted")
-        var payloads: [ElectronAgentTriggerFirePayload] = []
+        let submitted = expectation(description: "agent trigger prompt submitted")
+        var prompts: [PromptSubmission] = []
         let runtime = AgentTriggerRuntime(
             registry: AgentTriggerRegistry(factories: [
                 RecordingAgentTriggerProviderFactory(provider: chromeProvider),
             ]),
             store: store,
-            emit: { payload in
+            submit: { prompt in
                 XCTAssertTrue(Thread.isMainThread)
-                payloads.append(payload)
-                fired.fulfill()
+                prompts.append(prompt)
+                submitted.fulfill()
             }
         )
 
@@ -210,9 +211,9 @@ final class AgentTriggerRuntimeTests: XCTestCase {
             providerEmit()
         }
 
-        wait(for: [fired], timeout: 1.0)
-        XCTAssertEqual(payloads.count, 1)
-        guard case .text(_, let text) = payloads.first?.userInput.items.first else {
+        wait(for: [submitted], timeout: 1.0)
+        XCTAssertEqual(prompts.count, 1)
+        guard case .text(_, let text) = prompts.first?.userInput.items.first else {
             return XCTFail("Expected text input item")
         }
         XCTAssertEqual(text, "Summarize https://openai.com")

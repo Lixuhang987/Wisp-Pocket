@@ -20,7 +20,7 @@
 
 ## 运行边界
 
-- React 直接持有 `/api/thread?acceptServerRequests=1` WebSocket，负责完整 ThreadWindow UI 状态、历史、请求面板和 composer 输入；`acceptServerRequests=1` 表示它接收 permission / workspace 等交互式请求。Swift 只在 PromptPanel 首轮路径发送 `thread.start` / `op.submit(UserInput)` 并等待 `thread.started` / `thread.error`，不处理持续 `ThreadNotification` 或 `ServerRequest`。
+- React 直接持有 `/api/thread?acceptServerRequests=1` WebSocket，负责完整 ThreadWindow UI 状态、历史、请求面板和 composer 输入；`acceptServerRequests=1` 表示它接收 permission / workspace 等交互式请求。Swift 只在 PromptPanel 首轮和 AgentTrigger 命中路径发送 `thread.start` / `op.submit(UserInput)` 并等待 `thread.started` / `thread.error`，不处理持续 `ThreadNotification` 或 `ServerRequest`。
 - Electron preload 注入 `window.handAgentThreadWindowConfig`、`window.handAgentTheme`、`window.handAgentSubscribeThemeChange` 和 `window.handAgentReceiveInitialPrompt`。其中 `handAgentThreadWindowConfig` 同时提供 `/api/thread?acceptServerRequests=1` URL、宿主只读 `availableSkills` 与默认 `dynamicTools`；React 不持久化主题，只把宿主 resolved theme 写到 `data-theme`；thread 数据仍直接连接 `/api/thread`。host tool 由 thread metadata 中的 dynamic tools 激活后暴露。
 - `ThreadSocketClient` 只处理收发、发送队列和通知副作用，不直接写 UI；UI 状态由 store action 更新。React 和 app-server 之间本次视为稳定长连接，非主动断开后只把连接状态置为 `disconnected`，不重连、不恢复订阅、不拉取 snapshot、不发送任何恢复命令。
 - 组件只通过明确 props、store action 或根组件 callback 触发行为，不应绕过根组件直接操作 WebSocket。
@@ -47,7 +47,7 @@ Electron preload 会在 renderer 启动早期注入：
 - 临时 `window.handAgentReceiveInitialPrompt`
 - `window.handAgentPendingInitialPrompts`
 
-生产 PromptPanel 提交流程由 Swift 直连 `/api/thread` 完成：Swift 发送带默认 `dynamicTools` 的 `thread.start`，收到 `thread.started.threadId` 后发送首轮 `op.submit(UserInput)`，再让 Electron open/focus 对应 React ThreadWindow。所有 `/api/thread` 连接都会收到 `thread.started`；React 收到后创建本地 `ThreadState` 并切换右侧当前 thread，后续 live notification 继续由同一连接分发。
+生产 PromptPanel 和 AgentTrigger 首轮提交流程由 Swift 直连 `/api/thread` 完成：Swift 发送带默认 `dynamicTools` 的 `thread.start`，收到 `thread.started.threadId` 后发送首轮 `op.submit(UserInput)`；PromptPanel 路径再让 Electron open/focus 对应 React ThreadWindow，AgentTrigger 路径保持后台 thread。所有 `/api/thread` 连接都会收到 `thread.started`；React 收到后创建本地 `ThreadState`，但是否切换右侧当前 thread 由对应 UI 入口决定，后续 live notification 继续由同一连接分发。
 
 Electron `thread_window.open_initial_prompt` 和 preload receiver 仍保留给 fallback / 测试路径。React `App` 挂载后通过 `installInitialPromptReceiver` 替换正式 receiver，并 flush 早到的 pending prompt。
 

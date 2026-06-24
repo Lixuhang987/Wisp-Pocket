@@ -348,71 +348,6 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testAgentTriggerAttentionShowsAlertWithoutOpeningThreadWindow() {
-        let client = RecordingThreadWindowCommandClient()
-        let alertPresenter = RecordingFatalAlertPresenter()
-        let appServer = TriggerableAppServer()
-        let services = AppServices(
-            appServer: appServer,
-            threadWindowCommandClient: client,
-            settingsStore: AgentSettingsStore(homeDirectoryURL: TestFiles.makeTemporaryHomeDirectory()),
-            appearanceThemeService: AppearanceThemeService(
-                store: AgentSettingsStore(homeDirectoryURL: TestFiles.makeTemporaryHomeDirectory()),
-                systemResolver: { .light }
-            ),
-            hotkeyRegistrar: NopHotkeyRegistrar(),
-            settingsWindowPresenter: NopSettingsWindowPresenter(),
-            fatalAlertPresenter: alertPresenter,
-            setActivationPolicy: { _ in },
-            promptPanelPresentationMode: .hiddenForTesting
-        )
-        let coordinator = AppCoordinator(services: services)
-
-        coordinator.send(
-            .handleAgentTriggerAttention(
-                AgentTriggerAttention(
-                    threadId: "thread-1",
-                    triggerInstanceId: "trigger-1",
-                    reason: .failure,
-                    message: "后台 Agent 运行失败"
-                )
-            )
-        )
-
-        XCTAssertEqual(alertPresenter.attentionCalls.count, 1)
-        XCTAssertEqual(client.openHistoryCount, 0)
-        XCTAssertTrue(client.focusedThreadIDs.isEmpty)
-    }
-
-    @MainActor
-    func testAgentTriggerAttentionCanOpenTargetThreadAfterUserConfirms() {
-        let client = RecordingThreadWindowCommandClient()
-        let alertPresenter = RecordingFatalAlertPresenter()
-        alertPresenter.triggerSecondaryAction = true
-        let services = electronServices(
-            commandClient: client,
-            fatalAlertPresenter: alertPresenter
-        )
-        let coordinator = AppCoordinator(services: services)
-
-        coordinator.send(
-            .handleAgentTriggerAttention(
-                AgentTriggerAttention(
-                    threadId: "thread-42",
-                    triggerInstanceId: "trigger-1",
-                    reason: .permission,
-                    message: "后台 Agent 需要权限确认"
-                )
-            )
-        )
-        client.complete(commandId: "open-history-1", kind: .openHistory, ok: true)
-
-        XCTAssertEqual(alertPresenter.attentionCalls.count, 1)
-        XCTAssertEqual(client.openHistoryCount, 1)
-        XCTAssertEqual(client.focusedThreadIDs.last!, "thread-42")
-    }
-
-    @MainActor
     func testMultiplePromptsSendMultipleElectronCommands() {
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(services: electronServices(commandClient: client))
@@ -739,51 +674,14 @@ private final class RecordingSwiftThreadClient: SwiftThreadSubmitting {
 }
 
 @MainActor
-private final class RecordingAgentTriggerCommandClient: AgentTriggerCommanding {
-    var onAgentTriggerCommandResult: ((AgentTriggerCommandResult) -> Void)?
-    var onAgentTriggerAttention: ((AgentTriggerAttentionResult) -> Void)?
-
-    func fireAgentTrigger(_ payload: ElectronAgentTriggerFirePayload) throws -> String {
-        _ = payload
-        return "agent-trigger-fire-1"
-    }
-
-    func publishAttention(
-        threadId: String,
-        triggerInstanceId: String,
-        reason: AgentTriggerAttentionReason,
-        message: String
-    ) {
-        onAgentTriggerAttention?(
-            AgentTriggerAttentionResult(
-                threadId: threadId,
-                triggerInstanceId: triggerInstanceId,
-                reason: reason,
-                message: message
-            )
-        )
-    }
-}
-
-@MainActor
 private final class RecordingFatalAlertPresenter: FatalAlertPresenting {
     private(set) var fatalCalls: [(String, String)] = []
-    private(set) var attentionCalls: [(String, String)] = []
     var triggerSecondaryAction = false
 
     func showFatal(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?) {
         _ = primaryButtonTitle
         _ = secondaryButtonTitle
         fatalCalls.append((title, message))
-        if triggerSecondaryAction {
-            onSecondary?()
-        }
-    }
-
-    func showAgentTriggerAttention(title: String, message: String, primaryButtonTitle: String, secondaryButtonTitle: String?, onSecondary: (() -> Void)?) {
-        _ = primaryButtonTitle
-        _ = secondaryButtonTitle
-        attentionCalls.append((title, message))
         if triggerSecondaryAction {
             onSecondary?()
         }

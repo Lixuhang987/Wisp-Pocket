@@ -15,8 +15,6 @@
 | `ThreadNotificationPublisher.ts` | 维护 `connection -> subscribed threadIds` 的分发表；thread 级消息按 `threadId` 定向，非 thread 级 notification 广播 |
 | `ThreadRuntimeOrchestrator.ts` | Agent 内部 ReAct turn 执行器：记录输入、唤醒 runtime、drain queued input、转译通知、处理中断与错误；thread 输入临界区由 `async-mutex` 管理 |
 | `ThreadPersistence.ts` | `@handagent/thread-store` 的唯一直接封装：创建 / 删除 / 读取 / 列出 thread，把用户消息、runtime delta、审计事件和 runtime notification 写成 rollout items，并恢复重启前未完成的 turn |
-| `AgentTriggerAttentionPublisher.ts` | 后台 AgentTrigger attention 事件分发：按 `threadId` 注册 trigger 状态，观察 `ThreadNotification` / `ServerRequest` 派生 `AgentTriggerAttention`，并向已注册的 `/api/agent-trigger/attention` 连接广播 |
-| `AgentTriggerLaunchService.ts` | 后台 AgentTrigger 启动入口：接收 `AgentTriggerFireRequest`，用默认 host dynamic tools 创建 thread、注册持久 Agent、发布 `thread.started` 并提交首轮 `UserInput`，返回 `AgentTriggerFireResult` |
 
 ## 运行期输入
 
@@ -98,8 +96,6 @@ sequenceDiagram
 - `ThreadInputQueue`：只负责队列和等待者，不做持久化、不判断运行状态。
 - `ThreadPersistence`：本目录唯一直接持有 `@handagent/thread-store` 的类；同时负责 user attachment 入库、rollout item 写入、conversation snapshot 转换和残缺 turn 恢复。
 - `ThreadNotificationPublisher`：只负责连接与 thread 维度的消息分发，不做业务判断。
-- `AgentTriggerAttentionPublisher`：只负责 trigger 状态跟踪和 attention 事件广播，不处理 thread 命令或 runtime 编排。
-- `AgentTriggerLaunchService`：只负责后台 trigger 的 thread 创建与首轮提交，不参与普通用户发起的 thread 生命周期；创建 thread 时会写入默认 host dynamic tools，并通过注入的 hook 同步 thread-scoped registry。
 
 ## 编辑约束
 

@@ -118,7 +118,7 @@ desktop 与 agent-server 共享的模型、builtin tool 和外观主题配置文
 
 - 修改 TS 源码必须重启 desktop app 才能让受监督 agent-server 重新加载。
 - 设置窗口与 Electron ThreadWindow 共享 `AppActivationPolicyCoordinator`；全部关闭后 app 切回 `.accessory`。
-- desktop 持有窄口径 thread client，仅用于 PromptPanel 直连创建 thread 与提交初始输入。`ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 按 threadId 打开或聚焦 Electron ThreadWindow。
+- desktop 持有窄口径 thread client，用于 PromptPanel 和 AgentTrigger 创建 thread 与提交初始输入；只有 PromptPanel handoff 会通过 `ElectronThreadWindowLifecycle` / `ThreadWindowCommanding` 按 threadId 打开或聚焦 Electron ThreadWindow。
 - PromptPanel show/toggle 只打开原生输入面板，不触发 Electron ThreadWindow 预热。
 - React ThreadWindow 负责 `/api/thread` 上的 command / notification / request / response 编解码和 UI 状态。
 - ActivityWindow 负责 React StatusBubble；Swift 只发送 `activity_window.show`，show 失败不再回退到 Swift StatusBubble。

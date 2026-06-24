@@ -28,39 +28,11 @@ struct ElectronInitialPromptPayload: Encodable, Equatable {
     }
 }
 
-struct ElectronAgentTriggerNotificationPolicy: Encodable, Equatable {
-    let mode: String
-}
-
-struct ElectronAgentTriggerSourceEvent: Encodable, Equatable {
-    let triggerInstanceId: String
-    let providerKind: String
-    let occurredAt: String
-    let summary: String
-    let payload: [String: String]
-}
-
-struct ElectronAgentTriggerFirePayload: Encodable, Equatable {
-    let triggerInstanceId: String
-    let threadTitleHint: String?
-    let userInput: PromptUserInput
-    let notificationPolicy: ElectronAgentTriggerNotificationPolicy
-    let sourceEvent: ElectronAgentTriggerSourceEvent
-}
-
-struct ElectronAgentTriggerAttentionPayload: Decodable, Equatable {
-    let threadId: String
-    let triggerInstanceId: String
-    let reason: String
-    let message: String
-}
-
 enum ElectronShellCommand: Encodable, Equatable {
     case openInitialPrompt(commandId: String, payload: ElectronInitialPromptPayload)
     case openHistory(commandId: String)
     case focus(commandId: String, threadId: String?)
     case showActivityWindow(commandId: String)
-    case agentTriggerFire(commandId: String, payload: ElectronAgentTriggerFirePayload)
     case themeChanged(commandId: String, theme: HostThemePayload)
     case shutdown(commandId: String)
 
@@ -86,10 +58,6 @@ enum ElectronShellCommand: Encodable, Equatable {
         case .showActivityWindow(let commandId):
             try container.encode("activity_window.show", forKey: .type)
             try container.encode(commandId, forKey: .commandId)
-        case .agentTriggerFire(let commandId, let payload):
-            try container.encode("agent_trigger.fire", forKey: .type)
-            try container.encode(commandId, forKey: .commandId)
-            try container.encode(payload, forKey: .payload)
         case .themeChanged(let commandId, let theme):
             try container.encode("theme.changed", forKey: .type)
             try container.encode(commandId, forKey: .commandId)
@@ -106,13 +74,12 @@ enum ElectronShellEvent: Decodable, Equatable {
     case threadWindowPrepared(timestamp: String)
     case threadWindowPrepareFailed(message: String)
     case commandAck(commandId: String, ok: Bool, error: String?)
-    case agentTriggerAttention(payload: ElectronAgentTriggerAttentionPayload)
     case threadWindowClosed(timestamp: String, wasVisible: Bool)
     case rendererCrashed(window: ElectronShellRendererWindow, reason: String)
     case agentServerHealth(available: Bool, message: String?)
 
     private enum CodingKeys: String, CodingKey {
-        case channel, type, timestamp, commandId, ok, error, window, reason, available, message, wasVisible, threadId, triggerInstanceId
+        case channel, type, timestamp, commandId, ok, error, window, reason, available, message, wasVisible
     }
 
     init(from decoder: Decoder) throws {
@@ -135,15 +102,6 @@ enum ElectronShellEvent: Decodable, Equatable {
                 commandId: try container.decode(String.self, forKey: .commandId),
                 ok: try container.decode(Bool.self, forKey: .ok),
                 error: try container.decodeIfPresent(String.self, forKey: .error)
-            )
-        case "agent_trigger.attention":
-            self = .agentTriggerAttention(
-                payload: ElectronAgentTriggerAttentionPayload(
-                    threadId: try container.decode(String.self, forKey: .threadId),
-                    triggerInstanceId: try container.decode(String.self, forKey: .triggerInstanceId),
-                    reason: try container.decode(String.self, forKey: .reason),
-                    message: try container.decode(String.self, forKey: .message)
-                )
             )
         case "thread_window.closed":
             self = .threadWindowClosed(

@@ -33,7 +33,7 @@ Chrome 侧监听由 HandAgent Chrome 扩展完成；Swift 桌面 App 不直接�
   Expected result/effect：Chrome 扩展收到 `chrome.bookmarks.onCreated` 事件，确认新增节点是 URL 书签且父 folder ID 命中配置后，把事件通过 Native Messaging 转发给 HandAgent。
 
 - Trigger：HandAgent 收到命中的新增收藏事件。  
-  Expected result/effect：Swift provider 生成 AgentTriggerEvent，payload 包含 URL、书签标题、folder ID、profile 标识和事件时间；AgentTriggerRuntime 用实例提示词渲染出首条用户输入，并通过现有 `agent_trigger.fire` 链路新建后台 session。
+  Expected result/effect：Swift provider 生成 AgentTriggerEvent，payload 包含 URL、书签标题、folder ID、profile 标识和事件时间；AgentTriggerRuntime 用实例提示词渲染出首条用户输入，并复用 SwiftThreadClient 的 `/api/thread` 提交流程新建后台 session。
 
 - Trigger：用户把网页收藏到未配置的 folder，或新增的是文件夹而不是 URL 书签。  
   Expected result/effect：HandAgent 不启动 session，不写入误触发记录。

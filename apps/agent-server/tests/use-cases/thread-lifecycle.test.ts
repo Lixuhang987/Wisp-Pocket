@@ -11,7 +11,6 @@ import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 import type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
 import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
 import type { AgentActivityEvent } from "@handagent/core/protocol/AgentActivity.ts";
-import { DEFAULT_HOST_MACOS_DYNAMIC_TOOLS } from "@handagent/core/protocol/HostDynamicTools.ts";
 import type { FilePermissionPolicy } from "@handagent/core/permission/FilePermissionPolicy.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
@@ -21,8 +20,6 @@ import {
   createSharedAgentStatus,
 } from "../../src/agent/AgentManager.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
-import { AgentTriggerAttentionPublisher } from "../../src/thread/AgentTriggerAttentionPublisher.ts";
-import { AgentTriggerLaunchService } from "../../src/thread/AgentTriggerLaunchService.ts";
 import { ThreadRuntimeOrchestrator } from "../../src/thread/ThreadRuntimeOrchestrator.ts";
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
@@ -546,38 +543,17 @@ describe("startServer", () => {
     }
   });
 
-  it("fires agent trigger requests through the background launch service", async () => {
-    const store = testStore(() => "2026-06-18T00:00:00.000Z");
-    const persistence = new ThreadPersistence(store, () => "2026-06-18T00:00:00.000Z");
+  it("does not expose the legacy agent trigger fire HTTP entrypoint", async () => {
     const eventPublisher = new ThreadNotificationPublisher();
-    const onThreadDynamicTools = vi.fn();
     const commandRouter = {
       receive: vi.fn(async () => {}),
       interruptThread: vi.fn(),
       handleResponse: vi.fn(),
     } as unknown as ThreadCommandRouter;
-    const launchService = new AgentTriggerLaunchService(
-      persistence,
-      new AgentManager(),
-      () => ({
-        tx_sub: {
-          async send() {},
-        },
-        rx_event: (async function* emptyRuntimeEventStream() {})(),
-        agent_status: createSharedAgentStatus(),
-        session: { threadId: "trigger-thread" },
-        async close() {},
-      }),
-      eventPublisher,
-      new AgentTriggerAttentionPublisher(),
-      () => "2026-06-18T00:00:00.000Z",
-      { onThreadDynamicTools },
-    );
 
     const server = await startServer({
       commandRouter,
       eventPublisher,
-      agentTriggerLaunchService: launchService,
       port: 0,
     });
     const address = server.address() as AddressInfo;
@@ -605,16 +581,7 @@ describe("startServer", () => {
         }),
       });
 
-      expect(response.status).toBe(202);
-      const body = await response.json() as { threadId: string; acceptedAt: string };
-      expect(body.threadId).toBeTruthy();
-      expect(body.acceptedAt).toBe("2026-06-18T00:00:00.000Z");
-      const thread = await persistence.getThread(body.threadId);
-      expect(thread?.metadata.dynamicTools).toEqual(DEFAULT_HOST_MACOS_DYNAMIC_TOOLS);
-      expect(onThreadDynamicTools).toHaveBeenCalledWith(
-        body.threadId,
-        DEFAULT_HOST_MACOS_DYNAMIC_TOOLS,
-      );
+      expect(response.status).toBe(404);
     } finally {
       server.close();
       await once(server, "close");

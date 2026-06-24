@@ -6,21 +6,30 @@ protocol AgentTriggerRuntimeReloading: AnyObject {
 }
 
 @MainActor
-final class AgentTriggerRuntime: AgentTriggerRuntimeReloading {
+protocol AgentTriggerSubmitting: AnyObject {
+    func submit(_ prompt: PromptSubmission)
+}
+
+@MainActor
+final class AgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmitting {
     private let registry: AgentTriggerRegistry
     private let store: AgentTriggerStore
-    private let emit: (ElectronAgentTriggerFirePayload) -> Void
+    private let submitPrompt: (PromptSubmission) -> Void
 
     @ObservationIgnored private var activeProviders: [String: any AgentTriggerProvider] = [:]
 
     init(
         registry: AgentTriggerRegistry,
         store: AgentTriggerStore,
-        emit: @escaping (ElectronAgentTriggerFirePayload) -> Void = { _ in }
+        submit: @escaping (PromptSubmission) -> Void = { _ in }
     ) {
         self.registry = registry
         self.store = store
-        self.emit = emit
+        self.submitPrompt = submit
+    }
+
+    func submit(_ prompt: PromptSubmission) {
+        submitPrompt(prompt)
     }
 
     func reload() throws {
@@ -44,36 +53,27 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading {
             let instances = instancesByProvider[descriptor.kind] ?? []
             let instancesById = Dictionary(uniqueKeysWithValues: instances.map { ($0.id, $0) })
             let provider = factory.createHostProvider()
-            try provider.start(instances: instances) { [weak self, emit] event in
+            try provider.start(instances: instances) { [weak self, submitPrompt] event in
                 DispatchQueue.main.async {
                     guard let self,
                           let instance = instancesById[event.triggerInstanceId] else { return }
-                    emit(self.makeFirePayload(from: event, instance: instance))
+                    submitPrompt(self.makePromptSubmission(from: event, instance: instance))
                 }
             }
             activeProviders[descriptor.kind] = provider
         }
     }
 
-    private func makeFirePayload(
+    private func makePromptSubmission(
         from event: AgentTriggerEvent,
         instance: AgentTriggerInstance
-    ) -> ElectronAgentTriggerFirePayload {
+    ) -> PromptSubmission {
         let renderedPrompt = renderPromptTemplate(instance.promptTemplate, event: event, instance: instance)
-        return ElectronAgentTriggerFirePayload(
-            triggerInstanceId: instance.id,
-            threadTitleHint: instance.title,
+        return PromptSubmission(
             userInput: PromptUserInput(items: [
                 .text(id: UUID().uuidString, text: renderedPrompt)
             ]),
-            notificationPolicy: ElectronAgentTriggerNotificationPolicy(mode: instance.notificationPolicy.mode.rawValue),
-            sourceEvent: ElectronAgentTriggerSourceEvent(
-                triggerInstanceId: event.triggerInstanceId,
-                providerKind: event.providerKind,
-                occurredAt: event.occurredAt,
-                summary: event.summary,
-                payload: event.payload.mapValues(renderAgentTriggerValue)
-            )
+            summary: instance.title.isEmpty ? event.summary : instance.title
         )
     }
 
