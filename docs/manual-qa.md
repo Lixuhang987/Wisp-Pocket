@@ -20,7 +20,7 @@
 ### Context History 与自进化 Automation 官方 plugin
 
 - 完成日期：2026-06-25
-- 关键 commit：0b88e68
+- 关键 commit：0b88e68、187c867
 - 实现位置：`apps/desktop/Sources/AppServices/PlatformBridge/PluginDynamicTools.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/builtin-plugins/`、`Package.swift`、`apps/desktop/TestsSwift/AppServices/PlatformBridge/PluginDynamicToolsTests.swift`、`apps/builtin-plugins/Tests/ContextHistoryPluginCoreTests.swift`、`apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
 - 验收结果：新增官方 Swift plugin 安装/修复流程；AX、screenshot、app/window 原子 plugin 默认启用，其中 app/window plugin 提供 frontmost、list_windows、activate；Context History 与 Automation runtime 默认关闭，启用 manifest 后由 Swift desktop 启动 always-on plugin，并通过常驻 stdin/stdout RPC 响应 dynamic tool 调用。Context History core 已覆盖前台 app/window 变化采样、30 秒周期 activity sample、60 秒截图记录和 activity index / sample details / thumbnails / original screenshot 分层查询；Automation 第一阶段已覆盖 record_start / record_stop / policy_create / run / history / apply_patch 的 tool 路由、结构化存储、受限 AX Policy 执行、waitFor、断言、失败 fallback repair patch 自动合入和 run/patch history 写入。真实用户操作录制、agent 归纳 policy、computer use repair 闭环仍需实机 QA 验证。
 - 自动化验证：需执行 `bash ./scripts/swiftw test --filter PluginDynamicToolsTests`、`bash ./scripts/swiftw test --filter ContextHistoryPluginCoreTests`、`bash ./scripts/swiftw test --filter AutomationRuntimeTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
