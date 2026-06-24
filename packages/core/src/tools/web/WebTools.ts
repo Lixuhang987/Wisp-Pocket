@@ -19,6 +19,11 @@ const TAVILY_SEARCH_URL = "https://api.tavily.com/search";
 type FetchLike = typeof fetch;
 type LookupAddress = { address: string; family: 4 | 6 };
 type LookupLike = (hostname: string) => Promise<LookupAddress[]>;
+type PinnedLookupCallback = (
+  error: Error | null,
+  addressOrAddresses?: string | LookupAddress[],
+  family?: 4 | 6,
+) => void;
 type PageRequestOptions = {
   timeoutMs: number;
   maxResponseBytes: number;
@@ -387,7 +392,7 @@ function requestPublicPageOnce(
 ): Promise<PageRequestResult> {
   const url = new URL(urlValue);
   const requestImpl = url.protocol === "https:" ? httpsRequest : httpRequest;
-  const pinned = addresses[0];
+  const pinnedLookup = createPinnedLookup(addresses);
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -413,9 +418,7 @@ function requestPublicPageOnce(
         "User-Agent": "HandAgentWebSearch/1.0",
         Accept: "text/html,text/plain;q=0.9,application/xhtml+xml;q=0.8,*/*;q=0.1",
       },
-      lookup: (_hostname, _options, callback) => {
-        callback(null, pinned.address, pinned.family);
-      },
+      lookup: pinnedLookup,
     }, (response) => {
       const headers = headersFromIncoming(response.headers);
       const status = response.statusCode ?? 0;
@@ -468,6 +471,34 @@ function requestPublicPageOnce(
     }
     throw error;
   });
+}
+
+export function createPinnedLookup(
+  addresses: LookupAddress[],
+): (_hostname: string, options: unknown, callback: PinnedLookupCallback) => void {
+  return (_hostname, options, callback) => {
+    const pinned = addresses[0];
+    if (!pinned) {
+      callback(new Error("fetch_page only supports public web URLs"));
+      return;
+    }
+
+    if (isLookupAllOptions(options)) {
+      callback(null, addresses.map((address) => ({ ...address })));
+      return;
+    }
+
+    callback(null, pinned.address, pinned.family);
+  };
+}
+
+function isLookupAllOptions(options: unknown): boolean {
+  return Boolean(
+    options &&
+      typeof options === "object" &&
+      "all" in options &&
+      (options as { all?: unknown }).all === true,
+  );
 }
 
 function headersFromIncoming(headers: Record<string, string | string[] | number | undefined>): Headers {

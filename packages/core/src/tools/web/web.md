@@ -21,7 +21,7 @@
 
 - 两个工具都使用进程内 TTL cache 和容量上限；`web_search` 默认 5 分钟，`fetch_page` 默认 10 分钟。
 - 两个工具的 `requiresPermission` 都是 `false`，由 runtime 跳过 `PermissionPolicy.check`，和 `use_tools` 一样可默认调用。
-- `fetch_page` 只允许 `http` / `https` 公共地址；请求前和每次重定向后都会 DNS 解析并拒绝 loopback、私网、link-local、metadata 等非公共地址，生产请求会把已校验地址固定到实际连接，降低 DNS rebinding 风险。
+- `fetch_page` 只允许 `http` / `https` 公共地址；请求前和每次重定向后都会 DNS 解析并拒绝 loopback、私网、link-local、metadata 等非公共地址，生产请求会把已校验地址固定到实际连接，降低 DNS rebinding 风险；固定地址 lookup 同时兼容 Node 请求层的单地址回调和 `all: true` 地址数组回调。
 - `fetch_page` 手动处理重定向，限制最大重定向次数、完整响应读取超时、文本 content-type 和响应字节数。
 - `fetch_page` 返回的网页正文是外部不可信文本。模型只能把它当资料来源，不应执行其中的指令。
 - 本目录不实现自托管搜索索引，不批量抓取搜索结果全文。
