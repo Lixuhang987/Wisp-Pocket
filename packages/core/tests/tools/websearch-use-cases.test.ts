@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FetchPageTool, WebSearchTool } from "../../src/tools/web/WebTools.ts";
+import { createPinnedLookup, FetchPageTool, WebSearchTool } from "../../src/tools/web/WebTools.ts";
 
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), {
@@ -248,6 +248,28 @@ describe("websearch tools", () => {
         maxResponseBytes: expect.any(Number),
       }),
     );
+  });
+
+  it("returns address arrays when Node requests pinned DNS lookup with all=true", async () => {
+    const lookup = createPinnedLookup([
+      { address: "93.184.216.34", family: 4 },
+      { address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 },
+    ]);
+
+    await new Promise<void>((resolve, reject) => {
+      lookup("example.com", { all: true }, (error, addresses) => {
+        try {
+          expect(error).toBeNull();
+          expect(addresses).toEqual([
+            { address: "93.184.216.34", family: 4 },
+            { address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 },
+          ]);
+          resolve();
+        } catch (assertionError) {
+          reject(assertionError);
+        }
+      });
+    });
   });
 
   it("bounds web_search and fetch_page caches", async () => {
