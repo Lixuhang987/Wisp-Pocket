@@ -606,3 +606,19 @@
   4. **ThreadWindow**：打开 ThreadWindow，确认背景 glow 更柔和（几乎不可见）；HistorySidebar 头部只有 + 图标按钮和搜索框（无 logo/标题/描述/大按钮）；搜索框高度更小；User bubble 更窄 (75%)、无阴影；Tool bubble 无边框无阴影；消息操作按钮固定显示为纯 icon (复制/编辑/重新生成)；空状态为极简文字；Composer 按钮略小。
   5. **StatusBubble**：确认 StatusBubble 表面颜色跟随主题系统；6 种状态颜色与主题 token 一致（idle=#8e8b82 running=#cc785c tool=#5db8a6 waiting=#e8a55a done=#5db872 error=#c64545）；hover 无位移只变色；pulse 动画为柔和呼吸扩散；label 字重更轻(600)；detail 字号略大(13px)。
   6. **亮色主题交叉验证**：切回亮色主题，确认所有界面暖奶白底色不变，PromptPanel/Settings/ThreadWindow/StatusBubble 视觉更紧凑但功能不变。
+
+### Tool 调用消息默认收起展开交互
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/thread-window-web/src/components/MessageBubble.tsx`
+- 修复结论：Tool 消息从全量展示改为默认收起的紧凑单行布局。收起态只显示工具名和状态图标（运行中为 amber spinner，完成为 green check），点击 header 可展开查看完整输入/输出 JSON。使用 CSS `grid-template-rows: 0fr → 1fr` 过渡实现平滑展开动画。运行中的 tool 自动展开，完成后自动收起；用户手动操作后不再被自动切换覆盖。展开时底部显示复制按钮，收起时隐藏。
+- 自动化验证：需执行 `bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 启动桌面 App，提交会触发 tool 调用的 prompt，确认 tool 消息默认以单行紧凑形式展示，只显示 `▶ [toolName]` 和状态图标。
+  2. 确认运行中的 tool 消息自动展开，显示 amber 色旋转 spinner 图标。
+  3. 确认 tool 运行完成后自动收起，状态图标变为绿色 check。
+  4. 点击收起态的 tool 消息 header，确认内容区平滑展开，显示完整 JSON 文本。
+  5. 再次点击 header，确认内容区平滑收起。
+  6. 手动展开一个已完成的 tool 消息后，确认后续新 tool 消息的自动收起不会影响已手动展开的消息。
+  7. 展开状态下确认底部显示复制按钮，点击可复制 tool 输出内容。
+  8. 确认 assistant 和 user 消息的显示不受影响，行为与之前一致。

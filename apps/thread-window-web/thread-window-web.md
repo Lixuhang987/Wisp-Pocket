@@ -90,6 +90,7 @@ fallback initial prompt 流程仍是先建 thread，再提交首轮输入：
 - `ThreadItem` 选中状态使用整行 `bg-app-accent-subtle` 高亮，并保留 `aria-current="page"` 语义标记；禁止使用会被误读为图片描边的 `border`、`shadow` 或点击后常驻 focus ring。键盘导航仅在 `focus-visible` 时显示焦点 ring，hover 背景只用于未选中项。
 - `Composer` 以受控 `InputItem[]` 作为真实输入状态，渲染输入框内 prefix chips 和唯一 editable text item；提交时发送完整 `UserInput.items`。开头输入 `/` 时会基于宿主注入的 `availableSkills` 在输入框上方显示 Popover 形式的 slash 菜单（Portal 渲染，自动碰撞检测）。菜单必须使用 Radix `--radix-popover-trigger-width` 匹配输入框宽度，并用 `--radix-popover-content-available-height` 约束最大高度；窄高窗口中即使没有翻转到下方，也必须完整留在视口内且可滚动。`ArrowUp`/`ArrowDown` 在候选列表中导航，`Tab` 选择当前高亮 skill：追加一个 `skill` item、清空唯一 text item，并保持焦点留在 textarea。`Escape` 清除 `/` 前缀文本并关闭菜单。没有匹配 skill 时必须显示可见空态，不能留下无内容的空白菜单。不要恢复 `createUserInputFromText` 这类产品级纯文本构造 helper。running 时提交由 `App`/store 排队，附件按钮、编辑和重新生成仍是 UI 占位，不能在文档或代码中当作已完成能力。
 - `MessageBubble` 对 user role 不再只显示扁平 `text`：若存在 `userInputItems`，图片作为独立 strip 显示在 user 气泡上方，`skill` / `text_selection` chip row 和 text block 显示在气泡内；旧快照或旧通知没有 `userInputItems` 时，继续回退到纯文本气泡。
+- `MessageBubble` 对 tool role 使用独立的紧凑可折叠布局：默认收起，只显示工具名和状态图标（运行中 `Loader2` amber spin、完成 `Check` green）；点击 header 展开查看完整 JSON 内容。展开/收起使用 CSS `grid-template-rows: 0fr → 1fr` 过渡动画（`duration-200 ease-out`）。运行中的 tool 自动展开，完成后自动收起；用户手动操作后 `userToggledRef` 阻止自动切换覆盖。展开时底部显示复制按钮，收起时隐藏操作栏。
 
 ## 样式前提
 
