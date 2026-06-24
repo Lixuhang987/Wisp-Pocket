@@ -160,6 +160,7 @@ public final class AutomationRepairRequestStore: @unchecked Sendable {
         let id = UUID().uuidString
         var payload: [String: Any] = [
             "id": id,
+            "status": "pending",
             "policyId": request.policy.id,
             "policyVersion": request.policy.version,
             "runId": request.runId,
@@ -183,6 +184,19 @@ public final class AutomationRepairRequestStore: @unchecked Sendable {
             "route": "agent_computer_use",
             "failureReason": request.failureReason,
         ]
+    }
+
+    public func listRepairRequests() throws -> [[String: Any]] {
+        try store.listRepairRequests()
+    }
+
+    public func markApplied(id: String, patchId: String) throws -> [String: Any] {
+        var request = try store.loadRepairRequest(id: id)
+        request["status"] = "applied"
+        request["patchId"] = patchId
+        request["appliedAt"] = iso8601(Date())
+        try store.saveRepairRequest(id: id, payload: request)
+        return request
     }
 }
 
@@ -379,6 +393,19 @@ public final class AutomationStore: @unchecked Sendable {
         return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
     }
 
+    public func listRepairRequests() throws -> [[String: Any]] {
+        guard let urls = try? fileManager.contentsOfDirectory(at: repairRequestsURL, includingPropertiesForKeys: nil) else {
+            return []
+        }
+        return try urls
+            .filter { $0.pathExtension == "json" }
+            .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+            .map { url in
+                let data = try Data(contentsOf: url)
+                return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            }
+    }
+
     private func write<T: Encodable>(_ value: T, to url: URL) throws {
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try encoder.encode(value).write(to: url, options: .atomic)
@@ -573,6 +600,7 @@ public final class AutomationToolRouter: @unchecked Sendable {
                 return .json([
                     "runs": try store.listRuns().map(encodeDictionary),
                     "patches": try store.listPatches().map(encodeDictionary),
+                    "repairRequests": try AutomationRepairRequestStore(store: store).listRepairRequests(),
                 ])
             case "record_start":
                 if let recorder {
@@ -609,6 +637,37 @@ public final class AutomationToolRouter: @unchecked Sendable {
                 let patch = try store.loadPatch(id: patchId)
                 let policy = try store.applyPatch(patch)
                 return .json(["policy": try encodeDictionary(policy), "patch": try encodeDictionary(patch)])
+            case "repair_apply":
+                let object = dictionaryArgument(arguments)
+                let repairRequestId = stringArgument(arguments, "repairRequestId", fallback: "")
+                let repairStore = AutomationRepairRequestStore(store: store)
+                let repairRequest = try store.loadRepairRequest(id: repairRequestId)
+                guard stringValue(repairRequest["status"]) == "pending" else {
+                    return .text("automation repair request is not pending", success: false)
+                }
+                let policyId = stringValue(repairRequest["policyId"]) ?? ""
+                let runId = stringValue(repairRequest["runId"]) ?? UUID().uuidString
+                let policy = try store.loadPolicy(id: policyId)
+                let branch = try decodeJSONObject(AutomationBranch.self, from: object["branch"])
+                var evidence = stringDictionaryArgument(object["evidence"])
+                evidence["repair"] = "agent-computer-use-result"
+                evidence["repairRequestId"] = repairRequestId
+                evidence["route"] = "agent_computer_use"
+                let patch = AutomationPolicyPatch(
+                    id: stringArgument(arguments, "patchId", fallback: UUID().uuidString),
+                    policyId: policy.id,
+                    sourceRunId: runId,
+                    basePolicyVersion: policy.version,
+                    branch: branch,
+                    evidence: evidence
+                )
+                let updatedPolicy = try store.applyPatch(patch)
+                let updatedRepairRequest = try repairStore.markApplied(id: repairRequestId, patchId: patch.id)
+                return .json([
+                    "policy": try encodeDictionary(updatedPolicy),
+                    "patch": try encodeDictionary(patch),
+                    "repairRequest": updatedRepairRequest,
+                ])
             default:
                 return .text("unsupported automation tool: \(tool)", success: false)
             }
@@ -668,6 +727,12 @@ private func encodeDictionary<T: Encodable>(_ value: T) throws -> [String: Any] 
     return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
 }
 
+private func decodeJSONObject<T: Decodable>(_ type: T.Type, from value: Any?) throws -> T {
+    let object = value ?? [:]
+    let data = try JSONSerialization.data(withJSONObject: object)
+    return try JSONDecoder().decode(type, from: data)
+}
+
 private func stringArgument(_ arguments: Any?, _ key: String, fallback: String = "") -> String {
     let object = arguments as? [String: Any]
     return object?[key] as? String ?? fallback
@@ -675,6 +740,13 @@ private func stringArgument(_ arguments: Any?, _ key: String, fallback: String =
 
 private func dictionaryArgument(_ arguments: Any?) -> [String: Any] {
     arguments as? [String: Any] ?? [:]
+}
+
+private func stringDictionaryArgument(_ arguments: Any?) -> [String: String] {
+    let object = dictionaryArgument(arguments)
+    return object.reduce(into: [String: String]()) { result, pair in
+        result[pair.key] = stringValue(pair.value) ?? ""
+    }
 }
 
 private func metadataArguments(from object: [String: Any]) -> [String: Any] {

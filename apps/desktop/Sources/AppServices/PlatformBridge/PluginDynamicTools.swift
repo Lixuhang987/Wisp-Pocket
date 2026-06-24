@@ -244,8 +244,9 @@ struct BuiltinPluginInstaller {
                     tool("automation", "record_stop", "Stop recording and save the trace."),
                     tool("automation", "policy_create", "Create an Automation Policy from a trace."),
                     tool("automation", "run", "Run an Automation Policy."),
-                    tool("automation", "history", "Read automation run and patch history."),
+                    tool("automation", "history", "Read automation run, patch, and repair request history."),
                     tool("automation", "apply_patch", "Apply an Automation Policy patch."),
+                    tool("automation", "repair_apply", "Apply an agent repair branch to an Automation Policy."),
                 ],
             ]
         )

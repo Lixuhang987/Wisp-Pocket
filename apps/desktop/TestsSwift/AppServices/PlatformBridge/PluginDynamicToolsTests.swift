@@ -50,6 +50,7 @@ final class PluginDynamicToolsTests: XCTestCase {
             "run",
             "history",
             "apply_patch",
+            "repair_apply",
         ])
     }
 

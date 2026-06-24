@@ -70,7 +70,7 @@ struct AutomationPolicyPatch: Codable {
 
 官方 plugin manifest：
 
-- `handagent-automation-runtime`：`kind = automation`，`lifecycle = alwaysOn`，默认 `enabled = false`；依赖 `app_window`、`ax`、`screenshot`；提供 `automation.record_start`、`automation.record_event`、`automation.record_stop`、`automation.policy_create`、`automation.run`、`automation.history`、`automation.apply_patch`。
+- `handagent-automation-runtime`：`kind = automation`，`lifecycle = alwaysOn`，默认 `enabled = false`；依赖 `app_window`、`ax`、`screenshot`；提供 `automation.record_start`、`automation.record_event`、`automation.record_stop`、`automation.policy_create`、`automation.run`、`automation.history`、`automation.apply_patch`、`automation.repair_apply`。
 
 ### Use case map
 
@@ -114,7 +114,7 @@ flowchart LR
 4. 实现录制 trace 存储接口：第一版以 runtime API 接收 structured user events，并在每个 event 前后读取 app/window、AX、截图引用。
 5. 实现 failure collection 与 `AutomationRepairing` 边界：失败时收集当前 AX tree、截图、失败步骤、已执行步骤和目标。
 6. 实现 repair 成功后的 patch 生成与自动合入：更新 policy version，保存 patch、run history 和证据引用。
-7. 暴露 `automation.*` dynamic tools：record_start、record_event、record_stop、policy_create、run、history、apply_patch。
+7. 暴露 `automation.*` dynamic tools：record_start、record_event、record_stop、policy_create、run、history、apply_patch；第二阶段追加 repair_apply。
 8. 更新 `platform-bridge.md`、`app-services.md`、builtin plugin 文档和 `docs/manual-qa.md`。
 
 ### Self-review
@@ -124,3 +124,79 @@ flowchart LR
 - 运行时优先用 AX selector 与断言，失败才进入 repair。
 - repair 成功后自动合入 patch，不要求用户审核。
 - 不把 Context History 和 Automation 合并；它们只共享原子 plugin 能力。
+
+## 第二阶段：agent/computer-use repair 队列与回填闭环
+
+### Goal
+
+把第一阶段的 repair request 从“仅落盘”推进为 agent 可消费、可回填的 runtime 队列。`automation.run` 失败时仍收集当前 app/window、AX、截图、失败步骤、已执行步骤和目标，并保存 repair request；`automation.history` 必须返回 pending repair requests，让 agent 可以发现需要 computer-use 介入的失败运行。agent / computer-use 完成当前任务后，通过新的 repair result 入口提交可执行 branch，runtime 生成 `AutomationPolicyPatch`、自动合入 policy，并把 repair request 标记为 applied。
+
+这一阶段仍不把 plugin 进程直接连到 `/api/thread`，也不让 Automation runtime 自己驱动 LLM。agent 触发与 computer-use 执行由当前 thread/tool 体系承担；Automation runtime 负责提供可审计的 request/result 数据边界和自动合入语义。
+
+### Existing Flow Inventory
+
+- 复用 `AutomationRepairRequestStore.saveRepairRequest` 的 request 落盘能力，扩展为可列举、可加载、可标记状态的 repair request store。
+- 复用 `AutomationToolRouter.history` 作为 agent 查看运行历史的入口，追加 `repairRequests`，避免新增仅用于列表的 tool。
+- 复用 `AutomationStore.applyPatch` 的 policy version + patch 落盘语义；新增 repair result 入口只负责从 agent 返回的 branch 构造 patch 并调用 apply。
+- 不绕过 dynamic tool provider：agent 仍通过 `automation.*` tool 调用 runtime。
+
+### Core structure
+
+```swift
+struct AutomationRepairRequestRecord: Codable {
+    let id: String
+    let status: String // pending | applied
+    let policyId: String
+    let runId: String
+    let failedStepIndex: Int
+    let completedSteps: [[String: JSONValue]]
+    let appWindow: [String: JSONValue]
+    let axSnapshot: [String: JSONValue]
+    let screenshot: [String: JSONValue]
+    var patchId: String?
+    var appliedAt: String?
+}
+
+automation.history -> {
+  runs: [...],
+  patches: [...],
+  repairRequests: [AutomationRepairRequestRecord]
+}
+
+automation.repair_apply({
+  repairRequestId,
+  branch: { id, steps, assertions },
+  evidence: { ... }
+}) -> {
+  policy,
+  patch,
+  repairRequest
+}
+
+// 非 pending repair request 必须拒绝，避免同一个 agent/computer-use
+// repair result 重复合入并重复递增 policy version。
+```
+
+### Use case map
+
+```mermaid
+flowchart LR
+    A["automation.run selector/action/assertion 失败"] --> B["AutomationRuntime 收集失败 evidence"]
+    B --> C["AutomationRepairRequestStore 写入 pending repair request"]
+    C --> D["automation.history 返回 repairRequests"]
+    D --> E["agent 使用 computer-use 完成当前任务并形成 branch"]
+    E --> F["agent 调用 automation.repair_apply"]
+    F --> G["runtime 生成 patch 并自动合入 policy"]
+    G --> H["repair request 标记 applied，history 可审计 patchId"]
+```
+
+- Integration test need to update: `apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
+  - 构造失败 policy，断言 `automation.history` 返回 pending repair request，包含 runId、failedStepIndex、completedSteps、appWindow、axSnapshot、screenshot。
+  - 调用 `automation.repair_apply`，传入 agent/computer-use 生成的 branch，断言 policy version + 1、patch 写入、repair request status 变为 applied，并在 history 中带 patchId。
+
+### Implementation tasks
+
+1. 扩展 repair request 存储：列举、加载、标记 applied，保存时包含 `status = pending`。
+2. 扩展 `automation.history` 返回 `repairRequests`。
+3. 新增 `automation.repair_apply` tool 路由：解析 `repairRequestId`、branch、evidence，只允许 pending request 构造 patch、调用 `AutomationStore.applyPatch` 并标记 request applied；已 applied request 必须拒绝，避免重复合入。
+4. 更新官方 Automation manifest tool 列表、desktop manifest 测试、builtin plugin 文档和 manual QA。

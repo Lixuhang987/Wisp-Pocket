@@ -126,6 +126,7 @@ final class AutomationRuntimeTests: XCTestCase {
         let repairRequestId = try XCTUnwrap(patch.evidence["repairRequestId"])
         let repairRequest = try store.loadRepairRequest(id: repairRequestId)
         XCTAssertEqual(repairRequest["policyId"] as? String, "policy-2")
+        XCTAssertEqual(repairRequest["status"] as? String, "pending")
         XCTAssertEqual(repairRequest["route"] as? String, "agent_computer_use")
         XCTAssertEqual(repairRequest["runId"] as? String, run.id)
         XCTAssertEqual(repairRequest["failedStepIndex"] as? Int, 0)
@@ -134,6 +135,103 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertNotNil(repairRequest["appWindow"] as? [String: Any])
         XCTAssertNotNil(repairRequest["axSnapshot"] as? [String: Any])
         XCTAssertNotNil(repairRequest["screenshot"] as? [String: Any])
+    }
+
+    func testAutomationToolRouterListsAndAppliesAgentRepairRequests() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: RecordingAutomationCapabilityClient(failAXAction: true),
+            repairer: PersistingAutomationRepairer(store: store)
+        )
+        let router = AutomationToolRouter(store: store, runtime: runtime)
+        let policy = AutomationPolicy(
+            id: "policy-repair-queue",
+            title: "Repair Queue",
+            targetBundleId: "com.example.app",
+            branches: [
+                AutomationBranch(
+                    id: "main",
+                    steps: [
+                        AutomationStep(kind: .click, selector: AXSelector(role: "AXButton", title: "Submit")),
+                    ],
+                    assertions: []
+                ),
+            ]
+        )
+        try store.savePolicy(policy)
+
+        let runResult = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "run",
+            arguments: ["policyId": "policy-repair-queue"]
+        ))
+        let run = try XCTUnwrap(runResult["run"] as? [String: Any])
+        XCTAssertEqual(run["status"] as? String, "repaired")
+
+        let history = decodeToolJSON(await router.handle(namespace: "automation", tool: "history", arguments: [:]))
+        let repairRequests = try XCTUnwrap(history["repairRequests"] as? [[String: Any]])
+        let repairRequest = try XCTUnwrap(repairRequests.first)
+        let repairRequestId = try XCTUnwrap(repairRequest["id"] as? String)
+        XCTAssertEqual(repairRequest["status"] as? String, "pending")
+        XCTAssertEqual(repairRequest["policyId"] as? String, "policy-repair-queue")
+        XCTAssertEqual(repairRequest["runId"] as? String, run["id"] as? String)
+        XCTAssertEqual(repairRequest["failedStepIndex"] as? Int, 0)
+        XCTAssertNotNil(repairRequest["completedSteps"] as? [[String: Any]])
+        XCTAssertNotNil(repairRequest["appWindow"] as? [String: Any])
+        XCTAssertNotNil(repairRequest["axSnapshot"] as? [String: Any])
+        XCTAssertNotNil(repairRequest["screenshot"] as? [String: Any])
+
+        let apply = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "repair_apply",
+            arguments: [
+                "repairRequestId": repairRequestId,
+                "patchId": "agent-repair-patch",
+                "branch": [
+                    "id": "agent-computer-use-branch",
+                    "steps": [
+                        [
+                            "kind": "click",
+                            "selector": ["role": "AXButton", "title": "Submit Now"],
+                        ],
+                    ],
+                    "assertions": [],
+                ],
+                "evidence": [
+                    "agentRunId": "agent-run-1",
+                    "result": "completed",
+                ],
+            ]
+        ))
+        let updatedPolicy = try XCTUnwrap(apply["policy"] as? [String: Any])
+        let patch = try XCTUnwrap(apply["patch"] as? [String: Any])
+        let updatedRepairRequest = try XCTUnwrap(apply["repairRequest"] as? [String: Any])
+        XCTAssertEqual(updatedPolicy["version"] as? Int, 3)
+        XCTAssertEqual(patch["id"] as? String, "agent-repair-patch")
+        let evidence = try XCTUnwrap(patch["evidence"] as? [String: Any])
+        XCTAssertEqual(evidence["agentRunId"] as? String, "agent-run-1")
+        XCTAssertEqual(evidence["repairRequestId"] as? String, repairRequestId)
+        XCTAssertEqual(updatedRepairRequest["status"] as? String, "applied")
+        XCTAssertEqual(updatedRepairRequest["patchId"] as? String, "agent-repair-patch")
+
+        let duplicateApply = await router.handle(
+            namespace: "automation",
+            tool: "repair_apply",
+            arguments: [
+                "repairRequestId": repairRequestId,
+                "patchId": "agent-repair-patch-duplicate",
+                "branch": [
+                    "id": "duplicate",
+                    "steps": [],
+                    "assertions": [],
+                ],
+            ]
+        )
+        XCTAssertFalse(duplicateApply.success)
+        XCTAssertEqual(duplicateApply.contentItems.first?["text"] as? String, "automation repair request is not pending")
+        XCTAssertEqual(try store.loadPolicy(id: "policy-repair-queue").version, 3)
     }
 
     func testAutomationToolRouterRecordsTraceCreatesPolicyAndListsHistory() async throws {
@@ -245,6 +343,7 @@ final class AutomationRuntimeTests: XCTestCase {
         let history = decodeToolJSON(await router.handle(namespace: "automation", tool: "history", arguments: [:]))
         XCTAssertNotNil(history["runs"] as? [[String: Any]])
         XCTAssertNotNil(history["patches"] as? [[String: Any]])
+        XCTAssertNotNil(history["repairRequests"] as? [[String: Any]])
     }
 
     func testRecordingWithoutTargetBundleIdStillReturnsJSONAndSavesTrace() async throws {
