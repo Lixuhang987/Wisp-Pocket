@@ -158,6 +158,6 @@ HDR、录制、麦克风、Presenter Overlay 都是后续增强项，不是第�
 如果你的目标是“桌面 agent 真正理解窗口级内容并持续工作”，`ScreenCaptureKit` 是明显更对的底座。
 
 如果你要，我下一步可以直接给你一份面向 `handAgent` 的迁移设计：
-- 哪些现有 `PlatformAdapter` 接口保持不变
+- 哪些现有 `host_macos.*` dynamic tool spec 保持不变
 - 哪些能力先用 `ScreenCaptureKit` 替换
-- Swift 宿主层还是 TS 平台层负责采集更合适
+- Swift 宿主层还是 dynamic tool provider 层负责采集更合适
