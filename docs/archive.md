@@ -1487,3 +1487,33 @@
   5. 在 React ThreadWindow 中点击“新建对话”，observer 收到新的 `thread.started`：`thread-ac1ca53b-6765-4338-ac01-2c1b0b87e523`，UI 切到“新对话 / 等待输入”。随后在 composer 提交 `THREAD_STARTED_REACT_COMPOSER_QA_20260625 [mock:assistant-ok] composer submit`，observer 收到 `user.message.recorded`、`turn.started`、多条 `assistant.delta`、`turn.completed`、`thread.status.changed(idle)`，React UI 显示用户消息、mock assistant 回复并回到 idle。
 - **证据**：`/api/thread` observer 输出包含 `thread-7c6ef78c-db09-4962-ac02-8e5b1ba88b36` 的 `thread.started` 与后续普通 notification，以及 `thread-ac1ca53b-6765-4338-ac01-2c1b0b87e523` 的 React 新建 thread `thread.started`；Computer Use 可见 ThreadWindow URL 为 `127.0.0.1:4317/thread-window/index.html`，消息区显示 `THREAD_STARTED_SWIFT_QA_20260625`、`THREAD_STARTED_WORKSPACE_QA_20260625`、`THREAD_STARTED_REACT_COMPOSER_QA_20260625` 三条验证输入及对应 mock 结果。
 - **结论**：通过。`thread.started` 对所有 `/api/thread` 连接广播并自动订阅后续普通 notification；`acceptServerRequests=1` 仅控制 permission / workspace 等交互式请求 owner；Swift PromptPanel、React ThreadWindow、observer 三类连接的职责边界符合预期。
+
+
+### AgentTrigger bridge 重启 endpoint 修复回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/Coordinator/AppCoordinator.swift`、`apps/desktop/Sources/AppServices/AgentTrigger/AgentTriggerRuntime.swift`、`apps/desktop/Sources/AppServices/AgentTrigger/ChromeBookmarksExtensionBridge.swift`、`apps/desktop/TestsSwift/Coordinator/AppCoordinatorTests.swift`、`apps/desktop/TestsSwift/AppServices/AgentTriggerRuntimeTests.swift`、`apps/desktop/TestsSwift/AppServices/ChromeBookmarksExtensionBridgeServerTests.swift`、`docs/medium-powers/plans/2026-06-25-agenttrigger-bridge-restart-endpoint-fix.md`
+- 修复结论：`AgentTriggerRuntime` 新增显式 `stop()`，`AppCoordinator.shutdown()` 幂等停止 AgentTrigger provider；Chrome Bookmarks bridge server 停止或释放时只删除自己 token 对应的 `bridge.json`，避免退出 / 重启后磁盘保留无 live listener 的 endpoint，也避免旧 listener stop 误删新 listener endpoint。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppCoordinatorTests/testShutdownStopsAgentTriggerRuntimeOnce`、`bash ./scripts/swiftw test --filter AgentTriggerRuntimeTests/testStopStopsActiveProvidersAndAllowsReload`、`bash ./scripts/swiftw test --filter ChromeBookmarksExtensionBridgeServerTests/testStopRemovesOwnedEndpoint`、`bash ./scripts/swiftw test --filter ChromeBookmarksExtensionBridgeServerTests/testStopDoesNotRemoveEndpointOwnedByNewerServer`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 备份并移走 `~/.spotAgent/agent-triggers/`，使用带 Chrome Bookmarks extension id 和 native host helper path 的桌面 App 启动 HandAgent。
+  2. 创建并保存一个 Chrome Bookmarks 自动化实例，选择一个测试收藏夹；确认保存后的 `bridge.json.port` 等于当前 HandAgentDesktop 进程监听端口，synthetic `handagent.bookmarks.hello` / `handagent.bookmarks.folderTreeSnapshot` 均成功。
+  3. 退出桌面 App，确认 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/bridge.json` 不再保留已停止 listener 的 endpoint。
+  4. 重新启动桌面 App，确认已保存实例自动 reload，新的 `bridge.json.port` 等于当前 HandAgentDesktop 进程监听端口。
+  5. 重启后再次通过产品 native host 发送真实扩展 `hello` / `folderTreeSnapshot`，确认返回成功；不得使用旧进程遗留端口作为成功依据。若只直接携带当前 token POST 到 Swift bridge，该步骤只能证明当前 bridge 可达，不能证明 native host 状态写入。
+  6. 在产品 native host 路径下确认 `status.json.updatedAt` 不早于当前 `bridge.json.updatedAt`，Settings → 触发器 → Chrome Bookmarks 显示扩展已连接并能看到文件夹树。
+- 部分验证记录（2026-06-25）：
+  - 环境：主 checkout `/Users/mu9/proj/handAgent`，`main` 分支，提交 `e298047`；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均输出 `success`；`bash ./scripts/package-app.sh --mock-llm` 输出 `success`。
+  - 已验证核心 endpoint 链路：首次启动 pid `98542` 写出 `bridge.json.port=53654`，`lsof` 显示同 pid 监听 `*:53654`；产品 native host helper synthetic `hello` / `folderTreeSnapshot` 均返回 `{"ok":true}`，`status.json.state=connected` 且 `updatedAt=2026-06-24T22:20:55Z` 晚于 `bridge.json.updatedAt=2026-06-24T22:19:56Z`，`folders.json` 包含 `QA Target Folder`。
+  - 为避开 Computer Use 对当前 accessory/settings 窗口读取超时，本轮用 `instances.json` 写入 enabled `QA Bridge Automation`，`folderIds=["qa-target"]`，模拟已保存实例后重启。正常 quit 后确认旧 `bridge.json` 被删除，旧端口 `53654` 不再可作为成功依据。
+  - 重启后 pid `2156` 写出 `bridge.json.port=53655`，`lsof` 显示同 pid 监听 `*:53655`；旧端口 `53654` 携带当前 token POST 返回 `502`，当前端口 `53655` 携带当前 token POST 返回 `204`；再次通过产品 native host helper 发送 `hello` / `folderTreeSnapshot` 均返回 `{"ok":true}`，`status.json.state=connected` 且 `updatedAt=2026-06-24T22:27:42Z` 晚于 `bridge.json.updatedAt=2026-06-24T22:26:43Z`，`folders.json` 仍包含 `QA Target Folder`。
+  - 未完成项：Computer Use 对 `HandAgentDesktop` 设置窗口持续返回 timeout，未能取得 Settings → 触发器 → Chrome Bookmarks 的视觉证据，也未通过 UI 创建实例。因此本条不归档，仍需后续补 Settings UI 实机确认。
+  - 清理状态：QA 残留 HandAgentDesktop / Electron / agent-server 均已退出，`127.0.0.1:4317` 无监听；QA 前备份 `~/.spotAgent/qa-backup-agent-triggers-20260625-061910` 已恢复为 `~/.spotAgent/agent-triggers/`，本轮现场保存在 `~/.spotAgent/agent-triggers.qa-restart-fix-20260625-062954`。
+
+### AgentTrigger bridge 重启 endpoint 修复回归
+
+- **验证日期**：2026-06-25
+- **验证环境**：主 checkout `/Users/mu9/proj/handAgent`，`main` 分支，提交 `b72fcf1`；本轮 QA 前已执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/package-app.sh --mock-llm`，均成功；packaged App 使用 mock LLM、扩展 ID `iidkhdjaboimibeplbeanlklgakmfebb` 与打包产物里的 `HandAgentChromeBookmarksNativeHost`。
+- **验证过程**：备份并移走现有 `~/.spotAgent/agent-triggers/` 后启动 packaged App；通过 Settings → 触发器 → Chrome Bookmarks 的新增自动化表单创建实例，文件夹树显示 `QA Root` / `QA Target Folder`，保存后 `instances.json` 写入 enabled 实例 `QABridge` 且 `folderIds=["qa-target"]`。保存触发 runtime reload，bridge 从 `53669` 切到 `53670` 并由当前 pid `7650` 监听；产品 native host helper 持续连接发送 `hello` / `folderTreeSnapshot` 均返回 `{"ok":true}`，重新进入 Settings 后显示扩展已连接并列出实例。随后用 Cmd-Q 退出 App，确认 App/Electron/agent-server 均退出、`bridge.json` 删除、`53670` 无 listener。重启 packaged App 后，已保存实例自动 reload，新 pid `31607` 写出 `bridge.json.port=53671` 并监听该端口；旧端口 `53670` 携当前 token POST 返回 `502`，当前端口 `53671` POST 返回 `204`；再次通过产品 native host helper 发送 `hello` / `folderTreeSnapshot` 均返回 `{"ok":true}`。
+- **证据**：UI 表单和文件夹树截图 `/var/folders/m7/6b3swwk92mb0zthbzy5pfjvc0000gn/T/codex-shot-2026-06-25_06-47-20.png`；保存后实例截图 `/var/folders/m7/6b3swwk92mb0zthbzy5pfjvc0000gn/T/codex-shot-2026-06-25_06-59-43.png`；保存后 native host 重连并重新进入详情页截图 `/var/folders/m7/6b3swwk92mb0zthbzy5pfjvc0000gn/T/codex-shot-2026-06-25_07-04-29.png`；重启后最终详情页截图 `/var/folders/m7/6b3swwk92mb0zthbzy5pfjvc0000gn/T/codex-shot-2026-06-25_07-12-08.png`。重启后 `status.json.state=connected`、`status.updatedAt=2026-06-24T23:09:14Z`，晚于 `bridge.updatedAt=2026-06-24T23:07:21Z`；`folders.json` 包含 `QA Target Folder`；`lsof` 显示 `HandAgentDesktop` pid `31607` 监听 `*:53671`。
+- **结论**：通过。bridge endpoint 在保存 reload、退出清理、重启 reload 后均指向当前 live listener；旧端口不可作为成功依据，产品 native host 能读取当前 `bridge.json` 并写入最新 connected/folders 状态，Settings UI 与持久化状态一致。
