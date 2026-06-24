@@ -64,8 +64,8 @@ macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicT
 
 - 不进入 `registerBuiltins` / `registerTools` 的 builtin 注册流程，由 `ThreadScopedToolRegistry` 单独管理。
 - 不受 `~/.spotAgent/settings.json` 的 `allowlist` / `denylist` 影响；无论 settings 如何配置，未激活 thread 始终只暴露这一个 tool。
-- 激活后 meta-tool 仍保留在 registry 里；重复调用走幂等路径，返回 `META_TOOL_ALREADY_ACTIVE_RESULT`，不会重复扩展工具集。
-- 首次激活返回 `META_TOOL_FIRST_ACTIVATION_RESULT`，runtime 随即把完整 builtin + MCP 工具集注入当前 thread。
+- 首次激活返回 `META_TOOL_FIRST_ACTIVATION_RESULT`，runtime 随即把完整 builtin + MCP + dynamic tools 工具集注入当前 thread。
+- 激活后 provider 可见 registry 会移除 `use_tools`，避免后续轮次重复暴露 meta-tool；若模型或历史回放仍提交晚到的 `use_tools` 调用，runtime 走幂等兜底并返回 `META_TOOL_ALREADY_ACTIVE_RESULT`，不会重复扩展工具集。
 
 导出常量：`META_TOOL_NAME`、`META_TOOL_FIRST_ACTIVATION_RESULT`、`META_TOOL_ALREADY_ACTIVE_RESULT`。
 
