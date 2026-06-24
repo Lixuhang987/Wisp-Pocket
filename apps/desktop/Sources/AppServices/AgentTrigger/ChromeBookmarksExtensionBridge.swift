@@ -49,17 +49,44 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
         try stop()
         let token = UUID().uuidString
         let listener = try NWListener(using: .tcp, on: .any)
-        guard let port = listener.port?.rawValue else {
-            throw ChromeBookmarksExtensionBridgeError.missingPort
-        }
         self.token = token
         self.handler = handler
         listener.newConnectionHandler = { [weak self] connection in
             self?.handle(connection)
         }
-        listener.start(queue: queue)
         self.listener = listener
-        try writeEndpoint(port: Int(port), token: token)
+
+        let readyState = ChromeBookmarksListenerReadyState()
+        listener.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                if let port = listener.port?.rawValue, port > 0 {
+                    readyState.complete(.success(port))
+                } else {
+                    readyState.complete(.failure(.missingPort))
+                }
+            case .failed:
+                readyState.complete(.failure(.listenerFailed))
+            default:
+                return
+            }
+        }
+        listener.start(queue: queue)
+
+        guard readyState.wait(timeout: .now() + 2) else {
+            try? stop()
+            throw ChromeBookmarksExtensionBridgeError.listenerTimedOut
+        }
+        switch readyState.result {
+        case .success(let port):
+            try writeEndpoint(port: Int(port), token: token)
+        case .failure(let error):
+            try? stop()
+            throw error
+        case .none:
+            try? stop()
+            throw ChromeBookmarksExtensionBridgeError.listenerTimedOut
+        }
     }
 
     func stop() throws {
@@ -141,6 +168,36 @@ final class ChromeBookmarksExtensionBridgeServer: ChromeBookmarksExtensionEventS
 
 enum ChromeBookmarksExtensionBridgeError: Error, Equatable {
     case missingPort
+    case listenerFailed
+    case listenerTimedOut
+}
+
+private final class ChromeBookmarksListenerReadyState: @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var storedResult: Result<UInt16, ChromeBookmarksExtensionBridgeError>?
+
+    var result: Result<UInt16, ChromeBookmarksExtensionBridgeError>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedResult
+    }
+
+    func complete(_ result: Result<UInt16, ChromeBookmarksExtensionBridgeError>) {
+        lock.lock()
+        let shouldSignal = storedResult == nil
+        if shouldSignal {
+            storedResult = result
+        }
+        lock.unlock()
+        if shouldSignal {
+            semaphore.signal()
+        }
+    }
+
+    func wait(timeout: DispatchTime) -> Bool {
+        semaphore.wait(timeout: timeout) == .success
+    }
 }
 
 private struct HTTPBookmarkEventRequest {
