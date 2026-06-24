@@ -2,14 +2,14 @@
 
 ## 目录职责
 
-`actions/` 管理 thread 可用工具集合。它连接 settings 生成的 builtin workspace/file tools、`~/.spotAgent/mcp.json` 中的全局 MCP server，以及 thread metadata 中保存的 dynamic tools。
+`actions/` 管理 thread 可用工具集合。它连接默认公开 web tools、settings 生成的 builtin workspace/file tools、`~/.spotAgent/mcp.json` 中的全局 MCP server，以及 thread metadata 中保存的 dynamic tools。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
 | `MCPServerRegistry.ts` | 按 `serverId` 缓存 MCP client 和适配后的 tools；代理 prompts/resources 能力 |
-| `ThreadScopedToolRegistry.ts` | 为每个 thread 维护独立 `ToolRegistry`；处理 `use_tools` 懒加载、全局 MCP、dynamic tools、mock LLM 特例和删除清理 |
+| `ThreadScopedToolRegistry.ts` | 为每个 thread 维护独立 `ToolRegistry`；处理默认公开工具、`use_tools` 懒加载、全局 MCP、dynamic tools、mock LLM 特例和删除清理 |
 
 ## 工具组合流
 
@@ -17,10 +17,11 @@
 flowchart TD
   A["settings builtin registry"] --> D["ThreadScopedToolRegistry"]
   B["~/.spotAgent/mcp.json 全局 server ids"] --> D
+  W["default web tools"] --> D
   D --> E{"thread activated?"}
-  E -- "否" --> F["只暴露 use_tools"]
-  E -- "mock 模式" --> G["use_tools + builtin tools"]
-  E -- "是" --> H["builtin + 全局 MCP + dynamic tools，不再暴露 use_tools"]
+  E -- "否" --> F["use_tools + web_search + fetch_page"]
+  E -- "mock 模式" --> G["use_tools + web tools + builtin tools"]
+  E -- "是" --> H["web tools + builtin + 全局 MCP + dynamic tools，不再暴露 use_tools"]
   H --> I["core AgentRuntime registryForThread(threadId)"]
 ```
 
@@ -32,7 +33,11 @@ flowchart TD
 
 ## thread 懒激活
 
-未激活 thread 默认只暴露 `use_tools`，减少普通聊天请求里的工具噪音。模型调用 meta-tool 后，core runtime 触发 `activate(threadId)`，下一轮工具表扩展为 builtin + 全局 MCP，并移除 `use_tools`。
+未激活 thread 默认暴露 `use_tools`、`web_search`、`fetch_page`，减少高风险工具噪音，同时保留最新外部信息查询能力。模型调用 meta-tool 后，core runtime 触发 `activate(threadId)`，下一轮工具表扩展为 web tools + builtin + 全局 MCP + dynamic tools，并移除 `use_tools`。
+
+## 默认公开 web tools
+
+`startDefaultServer` 通过 `createDefaultWebTools()` 注入 `web_search` 和 `fetch_page`。这两个工具不由 settings registry 生成，不触发 permission ask；`web_search` 需要环境变量 `TAVILY_API_KEY`，缺失时工具调用返回可读错误。
 
 ## Dynamic tools
 

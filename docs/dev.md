@@ -22,6 +22,7 @@
 - `provider` 当前支持 `openai-compatible` 与 `anthropic`；缺失时默认按旧配置走 `openai-compatible`。
 - `api` 当前支持 `responses`、`chat`、`completion`。
 - `agent-server` 会在每次模型请求前检查这份文件的文件戳；文件变化后会重新读取，因此修改设置后无需重启桌面宿主。
+- 默认公开的 `web_search` 需要启动 `agent-server` 的环境提供 `TAVILY_API_KEY`；缺失时 App 仍可启动，但模型调用 `web_search` 会返回明确错误。`fetch_page` 不依赖该变量，但会请求模型指定的目标 URL。
 
 2. 安装 workspace 依赖。
 

@@ -12,7 +12,7 @@
 | `blob/` | [blob/blob.md](/Users/mu9/proj/handAgent/packages/core/src/blob/blob.md) | 大段上下文内容的本地 Blob 持久化与 summary 元数据 |
 | `llm/` | [llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md) | LLMClient 抽象 + Vercel AI SDK 适配 |
 | `mcp/` | [mcp/mcp.md](/Users/mu9/proj/handAgent/packages/core/src/mcp/mcp.md) | 标准 MCP client 与 MCP tool adapter |
-| `tools/` | [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md) | AgentTool 协议 + workspace/file builtin tools + dynamic tool adapter + 注册组合根 |
+| `tools/` | [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md) | AgentTool 协议 + 默认 web tools + workspace/file builtin tools + dynamic tool adapter + 注册组合根 |
 | `permission/` | [permission/permission.md](/Users/mu9/proj/handAgent/packages/core/src/permission/permission.md) | 权限策略接口 + 三档记忆持久化 |
 | `workspace/` | [workspace/workspace.md](/Users/mu9/proj/handAgent/packages/core/src/workspace/workspace.md) | 显式 workspace 沙箱 + 默认播种 |
 | `config/` | [config/config.md](/Users/mu9/proj/handAgent/packages/core/src/config/config.md) | settings.json 模型与 tool 设置解析 |
@@ -47,8 +47,9 @@
 
 ### 4. tool 阶段
 
-当前生产路径会注册的 builtin tool 共 4 个，按依赖分类：
+当前生产路径包含 2 个默认公开 web tool 和 4 个 settings builtin tool，按依赖分类：
 
+- 默认公开（不依赖 settings、不走权限审批）：`web_search`、`fetch_page`。
 - 工作区类（依赖 `WorkspaceRegistry`）：`workspace.list`、`workspace.askUser`、`file.read`、`file.write`。
 - macOS 原生能力不再是 core builtin；Swift 默认 provider 在 thread 创建时写入 `dynamicTools`，激活后以 `host_macos.*` 暴露。
 

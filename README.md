@@ -2,7 +2,7 @@
 
 **macOS 原生 Agent Runtime — 一键唤起，随处可用。**
 
-HandAgent 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 PromptPanel，选中文本或截取屏幕区域作为上下文，提交后由本地 Agent Runtime 驱动工具调用与多轮对话。所有数据留在本地，模型按你的配置连接。
+HandAgent 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 PromptPanel，选中文本或截取屏幕区域作为上下文，提交后由本地 Agent Runtime 驱动工具调用与多轮对话。线程、附件、权限和工作区数据默认保留在本机；模型请求按你的 provider 配置发送，启用 Web 搜索时查询会发送给 Tavily，抓页时会请求目标 URL。
 
 ![Hero](docs/assets/hero.png)
 
@@ -27,6 +27,10 @@ ThreadWindow 展示完整对话流，包括 assistant 回复、工具调用过�
 通过本地 manifest 定义 Skill（Append Prompt），通过 MCP 协议接入外部工具。PromptPanel 中选中 Skill 即作为 chip 附加到输入。
 
 ![Skills](docs/assets/skills.png)
+
+### Web 搜索
+
+Agent 默认可调用 `web_search` 与 `fetch_page` 查询公共 Web。`web_search` 使用 Tavily Search API，需要在运行 agent-server 的环境中设置 `TAVILY_API_KEY`；`fetch_page` 只在需要精读单个 URL 时抓取并清洗正文。
 
 ### 灵活的模型配置
 

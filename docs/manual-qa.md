@@ -17,6 +17,20 @@
 
 ## 测试体系收敛记录
 
+### 默认 Websearch 工具
+
+- 完成日期：待实机 QA
+- 实现位置：`packages/core/src/tools/web/WebTools.ts`、`packages/core/src/runtime/AgentRuntime.ts`、`apps/agent-server/src/actions/ThreadScopedToolRegistry.ts`、`apps/agent-server/src/server/server.ts`、`packages/core/tests/tools/websearch-use-cases.test.ts`、`apps/agent-server/tests/thread/ThreadScopedToolRegistry.test.ts`、`packages/core/tests/permission/security-use-cases.test.ts`
+- 修复结论：新增默认公开的 `web_search` 与 `fetch_page`。未激活 thread 默认暴露 `use_tools`、`web_search`、`fetch_page`；调用 `use_tools` 后移除 `use_tools`，但继续保留 websearch 工具并合并 builtin / MCP / dynamic tools。两个 web 工具设置 `requiresPermission=false`，runtime 跳过普通权限审批但仍产出 tool 审计事件。`web_search` 使用 Tavily Search API 并缓存结构化结果；`fetch_page` 只抓取公共 HTTP(S) URL，拒绝本机/私网/metadata 地址和危险重定向，移除非正文 HTML 后截断返回。
+- 自动化验证：需执行 `pnpm exec vitest run apps/agent-server/tests/thread/ThreadScopedToolRegistry.test.ts packages/core/tests/tools/websearch-use-cases.test.ts packages/core/tests/permission/security-use-cases.test.ts`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 在启动 agent-server 的环境设置 `TAVILY_API_KEY`，启动桌面 App。
+  2. 提交需要近期信息的问题，例如查询某个官方发布说明，确认未先调用 `use_tools` 也能直接出现 `web_search` tool 调用。
+  3. 确认 `web_search` tool result 中每条结果包含 URL、snippet 和 source，最终 assistant 回答引用这些 URL。
+  4. 让模型精读某条搜索结果，确认只调用对应 URL 的 `fetch_page`，tool result 是清洗后的正文，不包含 script/style/nav 等 HTML 噪音。
+  5. 重复同一 query 或同一 URL，确认响应更快且不会重复产生多次外部请求异常；若去掉 `TAVILY_API_KEY` 重启，确认 `web_search` 返回明确缺 key 错误，App 不崩溃。
+  6. 要求模型抓取 `http://localhost`、`http://127.0.0.1` 或私网地址，确认 `fetch_page` 拒绝并返回只支持公共 Web URL 的错误。
+
 ### Use-case 驱动测试收敛
 
 - 完成日期：2026-06-18

@@ -466,6 +466,7 @@ export async function startDefaultServer(port = 4317) {
     { FilesystemBlobStore },
     { TurnSummarizer },
     { MockLLMClient },
+    { createDefaultWebTools },
   ] = await Promise.all([
     import("@handagent/core/runtime/AgentRuntime.ts"),
     import("@handagent/core/workspace/FileWorkspaceRegistry.ts"),
@@ -480,6 +481,7 @@ export async function startDefaultServer(port = 4317) {
     import("@handagent/core/blob/FilesystemBlobStore.ts"),
     import("@handagent/core/runtime/TurnSummarizer.ts"),
     import("@handagent/core/llm/MockLLMClient.ts"),
+    import("@handagent/core/tools/web/WebTools.ts"),
   ]);
 
   const paths = resolveServerPaths();
@@ -524,6 +526,7 @@ export async function startDefaultServer(port = 4317) {
       listMcpTools: (serverId: string) => mcpRegistry.listTools(serverId),
       dynamicToolBridge,
       exposeBuiltinToolsBeforeActivation: llmMode === "mock",
+      defaultTools: createDefaultWebTools(),
     },
     {
       log: (message: string) => console.warn(message),

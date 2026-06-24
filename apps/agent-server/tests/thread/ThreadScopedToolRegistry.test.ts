@@ -21,12 +21,14 @@ function buildScoped(options?: {
   builtin?: AgentTool[];
   mcp?: Record<string, AgentTool[]>;
   globalMcpServerIds?: string[];
+  defaultTools?: AgentTool[];
 }): ThreadScopedToolRegistry {
   const builtin = new ToolRegistry(options?.builtin ?? [fakeTool("workspace.list")]);
   return new ThreadScopedToolRegistry({
     builtinRegistry: builtin,
     globalMcpServerIds: options?.globalMcpServerIds ?? [],
     listMcpTools: async (id) => options?.mcp?.[id] ?? [],
+    defaultTools: options?.defaultTools,
   });
 }
 
@@ -37,6 +39,27 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual(["use_tools"]);
     expect(scoped.isActivated("s1")).toBe(false);
+  });
+
+  it("exposes configured default tools before and after use_tools activation", async () => {
+    const scoped = buildScoped({
+      builtin: [fakeTool("workspace.list")],
+      defaultTools: [fakeTool("web_search"), fakeTool("fetch_page")],
+    });
+
+    await scoped.refreshForThread("s1");
+    expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
+      "use_tools",
+      "web_search",
+      "fetch_page",
+    ]);
+
+    await scoped.activate("s1");
+    expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
+      "web_search",
+      "fetch_page",
+      "workspace.list",
+    ]);
   });
 
   it("activate switches the registry to builtin + mcp tools without the meta-tool", async () => {

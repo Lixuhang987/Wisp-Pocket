@@ -251,6 +251,10 @@ class EchoTool implements AgentTool {
   call = vi.fn(async (input: unknown) => ({ echoed: input }));
 }
 
+class NoPermissionEchoTool extends EchoTool {
+  requiresPermission = false;
+}
+
 function makeClient() {
   let calls = 0;
   return {
@@ -341,5 +345,23 @@ describe("PermissionPolicy runtime integration", () => {
     await runtime.runWithMessages([{ role: "user", content: "hi" }]);
 
     expect(tool.call).not.toHaveBeenCalled();
+  });
+
+  it("skips PermissionPolicy for tools that do not require approval", async () => {
+    const tool = new NoPermissionEchoTool();
+    const policy: PermissionPolicy = {
+      check: vi.fn(async () => "deny"),
+      async resolveAsk() { return { decision: "deny" }; },
+      async remember() {},
+    };
+    const runtime = new AgentRuntime(makeClient(), new ToolRegistry([tool]), {
+      permissionPolicy: policy,
+    });
+
+    const result = await runtime.runWithMessages([{ role: "user", content: "hi" }]);
+
+    expect(policy.check).not.toHaveBeenCalled();
+    expect(tool.call).toHaveBeenCalledTimes(1);
+    expect(result.messages.find((m) => m.role === "tool")?.content).toContain("echoed");
   });
 });

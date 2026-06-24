@@ -202,10 +202,12 @@ export class AgentRuntime {
       return;
     }
 
-    const decision = await this.resolveToolPermission(toolCall, onEvent, runOptions);
-    if (decision === "deny") {
-      this.appendDeniedToolResult(toolCall, messages, onEvent);
-      return;
+    if (tool.requiresPermission !== false) {
+      const decision = await this.resolveToolPermission(toolCall, onEvent, runOptions);
+      if (decision === "deny") {
+        this.appendDeniedToolResult(toolCall, messages, onEvent);
+        return;
+      }
     }
 
     onEvent({

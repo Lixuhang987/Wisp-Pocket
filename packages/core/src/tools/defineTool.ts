@@ -6,6 +6,7 @@ export interface DefineToolOptions<TInput, TOutput, TDeps> {
   description: string;
   inputSchema: z.ZodType<TInput>;
   stubByDefault?: boolean;
+  requiresPermission?: boolean;
   run: (input: TInput, deps: TDeps, context: AgentToolCallContext) => Promise<TOutput>;
 }
 
@@ -55,6 +56,7 @@ export function defineTool<TInput, TOutput, TDeps = unknown>(
       description: options.description,
       inputSchema: jsonSchema,
       stubByDefault: options.stubByDefault,
+      requiresPermission: options.requiresPermission,
       call: async (input: TInput, context: AgentToolCallContext = {}) => {
         const parsed = options.inputSchema.safeParse(input);
         if (!parsed.success) {

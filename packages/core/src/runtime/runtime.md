@@ -9,7 +9,7 @@ Thread turn 循环、消息模型、tool call 编排。是整个 Agent 的"主�
 | `AgentMessage.ts` | LLM 面向的消息判别联合：`user / assistant(+toolCalls?) / tool / system`；user content 支持字符串或 `text/image` 多模态 parts，并可带 `inputItems?` 供 UI / 持久化 round-trip |
 | `ToolCallEnvelope.ts` | `{ id, name, arguments }` 三元组，连接 LLM 输出与 ToolRegistry |
 | `AgentThread.ts` | 把 `AgentThreadInput`（prompt + 可选选区）归一化为首轮 user message；当前未在 agent-server 主链路使用，仅作为脚本入口 |
-| `AgentRuntime.ts` | 单次 ReAct 主循环：消费 `LLMClient.stream` → 按 delta 发 assistant runtime 事件 → 收集 toolCalls → 逐个交给 `handleToolCall` 处理权限、执行、结果回灌；同一次用户输入内最多循环 `maxTimes` 次；支持 `AbortSignal` 中断 |
+| `AgentRuntime.ts` | 单次 ReAct 主循环：消费 `LLMClient.stream` → 按 delta 发 assistant runtime 事件 → 收集 toolCalls → 逐个交给 `handleToolCall` 处理权限、执行、结果回灌；`requiresPermission=false` 的 tool 跳过普通权限审批；同一次用户输入内最多循环 `maxTimes` 次；支持 `AbortSignal` 中断 |
 | `AgentRunner.ts` | 持续消费 `Op` 的外层运行壳，协调 thread port、active turn 与状态 |
 | `AgentSession.ts` | Agent 静态配置与服务容器 |
 | `AgentThreadPort.ts` | thread 端口：记录用户输入、发事件、等待 summary |
@@ -71,6 +71,10 @@ flowchart TD
   - `onMetaToolActivate(threadId)`：激活时通知 `ThreadScopedToolRegistry` 扩展工具集。
   - `isThreadActivated(threadId)`：每次 LLM 请求前判断当前 thread 是否已激活，用于决定传入完整工具集还是仅 meta-tool。
 - tool-use-policy system prompt section 仅在 `hasRealTools`（registry 中存在非 meta-tool）为真时出现；未激活 thread 不注入该 section，避免引导模型调用尚不存在的工具。
+
+## 无需审批工具
+
+普通 tool call 默认进入 `PermissionPolicy.check`。如果 `AgentTool.requiresPermission === false`，runtime 会跳过 `PermissionPolicy`，直接执行工具并照常发送 `tool_call` / `tool_result` 审计事件。当前用于默认公开且低风险的 `use_tools`、`web_search`、`fetch_page`；新增工具不得随意复用该开关。
 
 ## 运行约定
 

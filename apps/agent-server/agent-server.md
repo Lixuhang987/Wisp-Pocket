@@ -33,7 +33,7 @@ node --experimental-transform-types --experimental-specifier-resolution=node app
 1. 构造 `ThreadStore({ dbPath: ~/.spotAgent/threads.sqlite })`、`FilesystemBlobStore`、`FileNetworkLogger`、`FileWorkspaceRegistry`。
 2. 读取 `~/.spotAgent/mcp.json` 并创建 `MCPServerRegistry`。
 3. 创建 `WebSocketDynamicToolBridge` 与 `AgentRequestBroker`；permission/workspace ask 先进入 Agent `rx_event`。
-4. 通过 `SettingsBackedToolRegistry` 注册 builtin tools。
+4. 通过 `SettingsBackedToolRegistry` 注册 builtin tools，并通过 core `createDefaultWebTools()` 创建默认公开的 web tools。
 5. 通过 `SettingsBackedLLMClient` 或 `MockLLMClient` 选择 LLM 模式。
 6. 按 thread 缓存 `AgentRuntime`，注入 thread 级 tool registry、permission policy、blob store 和 turn summarizer；mock 模式使用 `MockLLMClient` 且不启用 summarizer。
 7. 创建 `AgentManager` 作为持久 Agent owner；每个 Agent 暴露 `tx_sub`、`rx_event`、`agent_status`、`session`，并在内部复用 `ThreadRuntimeOrchestrator` 执行 ReAct turn。

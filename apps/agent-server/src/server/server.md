@@ -86,7 +86,7 @@ const runtimeForThread = (threadId: string) => {
 };
 ```
 
-`startDefaultServer` 按 thread 缓存 `AgentRuntime`，让每个 thread 拥有独立的 tool registry 与激活状态；同时创建 `AgentManager` 维护 `threadId -> Agent`。这里是 core `AgentRuntime`、settings client、MCP 工具表、权限策略、BlobStore 与持久 Agent owner 的汇合点。
+`startDefaultServer` 按 thread 缓存 `AgentRuntime`，让每个 thread 拥有独立的 tool registry 与激活状态；同时创建 `AgentManager` 维护 `threadId -> Agent`。这里是 core `AgentRuntime`、settings client、默认公开 web tools、MCP 工具表、权限策略、BlobStore 与持久 Agent owner 的汇合点。
 
 ## 路径约定
 
@@ -99,6 +99,10 @@ const runtimeForThread = (threadId: string) => {
 - `~/.spotAgent/mcp.json`：MCP server 配置。
 - `~/.spotAgent/workspaces.json`：workspace 注册表。
 - `~/.spotAgent/permissions.json`：永久权限规则。
+
+## 外部环境变量
+
+- `TAVILY_API_KEY`：`web_search` 的 Tavily Search API key。缺失时 agent-server 仍可启动，但模型调用 `web_search` 会得到明确错误；`fetch_page` 不依赖该变量。
 
 ## 编辑约束
 

@@ -20,6 +20,7 @@ export class ThreadScopedToolRegistry {
       listMcpTools: (serverId: string) => Promise<AgentTool[]>;
       dynamicToolBridge?: DynamicToolBridge;
       exposeBuiltinToolsBeforeActivation?: boolean;
+      defaultTools?: AgentTool[];
     },
     private readonly dependencies: {
       log?: (message: string) => void;
@@ -35,11 +36,12 @@ export class ThreadScopedToolRegistry {
     if (this.options.exposeBuiltinToolsBeforeActivation) {
       this.replaceWithUniqueTools(registry, [
         this.metaTool,
+        ...this.defaultTools(),
         ...this.options.builtinRegistry.all(),
       ]);
       return;
     }
-    registry.replaceAll([this.metaTool]);
+    this.replaceWithUniqueTools(registry, [this.metaTool, ...this.defaultTools()]);
   }
 
   async activate(threadId: string): Promise<void> {
@@ -74,7 +76,10 @@ export class ThreadScopedToolRegistry {
     threadId: string,
     registry: ToolRegistry,
   ): Promise<void> {
-    const tools: AgentTool[] = [...this.options.builtinRegistry.all()];
+    const tools: AgentTool[] = [
+      ...this.defaultTools(),
+      ...this.options.builtinRegistry.all(),
+    ];
 
     const serverIds = new Set(this.options.globalMcpServerIds);
 
@@ -98,6 +103,10 @@ export class ThreadScopedToolRegistry {
     if (specs.length === 0) return [];
     const bridge = this.options.dynamicToolBridge ?? offlineDynamicToolBridge;
     return specs.map((spec) => new DynamicToolAdapter(spec, bridge));
+  }
+
+  private defaultTools(): AgentTool[] {
+    return this.options.defaultTools ?? [];
   }
 
   private replaceWithUniqueTools(registry: ToolRegistry, tools: AgentTool[]): void {

@@ -16,7 +16,7 @@
 | `thread/` | [thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md) | thread 路由、一轮 turn 编排、持久化恢复与删除 |
 | `protocol/` | [protocol/protocol.md](/Users/mu9/proj/handAgent/apps/agent-server/src/protocol/protocol.md) | core runtime event、thread 消息、审计事件与多模态 STUB 的翻译 |
 | `settings/` | [settings/settings.md](/Users/mu9/proj/handAgent/apps/agent-server/src/settings/settings.md) | `~/.spotAgent/settings.json` 驱动的 LLM client 与 builtin tool 热加载 |
-| `actions/` | [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md) | builtin / 全局 MCP / Computer Use 兼容层与 thread 级工具表 |
+| `actions/` | [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md) | 默认 web tools / builtin / 全局 MCP / dynamic tools 与 thread 级工具表 |
 | `bridges/` | [bridges/bridges.md](/Users/mu9/proj/handAgent/apps/agent-server/src/bridges/bridges.md) | dynamic tool provider bridge；thread request-response 归 `agent/AgentRequestBroker` |
 
 ## 内部依赖方向
@@ -26,7 +26,7 @@
 - `thread/` 消费已经注入的 agent manager、persistence、publisher 和 workspace registry，不直接创建 LLM client、MCP client 或 platform adapter；公开运行期输入只处理 `op.submit`。
 - `protocol/` 只做 runtime event、conversation message、audit event 和 attachment STUB 的翻译。
 - `settings/` 把 `settings.json` 热加载成 LLM client 与 builtin tool registry。
-- `actions/` 组合 builtin tools 与全局 MCP tools，产出 thread 级工具表。
+- `actions/` 组合默认 web tools、builtin tools、全局 MCP tools 与 dynamic tools，产出 thread 级工具表。
 - `bridges/` 只把 dynamic tool call 映射到 provider socket，不执行 tool 业务逻辑；permission/workspace request-response 不再放在 bridges。
 
 ## 边界规则

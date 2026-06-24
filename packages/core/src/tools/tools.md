@@ -1,20 +1,21 @@
 # tools
 
-`AgentTool` 协议、`ToolRegistry` 注册中心、workspace/file builtin tools、dynamic tool adapter，以及 builtin tool 注册组合根。
+`AgentTool` 协议、`ToolRegistry` 注册中心、workspace/file builtin tools、默认公开 web tools、dynamic tool adapter，以及 builtin tool 注册组合根。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `AgentTool.ts` | `AgentTool<TInput, TOutput>` 接口：`name / description / inputSchema (JSON Schema) / call(input, context?)`；`context` 当前包含 `threadId / turnId / toolCallId`；可选 `stubByDefault` 声明 runtime 可把结果写成 Blob/Stub |
-| `defineTool.ts` | `defineTool({ name, description, inputSchema (zod), stubByDefault?, run })` 工厂：`zod` schema 自动转 JSON Schema 2019-09；`.create(deps)` 生成的 `call(input, context?)` 会先用同一个 schema 做运行时入参校验，再调用 `run` |
+| `AgentTool.ts` | `AgentTool<TInput, TOutput>` 接口：`name / description / inputSchema (JSON Schema) / call(input, context?)`；`context` 当前包含 `threadId / turnId / toolCallId`；可选 `stubByDefault` 声明 runtime 可把结果写成 Blob/Stub；可选 `requiresPermission=false` 声明 runtime 跳过普通权限审批 |
+| `defineTool.ts` | `defineTool({ name, description, inputSchema (zod), stubByDefault?, requiresPermission?, run })` 工厂：`zod` schema 自动转 JSON Schema 2019-09；`.create(deps)` 生成的 `call(input, context?)` 会先用同一个 schema 做运行时入参校验，再调用 `run` |
 | `ToolRegistry.ts` | Map 包装；`register / replaceAll / get / list`，单次注册重名抛错，`replaceAll()` 供 settings 热加载原地刷新；`list()` 返回 `RegisteredTool`（去掉 `call`），供 `LLMClient.stream` 使用 |
-| `MetaToolUseTool.ts` | meta-tool `use_tools`，未激活 thread 默认只暴露它；首次调用后由 thread-scoped registry 注入完整 builtin + MCP + dynamic tools 工具集 |
+| `MetaToolUseTool.ts` | meta-tool `use_tools`，未激活 thread 默认和 web tools 一起暴露；首次调用后由 thread-scoped registry 注入完整 builtin + MCP + dynamic tools 工具集 |
 | `DynamicToolAdapter.ts` | 把 `DynamicToolSpec` 适配成 `AgentTool`，调用时通过 `DynamicToolBridge` 按 `clientId` 转发给 provider |
 | `registerBuiltins.ts` | 组合根：根据可选 `WorkspaceRegistry` + `ToolSettings` 装配 workspace/file candidates，过 allowlist/denylist 后注册 |
 | `registerTools.ts` | 当前等同于 builtin 注册组合根：按 `WorkspaceRegistry` 生成 builtin candidates，再统一套 `allowlist / denylist` |
 | `builtins/*.ts` | workspace/file builtin tool 实现，全部用 `defineTool` 工厂表达 |
 | `builtins/workspace-path.ts` | `file.read` / `file.write` 共享的 workspace 路径校验工具：拒绝绝对路径与 `..` 越狱、`realpath` 后再次校验 |
+| `web/` | [web/web.md](/Users/mu9/proj/handAgent/packages/core/src/tools/web/web.md) | 默认公开的 `web_search` / `fetch_page`：Tavily 搜索、单页正文抓取、结果清洗与进程内缓存 |
 
 ## Builtin tools
 
@@ -24,6 +25,15 @@
 | `workspace.askUser` | `{ prompt, candidateIds? }` | `WorkspaceRegistry.summarize` + `WorkspaceAskResolver` | 多个 workspace 候选都合理时，通过 Thread UI 内联气泡让用户选择；取消、超时或无活动 thread 返回 `{ cancelled: true }` |
 | `file.read` | `{ workspaceId, relativePath, cached }` | `WorkspaceRegistry` | 沙箱 read：经 `realpath` 校验仍在 rootPath 内；`cached` 必填，取 `turn` 或 `persist` |
 | `file.write` | `{ workspaceId, relativePath, content }` | `WorkspaceRegistry` | 沙箱 write：写前 lstat 拒绝 basename 是 symlink；10 MiB 上限；`.tmp → rename` 原子写 |
+
+## 默认公开 web tools
+
+这些工具不属于 workspace/file builtin 注册表，不受 settings allowlist / denylist 控制，由 agent-server 的 `ThreadScopedToolRegistry` 作为 `defaultTools` 注入。未激活 thread 默认暴露 `use_tools`、`web_search`、`fetch_page`；激活后移除 `use_tools`，但继续保留 `web_search` 与 `fetch_page`，再合并 builtin + MCP + dynamic tools。
+
+| name | 入参 | 依赖 | 说明 |
+|------|------|------|------|
+| `web_search` | `{ query, maxResults?, freshness?, includeDomains?, excludeDomains? }` | `TAVILY_API_KEY` + Tavily Search API | 查询公共 Web，返回 `{ query, results }`，每条结果含 URL、snippet、source 和可选发布时间；结果进程内短期缓存 |
+| `fetch_page` | `{ url, maxChars? }` | public URL fetch | 抓取单个公共 HTTP(S) 网页，拒绝本机/私网/metadata 地址和危险重定向；移除脚本、样式、导航等非正文 HTML，压缩空白并截断；只在需要精读某个搜索结果时使用 |
 
 ## 注册流程
 
@@ -41,7 +51,7 @@ flowchart LR
 
 `SettingsBackedToolRegistry` 在 agent-server 启动和每轮 user message 进入 runtime 前按 `settings.json` 文件戳刷新 builtin tool；`disabled` 列表回流到 `console.log`，便于排错；当 `workspaceRegistry` 缺失时，`workspace.list`、`workspace.askUser`、`file.read`、`file.write` 四个 workspace/file tool 直接进 disabled；当缺少 `WorkspaceAskResolver` 时，`workspace.askUser` 单独进 disabled。
 
-本目录不再包含私有 `tools[] + command` 外部工具运行时，也不通过 action binding 改变 thread tool scope。PromptPanel Action manifest 只负责生成 skill prompt chip；外部能力统一通过 `~/.spotAgent/mcp.json` 的全局 MCP tools 或 builtin tools 暴露。
+本目录不再包含私有 `tools[] + command` 外部工具运行时，也不通过 action binding 改变 thread tool scope。PromptPanel Action manifest 只负责生成 skill prompt chip；外部能力统一通过默认公开 web tools、`~/.spotAgent/mcp.json` 的全局 MCP tools 或 builtin tools 暴露。
 
 ## Dynamic tools
 
@@ -56,6 +66,7 @@ macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicT
 - 工具结果优先返回**可序列化对象**（runtime 自动 JSON.stringify）；返回字符串只用于人类阅读场景。
 - 大段输出工具若需要 Blob/Stub 路径，应在 input schema 中加入必填 `cached: "turn" | "persist"`，并设置 `stubByDefault`；runtime 会负责落 Blob 与渲染 STUB，tool 不直接拼文本。
 - 入参 schema 单一源：写 `zod` schema 即可，`defineTool` 自动派生 JSON Schema、TS 类型，并在 `call(input)` 内执行运行时校验；builtin tool 的外层入参结构由 `defineTool` 统一校验。
+- 只有明确低风险且必须默认可用的工具才能设置 `requiresPermission=false`。当前仅 `use_tools`、`web_search`、`fetch_page` 使用该能力。
 - 运行时入参校验失败时，`call(input)` 以 rejected `Error` 返回统一可读错误，错误信息包含 tool name 与字段路径（例如缺字段、类型错误、strict object 的未知字段），方便 `AgentRuntime` 与审计日志直接展示。
 
 ## meta-tool：懒加载激活入口
@@ -63,7 +74,7 @@ macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicT
 `MetaToolUseTool`（常量 `META_TOOL_NAME = "use_tools"`）是工具集的激活入口，与普通 builtin tool 有以下本质区别：
 
 - 不进入 `registerBuiltins` / `registerTools` 的 builtin 注册流程，由 `ThreadScopedToolRegistry` 单独管理。
-- 不受 `~/.spotAgent/settings.json` 的 `allowlist` / `denylist` 影响；无论 settings 如何配置，未激活 thread 始终只暴露这一个 tool。
+- 不受 `~/.spotAgent/settings.json` 的 `allowlist` / `denylist` 影响；无论 settings 如何配置，未激活 thread 始终暴露 `use_tools` 以及 agent-server 注入的默认公开工具。
 - 首次激活返回 `META_TOOL_FIRST_ACTIVATION_RESULT`，runtime 随即把完整 builtin + MCP + dynamic tools 工具集注入当前 thread。
 - 激活后 provider 可见 registry 会移除 `use_tools`，避免后续轮次重复暴露 meta-tool；若模型或历史回放仍提交晚到的 `use_tools` 调用，runtime 走幂等兜底并返回 `META_TOOL_ALREADY_ACTIVE_RESULT`，不会重复扩展工具集。
 

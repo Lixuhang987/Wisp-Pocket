@@ -24,5 +24,6 @@ export const MetaToolUseTool = defineTool<z.infer<typeof inputSchema>, string, v
   name: META_TOOL_NAME,
   description: META_TOOL_DESCRIPTION,
   inputSchema,
+  requiresPermission: false,
   run: async () => META_TOOL_FIRST_ACTIVATION_RESULT,
 });

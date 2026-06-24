@@ -11,5 +11,6 @@ export interface AgentTool<TInput = unknown, TOutput = unknown> {
   description: string;
   inputSchema: AgentToolInputSchema;
   stubByDefault?: boolean;
+  requiresPermission?: boolean;
   call(input: TInput, context?: AgentToolCallContext): Promise<TOutput>;
 }
