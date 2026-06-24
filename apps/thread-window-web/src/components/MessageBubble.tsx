@@ -1,4 +1,5 @@
-import { Copy, Pencil, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronRight, Copy, Loader2, Pencil, RefreshCw } from 'lucide-react';
 import type { ThreadMessage } from '../store/threadWindowStore.ts';
 import { cn } from '../utils/cn.ts';
 import { TypingIndicator } from './TypingIndicator.tsx';
@@ -20,6 +21,102 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
   const isAssistant = message.role === 'assistant';
   const isTool = message.role === 'tool';
   const userSections = isUser ? splitUserMessageSections(message.userInputItems ?? []) : null;
+
+  // Tool 消息展开/收起状态
+  const isToolRunning = isTool && message.status === 'running';
+  const [isToolExpanded, setIsToolExpanded] = useState(isToolRunning);
+  // 追踪用户是否手动操作过，避免自动收起覆盖用户意图
+  const userToggledRef = useRef(false);
+
+  useEffect(() => {
+    if (!isTool) return;
+    if (userToggledRef.current) return; // 用户手动操作过，不再自动切换
+    if (message.status === 'running') {
+      setIsToolExpanded(true);
+    } else {
+      setIsToolExpanded(false);
+    }
+  }, [isTool, message.status]);
+
+  const handleToolToggle = () => {
+    userToggledRef.current = true;
+    setIsToolExpanded((prev) => !prev);
+  };
+
+  // Tool 消息使用独立的紧凑布局
+  if (isTool) {
+    return (
+      <article className="group mx-auto w-full">
+        <div className="w-full">
+          <div className="rounded-xl bg-app-tool-bubble px-md py-sm">
+            {/* 可点击的 header */}
+            <button
+              type="button"
+              onClick={handleToolToggle}
+              className="flex w-full items-center gap-xs text-left focus:outline-none"
+              aria-expanded={isToolExpanded}
+              aria-label={isToolExpanded ? '收起工具调用详情' : '展开工具调用详情'}
+            >
+              <ChevronRight
+                size={12}
+                strokeWidth={1.5}
+                className={cn(
+                  'flex-shrink-0 text-app-text-muted transition-transform duration-200',
+                  isToolExpanded && 'rotate-90'
+                )}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1 truncate font-code text-xs text-app-text-muted">
+                [{message.toolName}]
+              </span>
+              {/* 状态指示器 */}
+              {isToolRunning ? (
+                <Loader2
+                  size={12}
+                  strokeWidth={1.5}
+                  className="flex-shrink-0 animate-spin text-app-accent"
+                  aria-label="运行中"
+                />
+              ) : (
+                <Check
+                  size={12}
+                  strokeWidth={1.5}
+                  className="flex-shrink-0 text-green-500"
+                  aria-label="已完成"
+                />
+              )}
+            </button>
+
+            {/* 可折叠内容区 */}
+            <div
+              className="grid transition-[grid-template-rows] duration-200 ease-out"
+              style={{ gridTemplateRows: isToolExpanded ? '1fr' : '0fr' }}
+            >
+              <div className="overflow-hidden">
+                <p className="m-0 mt-xs whitespace-pre-wrap break-words font-code text-[13px] leading-[1.6] text-app-text-muted">
+                  {message.text}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 展开时显示操作栏 */}
+          {isToolExpanded && (
+            <div className="mt-xs flex h-8 items-center gap-xs px-xs">
+              <button
+                onClick={handleCopy}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
+                aria-label="复制消息"
+                title="复制"
+              >
+                <Copy size={14} strokeWidth={1.2} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article
@@ -51,16 +148,10 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
             'px-lg py-md',
             isUser && 'rounded-2xl border border-app-hairline/70 bg-app-user-bubble text-app-text-primary',
             isAssistant && 'bg-transparent text-app-text-primary',
-            isTool && 'rounded-xl bg-app-tool-bubble text-app-text-muted'
           )}
         >
           {message.toolName && (
-            <div
-              className={cn(
-                'mb-xs font-code text-xs',
-                isTool ? 'text-app-text-muted' : 'text-app-text-secondary'
-              )}
-            >
+            <div className="mb-xs font-code text-xs text-app-text-secondary">
               [{message.toolName}]
             </div>
           )}
@@ -88,23 +179,16 @@ export function MessageBubble({ message, onCopy, isRunning = false }: MessageBub
           ) : (
             <p
               className={cn(
-                'm-0 whitespace-pre-wrap break-words leading-[1.6]',
-                isTool ? 'font-code text-[13px]' : 'text-[15px]',
+                'm-0 whitespace-pre-wrap break-words leading-[1.6] text-[15px]',
                 isAssistant && 'text-app-text-primary',
                 isUser && 'text-app-text-primary',
-                isTool && 'text-app-text-muted'
               )}
             >
               {message.text}
             </p>
           )}
           {message.pending && (
-            <small
-              className={cn(
-                'mt-xs block text-xs',
-                isTool ? 'text-app-text-muted' : 'text-app-text-secondary'
-              )}
-            >
+            <small className="mt-xs block text-xs text-app-text-secondary">
               处理中...
             </small>
           )}
