@@ -34,4 +34,4 @@
 
 - [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 在 `bootstrap()` 调 `start()`，在 `shutdown()` 调 `stop()`；订阅 `onAvailabilityChange`、`onFatalError` 与 `onHostTerminationRequest`。
 - [ElectronShell](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/ElectronShell/electron-shell.md) 通过 `ElectronBackedAppServer` 暴露 app-server health、ThreadWindow command client 和 ActivityWindow command client。
-- [PlatformBridge](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md) 走独立 `/api/dynamic-tools` WebSocket，通过 `channel: "dynamic_tools"` 处理 host dynamic tools。
+- [PlatformBridge](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md) 走独立 `/api/dynamic-tools` WebSocket，通过 `channel: "dynamic_tools"` 处理 host / plugin dynamic tools。

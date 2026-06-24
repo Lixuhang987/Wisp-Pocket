@@ -29,7 +29,7 @@ Swift 原生 UI 只保留 PromptPanel 和 Settings：
 ### 4. 输入边界（产品红线）
 
 - 只有用户主动输入和用户主动选区可以作为 thread 初始上下文；屏幕 / 窗口 / 文件 / 剪贴板 / App 状态一律通过 tool 按需读取。
-- 宿主层不组装 LLM 消息、不读取 runtime 内部状态、不直接执行 tool 编排。React ThreadWindow 的 thread 协议由 React 前端通过 `/api/thread` 处理；Swift 宿主只用窄口径 `/api/thread` client 创建 PromptPanel thread，并通过 `/api/dynamic-tools` 处理默认 host dynamic tools。
+- 宿主层不组装 LLM 消息、不读取 runtime 内部状态、不直接执行 tool 编排。React ThreadWindow 的 thread 协议由 React 前端通过 `/api/thread` 处理；Swift 宿主只用窄口径 `/api/thread` client 创建 PromptPanel thread，并通过 `/api/dynamic-tools` 处理默认 host dynamic tools 与 plugin dynamic tools。
 - 快捷键配置只保存在宿主层本地（UserDefaults，由 `KeyboardShortcuts` 库管理），不下沉到 runtime。外观主题偏好由 Swift 宿主持久化到 `~/.spotAgent/settings.json`，并把解析后的主题通过 Electron command bridge 传给 React。
 
 ### 5. 测试与验证
@@ -122,4 +122,4 @@ desktop 与 agent-server 共享的模型、builtin tool 和外观主题配置文
 - PromptPanel show/toggle 只打开原生输入面板，不触发 Electron ThreadWindow 预热。
 - React ThreadWindow 负责 `/api/thread` 上的 command / notification / request / response 编解码和 UI 状态。
 - ActivityWindow 负责 React StatusBubble；Swift 只发送 `activity_window.show`，show 失败不再回退到 Swift StatusBubble。
-- `DynamicToolProviderConnectionClient` 连接 `/api/dynamic-tools`，发送 `provider_hello`，并把 `tool_call_request` 分派给 `DynamicToolProviderService`。
+- `DynamicToolProviderConnectionClient` 连接 `/api/dynamic-tools`，发送 host / plugin `provider_hello`，并把 `tool_call_request` 分派给 `DynamicToolProviderService`。

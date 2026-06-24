@@ -40,7 +40,7 @@
 ## 边界
 
 - 不迁移 PromptPanel、Settings、Hotkey、焦点恢复或 macOS host dynamic tools；这些仍由 Swift 宿主负责。
-- 不实现 macOS 原生能力，host 能力仍走 Swift `/api/dynamic-tools` provider。
+- 不实现 macOS 原生能力，也不管理 plugin 生命周期；host / plugin 能力仍走 Swift `/api/dynamic-tools` provider。
 - 不让 renderer 直接执行 runtime 或平台 tool；React ThreadWindow 仍直接连接 `/api/thread`。
 - 不把完整 thread 状态 mirror 到 Electron main；StatusBubble renderer 只订阅 `/api/activity`。
 

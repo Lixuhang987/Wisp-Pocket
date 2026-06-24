@@ -14,7 +14,7 @@
 - 作为 `ThreadWindowCommanding` 实现，只接收 Coordinator 的 openInitialPrompt/openHistory/focus/themeChanged 意图；`theme.changed` 不参与 ThreadWindow 可用性 gate。启动初值由 `HANDAGENT_INITIAL_THEME` 提供，运行中变化仍由 `theme.changed` command 提供。
 - 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`。
 - 作为 `AgentTriggerCommanding` 实现，接收 Swift `agent_trigger.fire` 后台启动请求，并把 agent-server 回推的 `agent_trigger.attention` 事件转成宿主可消费的最小提示信号。
-- 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行 macOS host dynamic tools。
+- 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行 macOS host dynamic tools，并把 plugin namespace 请求分派给 Swift plugin manager。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
 - Electron StatusBubble 点击只尝试聚焦已有 ThreadWindow；无法聚焦时不再让 Coordinator 打开 Swift PromptPanel。
 - `bash ./scripts/swiftw run HandAgentDesktop` 会先构建 `handagent-electron-shell`，确保开发态 `dist/main/main.js` 存在；不要依赖旧 worktree 残留产物。
