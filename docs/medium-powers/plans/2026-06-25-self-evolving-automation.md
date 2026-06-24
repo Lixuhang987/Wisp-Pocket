@@ -98,9 +98,9 @@ flowchart LR
 ```
 
 - Integration test need to create: `apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
-  - 用 fake app/window、AX、screenshot plugin client 执行一条 policy：激活 app、点击 selector、set value、断言成功。
+  - 用 fake app/window、AX、screenshot plugin client 执行一条 policy：按 branch conditions 匹配当前 AX 状态，激活 app、点击 selector、set value、断言成功。
   - 断言运行记录包含目标、步骤、AX/截图引用、成功状态。
-  - 构造 selector 失败，fake repair 返回成功分支；断言 runtime 生成 patch、自动合入 policy version + 1，并写入 patch evidence 与 run repair 结果。
+  - 构造 branch conditions 不匹配或 selector 失败，fake repair 返回成功分支；断言 runtime 生成 patch、自动合入 policy version + 1，并写入 patch evidence 与 run repair 结果。
 - Integration test need to update: `apps/desktop/TestsSwift/AppServices/PlatformBridge/PluginDynamicToolsTests.swift`
   - 官方 installer 写入 Automation runtime manifest，默认 `enabled = false`。
   - 覆盖 Automation manifest 的 `alwaysOn`、`kind = automation`、原子 plugin 依赖和 `automation.*` tool 集合。
@@ -135,15 +135,15 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["agent 读取 trace.json"] --> B["agent 归纳 AX selector / steps / assertions"]
+    A["agent 读取 trace.json"] --> B["agent 归纳 branch conditions / AX selector / steps / assertions"]
     B --> C["agent 调用 automation.policy_create(policy 或 branch)"]
     C --> D["Automation runtime 校验并保存受限 AutomationPolicy"]
     D --> E["后续 automation.run 读取同一 policy 执行"]
 ```
 
 - Integration test need to update: `apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
-  - 调用 `automation.policy_create` 传入 agent 生成的完整 `policy`，断言返回与落盘 policy 保留 agent 给出的 id、target、branch、steps 和 assertions。
-  - 调用 `automation.policy_create` 传入 agent 生成的单个 `branch`，断言 runtime 用 tool 参数中的 policy metadata 包装成完整 policy 并保存。
+  - 调用 `automation.policy_create` 传入 agent 生成的完整 `policy`，断言返回与落盘 policy 保留 agent 给出的 id、target、branch conditions、steps 和 assertions。
+  - 调用 `automation.policy_create` 传入 agent 生成的单个 `branch`，断言 runtime 用 tool 参数中的 policy metadata 包装成完整 policy 并保存 conditions。
 
 ### Implementation tasks
 

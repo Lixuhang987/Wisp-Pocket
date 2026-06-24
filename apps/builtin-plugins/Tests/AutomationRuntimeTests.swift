@@ -91,6 +91,89 @@ final class AutomationRuntimeTests: XCTestCase {
         }
     }
 
+    func testRuntimeSelectsFirstBranchWhoseConditionsMatchCurrentAXSnapshot() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let capabilityClient = RecordingAutomationCapabilityClient()
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: capabilityClient,
+            repairer: RecordingAutomationRepairer()
+        )
+        let policy = AutomationPolicy(
+            id: "policy-conditions",
+            title: "Conditional Branches",
+            targetBundleId: nil,
+            branches: [
+                AutomationBranch(
+                    id: "missing-state",
+                    conditions: [AutomationCondition(selector: AXSelector(role: "AXStaticText", title: "Missing"))],
+                    steps: [
+                        AutomationStep(kind: .click, selector: AXSelector(role: "AXButton", title: "Wrong")),
+                    ],
+                    assertions: []
+                ),
+                AutomationBranch(
+                    id: "saved-state",
+                    conditions: [AutomationCondition(selector: AXSelector(role: "AXStaticText", title: "Saved"))],
+                    steps: [
+                        AutomationStep(kind: .click, selector: AXSelector(role: "AXButton", title: "Correct")),
+                    ],
+                    assertions: []
+                ),
+            ]
+        )
+        try store.savePolicy(policy)
+
+        let run = try await runtime.run(policyId: "policy-conditions")
+
+        XCTAssertEqual(run.status, "completed")
+        XCTAssertEqual(run.steps.map(\.kind), [.click])
+        let actionCalls = capabilityClient.calls.filter { $0.namespace == "ax" && $0.tool == "action" }
+        XCTAssertEqual(actionCalls.count, 1)
+        let selector = try XCTUnwrap(actionCalls[0].arguments["selector"] as? [String: Any])
+        XCTAssertEqual(selector["title"] as? String, "Correct")
+    }
+
+    func testRuntimeRoutesUnmatchedBranchConditionsToRepair() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let repairer = RecordingAutomationRepairer()
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: RecordingAutomationCapabilityClient(),
+            repairer: repairer
+        )
+        let policy = AutomationPolicy(
+            id: "policy-unmatched-conditions",
+            title: "Unmatched Conditions",
+            targetBundleId: "com.example.app",
+            branches: [
+                AutomationBranch(
+                    id: "only-known-state",
+                    conditions: [AutomationCondition(selector: AXSelector(role: "AXStaticText", title: "Missing"))],
+                    steps: [
+                        AutomationStep(kind: .click, selector: AXSelector(role: "AXButton", title: "Fallback")),
+                    ],
+                    assertions: []
+                ),
+            ]
+        )
+        try store.savePolicy(policy)
+
+        let run = try await runtime.run(policyId: "policy-unmatched-conditions")
+
+        XCTAssertEqual(run.status, "repaired")
+        let request = try XCTUnwrap(repairer.requests.first)
+        XCTAssertEqual(request.failedStep.selector?.title, "Fallback")
+        XCTAssertEqual(request.failedStepIndex, 0)
+        XCTAssertEqual(request.completedSteps.count, 0)
+        XCTAssertEqual(request.failureReason, "automation condition failed")
+        XCTAssertNotNil(request.appWindow)
+        XCTAssertNotNil(request.axSnapshot)
+        XCTAssertNotNil(request.screenshot)
+    }
+
     func testRuntimeRepairsFailureAndAutomaticallyMergesPolicyPatch() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
@@ -400,6 +483,9 @@ final class AutomationRuntimeTests: XCTestCase {
                     "branches": [
                         [
                             "id": "agent-main",
+                            "conditions": [
+                                ["selector": ["role": "AXStaticText", "title": "Ready"]],
+                            ],
                             "steps": [
                                 [
                                     "kind": "click",
@@ -425,6 +511,7 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertEqual(policy["targetBundleId"] as? String, "com.example.agent")
         let storedAgentPolicy = try store.loadPolicy(id: "agent-policy")
         XCTAssertEqual(storedAgentPolicy.branches[0].id, "agent-main")
+        XCTAssertEqual(storedAgentPolicy.branches[0].conditions[0].selector.title, "Ready")
         XCTAssertEqual(storedAgentPolicy.branches[0].steps.map(\.kind), [.click, .typeText])
         XCTAssertEqual(storedAgentPolicy.branches[0].assertions.count, 1)
 
@@ -437,6 +524,9 @@ final class AutomationRuntimeTests: XCTestCase {
                 "targetBundleId": "com.example.branch",
                 "branch": [
                     "id": "agent-branch",
+                    "conditions": [
+                        ["selector": ["role": "AXStaticText", "title": "Saved"]],
+                    ],
                     "steps": [
                         [
                             "kind": "hotkey",
@@ -453,6 +543,7 @@ final class AutomationRuntimeTests: XCTestCase {
         let storedBranchPolicy = try store.loadPolicy(id: "agent-branch-policy")
         XCTAssertEqual(storedBranchPolicy.title, "Agent Branch Policy")
         XCTAssertEqual(storedBranchPolicy.branches[0].id, "agent-branch")
+        XCTAssertEqual(storedBranchPolicy.branches[0].conditions[0].selector.title, "Saved")
         XCTAssertEqual(storedBranchPolicy.branches[0].steps[0].kind, .hotkey)
         XCTAssertEqual(storedBranchPolicy.branches[0].steps[0].value, "command+s")
     }

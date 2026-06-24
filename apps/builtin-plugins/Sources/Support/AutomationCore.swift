@@ -62,13 +62,35 @@ public struct AutomationAssertion: Codable, Equatable {
 
 public struct AutomationBranch: Codable, Equatable {
     public var id: String
+    public var conditions: [AutomationCondition]
     public var steps: [AutomationStep]
     public var assertions: [AutomationAssertion]
 
-    public init(id: String, steps: [AutomationStep], assertions: [AutomationAssertion]) {
+    public init(
+        id: String,
+        conditions: [AutomationCondition] = [],
+        steps: [AutomationStep],
+        assertions: [AutomationAssertion]
+    ) {
         self.id = id
+        self.conditions = conditions
         self.steps = steps
         self.assertions = assertions
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case conditions
+        case steps
+        case assertions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.conditions = try container.decodeIfPresent([AutomationCondition].self, forKey: .conditions) ?? []
+        self.steps = try container.decode([AutomationStep].self, forKey: .steps)
+        self.assertions = try container.decode([AutomationAssertion].self, forKey: .assertions)
     }
 }
 
@@ -489,16 +511,21 @@ public final class AutomationRuntime: @unchecked Sendable {
         var policy = try store.loadPolicy(id: policyId)
         let runId = UUID().uuidString
         var records: [AutomationStepRecord] = []
-        guard let branch = policy.branches.first else {
+        guard !policy.branches.isEmpty else {
             throw AutomationRuntimeError.emptyPolicy
         }
+        var branch: AutomationBranch?
 
         do {
-            for (index, step) in branch.steps.enumerated() {
+            guard let matchedBranch = try await matchingBranch(in: policy) else {
+                throw AutomationRuntimeError.conditionFailed
+            }
+            branch = matchedBranch
+            for (index, step) in matchedBranch.steps.enumerated() {
                 try await execute(step: step)
                 records.append(AutomationStepRecord(stepIndex: index, kind: step.kind, status: "completed"))
             }
-            try await assert(branch.assertions)
+            try await assert(matchedBranch.assertions)
             let run = AutomationRunRecord(
                 id: runId,
                 policyId: policy.id,
@@ -511,8 +538,11 @@ public final class AutomationRuntime: @unchecked Sendable {
             try store.saveRun(run)
             return run
         } catch {
-            let failedStep = branch.steps[min(records.count, max(branch.steps.count - 1, 0))]
-            let failedStepIndex = min(records.count, max(branch.steps.count - 1, 0))
+            let (failedStep, failedStepIndex) = repairTargetStep(
+                branch: branch ?? policy.branches.first,
+                policy: policy,
+                completedStepCount: records.count
+            )
             let request = AutomationRepairRequest(
                 policy: policy,
                 runId: runId,
@@ -549,6 +579,19 @@ public final class AutomationRuntime: @unchecked Sendable {
             try store.saveRun(run)
             return run
         }
+    }
+
+    private func repairTargetStep(
+        branch: AutomationBranch?,
+        policy: AutomationPolicy,
+        completedStepCount: Int
+    ) -> (step: AutomationStep, index: Int) {
+        let steps = branch?.steps ?? []
+        guard !steps.isEmpty else {
+            return (AutomationStep(kind: .activateApp, bundleId: policy.targetBundleId), 0)
+        }
+        let index = min(completedStepCount, steps.count - 1)
+        return (steps[index], index)
     }
 
     private func execute(step: AutomationStep) async throws {
@@ -593,6 +636,24 @@ public final class AutomationRuntime: @unchecked Sendable {
             )
         case .waitFor:
             try await waitFor(condition: step.condition, timeoutMs: step.timeoutMs ?? 2_000)
+        }
+    }
+
+    private func matchingBranch(in policy: AutomationPolicy) async throws -> AutomationBranch? {
+        for branch in policy.branches {
+            if try await matchesAll(branch.conditions) {
+                return branch
+            }
+        }
+        return nil
+    }
+
+    private func matchesAll(_ conditions: [AutomationCondition]) async throws -> Bool {
+        guard !conditions.isEmpty else { return true }
+        let snapshot = try await capabilityClient.call(namespace: "ax", tool: "snapshot", arguments: [:])
+        let root = snapshotRoot(snapshot)
+        return conditions.allSatisfy { condition in
+            matches(selector: condition.selector, node: root)
         }
     }
 
