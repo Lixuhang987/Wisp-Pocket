@@ -1443,3 +1443,20 @@
 - **验证过程**：先在 main 执行 `pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh` 并通过；此前同一修复在 worktree `codex/radix-popover-flip` 通过 `pnpm --filter handagent-electron-shell build` 与 `bash ./scripts/package-app.sh --mock-llm`。启动 mock Electron shell 后通过 command socket 创建 `THREADWINDOW_RADIX_FLIP_FIX_QA_20260618 [mock:assistant-ok]` thread，将真实 Electron `HandAgent ThreadWindow` 设置为 `920x260`，在 Composer textarea 输入 `/`。
 - **证据**：CDP 读取到 `innerHeight=232`、`boxTop=118`、`boxBottom=216`、`menuTop=8`、`menuBottom=114`、`visible=true`、`cssMaxHeight=106px`、`styleMaxHeight=min(320px, var(--radix-popover-content-available-height))`；缺陷发现时同场景为 `menuTop=-206`。验证后已清理 Electron、agent-server 和 `4317` / `9222` 监听。
 - **结论**：通过。slash popover 在窄高窗口中已完整留在视口内，不再出现顶部跑出视口导致候选内容裁剪。
+
+
+### Use-case 驱动测试收敛
+
+- 完成日期：2026-06-18
+- 实现位置：`docs/medium-powers/plans/2026-06-18-use-case-driven-test-consolidation.md`、`packages/core/tests/runtime/runtime-use-cases.test.ts`、`packages/core/tests/mcp/mcp-use-cases.test.ts`、`packages/core/tests/permission/security-use-cases.test.ts`、`packages/core/tests/protocol/protocol-boundaries.test.ts`、`packages/thread-store/tests/thread-store-use-cases.test.ts`、`apps/agent-server/tests/use-cases/thread-lifecycle.test.ts`、`apps/electron-shell/tests/use-cases/*.test.ts`、`apps/thread-window-web/tests/use-cases/*.test.ts`、`apps/thread-window-web/tests/boundaries/protocol-native-theme.test.ts`
+- 验收结果：仓库测试体系已从按实现细节分散的 TDD 单测，收敛为按模块阶段组织的 use-case 集成测试。`packages/core`、`packages/thread-store`、`apps/agent-server`、`apps/electron-shell` 和 `apps/thread-window-web` 的主路径入口已保留为更接近真实用例的测试文件，相关模块文档与测试索引已同步更新。当前仍保留少量边界测试用于协议、外部适配和持久化合约。
+- 自动化验证：本轮合并收敛后已执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`；均返回 `success`。
+- 手工回归步骤：后续如继续调整测试边界，应优先从新增 `use-cases/` 入口补用例，再删除对应旧测试文件，并同步更新相应模块文档与本文件。
+
+### Use-case 驱动测试收敛
+
+- **验证日期**：2026-06-25
+- **验证环境**：macOS 本地主 checkout `/Users/mu9/proj/handAgent`，branch `main`，commit `b2d2d8d`。
+- **验证过程**：复核该条目为测试体系收敛证据项，不依赖可见 UI；在主 checkout 重新执行仓库验证命令。
+- **证据**：`pnpm exec vitest run packages/core/tests/llm/vercel-client.test.ts` 返回 13 files / 214 tests passed（含 root 20 tests）；`bash ./scripts/test.sh` 返回 `success`；`bash ./scripts/swiftw test` 返回 `success`；`bash ./scripts/swiftw build` 返回 `success`。
+- **结论**：通过
