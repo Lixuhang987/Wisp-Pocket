@@ -32,6 +32,7 @@ export function ThreadItemBubble({ item, onCopy, isRunning = false }: ThreadItem
     case "user_message":
       return <UserMessageBubble item={item} onCopy={onCopy} />;
     case "assistant_message":
+      if (!item.text && !isRunning) return null;
       return <AssistantMessageBubble item={item} onCopy={onCopy} isRunning={isRunning} />;
     case "error":
       return <ErrorBubble item={item} />;
