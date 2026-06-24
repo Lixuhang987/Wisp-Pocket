@@ -663,14 +663,22 @@ public final class AutomationToolRouter: @unchecked Sendable {
                 try store.saveTrace(id: traceId, payload: dictionaryArgument(arguments))
                 return .json(["traceId": traceId, "status": "saved"])
             case "policy_create":
+                let object = dictionaryArgument(arguments)
+                if object["policy"] != nil {
+                    let policy = try decodeJSONObject(AutomationPolicy.self, from: object["policy"])
+                    try store.savePolicy(policy)
+                    return .json(["policy": try encodeDictionary(policy)])
+                }
                 let policyId = stringArgument(arguments, "policyId", fallback: UUID().uuidString)
                 let traceId = stringArgument(arguments, "traceId", fallback: "")
                 let trace = traceId.isEmpty ? [:] : (try? store.loadTrace(id: traceId)) ?? [:]
-                let branch = automationBranch(from: trace)
+                let branch = object["branch"] != nil
+                    ? try decodeJSONObject(AutomationBranch.self, from: object["branch"])
+                    : automationBranch(from: trace)
                 let policy = AutomationPolicy(
                     id: policyId,
                     title: stringArgument(arguments, "title", fallback: "Recorded Automation"),
-                    targetBundleId: trace["targetBundleId"] as? String,
+                    targetBundleId: stringValue(object["targetBundleId"]) ?? trace["targetBundleId"] as? String,
                     branches: [branch]
                 )
                 try store.savePolicy(policy)

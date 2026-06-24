@@ -378,6 +378,85 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertNil(trace["targetBundleId"])
     }
 
+    func testPolicyCreateAcceptsAgentGeneratedPolicyAndBranch() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: RecordingAutomationCapabilityClient(),
+            repairer: RecordingAutomationRepairer()
+        )
+        let router = AutomationToolRouter(store: store, runtime: runtime)
+
+        let policyResult = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "policy_create",
+            arguments: [
+                "policy": [
+                    "id": "agent-policy",
+                    "version": 3,
+                    "title": "Agent Policy",
+                    "targetBundleId": "com.example.agent",
+                    "branches": [
+                        [
+                            "id": "agent-main",
+                            "steps": [
+                                [
+                                    "kind": "click",
+                                    "selector": ["role": "AXButton", "title": "Confirm"],
+                                ],
+                                [
+                                    "kind": "typeText",
+                                    "selector": ["role": "AXTextField"],
+                                    "value": "approved",
+                                ],
+                            ],
+                            "assertions": [
+                                ["selector": ["role": "AXStaticText", "title": "Done"]],
+                            ],
+                        ],
+                    ],
+                ],
+            ]
+        ))
+        let policy = try XCTUnwrap(policyResult["policy"] as? [String: Any])
+        XCTAssertEqual(policy["id"] as? String, "agent-policy")
+        XCTAssertEqual(policy["version"] as? Int, 3)
+        XCTAssertEqual(policy["targetBundleId"] as? String, "com.example.agent")
+        let storedAgentPolicy = try store.loadPolicy(id: "agent-policy")
+        XCTAssertEqual(storedAgentPolicy.branches[0].id, "agent-main")
+        XCTAssertEqual(storedAgentPolicy.branches[0].steps.map(\.kind), [.click, .typeText])
+        XCTAssertEqual(storedAgentPolicy.branches[0].assertions.count, 1)
+
+        let branchResult = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "policy_create",
+            arguments: [
+                "policyId": "agent-branch-policy",
+                "title": "Agent Branch Policy",
+                "targetBundleId": "com.example.branch",
+                "branch": [
+                    "id": "agent-branch",
+                    "steps": [
+                        [
+                            "kind": "hotkey",
+                            "value": "command+s",
+                        ],
+                    ],
+                    "assertions": [],
+                ],
+            ]
+        ))
+        let branchPolicy = try XCTUnwrap(branchResult["policy"] as? [String: Any])
+        XCTAssertEqual(branchPolicy["id"] as? String, "agent-branch-policy")
+        XCTAssertEqual(branchPolicy["targetBundleId"] as? String, "com.example.branch")
+        let storedBranchPolicy = try store.loadPolicy(id: "agent-branch-policy")
+        XCTAssertEqual(storedBranchPolicy.title, "Agent Branch Policy")
+        XCTAssertEqual(storedBranchPolicy.branches[0].id, "agent-branch")
+        XCTAssertEqual(storedBranchPolicy.branches[0].steps[0].kind, .hotkey)
+        XCTAssertEqual(storedBranchPolicy.branches[0].steps[0].value, "command+s")
+    }
+
     func testLiveUserEventRecordingMergesCapturedEventsIntoTrace() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)

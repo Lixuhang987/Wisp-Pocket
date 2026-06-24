@@ -125,6 +125,32 @@ flowchart LR
 - repair 成功后自动合入 patch，不要求用户审核。
 - 不把 Context History 和 Automation 合并；它们只共享原子 plugin 能力。
 
+## 第一阶段补充：agent 归纳 policy 回填
+
+### Goal
+
+补齐“agent 根据 trace 生成自动化”的数据入口：agent 可先读取 `record_stop` 保存的 trace，再调用 `automation.policy_create` 提交已经归纳好的受限 `AutomationPolicy` 或单个 `AutomationBranch`。runtime 只负责校验 JSON schema、保存 policy，并继续保留从 trace events 自动映射 branch 的 fallback。
+
+### Use case map
+
+```mermaid
+flowchart LR
+    A["agent 读取 trace.json"] --> B["agent 归纳 AX selector / steps / assertions"]
+    B --> C["agent 调用 automation.policy_create(policy 或 branch)"]
+    C --> D["Automation runtime 校验并保存受限 AutomationPolicy"]
+    D --> E["后续 automation.run 读取同一 policy 执行"]
+```
+
+- Integration test need to update: `apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
+  - 调用 `automation.policy_create` 传入 agent 生成的完整 `policy`，断言返回与落盘 policy 保留 agent 给出的 id、target、branch、steps 和 assertions。
+  - 调用 `automation.policy_create` 传入 agent 生成的单个 `branch`，断言 runtime 用 tool 参数中的 policy metadata 包装成完整 policy 并保存。
+
+### Implementation tasks
+
+1. 扩展 `automation.policy_create` 参数：优先接受完整 `policy` payload；其次接受 `branch` payload；最后才从 `traceId` 对应 trace events 自动映射 branch。
+2. 保持 policy schema 使用现有 `AutomationPolicy` / `AutomationBranch` Codable 解码，不引入任意代码执行。
+3. 更新 Automation runtime 测试、builtin plugin 文档和 manual QA。
+
 ## 第二阶段：agent/computer-use repair 队列与回填闭环
 
 ### Goal
