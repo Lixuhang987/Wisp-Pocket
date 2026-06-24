@@ -12,16 +12,16 @@ HandAgent 当前已有 macOS host dynamic tools，可通过 Swift 读取前台 a
 
 定义一种自进化自动化的产品能力：用户可以通过录制或请求 AI 创建自动化流程，系统将其转成可执行、可审计、可修订的自动化策略。运行时优先用 AX API 做确定性操作，减少 LLM 参与；只有在 selector 匹配失败、断言失败或遇到未知 UI 状态时，才把当前 AX 树、截图、失败步骤和目标交给 agent 修复。
 
-自动化流程的核心形态应是受限、可校验的 Automation Policy，而不是任意 Swift 代码。Swift 或外部 plugin runtime 负责解释执行 policy、调用宿主能力、记录审计日志、处理失败和生成待审核的演化 patch。
+自动化流程的核心形态应是受限、可校验的 Automation Policy，而不是任意 Swift 代码。Swift 或外部 plugin runtime 负责解释执行 policy、调用宿主能力、记录审计日志、处理失败和生成可自动合入的演化 patch。
 
-自进化不等于运行时静默改写规则。第一版应把 agent repair 成功后的新分支保存为 draft patch，附带 trace 和证据，由用户批准后生效。
+自进化过程不需要用户干预。agent repair 成功后的新分支应自动合入当前 automation policy，并附带 trace、证据和版本记录，方便后续调试、回滚和评估自动化覆盖范围。
 
 ## Non-Goals
 
 - 不在第一版允许 AI 直接生成并执行任意 Swift 代码。
 - 不把 Automation Policy 设计成完整通用编程语言。
 - 不承诺坐标级宏回放；自动化以 AX selector、UI 条件和断言为主。
-- 不在第一版自动启用自进化 patch。
+- 不要求用户审核或批准 agent repair 成功后生成的自进化 patch。
 - 不把普通 dynamic tool plugin 和 Automation Plugin 混为同一运行时模型。
 - 不在本 spec 中决定 Swift host capability RPC 的最终协议；该协议需要后续单独设计。
 - 不要求 Context History plugin 必须由自进化自动化生成；Context History 是独立的持续采集能力。
@@ -41,10 +41,10 @@ HandAgent 当前已有 macOS host dynamic tools，可通过 Swift 读取前台 a
 - 预期结果：runtime 收集当前 AX tree、截图、失败步骤、已执行步骤和目标，路由给 agent / computer use 修复，而不是继续盲目执行。
 
 - 触发：agent repair 成功完成当前任务。
-- 预期结果：系统生成 Automation Policy patch draft，描述新增条件分支、对应操作和成功证据，不直接静默生效。
+- 预期结果：系统生成 Automation Policy patch，描述新增条件分支、对应操作和成功证据，并自动合入当前 policy，后续相同或相近 UI 状态可优先走确定性 AX 流程。
 
-- 触发：用户审核并批准某个 patch draft。
-- 预期结果：该分支合入自动化 policy，后续相同或相近 UI 状态可优先走确定性 AX 流程。
+- 触发：用户查看自动化演化历史。
+- 预期结果：系统展示每次自动合入的 patch、来源 trace、agent repair 证据、policy 版本变化和可用于调试或回滚的信息。
 
 - 触发：用户查看自动化历史或调试失败。
-- 预期结果：系统展示每次运行的目标、匹配条件、执行步骤、读取的 AX/截图引用、失败原因、agent repair 结果和已启用或待审核的 patch。
+- 预期结果：系统展示每次运行的目标、匹配条件、执行步骤、读取的 AX/截图引用、失败原因、agent repair 结果和已自动合入的 patch。
