@@ -135,7 +135,7 @@ final class AgentTriggerStore {
                     required: true
                 )
             ]),
-            defaultPromptTemplate: "Summarize the bookmarked page.",
+            defaultPromptTemplate: "Summarize the bookmarked page: {{title}} {{url}}",
             defaultDeliveryPolicy: .default,
             defaultNotificationPolicy: .default
         ),

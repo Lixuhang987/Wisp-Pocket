@@ -49,7 +49,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.instances.count, 1)
         XCTAssertEqual(viewModel.instances.first?.packageId, "chrome-bookmarks")
         XCTAssertEqual(viewModel.instances.first?.title, "English Reading")
-        XCTAssertEqual(viewModel.instances.first?.promptTemplate, "Summarize the bookmarked page.")
+        XCTAssertEqual(viewModel.instances.first?.promptTemplate, "Summarize the bookmarked page: {{title}} {{url}}")
         XCTAssertEqual(runtime.reloadCount, 1)
         XCTAssertEqual(store.loadInstances().count, 1)
     }
