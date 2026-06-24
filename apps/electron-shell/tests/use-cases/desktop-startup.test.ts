@@ -184,7 +184,7 @@ describe("ElectronShellRuntime", () => {
     expect(harness.events).toEqual([]);
   });
 
-  it("acks focus false when no visible thread window exists", async () => {
+  it("opens and acks focus when no visible thread window exists", async () => {
     const harness = createHarness({ focusResult: false });
 
     await harness.runtime.handleCommand({
@@ -194,12 +194,12 @@ describe("ElectronShellRuntime", () => {
       threadId: null,
     });
 
+    expect(harness.prewarmer.openHistory).toHaveBeenCalledTimes(1);
     expect(harness.events).toContainEqual({
       channel: "electron_shell",
       type: "command.ack",
       commandId: "cmd-focus",
-      ok: false,
-      error: "thread window is not visible",
+      ok: true,
     });
   });
 

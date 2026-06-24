@@ -51,6 +51,7 @@ struct ElectronShellLaunchConfiguration: Equatable {
 @MainActor
 struct AppServicesRuntime {
     let appServer: any AppServerManaging
+    let swiftThreadClient: (any SwiftThreadSubmitting)?
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
     let agentTriggerCommandClient: (any AgentTriggerCommanding)?
@@ -70,7 +71,9 @@ final class AppServices {
     let appearanceThemeService: AppearanceThemeService
     let appearanceChangeObserver: any AppearanceChangeObserving
     let actionManifestStore: ActionManifestStore
-    let platformServerURL: URL
+    let dynamicToolServerURL: URL
+    let threadServerURL: URL
+    let swiftThreadClient: (any SwiftThreadSubmitting)?
     let hotkeyRegistrar: any HotkeyRegistering
     let settingsWindowPresenter: any SettingsWindowPresenting
     let fatalAlertPresenter: any FatalAlertPresenting
@@ -89,7 +92,9 @@ final class AppServices {
         appearanceThemeService: AppearanceThemeService? = nil,
         appearanceChangeObserver: (any AppearanceChangeObserving)? = nil,
         actionManifestStore: ActionManifestStore = ActionManifestStore(),
-        platformServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/platform")!,
+        dynamicToolServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
+        threadServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/thread")!,
+        swiftThreadClient: (any SwiftThreadSubmitting)? = nil,
         hotkeyRegistrar: any HotkeyRegistering = ProductionHotkeyRegistrar(),
         settingsWindowPresenter: any SettingsWindowPresenting = ProductionSettingsWindowPresenter(),
         fatalAlertPresenter: any FatalAlertPresenting = ProductionFatalAlertPresenter(),
@@ -108,10 +113,12 @@ final class AppServices {
             ? AppServices.defaultRuntime(
                 environment: environment,
                 initialTheme: resolvedAppearanceThemeService.currentTheme,
-                platformServerURL: platformServerURL
+                dynamicToolServerURL: dynamicToolServerURL,
+                threadServerURL: threadServerURL
             )
             : nil
         self.appServer = appServer ?? runtime!.appServer
+        self.swiftThreadClient = swiftThreadClient ?? runtime?.swiftThreadClient
         self.threadWindowCommandClient = threadWindowCommandClient ?? runtime?.threadWindowCommandClient ?? NopThreadWindowCommandClient()
         self.activityWindowCommandClient = activityWindowCommandClient ?? runtime?.activityWindowCommandClient
         self.agentTriggerCommandClient = runtime?.agentTriggerCommandClient
@@ -132,7 +139,8 @@ final class AppServices {
         self.appearanceThemeService = resolvedAppearanceThemeService
         self.appearanceChangeObserver = appearanceChangeObserver ?? SystemAppearanceChangeObserver()
         self.actionManifestStore = actionManifestStore
-        self.platformServerURL = platformServerURL
+        self.dynamicToolServerURL = dynamicToolServerURL
+        self.threadServerURL = threadServerURL
         self.hotkeyRegistrar = hotkeyRegistrar
         self.settingsWindowPresenter = settingsWindowPresenter
         self.fatalAlertPresenter = fatalAlertPresenter
@@ -154,7 +162,8 @@ final class AppServices {
         appearanceChangeObserver: (any AppearanceChangeObserving)? = nil,
         actionManifestStore: ActionManifestStore = ActionManifestStore(
             actionsDirectoryURL: URL(fileURLWithPath: "/dev/null", isDirectory: true)
-        )
+        ),
+        swiftThreadClient: (any SwiftThreadSubmitting)? = nil
     ) -> AppServices {
         AppServices(
             appServer: NopAppServer(),
@@ -166,7 +175,9 @@ final class AppServices {
             appearanceThemeService: appearanceThemeService,
             appearanceChangeObserver: appearanceChangeObserver ?? NopAppearanceChangeObserver(),
             actionManifestStore: actionManifestStore,
-            platformServerURL: URL(string: "ws://127.0.0.1:0/noop-platform")!,
+            dynamicToolServerURL: URL(string: "ws://127.0.0.1:0/noop-dynamic-tools")!,
+            threadServerURL: URL(string: "ws://127.0.0.1:0/noop-thread")!,
+            swiftThreadClient: swiftThreadClient,
             hotkeyRegistrar: NopHotkeyRegistrar(),
             settingsWindowPresenter: settingsWindowPresenter,
             fatalAlertPresenter: NopFatalAlertPresenter(),
@@ -180,11 +191,15 @@ final class AppServices {
     static func defaultRuntime(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         initialTheme: HostThemePayload? = nil,
-        platformServerURL: URL
+        dynamicToolServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
+        threadServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/thread")!
     ) -> AppServicesRuntime {
-        let platformClient = PlatformBridgeConnectionClient(
-            connection: AppServerConnection(serverURL: platformServerURL),
-            platformBridge: PlatformBridgeService()
+        let dynamicToolClient = DynamicToolProviderConnectionClient(
+            connection: AppServerConnection(serverURL: dynamicToolServerURL),
+            providerService: DynamicToolProviderService()
+        )
+        let swiftThreadClient = SwiftThreadClient(
+            connection: AppServerConnection(serverURL: threadServerURL)
         )
 
         let configuration = defaultElectronShellLaunchConfiguration(
@@ -197,9 +212,14 @@ final class AppServices {
             environment: configuration.environment,
             currentDirectoryURL: configuration.currentDirectoryURL
         )
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: platformClient)
+        let appServer = ElectronBackedAppServer(
+            shell: shell,
+            dynamicToolClient: dynamicToolClient,
+            swiftThreadClient: swiftThreadClient
+        )
         return AppServicesRuntime(
             appServer: appServer,
+            swiftThreadClient: swiftThreadClient,
             threadWindowCommandClient: appServer,
             activityWindowCommandClient: appServer,
             agentTriggerCommandClient: appServer

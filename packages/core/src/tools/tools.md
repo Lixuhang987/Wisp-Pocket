@@ -1,31 +1,25 @@
 # tools
 
-`AgentTool` 协议、`ToolRegistry` 注册中心、当前 11 个 builtin tool，以及 builtin tool 注册组合根。
+`AgentTool` 协议、`ToolRegistry` 注册中心、workspace/file builtin tools、dynamic tool adapter，以及 builtin tool 注册组合根。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `AgentTool.ts` | `AgentTool<TInput, TOutput>` 接口：`name / description / inputSchema (JSON Schema) / call(input, context?)`；`context` 当前包含 `threadId / toolCallId`；可选 `stubByDefault` 声明 runtime 可把结果写成 Blob/Stub |
+| `AgentTool.ts` | `AgentTool<TInput, TOutput>` 接口：`name / description / inputSchema (JSON Schema) / call(input, context?)`；`context` 当前包含 `threadId / turnId / toolCallId`；可选 `stubByDefault` 声明 runtime 可把结果写成 Blob/Stub |
 | `defineTool.ts` | `defineTool({ name, description, inputSchema (zod), stubByDefault?, run })` 工厂：`zod` schema 自动转 JSON Schema 2019-09；`.create(deps)` 生成的 `call(input, context?)` 会先用同一个 schema 做运行时入参校验，再调用 `run` |
 | `ToolRegistry.ts` | Map 包装；`register / replaceAll / get / list`，单次注册重名抛错，`replaceAll()` 供 settings 热加载原地刷新；`list()` 返回 `RegisteredTool`（去掉 `call`），供 `LLMClient.stream` 使用 |
 | `MetaToolUseTool.ts` | meta-tool `use_tools`，未激活 thread 默认只暴露它；首次调用后由 thread-scoped registry 注入完整 builtin + MCP 工具集 |
-| `registerBuiltins.ts` | 组合根：根据 `PlatformAdapter` + 可选 `WorkspaceRegistry` + `ToolSettings` 装配 candidates，过 allowlist/denylist 后注册 |
-| `registerTools.ts` | 当前等同于 builtin 注册组合根：按 `PlatformAdapter` / `WorkspaceRegistry` 生成 builtin candidates，再统一套 `allowlist / denylist` |
-| `builtins/*.ts` | 11 个 builtin tool 实现，全部用 `defineTool` 工厂表达 |
+| `DynamicToolAdapter.ts` | 把 `DynamicToolSpec` 适配成 `AgentTool`，调用时通过 `DynamicToolBridge` 按 `clientId` 转发给 provider |
+| `registerBuiltins.ts` | 组合根：根据可选 `WorkspaceRegistry` + `ToolSettings` 装配 workspace/file candidates，过 allowlist/denylist 后注册 |
+| `registerTools.ts` | 当前等同于 builtin 注册组合根：按 `WorkspaceRegistry` 生成 builtin candidates，再统一套 `allowlist / denylist` |
+| `builtins/*.ts` | workspace/file builtin tool 实现，全部用 `defineTool` 工厂表达 |
 | `builtins/workspace-path.ts` | `file.read` / `file.write` 共享的 workspace 路径校验工具：拒绝绝对路径与 `..` 越狱、`realpath` 后再次校验 |
 
-## 11 个 builtin tool
+## Builtin tools
 
 | name | 入参 | 依赖 | 说明 |
 |------|------|------|------|
-| `clipboard.read` | `{}` | `PlatformAdapter.currentClipboardText` | 读 NSPasteboard 文本 |
-| `app.frontmost` | `{}` | `PlatformAdapter.frontmostAppInfo` | 当前前台 App 信息 |
-| `window.list` | `{}` | `PlatformAdapter.frontmostWindowList` | 当前可见窗口列表（CGWindowList） |
-| `screen.capture` | `ScreenCaptureRequest` | `PlatformAdapter.captureScreen`（→ ScreenCaptureKit） | 支持 screen / display / window / region 四种 target，base64 PNG 返回；不传 target、`screen`、`display` 都是整屏/显示器截图路径，`window` 指定窗口，`region` 指定矩形区域 |
-| `ocr.read` | `OCRRequest` | `PlatformAdapter.recognizeText` | macOS Vision OCR，仅读入参图片 |
-| `accessibility.snapshot` | `AccessibilitySnapshotTarget` | `PlatformAdapter.accessibilitySnapshot` | macOS Accessibility 快照 |
-| `accessibility.action` | `AccessibilityActionRequest` | `PlatformAdapter.performAccessibilityAction` | macOS Accessibility 动作 |
 | `workspace.list` | `{}` | `WorkspaceRegistry.summarize` | 返回 `[{id, name, description, isDefault}]`，**不含 rootPath** |
 | `workspace.askUser` | `{ prompt, candidateIds? }` | `WorkspaceRegistry.summarize` + `WorkspaceAskResolver` | 多个 workspace 候选都合理时，通过 Thread UI 内联气泡让用户选择；取消、超时或无活动 thread 返回 `{ cancelled: true }` |
 | `file.read` | `{ workspaceId, relativePath, cached }` | `WorkspaceRegistry` | 沙箱 read：经 `realpath` 校验仍在 rootPath 内；`cached` 必填，取 `turn` 或 `persist` |
@@ -38,9 +32,8 @@ flowchart LR
   A[startDefaultServer / before run refresh] --> B[SettingsBackedToolRegistry.refresh]
   B --> C[loadToolSettings]
   A --> W[FileWorkspaceRegistry]
-  A --> D[RemotePlatformAdapter]
-  C & W & D --> E[registerTools]
-  E --> F[candidates = 7 platform tools + 4 workspace tools]
+  C & W --> E[registerTools]
+  E --> F[candidates = 4 workspace/file tools]
   F --> G[filterToolNames（denylist 优先 > allowlist）]
   G --> H[registry.replaceAll]
   H --> I[返回 {registry, registered, disabled}]
@@ -50,12 +43,16 @@ flowchart LR
 
 本目录不再包含私有 `tools[] + command` 外部工具运行时，也不通过 action binding 改变 thread tool scope。PromptPanel Action manifest 只负责生成 skill prompt chip；外部能力统一通过 `~/.spotAgent/mcp.json` 的全局 MCP tools 或 builtin tools 暴露。
 
+## Dynamic tools
+
+macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicToolSpec` 暴露，不进入 builtin 注册流程。`ThreadScopedToolRegistry` 在 agent-server 侧把 thread metadata 中的 dynamic tools 适配为 `DynamicToolAdapter`；模型可见名称是 `namespace.name`，例如 `host_macos.screen_capture`。adapter 会用 `threadId / turnId / toolCallId` 生成 provider-facing 唯一 call id，避免多个 thread 并发复用同一个 LLM tool call id 时互相覆盖；返回给 runtime 的 tool message 仍使用原始 `toolCallId`。
+
 ## 编辑此目录的约束
 
-- 新增 builtin tool 必须：实现 `AgentTool` → 在 `registerBuiltins.ts` 的 `candidates` 里挂上 → 同步更新 [README](/Users/mu9/proj/handAgent/README.md) 与本文件的"11 个 builtin tool"表。
+- 新增 builtin tool 必须：实现 `AgentTool` → 在 `registerBuiltins.ts` 的 `candidates` 里挂上 → 同步更新 [README](/Users/mu9/proj/handAgent/README.md) 与本文件的 builtin tool 表。
 - 新增 MCP 字段时，同步更新对应模块文档，并补 MCP 配置解析测试。
 - tool name 一律点号风格（`category.action`），描述要包含调用场景与边界条件，方便 LLM 自决策。
-- 不要在 tool 内部直接 `import "node:fs"` 与平台无关的 IO；platform 类 tool 必须经 `PlatformAdapter`，文件类 tool 必须经 `WorkspaceRegistry`。
+- 不要在 tool 内部直接 `import "node:fs"` 与平台无关的 IO；文件类 tool 必须经 `WorkspaceRegistry`，host/plugin 能力应走 dynamic tools。
 - 工具结果优先返回**可序列化对象**（runtime 自动 JSON.stringify）；返回字符串只用于人类阅读场景。
 - 大段输出工具若需要 Blob/Stub 路径，应在 input schema 中加入必填 `cached: "turn" | "persist"`，并设置 `stubByDefault`；runtime 会负责落 Blob 与渲染 STUB，tool 不直接拼文本。
 - 入参 schema 单一源：写 `zod` schema 即可，`defineTool` 自动派生 JSON Schema、TS 类型，并在 `call(input)` 内执行运行时校验；builtin tool 的外层入参结构由 `defineTool` 统一校验。
@@ -74,7 +71,6 @@ flowchart LR
 
 ## 相关文档
 
-- 平台抽象：[platform/platform.md](/Users/mu9/proj/handAgent/packages/core/src/platform/platform.md)
 - 工作区沙箱：[workspace/workspace.md](/Users/mu9/proj/handAgent/packages/core/src/workspace/workspace.md)
 - 配置开关：[config/config.md](/Users/mu9/proj/handAgent/packages/core/src/config/config.md)
-- 桌面侧 macOS 实现：[apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)
+- 桌面侧 macOS dynamic tools：[apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)

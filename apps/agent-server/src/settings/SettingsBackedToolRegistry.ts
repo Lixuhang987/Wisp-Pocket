@@ -1,5 +1,4 @@
 import { statSync } from "node:fs";
-import type { PlatformAdapter } from "@handagent/core/platform/PlatformAdapter.ts";
 import type { WorkspaceRegistry } from "@handagent/core/workspace/Workspace.ts";
 import type { WorkspaceAskResolver } from "@handagent/core/tools/builtins/WorkspaceAskUserTool.ts";
 import {
@@ -27,7 +26,6 @@ export class SettingsBackedToolRegistry {
 
   constructor(
     private readonly options: {
-      platform: PlatformAdapter;
       workspaceRegistry?: WorkspaceRegistry;
       workspaceAskResolver?: WorkspaceAskResolver;
     },
@@ -48,7 +46,6 @@ export class SettingsBackedToolRegistry {
 
     const result = await registerTools({
       registry: this.registry,
-      platform: this.options.platform,
       workspaceRegistry: this.options.workspaceRegistry,
       workspaceAskResolver: this.options.workspaceAskResolver,
       settings: this.loadToolSettings(),

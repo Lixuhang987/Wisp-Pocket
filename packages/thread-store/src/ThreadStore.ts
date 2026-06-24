@@ -500,6 +500,9 @@ export class ThreadStore {
       updatedAt: row.updated_at,
       messageCount: this.messagesForThread(row.thread_id).length,
       workspaceId: row.workspace_id,
+      ...(row.dynamic_tools_json
+        ? { dynamicTools: JSON.parse(row.dynamic_tools_json) }
+        : {}),
     };
   }
 
@@ -516,6 +519,7 @@ export class ThreadStore {
           updatedAt: live?.updatedAt ?? this.now(),
           messageCount: this.messagesForThread(threadId).length,
           workspaceId: live?.workspaceId ?? null,
+          ...(live?.meta.dynamicTools ? { dynamicTools: live.meta.dynamicTools } : {}),
         };
 
     const messages = this.messagesForThread(threadId);

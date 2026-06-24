@@ -2,7 +2,7 @@
 
 ## 目录职责
 
-`apps/agent-server/src` 是本地 Node agent-server 的源码层。它把 `/api/thread`、`/api/platform`、core runtime、settings、MCP、Agent request broker 和持久化组装成本地 thread 服务。
+`apps/agent-server/src` 是本地 Node agent-server 的源码层。它把 `/api/thread`、`/api/dynamic-tools`、core runtime、settings、MCP、Agent request broker 和持久化组装成本地 thread 服务。
 
 本目录不承载 macOS UI，不实现平台原生能力，也不定义 core 协议 DTO。
 
@@ -17,7 +17,7 @@
 | `protocol/` | [protocol/protocol.md](/Users/mu9/proj/handAgent/apps/agent-server/src/protocol/protocol.md) | core runtime event、thread 消息、审计事件与多模态 STUB 的翻译 |
 | `settings/` | [settings/settings.md](/Users/mu9/proj/handAgent/apps/agent-server/src/settings/settings.md) | `~/.spotAgent/settings.json` 驱动的 LLM client 与 builtin tool 热加载 |
 | `actions/` | [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md) | builtin / 全局 MCP / Computer Use 兼容层与 thread 级工具表 |
-| `bridges/` | [bridges/bridges.md](/Users/mu9/proj/handAgent/apps/agent-server/src/bridges/bridges.md) | desktop 平台 RPC bridge；thread request-response 归 `agent/AgentRequestBroker` |
+| `bridges/` | [bridges/bridges.md](/Users/mu9/proj/handAgent/apps/agent-server/src/bridges/bridges.md) | dynamic tool provider bridge；thread request-response 归 `agent/AgentRequestBroker` |
 
 ## 内部依赖方向
 
@@ -27,7 +27,7 @@
 - `protocol/` 只做 runtime event、conversation message、audit event 和 attachment STUB 的翻译。
 - `settings/` 把 `settings.json` 热加载成 LLM client 与 builtin tool registry。
 - `actions/` 组合 builtin tools 与全局 MCP tools，产出 thread 级工具表。
-- `bridges/` 只把 platform bridge 映射到 desktop socket，不执行 tool 业务逻辑；permission/workspace request-response 不再放在 bridges。
+- `bridges/` 只把 dynamic tool call 映射到 provider socket，不执行 tool 业务逻辑；permission/workspace request-response 不再放在 bridges。
 
 ## 边界规则
 
@@ -35,8 +35,8 @@
 - core 的 runtime、tool、permission、workspace 通过 `@handagent/core/<subpath>` package alias 引用，不使用跨包相对路径；thread 持久化通过 `@handagent/thread-store/<subpath>` 引用。
 - `server/` 是组合根；新增长驻服务要先在这里注入，再通过构造函数传给下游目录。
 - `thread/` 不直接创建 LLM client、MCP client 或 platform adapter；它只消费构造好的 runtime 与 persistence。
-- `bridges/` 只负责 platform bridge 接口映射到 desktop socket，不执行 tool 业务逻辑。
-- `/api/thread` 与 `/api/platform` 不共享消息 union；新增协议字段先改 `packages/core/src/protocol`，再在本目录接线。
+- `bridges/` 只负责 dynamic tool provider 接口映射到 provider socket，不执行 tool 业务逻辑。
+- `/api/thread` 与 `/api/dynamic-tools` 不共享消息 union；新增协议字段先改 `packages/core/src/protocol`，再在本目录接线。
 
 ## 推荐阅读顺序
 

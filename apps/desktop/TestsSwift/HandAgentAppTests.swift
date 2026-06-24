@@ -10,7 +10,6 @@ final class HandAgentAppTests: XCTestCase {
             services: AppServices(
                 appServer: appServer,
                 threadWindowCommandClient: NopThreadWindowCommandClient(),
-                platformServerURL: URL(string: "ws://127.0.0.1:0/noop-platform")!,
                 hotkeyRegistrar: NopHotkeyRegistrar(),
                 settingsWindowPresenter: NopSettingsWindowPresenter(),
                 fatalAlertPresenter: NopFatalAlertPresenter(),

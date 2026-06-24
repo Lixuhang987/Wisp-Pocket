@@ -5,7 +5,7 @@
 - React ThreadWindow 只提交 `ThreadCommand`，并回覆 `ClientResponse`
 - agent-server 向 React ThreadWindow 推送 `ThreadNotification`，并在需要用户决定时发 `ServerRequest`
 - Electron StatusBubble 和后续桌宠只订阅 `/api/activity`，接收轻量 `AgentActivityEvent`
-- 平台 RPC 独立于 thread 主路径，由 Swift desktop 通过 `/api/platform` 处理 `PlatformBridgeMessage`
+- Dynamic tool provider 独立于 thread 主路径，由 Swift desktop / plugin / 外部 provider 通过 `/api/dynamic-tools` 处理 `DynamicToolProviderMessage`
 
 ## 文件
 
@@ -19,7 +19,8 @@
 | `ClientResponse.ts` | 回执协议：`permission.answered` / `workspace.answered` |
 | `ThreadProtocolShared.ts` | 共享类型：`RunStatus` / `ThreadListEntry` / `WorkspaceAskCandidate` / `ThreadAttachment` |
 | `AgentActivity.ts` | `/api/activity` 轻量活动流：`activity.snapshot` / `activity.changed` |
-| `PlatformBridgeMessage.ts` | `PlatformBridgeMessage`（平台反向 RPC 帧）/ `PlatformResponsePayload` |
+| `DynamicTool.ts` | `DynamicToolSpec`、`DynamicToolProviderMessage` 与 `DynamicToolBridge` |
+| `HostDynamicTools.ts` | 默认 host dynamic tool spec，供 Electron / React preload 注入 |
 | `AgentTrigger.ts` | 后台 AgentTrigger 启动协议：`AgentTriggerFireRequest` / `AgentTriggerFireResult` / `AgentTriggerSourceEvent` / `AgentTriggerNotificationPolicy` |
 | `AgentTriggerAttention.ts` | 后台 AgentTrigger attention 事件：`AgentTriggerAttention` / `AgentTriggerAttentionReason`，供宿主在命中权限、工作区选择或失败时聚焦用户注意 |
 
@@ -35,11 +36,11 @@ flowchart LR
   A -->|/api/thread ClientResponse| B
   B -->|/api/activity AgentActivityEvent| E[Electron StatusBubble / 桌宠]
   B -->|/api/agent-trigger/attention AgentTriggerAttention| EA[Electron main]
-  B -->|/api/platform PlatformBridgeMessage| D[Swift desktop]
+  B -->|/api/dynamic-tools DynamicToolProviderMessage| D[Swift desktop / provider]
 ```
 
 - React ThreadWindow 不直接驱动 `AgentRuntime`，只发命令、收事件。
-- Swift desktop 不处理 thread DTO，只处理 platform bridge DTO。
+- Swift desktop 只用窄口径 thread client 创建 PromptPanel thread；host/tool provider 语义走 `/api/dynamic-tools`。
 - agent-server 负责 socket、订阅路由、持久化、Agent request broker，以及把 Agent `rx_event` 中的 notification/request 归一化发布到 `/api/thread`。
 - `/api/activity` 不承载 `ThreadCommand`、`ClientResponse`、`ThreadNotification` 或 `ServerRequest`，只发送 `AgentActivityEvent`。
 - core 只定义协议 DTO 与 runtime 事件，不负责 WebSocket 生命周期或连接分发。
@@ -151,7 +152,7 @@ agent-server 在进入 runtime 前统一解析这些 item，并组合成持久�
 
 ## Workspace 选择
 
-`workspace.askUser` 通过 `ServerRequest` / `ClientResponse` 向当前 ThreadWindow 发起内联选择，而不是复用平台 RPC。
+`workspace.askUser` 通过 `ServerRequest` / `ClientResponse` 向当前 ThreadWindow 发起内联选择，而不是复用 dynamic tool provider 通道。
 
 ```json
 {
@@ -186,33 +187,50 @@ React ThreadWindow 回复：
 
 用户取消、超时、thread 关闭或没有活动 ThreadWindow 时，tool 返回 `{ "cancelled": true }`。
 
-## 平台 RPC 帧
+## Dynamic Tool Provider 帧
 
 ```json
-// platform_request
+// provider_hello
 {
-  "channel": "platform",
-  "type": "platform_request",
-  "messageId": "...",
-  "timestamp": "...",
+  "channel": "dynamic_tools",
+  "type": "provider_hello",
+  "clientId": "swift-host",
+  "tools": [
+    {
+      "clientId": "swift-host",
+      "namespace": "host_macos",
+      "name": "screen_capture",
+      "description": "Capture a screenshot from an available macOS display.",
+      "inputSchema": { "type": "object", "additionalProperties": true }
+    }
+  ]
+}
+
+// tool_call_request
+{
+  "channel": "dynamic_tools",
+  "type": "tool_call_request",
   "payload": {
-    "requestId": "...",
-    "method": "screen.capture",
-    "args": {...},
-    "timeoutMs": 15000
+    "clientId": "swift-host",
+    "threadId": "...",
+    "turnId": "...",
+    "callId": "...",
+    "namespace": "host_macos",
+    "tool": "screen_capture",
+    "arguments": {}
   }
 }
 
-// platform_response
+// tool_call_response
 {
-  "channel": "platform",
-  "type": "platform_response",
-  "messageId": "...",
-  "timestamp": "...",
+  "channel": "dynamic_tools",
+  "type": "tool_call_response",
   "payload": {
-    "requestId": "...",
-    "status": "ok",
-    "result": {...}
+    "callId": "...",
+    "success": true,
+    "contentItems": [
+      { "type": "inputText", "text": "{\"width\":100,\"height\":100}" }
+    ]
   }
 }
 ```
@@ -222,12 +240,11 @@ React ThreadWindow 回复：
 - 协议是合约，desktop（Swift）与 agent-server（TS）必须严格对齐字段。
 - 新增 type 时考虑：是否同时影响 `@handagent/thread-store` 持久化、`ConversationMessage` UI、`ThreadAuditEvent` 审计三处。
 - 协议字段保持平铺，不要嵌套 anyJson 黑洞，让两边 codec 都能强类型化。
-- 平台 RPC 不带 `threadId`；server 只通过 `channel: "platform"` 分派平台帧。
+- dynamic tool call 带 `threadId`、`callId` 与 provider `clientId`；server 只通过 `channel: "dynamic_tools"` 分派 provider 帧。
 
 ## 相关文档
 
 - TS 处理方：[apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)
 - React 处理方：[apps/thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)
-- Swift platform 处理方：[PlatformBridge](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)
-- 平台 RPC 接口：[platform/platform.md](/Users/mu9/proj/handAgent/packages/core/src/platform/platform.md)
+- Swift host dynamic tools：[PlatformBridge](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)
 - UI 模型：[conversation/conversation.md](/Users/mu9/proj/handAgent/packages/core/src/conversation/conversation.md)

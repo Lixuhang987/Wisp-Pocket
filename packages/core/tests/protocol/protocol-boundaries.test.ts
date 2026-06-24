@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { AgentActivityEvent } from "../../src/protocol/AgentActivity.ts";
 import type { ClientResponse } from "../../src/protocol/ClientResponse.ts";
+import type { DynamicToolProviderMessage } from "../../src/protocol/DynamicTool.ts";
 import type { Op } from "../../src/protocol/Op.ts";
-import type { PlatformBridgeMessage } from "../../src/protocol/PlatformBridgeMessage.ts";
 import type { ServerRequest } from "../../src/protocol/ServerRequest.ts";
 import type { ThreadCommand } from "../../src/protocol/ThreadCommand.ts";
 import type { ThreadNotification } from "../../src/protocol/ThreadNotification.ts";
@@ -192,21 +192,23 @@ describe("thread protocol boundaries", () => {
     expect(snapshot.commandId).toBe(resume.commandId);
   });
 
-  it("keeps platform bridge messages on an independent channel", () => {
-    const platformMessage: PlatformBridgeMessage = {
-      channel: "platform",
-      type: "platform_request",
-      messageId: "p1",
-      timestamp: "2026-06-05T00:00:00.000Z",
+  it("keeps dynamic tool provider messages on an independent channel", () => {
+    const providerMessage: DynamicToolProviderMessage = {
+      channel: "dynamic_tools",
+      type: "tool_call_request",
       payload: {
-        requestId: "r1",
-        method: "screen.capture",
-        args: { target: "frontmost" },
+        clientId: "swift-host",
+        threadId: "thread-1",
+        turnId: "turn-1",
+        callId: "call-1",
+        namespace: "host_macos",
+        tool: "screen_capture",
+        arguments: { target: "frontmost" },
       },
     };
 
-    expect(platformMessage.channel).toBe("platform");
-    expect(platformMessage.type).toBe("platform_request");
+    expect(providerMessage.channel).toBe("dynamic_tools");
+    expect(providerMessage.type).toBe("tool_call_request");
   });
 
   it("models activity stream separately from thread notifications", () => {

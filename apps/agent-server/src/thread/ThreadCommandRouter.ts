@@ -15,6 +15,7 @@ import type {
 import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
 import type { ThreadSummary } from "@handagent/thread-store/index.ts";
 import type { WorkspaceRegistry } from "@handagent/core/workspace/Workspace.ts";
+import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
 import type { Agent, AgentManager } from "../agent/AgentManager.ts";
 import { threadIdFromRequestId } from "../agent/AgentRequestBroker.ts";
 import { ThreadNotificationPublisher } from "./ThreadNotificationPublisher.ts";
@@ -43,6 +44,10 @@ export class ThreadCommandRouter {
     private readonly responseHandlers: ResponseHandlers = {},
     private readonly workspaceRegistry?: WorkspaceRegistry,
     private readonly createAgent?: AgentFactory,
+    private readonly onThreadDynamicTools?: (
+      threadId: string,
+      dynamicTools: DynamicToolSpec[],
+    ) => void,
   ) {}
 
   async receive(command: ThreadCommand, connectionId: string): Promise<void> {
@@ -81,14 +86,15 @@ export class ThreadCommandRouter {
     command: ThreadStartCommand,
     connectionId: string,
   ): Promise<void> {
-    const thread = await this.persistence.createThread(
-      undefined,
-      command.payload.workspaceId,
-    );
+    const thread = await this.persistence.createThread({
+      workspaceId: command.payload.workspaceId,
+      dynamicTools: command.payload.dynamicTools,
+    });
     const threadId = thread.metadata.id;
+    this.onThreadDynamicTools?.(threadId, command.payload.dynamicTools ?? []);
     this.ensureAgent(threadId);
     this.publisher.subscribe(connectionId, threadId);
-    this.publisher.publishToConnection(connectionId, {
+    this.publisher.publish({
       type: "thread.started",
       threadId,
       notificationId: this.makeNotificationId(),

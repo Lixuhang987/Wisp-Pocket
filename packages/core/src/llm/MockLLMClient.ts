@@ -44,35 +44,35 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "clipboard-read",
     trigger: "[mock:clipboard-read]",
-    description: "调用 clipboard.read，用于验证 tool settings denylist 和平台 tool 链路。",
+    description: "调用 host_macos.clipboard_read，用于验证 tool settings denylist 和平台 tool 链路。",
     toolCall: {
       id: "mock-clipboard-read-1",
-      name: "clipboard.read",
+      name: "host_macos.clipboard_read",
       arguments: {},
     },
-    finalText: "Mock clipboard.read completed.",
+    finalText: "Mock host_macos.clipboard_read completed.",
   }),
   toolScenario({
     id: "screen-display",
     trigger: "[mock:screen-display]",
-    description: "调用 screen.capture display，用于验证 ScreenCaptureKit display 截图链路。",
+    description: "调用 host_macos.screen_capture display，用于验证 ScreenCaptureKit display 截图链路。",
     toolCall: {
       id: "mock-screen-display-1",
-      name: "screen.capture",
+      name: "host_macos.screen_capture",
       arguments: { target: { kind: "display" } },
     },
-    finalText: "Mock screen.capture display completed.",
+    finalText: "Mock host_macos.screen_capture display completed.",
   }),
   toolScenario({
     id: "screen-window",
     trigger: "[mock:screen-window]",
-    description: "调用 screen.capture window，prompt 中可用 windowId=<number> 指定窗口 id。",
+    description: "调用 host_macos.screen_capture window，prompt 中可用 windowId=<number> 指定窗口 id。",
     toolCall: (context) => ({
       id: "mock-screen-window-1",
-      name: "screen.capture",
+      name: "host_macos.screen_capture",
       arguments: { target: { kind: "window", windowId: parseWindowId(context) } },
     }),
-    finalText: "Mock screen.capture window completed.",
+    finalText: "Mock host_macos.screen_capture window completed.",
   }),
   toolScenario({
     id: "file-write",
@@ -210,47 +210,47 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "ocr-invalid",
     trigger: "[mock:ocr-invalid]",
-    description: "调用缺少 imageBase64 的 ocr.read，用于验证明确 invalid_argument 错误。",
+    description: "调用缺少 imageBase64 的 host_macos.ocr_read，用于验证明确 invalid_argument 错误。",
     toolCall: {
       id: "mock-ocr-invalid-1",
-      name: "ocr.read",
+      name: "host_macos.ocr_read",
       arguments: {},
     },
-    finalText: "Mock ocr invalid scenario finished.",
+    finalText: "Mock host_macos.ocr_read invalid scenario finished.",
   }),
   toolScenario({
     id: "ocr-sample",
     trigger: "[mock:ocr-sample]",
-    description: "调用带 imageBase64 的 ocr.read，prompt 可用 imageBase64=<base64> 覆盖默认样例。",
+    description: "调用带 imageBase64 的 host_macos.ocr_read，prompt 可用 imageBase64=<base64> 覆盖默认样例。",
     toolCall: (context) => ({
       id: "mock-ocr-sample-1",
-      name: "ocr.read",
+      name: "host_macos.ocr_read",
       arguments: {
         imageBase64: parseInlineValue(context, "imageBase64") ?? samplePngBase64,
         mimeType: "image/png",
         language: "en-US",
       },
     }),
-    finalText: "Mock ocr sample completed.",
+    finalText: "Mock host_macos.ocr_read sample completed.",
   }),
   toolScenario({
     id: "accessibility-frontmost",
     trigger: "[mock:accessibility-frontmost]",
-    description: "调用 accessibility.snapshot frontmost_app，用于验证辅助功能快照或权限错误。",
+    description: "调用 host_macos.accessibility_snapshot frontmost_app，用于验证辅助功能快照或权限错误。",
     toolCall: {
       id: "mock-accessibility-frontmost-1",
-      name: "accessibility.snapshot",
+      name: "host_macos.accessibility_snapshot",
       arguments: { kind: "frontmost_app" },
     },
-    finalText: "Mock accessibility snapshot completed.",
+    finalText: "Mock host_macos.accessibility_snapshot completed.",
   }),
   toolScenario({
     id: "accessibility-set-frontmost",
     trigger: "[mock:accessibility-set-frontmost]",
-    description: "调用 accessibility.action set_value frontmost_app，用于验证辅助功能动作或权限错误。",
+    description: "调用 host_macos.accessibility_action set_value frontmost_app，用于验证辅助功能动作或权限错误。",
     toolCall: {
       id: "mock-accessibility-set-frontmost-1",
-      name: "accessibility.action",
+      name: "host_macos.accessibility_action",
       arguments: {
         target: { kind: "frontmost_app" },
         action: {
@@ -259,7 +259,7 @@ export const mockLLMScenarios: MockLLMScenario[] = [
         },
       },
     },
-    finalText: "Mock accessibility action completed.",
+    finalText: "Mock host_macos.accessibility_action completed.",
   }),
   {
     id: "image-summary",

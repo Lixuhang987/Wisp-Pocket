@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { MockLLMClient } from "@handagent/core/llm/MockLLMClient.ts";
-import { AgentRuntime } from "@handagent/core/runtime/AgentRuntime.ts";
+import { AgentRuntime, type AgentRuntimeEvent } from "@handagent/core/runtime/AgentRuntime.ts";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { AgentTool } from "@handagent/core/tools/AgentTool.ts";
 import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
 import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
+import type { DynamicToolBridge } from "@handagent/core/protocol/DynamicTool.ts";
 import { ThreadScopedToolRegistry } from "../../src/actions/ThreadScopedToolRegistry.ts";
 
 function fakeTool(name: string): AgentTool {
@@ -21,7 +22,7 @@ function buildScoped(options?: {
   mcp?: Record<string, AgentTool[]>;
   globalMcpServerIds?: string[];
 }): ThreadScopedToolRegistry {
-  const builtin = new ToolRegistry(options?.builtin ?? [fakeTool("frontmost.app")]);
+  const builtin = new ToolRegistry(options?.builtin ?? [fakeTool("workspace.list")]);
   return new ThreadScopedToolRegistry({
     builtinRegistry: builtin,
     globalMcpServerIds: options?.globalMcpServerIds ?? [],
@@ -40,7 +41,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
   it("activate switches the registry to builtin + mcp tools without the meta-tool", async () => {
     const scoped = buildScoped({
-      builtin: [fakeTool("frontmost.app"), fakeTool("clipboard.read")],
+      builtin: [fakeTool("workspace.list"), fakeTool("file.read")],
       mcp: { srv: [fakeTool("mcp.srv.echo")] },
       globalMcpServerIds: ["srv"],
     });
@@ -48,17 +49,78 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     await scoped.activate("s1");
 
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
-      "frontmost.app",
-      "clipboard.read",
+      "workspace.list",
+      "file.read",
       "mcp.srv.echo",
     ]);
     expect(scoped.isActivated("s1")).toBe(true);
   });
 
+  it("keeps dynamic tools hidden before activation and registers them after use_tools", async () => {
+    const bridgeCalls: unknown[] = [];
+    const bridge: DynamicToolBridge = {
+      async call(payload) {
+        bridgeCalls.push(payload);
+        return {
+          callId: payload.callId,
+          success: true,
+          contentItems: [{ type: "inputText", text: "captured" }],
+        };
+      },
+    };
+    const scoped = new ThreadScopedToolRegistry({
+      builtinRegistry: new ToolRegistry([fakeTool("file.read")]),
+      globalMcpServerIds: [],
+      listMcpTools: async () => [],
+      dynamicToolBridge: bridge,
+    });
+    scoped.setDynamicTools("s1", [
+      {
+        clientId: "swift-host",
+        namespace: "host_macos",
+        name: "screen_capture",
+        description: "Capture a screen image",
+        inputSchema: { type: "object", properties: {} },
+      },
+    ]);
+
+    await scoped.refreshForThread("s1");
+    expect(scoped.registryForThread("s1").list().map((tool) => tool.name)).toEqual([
+      "use_tools",
+    ]);
+
+    await scoped.activate("s1");
+    expect(scoped.registryForThread("s1").list().map((tool) => tool.name)).toEqual([
+      "file.read",
+      "host_macos.screen_capture",
+    ]);
+
+    const tool = scoped.registryForThread("s1").get("host_macos.screen_capture");
+    await expect(tool?.call({}, {
+      threadId: "s1",
+      turnId: "turn-1",
+      toolCallId: "call-1",
+    })).resolves.toEqual({
+      callId: "call-1",
+      success: true,
+      contentItems: [{ type: "inputText", text: "captured" }],
+    });
+    expect(bridgeCalls).toEqual([
+      expect.objectContaining({
+        clientId: "swift-host",
+        threadId: "s1",
+        turnId: "turn-1",
+        callId: "s1:turn-1:call-1",
+        namespace: "host_macos",
+        tool: "screen_capture",
+      }),
+    ]);
+  });
+
   it("removes the meta-tool from the next LLM request after activation", async () => {
     const toolNamesPerRequest: string[][] = [];
     const scoped = buildScoped({
-      builtin: [fakeTool("frontmost.app")],
+      builtin: [fakeTool("workspace.list")],
     });
     await scoped.refreshForThread("s1");
 
@@ -97,8 +159,121 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
     expect(toolNamesPerRequest).toEqual([
       ["use_tools"],
-      ["frontmost.app"],
+      ["workspace.list"],
     ]);
+  });
+
+  it("emits dynamic tool calls through the generic tool audit events", async () => {
+    const bridgeCalls: unknown[] = [];
+    const bridge: DynamicToolBridge = {
+      async call(payload) {
+        bridgeCalls.push(payload);
+        return {
+          callId: payload.callId,
+          success: true,
+          contentItems: [{ type: "inputText", text: "captured" }],
+        };
+      },
+    };
+    const scoped = new ThreadScopedToolRegistry({
+      builtinRegistry: new ToolRegistry([]),
+      globalMcpServerIds: [],
+      listMcpTools: async () => [],
+      dynamicToolBridge: bridge,
+    });
+    scoped.setDynamicTools("s1", [
+      {
+        clientId: "swift-host",
+        namespace: "host_macos",
+        name: "screen_capture",
+        description: "Capture a screen image",
+        inputSchema: { type: "object", properties: {} },
+      },
+    ]);
+    await scoped.refreshForThread("s1");
+
+    let requestCount = 0;
+    const client = {
+      async *stream(_messages: AgentMessage[], tools: AgentTool[]) {
+        requestCount += 1;
+        if (requestCount === 1) {
+          expect(tools.map((tool) => tool.name)).toEqual(["use_tools"]);
+          yield {
+            type: "tool_call" as const,
+            toolCall: { id: "meta-1", name: META_TOOL_NAME, arguments: {} },
+          };
+          yield {
+            type: "message_end" as const,
+            message: { role: "assistant" as const, content: "" },
+            toolCalls: [{ id: "meta-1", name: META_TOOL_NAME, arguments: {} }],
+          };
+          return;
+        }
+        if (requestCount === 2) {
+          expect(tools.map((tool) => tool.name)).toEqual([
+            "host_macos.screen_capture",
+          ]);
+          yield {
+            type: "tool_call" as const,
+            toolCall: {
+              id: "dyn-1",
+              name: "host_macos.screen_capture",
+              arguments: { displayId: 1 },
+            },
+          };
+          yield {
+            type: "message_end" as const,
+            message: { role: "assistant" as const, content: "" },
+            toolCalls: [{
+              id: "dyn-1",
+              name: "host_macos.screen_capture",
+              arguments: { displayId: 1 },
+            }],
+          };
+          return;
+        }
+        yield { type: "text_delta" as const, text: "done" };
+        yield {
+          type: "message_end" as const,
+          message: { role: "assistant" as const, content: "done" },
+          toolCalls: [],
+        };
+      },
+    };
+    const runtime = new AgentRuntime(client, scoped.registryForThread("s1"), {
+      onMetaToolActivate: (threadId) => scoped.activate(threadId),
+      isThreadActivated: (threadId) => scoped.isActivated(threadId),
+    });
+    const events: AgentRuntimeEvent[] = [];
+
+    await runtime.runWithMessages(
+      [{ role: "user", content: "inspect screen" }],
+      (event) => events.push(event),
+      { threadId: "s1", turnId: "turn-1" },
+    );
+
+    expect(bridgeCalls).toEqual([
+      expect.objectContaining({
+        threadId: "s1",
+        turnId: "turn-1",
+        callId: "s1:turn-1:dyn-1",
+      }),
+    ]);
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "tool_call",
+        toolCallId: "dyn-1",
+        toolName: "host_macos.screen_capture",
+        input: { displayId: 1 },
+      }),
+      expect.objectContaining({
+        type: "tool_result",
+        toolCallId: "dyn-1",
+        toolName: "host_macos.screen_capture",
+        status: "success",
+        output: expect.stringContaining("captured"),
+      }),
+    ]));
   });
 
   it("isolates activation state per Thread", async () => {
@@ -110,13 +285,13 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     expect(scoped.isActivated("s2")).toBe(false);
     expect(scoped.registryForThread("s2").list().map((t) => t.name)).toEqual(["use_tools"]);
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
-      "frontmost.app",
+      "workspace.list",
     ]);
   });
 
   it("does not activate a Thread only because MCP servers exist globally", async () => {
     const scoped = buildScoped({
-      builtin: [fakeTool("frontmost.app")],
+      builtin: [fakeTool("workspace.list")],
       mcp: { srv: [fakeTool("mcp.srv.echo")] },
       globalMcpServerIds: ["srv"],
     });
@@ -140,7 +315,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
   it("does not rewrite one Thread registry when another Thread refreshes", async () => {
     const scoped = buildScoped({
-      builtin: [fakeTool("frontmost.app"), fakeTool("clipboard.read")],
+      builtin: [fakeTool("workspace.list"), fakeTool("file.read")],
     });
 
     await scoped.activate("s1");
@@ -150,8 +325,8 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
     expect(scoped.registryForThread("s2").list().map((t) => t.name)).toEqual(["use_tools"]);
     expect(s1Registry.list().map((t) => t.name)).toEqual([
-      "frontmost.app",
-      "clipboard.read",
+      "workspace.list",
+      "file.read",
     ]);
   });
 

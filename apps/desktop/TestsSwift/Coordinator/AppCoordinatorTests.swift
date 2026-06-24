@@ -46,6 +46,26 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testSubmitPromptUsesSwiftThreadClientBeforeOpeningThreadWindow() async throws {
+        let threadClient = RecordingSwiftThreadClient(threadId: "thread-123")
+        let windowClient = RecordingThreadWindowCommandClient()
+        let coordinator = AppCoordinator(
+            services: electronServices(
+                commandClient: windowClient,
+                swiftThreadClient: threadClient
+            )
+        )
+
+        coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
+        try await Task.sleep(for: .milliseconds(10))
+
+        XCTAssertEqual(threadClient.submittedPrompts.map(\.textContent), ["hello"])
+        XCTAssertTrue(windowClient.openedPrompts.isEmpty)
+        XCTAssertEqual(windowClient.focusedThreadIDs, ["thread-123"])
+        _ = coordinator
+    }
+
+    @MainActor
     func testThreadWindowOpenAckPromotesRegularPolicy() {
         var appliedPolicies: [NSApplication.ActivationPolicy] = []
         let client = RecordingThreadWindowCommandClient()
@@ -194,7 +214,6 @@ final class AppCoordinatorTests: XCTestCase {
                 settingsStore: settingsStore,
                 appearanceThemeService: appearanceThemeService,
                 appearanceChangeObserver: observer,
-                platformServerURL: URL(string: "ws://127.0.0.1:0/noop-platform")!,
                 hotkeyRegistrar: NopHotkeyRegistrar(),
                 settingsWindowPresenter: NopSettingsWindowPresenter(),
                 fatalAlertPresenter: NopFatalAlertPresenter(),
@@ -341,7 +360,6 @@ final class AppCoordinatorTests: XCTestCase {
                 store: AgentSettingsStore(homeDirectoryURL: TestFiles.makeTemporaryHomeDirectory()),
                 systemResolver: { .light }
             ),
-            platformServerURL: URL(string: "ws://127.0.0.1:0/noop-platform")!,
             hotkeyRegistrar: NopHotkeyRegistrar(),
             settingsWindowPresenter: NopSettingsWindowPresenter(),
             fatalAlertPresenter: alertPresenter,
@@ -498,6 +516,7 @@ private func electronServices(
     appServer: any AppServerManaging = NopAppServer(),
     commandClient: RecordingThreadWindowCommandClient,
     activityClient: RecordingActivityWindowCommandClient? = nil,
+    swiftThreadClient: (any SwiftThreadSubmitting)? = nil,
     fatalAlertPresenter: any FatalAlertPresenting = NopFatalAlertPresenter(),
     setActivationPolicy: @escaping @MainActor (NSApplication.ActivationPolicy) -> Void = { _ in },
     terminateApplication: @escaping @MainActor () -> Void = {}
@@ -509,7 +528,7 @@ private func electronServices(
         activityWindowCommandClient: activityClient,
         settingsStore: settingsStore,
         appearanceThemeService: AppearanceThemeService(store: settingsStore, systemResolver: { .light }),
-        platformServerURL: URL(string: "ws://127.0.0.1:0/noop-platform")!,
+        swiftThreadClient: swiftThreadClient,
         hotkeyRegistrar: NopHotkeyRegistrar(),
         settingsWindowPresenter: NopSettingsWindowPresenter(),
         fatalAlertPresenter: fatalAlertPresenter,
@@ -691,6 +710,31 @@ private final class RecordingThreadWindowCommandClient: ThreadWindowCommanding {
         case .focus:
             return "focus-\(next)"
         }
+    }
+}
+
+@MainActor
+private final class RecordingSwiftThreadClient: SwiftThreadSubmitting {
+    private let threadId: String
+    private(set) var submittedPrompts: [PromptSubmission] = []
+    private(set) var connectCount = 0
+    private(set) var disconnectCount = 0
+
+    init(threadId: String) {
+        self.threadId = threadId
+    }
+
+    func connect() {
+        connectCount += 1
+    }
+
+    func disconnect() {
+        disconnectCount += 1
+    }
+
+    func submitInitialPrompt(_ prompt: PromptSubmission) async throws -> String {
+        submittedPrompts.append(prompt)
+        return threadId
     }
 }
 

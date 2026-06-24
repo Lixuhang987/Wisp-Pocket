@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { OfflinePlatformAdapter } from "@handagent/core/platform/OfflinePlatformAdapter.ts";
+import { FileWorkspaceRegistry } from "@handagent/core/workspace/FileWorkspaceRegistry.ts";
 import { SettingsBackedToolRegistry } from "../../src/settings/SettingsBackedToolRegistry.ts";
 
 describe("SettingsBackedToolRegistry", () => {
   it("refreshes the existing registry when tool settings stamp changes", async () => {
-    const platform = new OfflinePlatformAdapter();
+    const workspaceRegistry = await makeWorkspaceRegistry();
     let stamp = "v1";
     let denylist: string[] = [];
     const manager = new SettingsBackedToolRegistry(
-      { platform },
+      { workspaceRegistry },
       {
         readSettingsStamp: () => stamp,
         loadToolSettings: () => ({ allowlist: null, denylist }),
@@ -20,23 +20,20 @@ describe("SettingsBackedToolRegistry", () => {
     );
 
     await manager.refresh();
-    expect(manager.registry.get("screen.capture")).toBeDefined();
+    expect(manager.registry.get("file.read")).toBeDefined();
 
-    denylist = ["screen.capture"];
+    denylist = ["file.read"];
     stamp = "v2";
     await manager.refresh();
 
-    expect(manager.registry.get("screen.capture")).toBeUndefined();
-    expect(manager.registry.list().map((tool) => tool.name)).not.toContain(
-      "screen.capture",
-    );
+    expect(manager.registry.get("file.read")).toBeUndefined();
+    expect(manager.registry.list().map((tool) => tool.name)).not.toContain("file.read");
   });
 
   it("skips reload when settings stamp is unchanged", async () => {
-    const platform = new OfflinePlatformAdapter();
     let loadCount = 0;
     const manager = new SettingsBackedToolRegistry(
-      { platform },
+      {},
       {
         readSettingsStamp: () => "v1",
         loadToolSettings: () => {
@@ -56,7 +53,7 @@ describe("SettingsBackedToolRegistry", () => {
   it("does not register legacy external tools", async () => {
     const legacyToolName = "external" + ".echo";
     const manager = new SettingsBackedToolRegistry(
-      { platform: new OfflinePlatformAdapter() },
+      {},
       {
         readSettingsStamp: () => "v1",
         loadToolSettings: () => ({ allowlist: null, denylist: [] }),
@@ -71,3 +68,11 @@ describe("SettingsBackedToolRegistry", () => {
     );
   });
 });
+
+async function makeWorkspaceRegistry() {
+  const dir = await mkdtemp(join(tmpdir(), "settings-backed-tools-"));
+  return new FileWorkspaceRegistry({
+    filePath: join(dir, "workspaces.json"),
+    defaultRootPath: join(dir, "ws"),
+  });
+}

@@ -5,7 +5,7 @@ final class AppServerConnectionTests: XCTestCase {
     func testConnectOpensSocketAndEmitsConnectedState() {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
-            serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
             transport: transport,
             reconnectDelay: 0
         )
@@ -21,7 +21,7 @@ final class AppServerConnectionTests: XCTestCase {
     func testReceiveFailureReconnectsAndEmitsReconnectingThenConnected() {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
-            serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
             transport: transport,
             reconnectDelay: 0
         )
@@ -38,7 +38,7 @@ final class AppServerConnectionTests: XCTestCase {
     func testManualDisconnectPreventsReconnectAfterReceiveFailure() {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
-            serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
             transport: transport,
             reconnectDelay: 0
         )
@@ -56,7 +56,7 @@ final class AppServerConnectionTests: XCTestCase {
     func testSendForwardsRawTextToSocketTask() {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
-            serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
             transport: transport,
             reconnectDelay: 0
         )
@@ -69,17 +69,19 @@ final class AppServerConnectionTests: XCTestCase {
 }
 
 @MainActor
-final class PlatformBridgeConnectionClientTests: XCTestCase {
-    func testConnectPlatformBridgeSendsHelloToPlatformConnection() async {
+final class DynamicToolProviderConnectionClientTests: XCTestCase {
+    func testConnectSendsProviderHelloToDynamicToolsConnection() async {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
-            serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
             transport: transport,
             reconnectDelay: 0
         )
-        let client = PlatformBridgeConnectionClient(
+        let client = DynamicToolProviderConnectionClient(
             connection: connection,
-            platformBridge: PlatformBridgeService(provider: RecordingAppServerClientPlatformProvider())
+            providerService: DynamicToolProviderService(
+                provider: RecordingAppServerClientPlatformProvider()
+            )
         )
 
         client.connect()
@@ -87,58 +89,38 @@ final class PlatformBridgeConnectionClientTests: XCTestCase {
 
         let sent = transport.tasks[0].sentObjects
         XCTAssertEqual(sent.count, 1)
-        XCTAssertEqual(sent[0]["channel"] as? String, "platform")
-        XCTAssertEqual(sent[0]["type"] as? String, "platform_bridge_hello")
+        XCTAssertEqual(sent[0]["channel"] as? String, "dynamic_tools")
+        XCTAssertEqual(sent[0]["type"] as? String, "provider_hello")
+        XCTAssertEqual(sent[0]["clientId"] as? String, "swift-host")
     }
 
-    func testConnectPlatformBridgeRetriesHelloAfterInitialConnect() async throws {
+    func testConnectionHandlesDynamicToolRequest() async {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
-            serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
-            transport: transport,
-            reconnectDelay: 0
-        )
-        let client = PlatformBridgeConnectionClient(
-            connection: connection,
-            platformBridge: PlatformBridgeService(provider: RecordingAppServerClientPlatformProvider()),
-            retryHelloDelayNanoseconds: 1_000_000
-        )
-
-        client.connect()
-        try await waitForPlatformHelloCount(2, task: transport.tasks[0])
-
-        let helloCount = transport.tasks[0].sentObjects.filter { object in
-            object["channel"] as? String == "platform" &&
-                object["type"] as? String == "platform_bridge_hello"
-        }.count
-        XCTAssertEqual(helloCount, 2)
-    }
-
-    func testPlatformConnectionHandlesPlatformRequest() async {
-        let transport = RecordingAppServerConnectionTransport()
-        let connection = AppServerConnection(
-            serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
             transport: transport,
             reconnectDelay: 0
         )
         let provider = RecordingAppServerClientPlatformProvider(result: ["text": "hello"])
-        let client = PlatformBridgeConnectionClient(
+        let client = DynamicToolProviderConnectionClient(
             connection: connection,
-            platformBridge: PlatformBridgeService(provider: provider)
+            providerService: DynamicToolProviderService(provider: provider)
         )
 
         client.connect()
         transport.tasks[0].succeedReceive(
             """
             {
-              "channel": "platform",
-              "type": "platform_request",
-              "messageId": "m1",
-              "timestamp": "2026-05-19T00:00:00Z",
+              "channel": "dynamic_tools",
+              "type": "tool_call_request",
               "payload": {
-                "requestId": "r1",
-                "method": "clipboard.read",
-                "args": {}
+                "clientId": "swift-host",
+                "threadId": "thread-1",
+                "turnId": "turn-1",
+                "callId": "call-1",
+                "namespace": "host_macos",
+                "tool": "clipboard_read",
+                "arguments": {}
               }
             }
             """
@@ -147,27 +129,68 @@ final class PlatformBridgeConnectionClientTests: XCTestCase {
 
         XCTAssertEqual(provider.calls.map(\.method), ["clipboard.read"])
         let response = transport.tasks[0].sentObjects[1]
-        XCTAssertEqual(response["channel"] as? String, "platform")
-        XCTAssertEqual(response["type"] as? String, "platform_response")
+        XCTAssertEqual(response["channel"] as? String, "dynamic_tools")
+        XCTAssertEqual(response["type"] as? String, "tool_call_response")
+        let payload = response["payload"] as? [String: Any]
+        XCTAssertEqual(payload?["callId"] as? String, "call-1")
+        XCTAssertEqual(payload?["success"] as? Bool, true)
     }
-
 }
 
-private func waitForPlatformHelloCount(
-    _ expectedCount: Int,
-    task: RecordingAppServerConnectionTask,
-    attempts: Int = 20
-) async throws {
-    for _ in 0..<attempts {
-        let helloCount = task.sentObjects.filter { object in
-            object["channel"] as? String == "platform" &&
-                object["type"] as? String == "platform_bridge_hello"
-        }.count
-        if helloCount >= expectedCount {
-            return
+@MainActor
+final class SwiftThreadClientTests: XCTestCase {
+    func testSubmitInitialPromptStartsThreadWithHostDynamicToolsThenSubmitsOp() async throws {
+        let transport = RecordingAppServerConnectionTransport()
+        let connection = AppServerConnection(
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/thread")!,
+            transport: transport,
+            reconnectDelay: 0
+        )
+        let client = SwiftThreadClient(connection: connection)
+        client.connect()
+
+        let task = Task { @MainActor in
+            try await client.submitInitialPrompt(makePromptSubmission("hello"))
         }
-        try await Task.sleep(nanoseconds: 10_000_000)
+        await Task.yield()
+
+        let start = transport.tasks[0].sentObjects[0]
+        XCTAssertEqual(start["type"] as? String, "thread.start")
+        let startPayload = start["payload"] as? [String: Any]
+        let dynamicTools = startPayload?["dynamicTools"] as? [[String: Any]]
+        XCTAssertEqual(dynamicTools?.count, 8)
+        XCTAssertTrue(dynamicTools?.contains { $0["name"] as? String == "screen_capture" } == true)
+
+        transport.tasks[0].succeedReceive(
+            """
+            {
+              "type": "thread.started",
+              "threadId": "thread-1",
+              "notificationId": "n1",
+              "commandId": "\(start["commandId"] as? String ?? "")",
+              "timestamp": "2026-06-24T00:00:00.000Z",
+              "payload": { "preview": null }
+            }
+            """
+        )
+
+        let threadId = try await task.value
+        XCTAssertEqual(threadId, "thread-1")
+        let submit = transport.tasks[0].sentObjects[1]
+        XCTAssertEqual(submit["type"] as? String, "op.submit")
+        XCTAssertEqual(submit["threadId"] as? String, "thread-1")
+        let submitPayload = submit["payload"] as? [String: Any]
+        let op = submitPayload?["op"] as? [String: Any]
+        XCTAssertEqual(op?["type"] as? String, "user_input")
     }
+}
+
+@MainActor
+private func makePromptSubmission(_ text: String) -> PromptSubmission {
+    PromptSubmission(
+        userInput: PromptUserInput(items: [.text(id: "text-1", text: text)]),
+        summary: text
+    )
 }
 
 private final class RecordingAppServerConnectionTransport: AppServerConnectionTransport {

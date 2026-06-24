@@ -7,6 +7,7 @@ type SendEvent = (event: PublishedThreadMessage) => void;
 type ConnectionState = {
   send: SendEvent;
   subscriptions: Set<string>;
+  subscribeNewThreads: boolean;
 };
 
 export class ThreadNotificationPublisher {
@@ -18,6 +19,7 @@ export class ThreadNotificationPublisher {
     this.connections.set(connectionId, {
       send,
       subscriptions: this.connections.get(connectionId)?.subscriptions ?? new Set<string>(),
+      subscribeNewThreads: this.connections.get(connectionId)?.subscribeNewThreads ?? false,
     });
   }
 
@@ -29,6 +31,13 @@ export class ThreadNotificationPublisher {
     this.connections.get(connectionId)?.subscriptions.add(threadId);
   }
 
+  subscribeNewThreads(connectionId: string): void {
+    const state = this.connections.get(connectionId);
+    if (state) {
+      state.subscribeNewThreads = true;
+    }
+  }
+
   unsubscribe(connectionId: string, threadId: string): void {
     this.connections.get(connectionId)?.subscriptions.delete(threadId);
   }
@@ -38,6 +47,12 @@ export class ThreadNotificationPublisher {
 
     if (hasThreadId(event)) {
       for (const state of this.connections.values()) {
+        if (event.type === "thread.started" && state.subscribeNewThreads) {
+          state.subscriptions.add(event.threadId);
+        }
+        if (isServerRequest(event) && !state.subscribeNewThreads) {
+          continue;
+        }
         if (state.subscriptions.has(event.threadId)) {
           state.send(event);
         }
@@ -68,4 +83,8 @@ function hasThreadId(
   event: PublishedThreadMessage,
 ): event is PublishedThreadMessage & { threadId: string } {
   return "threadId" in event && typeof event.threadId === "string";
+}
+
+function isServerRequest(event: PublishedThreadMessage): event is ServerRequest {
+  return event.type === "permission.requested" || event.type === "workspace.requested";
 }

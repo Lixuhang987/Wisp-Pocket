@@ -8,8 +8,7 @@ final class AppServicesTests: XCTestCase {
             environment: [
                 "HANDAGENT_ELECTRON_MAIN": "apps/electron-shell/dist/main/main.js",
             ],
-            initialTheme: HostThemePayload(preference: .system, resolved: .dark),
-            platformServerURL: URL(string: "ws://127.0.0.1:4317/api/platform")!
+            initialTheme: HostThemePayload(preference: .system, resolved: .dark)
         )
 
         XCTAssertTrue(runtime.appServer is ElectronBackedAppServer)

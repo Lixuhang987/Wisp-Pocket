@@ -7,11 +7,11 @@ import { WebSocket } from "ws";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
 import type { AgentRuntimeEvent } from "@handagent/core/runtime/AgentRuntime.ts";
-import type { PlatformBridgeMessage } from "@handagent/core/protocol/PlatformBridgeMessage.ts";
 import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
 import type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
 import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
 import type { AgentActivityEvent } from "@handagent/core/protocol/AgentActivity.ts";
+import { DEFAULT_HOST_MACOS_DYNAMIC_TOOLS } from "@handagent/core/protocol/HostDynamicTools.ts";
 import type { FilePermissionPolicy } from "@handagent/core/permission/FilePermissionPolicy.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
@@ -28,7 +28,6 @@ import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
 import {
   attachActivitySocketHandlers,
-  attachPlatformSocketHandlers,
   attachThreadSocketHandlers,
   createMCPClientFromConfig,
   resolveLLMMode,
@@ -62,16 +61,6 @@ function opSubmit(threadId: string, text: string): ThreadCommand {
   };
 }
 
-function platformHello(messageId: string): PlatformBridgeMessage {
-  return {
-    channel: "platform",
-    type: "platform_bridge_hello",
-    messageId,
-    timestamp: new Date().toISOString(),
-    payload: { agent: "test" },
-  };
-}
-
 function permissionResponse(
   requestId: string,
   decision: "allow" | "deny" = "allow",
@@ -86,7 +75,7 @@ function permissionResponse(
 
 async function emitMessage(
   socket: FakeSocket,
-  message: ThreadCommand | ClientResponse | PlatformBridgeMessage,
+  message: ThreadCommand | ClientResponse,
 ): Promise<void> {
   socket.emit("message", Buffer.from(JSON.stringify(message)));
   await Promise.resolve();
@@ -184,16 +173,23 @@ describe("attachThreadSocketHandlers", () => {
     );
   });
 
-  it("sends server requests through the thread event publisher after a socket subscribed to a thread", async () => {
+  it("sends server requests only through React new-thread subscriber connections", async () => {
     const socket = new FakeSocket();
+    const swiftSocket = new FakeSocket();
     const { commandRouter, eventPublisher } = makeHandlerDependencies();
 
     attachThreadSocketHandlers(socket as never, {
       commandRouter,
       eventPublisher,
+      subscribeNewThreads: true,
+    });
+    attachThreadSocketHandlers(swiftSocket as never, {
+      commandRouter,
+      eventPublisher,
     });
 
     await emitMessage(socket, opSubmit("Thread-A", "first"));
+    await emitMessage(swiftSocket, opSubmit("Thread-A", "from swift"));
     eventPublisher.publish({
       type: "permission.requested",
       requestId: "Thread-A:permission-1",
@@ -212,6 +208,7 @@ describe("attachThreadSocketHandlers", () => {
       requestId: "Thread-A:permission-1",
       threadId: "Thread-A",
     });
+    expect(lastSent<ServerRequest>(swiftSocket)).toBeNull();
   });
 
   it("interrupts the active run owned by a socket when that socket closes", async () => {
@@ -306,22 +303,6 @@ describe("attachThreadSocketHandlers", () => {
     ]);
   });
 
-  it("ignores platform bridge messages on the thread socket", async () => {
-    const socket = new FakeSocket();
-    const { commandRouter, eventPublisher } = makeHandlerDependencies();
-
-    attachThreadSocketHandlers(socket as never, {
-      commandRouter,
-      eventPublisher,
-    });
-
-    await emitMessage(socket, platformHello("bridge-1"));
-    socket.emit("close");
-
-    expect(commandRouter.receive).not.toHaveBeenCalled();
-    expect(socket.sent).toEqual([]);
-  });
-
   it("ignores non-object and malformed thread socket frames", async () => {
     const socket = new FakeSocket();
     const { commandRouter, eventPublisher } = makeHandlerDependencies();
@@ -363,93 +344,6 @@ describe("attachThreadSocketHandlers", () => {
     expect(commandRouter.receive).not.toHaveBeenCalled();
   });
 
-  it("detaches platform sockets without interrupting thread runs", async () => {
-    const socket = new FakeSocket();
-    const bridge = {
-      attach: vi.fn().mockReturnValue(501),
-      detach: vi.fn(),
-      handleResponse: vi.fn(),
-    };
-
-    attachPlatformSocketHandlers(socket as never, {
-      bridge: bridge as never,
-    });
-
-    await emitMessage(socket, platformHello("bridge-1"));
-    socket.emit("close");
-
-    expect(bridge.attach).toHaveBeenCalledWith(expect.any(Function));
-    expect(bridge.detach).toHaveBeenCalledWith(501);
-  });
-
-  it("treats duplicate hello on the same platform socket as idempotent", async () => {
-    const socket = new FakeSocket();
-    const bridge = {
-      attach: vi.fn().mockReturnValue(501),
-      detach: vi.fn(),
-      handleResponse: vi.fn(),
-    };
-
-    attachPlatformSocketHandlers(socket as never, {
-      bridge: bridge as never,
-    });
-
-    await emitMessage(socket, platformHello("bridge-1"));
-    await emitMessage(socket, platformHello("bridge-1-retry"));
-    socket.emit("close");
-
-    expect(bridge.attach).toHaveBeenCalledTimes(1);
-    expect(bridge.detach).toHaveBeenCalledWith(501);
-  });
-
-  it("ignores non-platform and malformed platform socket frames", async () => {
-    const socket = new FakeSocket();
-    const bridge = {
-      attach: vi.fn().mockReturnValue(501),
-      detach: vi.fn(),
-      handleResponse: vi.fn(),
-    };
-
-    attachPlatformSocketHandlers(socket as never, {
-      bridge: bridge as never,
-    });
-
-    await emitRawMessage(socket, "null");
-    await emitRawMessage(socket, '"platform_bridge_hello"');
-    await emitRawMessage(socket, JSON.stringify({ type: "platform_bridge_hello" }));
-    await emitRawMessage(socket, "{not json");
-
-    expect(bridge.attach).not.toHaveBeenCalled();
-    expect(bridge.handleResponse).not.toHaveBeenCalled();
-
-    await emitMessage(socket, platformHello("bridge-1"));
-
-    expect(bridge.attach).toHaveBeenCalledTimes(1);
-  });
-
-  it("ignores platform responses with missing response payload shape", async () => {
-    const socket = new FakeSocket();
-    const bridge = {
-      attach: vi.fn().mockReturnValue(501),
-      detach: vi.fn(),
-      handleResponse: vi.fn(),
-    };
-
-    attachPlatformSocketHandlers(socket as never, {
-      bridge: bridge as never,
-    });
-
-    await emitMessage(socket, platformHello("bridge-1"));
-    await emitRawMessage(socket, JSON.stringify({
-      channel: "platform",
-      type: "platform_response",
-      messageId: "response-1",
-      timestamp: new Date().toISOString(),
-      payload: { status: "ok" },
-    }));
-
-    expect(bridge.handleResponse).not.toHaveBeenCalled();
-  });
 });
 
 describe("attachActivitySocketHandlers", () => {
@@ -656,6 +550,7 @@ describe("startServer", () => {
     const store = testStore(() => "2026-06-18T00:00:00.000Z");
     const persistence = new ThreadPersistence(store, () => "2026-06-18T00:00:00.000Z");
     const eventPublisher = new ThreadNotificationPublisher();
+    const onThreadDynamicTools = vi.fn();
     const commandRouter = {
       receive: vi.fn(async () => {}),
       interruptThread: vi.fn(),
@@ -676,6 +571,7 @@ describe("startServer", () => {
       eventPublisher,
       new AgentTriggerAttentionPublisher(),
       () => "2026-06-18T00:00:00.000Z",
+      { onThreadDynamicTools },
     );
 
     const server = await startServer({
@@ -713,7 +609,12 @@ describe("startServer", () => {
       const body = await response.json() as { threadId: string; acceptedAt: string };
       expect(body.threadId).toBeTruthy();
       expect(body.acceptedAt).toBe("2026-06-18T00:00:00.000Z");
-      expect(await persistence.getThread(body.threadId)).not.toBeNull();
+      const thread = await persistence.getThread(body.threadId);
+      expect(thread?.metadata.dynamicTools).toEqual(DEFAULT_HOST_MACOS_DYNAMIC_TOOLS);
+      expect(onThreadDynamicTools).toHaveBeenCalledWith(
+        body.threadId,
+        DEFAULT_HOST_MACOS_DYNAMIC_TOOLS,
+      );
     } finally {
       server.close();
       await once(server, "close");
@@ -730,10 +631,9 @@ describe("resolveLLMMode", () => {
 });
 
 describe("createMCPClientFromConfig", () => {
-  it("routes bundled Computer Use MCP config to the HandAgent native client", () => {
+  it("routes stdio MCP config to the stdio client", () => {
     const StdioMCPClient = vi.fn(() => makeNoopMCPClient("stdio"));
     const StreamableHttpMCPClient = vi.fn(() => makeNoopMCPClient("http"));
-    const ComputerUseMCPClient = vi.fn(() => makeNoopMCPClient("computer-use"));
 
     const client = createMCPClientFromConfig(
       {
@@ -746,19 +646,17 @@ describe("createMCPClientFromConfig", () => {
       {
         StdioMCPClient: StdioMCPClient as never,
         StreamableHttpMCPClient: StreamableHttpMCPClient as never,
-        ComputerUseMCPClient: ComputerUseMCPClient as never,
-      },
-      {
-        platform: {} as never,
       },
     );
 
-    expect(client.serverInfo()?.name).toBe("computer-use");
-    expect(ComputerUseMCPClient).toHaveBeenCalledWith({
-      serverId: "computer_use",
-      platform: {},
+    expect(client.serverInfo()?.name).toBe("stdio");
+    expect(StdioMCPClient).toHaveBeenCalledWith({
+      id: "computer_use",
+      title: "Computer Use",
+      transport: "stdio",
+      command: "./Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
+      args: ["mcp"],
     });
-    expect(StdioMCPClient).not.toHaveBeenCalled();
     expect(StreamableHttpMCPClient).not.toHaveBeenCalled();
   });
 });

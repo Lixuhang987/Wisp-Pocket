@@ -506,6 +506,14 @@
 
 ### 对于每个可交互的点，都验证一遍，看是否符合预期，这里不当做硬性bug，而是记录下可能不符合的行为，事无巨细
 
+- 2026-06-24 plugin system / dynamic tools 迁移已完成自动化验证，仍需补实机 QA：
+  1. 使用 mock LLM packaged app 启动桌面端，确认 agent-server 只监听 `/api/thread`、`/api/activity`、`/api/agent-trigger/attention`、`/api/dynamic-tools`，旧 `/api/platform` WebSocket 不再可用。
+  2. 通过 PromptPanel 提交 `DYNAMIC_TOOLS_CLIPBOARD_QA_20260624 [mock:clipboard-read]`，确认 Swift 直连 `/api/thread` 创建 thread，React ThreadWindow 自动收到 `thread.started` 并打开对应 thread；tool 名显示为 `host_macos.clipboard_read`，结果来自当前剪贴板。
+  3. 提交 `DYNAMIC_TOOLS_SCREEN_QA_20260624 [mock:screen-display]`，允许屏幕录制相关权限后确认 tool 名为 `host_macos.screen_capture`，结果包含截图尺寸和 PNG 内容；若系统权限缺失，应返回明确 `permission_denied` 文案。
+  4. 在同一运行中触发 `file.write` 权限请求，确认 `permission.requested` 只显示在 React ThreadWindow，Swift 直连 thread client 不弹出或处理该交互式请求。
+  5. 重启 App 后打开历史 thread，确认 thread metadata 中的 `dynamicTools` 可恢复；调用 `use_tools` 后仍能看到 `host_macos.*` 工具。
+  6. 打开 Settings → 工具，确认只显示 `workspace.list`、`file.read`、`file.write` 等 core builtin 工具，不再显示旧 `clipboard.read`、`screen.capture` 等平台内置工具。
+  - 自动化验证：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 已通过。
 - 2026-06-19 plugin 残留清理完成后需补实机 QA：打开 Settings → 追加，点击“添加示例”或手动新建 Append Prompt，确认写入路径为 `~/.spotAgent/actions/append-prompts/action.json`；重启桌面 App 后 PromptPanel 仍能显示 `explain` / `sum` 等 action，并以 skill chip 追加到 `UserInput.items`。同时在 `~/.spotAgent/plugins/append-prompts/plugin.json` 放置旧 action manifest，确认当前 PromptPanel / ThreadWindow availableSkills 不再读取旧路径，避免与 2026-06-19 plugin system 的 `~/.spotAgent/plugins/<id>/plugin.json` 入口冲突。
 - 2026-06-09 观察：在历史侧栏搜索出 `HANDAGENT_REAL_PERMISSION_REPLAY_OCR5...` 后，Computer Use 直接触发该 AX row button 会打开删除确认；用鼠标点击 row 左侧正文区域可以正常打开 thread。该现象先记录为可访问性 / hit area 待观察点，不影响普通指针路径。
 - 本文件中对应条目的用户可见行为、持久化记录、错误文案和隔离边界均符合预期。

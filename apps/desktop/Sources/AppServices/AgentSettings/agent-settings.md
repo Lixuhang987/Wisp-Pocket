@@ -25,8 +25,8 @@ LLM 模型配置、tool allowlist / denylist 与 Swift 宿主外观主题偏好�
     "api": "responses"   // responses | chat | completion
   },
   "tools": {
-    "allowlist": ["file.read", "clipboard.read"], // 可选；为 null 时表示不启用白名单模式
-    "denylist": ["screen.capture"]                // 已禁用工具
+    "allowlist": ["file.read", "file.write"], // 可选；为 null 时表示不启用白名单模式
+    "denylist": ["file.write"]                // 已禁用 builtin 工具
   }
 }
 ```

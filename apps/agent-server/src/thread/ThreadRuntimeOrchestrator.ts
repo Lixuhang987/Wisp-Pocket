@@ -422,7 +422,11 @@ export class ThreadRuntimeOrchestrator {
               events.push(auditEvent);
             }
           },
-          { threadId: session.threadId, signal: activeRun.controller.signal },
+          {
+            threadId: session.threadId,
+            turnId: activeRun.turnId,
+            signal: activeRun.controller.signal,
+          },
         );
 
         if (!this.isActive(session.threadId, activeRun) || activeRun.controller.signal.aborted) {

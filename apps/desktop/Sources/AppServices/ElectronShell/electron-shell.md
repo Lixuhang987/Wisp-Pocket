@@ -14,7 +14,7 @@
 - 作为 `ThreadWindowCommanding` 实现，只接收 Coordinator 的 openInitialPrompt/openHistory/focus/themeChanged 意图；`theme.changed` 不参与 ThreadWindow 可用性 gate。启动初值由 `HANDAGENT_INITIAL_THEME` 提供，运行中变化仍由 `theme.changed` command 提供。
 - 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`。
 - 作为 `AgentTriggerCommanding` 实现，接收 Swift `agent_trigger.fire` 后台启动请求，并把 agent-server 回推的 `agent_trigger.attention` 事件转成宿主可消费的最小提示信号。
-- 连接 `/api/platform`，继续由 Swift `PlatformBridgeService` 执行 macOS 原生能力。
+- 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行 macOS host dynamic tools。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
 - Electron StatusBubble 点击只尝试聚焦已有 ThreadWindow；无法聚焦时不再让 Coordinator 打开 Swift PromptPanel。
 - `bash ./scripts/swiftw run HandAgentDesktop` 会先构建 `handagent-electron-shell`，确保开发态 `dist/main/main.js` 存在；不要依赖旧 worktree 残留产物。
@@ -25,7 +25,7 @@
 |------|------|
 | `ElectronShellProcess.swift` | 启动 Electron 子进程、通过 Unix socket 写入 command JSON line、读取 stdout event JSON line、处理主动停机和非主动退出 |
 | `ElectronShellProtocol.swift` | Swift 端 command/event DTO，必须与 TS `electronShellProtocol.ts` 字段一致 |
-| `ElectronBackedAppServer.swift` | app-server health gate、ThreadWindow command client、ActivityWindow command client 和 platform bridge 连接管理 |
+| `ElectronBackedAppServer.swift` | app-server health gate、ThreadWindow command client、ActivityWindow command client、dynamic tool provider client 和 Swift thread client 连接管理 |
 | `ThreadWindowDiagnostics.swift` | 仅供宿主侧排查 ThreadWindow 首次打开/关闭竞态的 stderr 诊断开关；`HANDAGENT_THREADWINDOW_TRACE=1` 时输出 `openHistory`、`hide(restoringFocus:false)`、`command.ack`、`thread_window_closed` 等关键时序 |
 | `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 与 AgentTrigger 的 command 抽象：open initial prompt、open history、focus、theme changed、后台 trigger fire / attention 回调 |
 | `ActivityWindowCommanding.swift` | Coordinator 面向 Electron ActivityWindow 的 show command 抽象 |
@@ -35,7 +35,7 @@
 
 - `ElectronBackedAppServer.isAvailable` 必须同时满足 `agent_server.health available=true`、`thread_window.prepared`、没有 agent-server/thread-window 错误。
 - `thread_window.prepare_failed` 或 hidden/visible ThreadWindow closed 都会让 `hasPreparedThreadWindow=false`，并发布 unavailable。
-- `agent_server.health available=false` 会断开 `/api/platform`；重新 available 后才连接 `PlatformBridgeConnectionClient`。
+- `agent_server.health available=false` 会断开 `/api/dynamic-tools` 与 Swift `/api/thread` client；重新 available 后才连接 `DynamicToolProviderConnectionClient` 与 `SwiftThreadClient`。
 - visible ThreadWindow closed 才调用 `onThreadWindowClosed`；hidden prewarm 关闭只影响可提交状态。
 - ActivityWindow renderer crash 不改变 app-server availability；ThreadWindow renderer crash 会按 fatal 处理。
 - 这条链路是高频回归点：凡是改动 `openHistory` / `focus` / `commandAck` / `threadWindowClosed` 相关行为，都要同时复验“首次 PromptPanel -> ThreadWindow handoff 不会把窗口一起带没”和 `docs/manual-qa.md` 中对应条目。
@@ -45,13 +45,13 @@
 - 不持有 ThreadWindow thread 缓存、消息或历史状态。
 - 不解析 `/api/thread` 的 `ThreadNotification`。
 - 不消费完整 `/api/thread` 状态；但会为后台 AgentTrigger 单独接收宿主级 attention 事件，用于权限/工作区/失败提示。
-- 不执行 ScreenCaptureKit、Accessibility、NSWorkspace、NSPasteboard 以外的新平台能力迁移。
+- 新增 host dynamic tool 时，先在 `MacHostDynamicTools` 与 `MacPlatformProvider` 同步 spec / method 映射。
 - 不承载 PromptPanel、Settings、Hotkey 或焦点恢复；这些仍由 Swift 宿主负责。
 
 ## 修改约束
 
 - 新增或改名 Electron command/event 时，先改 `ElectronShellProtocol.swift`，再同步 `apps/electron-shell/src/main/protocol/electronShellProtocol.ts` 和双方测试。主题同步 command 固定为 `theme.changed`，payload 为 `{ preference, resolved }`。
-- 不把 `ThreadCommand` / `ThreadNotification` 引入本目录；Swift 只传 initial prompt payload 和窗口 command。
+- 不把持续 `ThreadNotification` / `ServerRequest` 引入本目录；生产 PromptPanel 提交由 `AgentServer/SwiftThreadClient` 直连 `/api/thread` 完成，本目录只处理 Electron 窗口 command。`thread_window.open_initial_prompt` 仍作为 fallback / 测试协议保留。
 - `ElectronShellProcess` 的 stdout 只能解析 event；stderr 作为 diagnostic 日志原样转发到宿主 stderr，支持 packaged app stdout/stderr 重定向观察。不要把 Electron diagnostic 写到 stdout。
 - Swift->Electron command socket 路径必须保持短路径；macOS `sockaddr_un.sun_path` 长度有限，当前使用 `/tmp/hae-<uuid>.sock`。
-- `stop()` 必须清理 callbacks、pending command kind、platform client、宿主退出请求回调和 shell handlers，避免旧 Electron 事件影响下一次 start。
+- `stop()` 必须清理 callbacks、pending command kind、dynamic tool provider client、Swift thread client、宿主退出请求回调和 shell handlers，避免旧 Electron 事件影响下一次 start。

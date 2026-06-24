@@ -21,7 +21,7 @@ Thread turn 循环、消息模型、tool call 编排。是整个 Agent 的"主�
 
 ```mermaid
 flowchart TD
-  A[AgentRuntime.runWithMessages(messages, onEvent, {threadId, signal?})] --> A1[await pending turn summaries]
+  A[AgentRuntime.runWithMessages(messages, onEvent, {threadId, turnId?, signal?})] --> A1[await pending turn summaries]
   A1 --> B0[time ← 0]
   B0 --> B1[SystemPrompt sections + messages -> LLM messages]
   B1 --> C[LLMClient.stream(llmMessages, registry.list(), {blobStore?})]

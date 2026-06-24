@@ -5,7 +5,7 @@ import XCTest
 final class ElectronBackedAppServerTests: XCTestCase {
     func testOpenInitialPromptSendsElectronPayload() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         let prompt = try XCTUnwrap(PromptSubmission.compose(draft: "hello", attachments: []))
 
         let commandId = try appServer.openInitialPrompt(prompt)
@@ -23,7 +23,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testOpenHistorySendsOpenHistoryCommand() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
 
         let commandId = try appServer.openHistory()
 
@@ -35,7 +35,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testFocusSendsFocusCommand() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
 
         let commandId = try appServer.focus(threadId: "thread-1")
 
@@ -48,7 +48,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testShowActivityWindowSendsCommand() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
 
         let commandId = try appServer.showActivityWindow()
 
@@ -60,7 +60,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testSendThemeChangedSendsThemeCommandWithoutPendingThreadResult() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var results: [ThreadWindowCommandResult] = []
         appServer.onCommandResult = { results.append($0) }
 
@@ -78,7 +78,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testCommandAckPublishesThreadWindowCommandResult() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var results: [ThreadWindowCommandResult] = []
         appServer.onCommandResult = { results.append($0) }
 
@@ -102,7 +102,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testActivityWindowCommandAckPublishesActivityCommandResult() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var results: [ActivityWindowCommandResult] = []
         appServer.onActivityWindowCommandResult = { results.append($0) }
 
@@ -126,7 +126,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testUnknownCommandAckIsIgnored() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var results: [ThreadWindowCommandResult] = []
         appServer.onCommandResult = { results.append($0) }
 
@@ -138,7 +138,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testVisibleThreadWindowClosedInvokesWindowClosedCallback() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var closeCount = 0
         appServer.onThreadWindowClosed = { closeCount += 1 }
 
@@ -154,7 +154,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testThreadWindowClosedDoesNotSendShutdown() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
 
         appServer.start()
         shell.emit(.agentServerHealth(available: true, message: nil))
@@ -171,7 +171,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testHiddenThreadWindowClosedDoesNotInvokeWindowClosedCallback() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var closeCount = 0
         appServer.onThreadWindowClosed = { closeCount += 1 }
 
@@ -183,7 +183,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testAvailableOnlyAfterServerHealthAndThreadPrepared() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
         appServer.onAvailabilityChange = { availability.append($0) }
 
@@ -202,7 +202,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testUnavailableWhenAgentServerReportsFailure() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
         appServer.onAvailabilityChange = { availability.append($0) }
 
@@ -217,7 +217,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testThreadWindowPreparedDoesNotClearAgentServerFailure() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
 
         appServer.start()
         shell.emit(.agentServerHealth(available: false, message: "port unavailable"))
@@ -229,7 +229,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testThreadWindowPrepareFailedMarksUnavailableWithMessage() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
         appServer.onAvailabilityChange = { availability.append($0) }
 
@@ -245,7 +245,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testThreadWindowClosedReportsSpecificPrewarmError() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
         appServer.onAvailabilityChange = { availability.append($0) }
 
@@ -259,40 +259,50 @@ final class ElectronBackedAppServerTests: XCTestCase {
         XCTAssertEqual(availability, [true, false])
     }
 
-    func testAgentServerHealthAvailableStartsPlatformBridgeClient() async {
+    func testAgentServerHealthAvailableStartsDynamicToolProviderClient() async {
         let shell = RecordingElectronShellProcess()
         let transport = RecordingElectronBackedConnectionTransport()
-        let platformClient = PlatformBridgeConnectionClient(
+        let dynamicToolClient = DynamicToolProviderConnectionClient(
             connection: AppServerConnection(
-                serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+                serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
                 transport: transport,
                 reconnectDelay: 0
             ),
-            platformBridge: PlatformBridgeService(provider: RecordingElectronBackedPlatformProvider())
+            providerService: DynamicToolProviderService(
+                provider: RecordingElectronBackedPlatformProvider()
+            )
         )
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: platformClient)
+        let appServer = ElectronBackedAppServer(
+            shell: shell,
+            dynamicToolClient: dynamicToolClient
+        )
 
         appServer.start()
         shell.emit(.agentServerHealth(available: true, message: nil))
         await Task.yield()
 
         XCTAssertEqual(transport.tasks.count, 1)
-        XCTAssertEqual(transport.tasks[0].sentObjects.first?["channel"] as? String, "platform")
-        XCTAssertEqual(transport.tasks[0].sentObjects.first?["type"] as? String, "platform_bridge_hello")
+        XCTAssertEqual(transport.tasks[0].sentObjects.first?["channel"] as? String, "dynamic_tools")
+        XCTAssertEqual(transport.tasks[0].sentObjects.first?["type"] as? String, "provider_hello")
     }
 
-    func testStopSendsShutdownDisconnectsPlatformClientAndStopsShell() {
+    func testStopSendsShutdownDisconnectsDynamicToolClientAndStopsShell() {
         let shell = RecordingElectronShellProcess()
         let transport = RecordingElectronBackedConnectionTransport()
-        let platformClient = PlatformBridgeConnectionClient(
+        let dynamicToolClient = DynamicToolProviderConnectionClient(
             connection: AppServerConnection(
-                serverURL: URL(string: "ws://127.0.0.1:4317/api/platform")!,
+                serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
                 transport: transport,
                 reconnectDelay: 0
             ),
-            platformBridge: PlatformBridgeService(provider: RecordingElectronBackedPlatformProvider())
+            providerService: DynamicToolProviderService(
+                provider: RecordingElectronBackedPlatformProvider()
+            )
         )
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: platformClient)
+        let appServer = ElectronBackedAppServer(
+            shell: shell,
+            dynamicToolClient: dynamicToolClient
+        )
 
         appServer.start()
         shell.emit(.threadWindowPrepared(timestamp: "2026-06-08T00:00:00.000Z"))
@@ -310,7 +320,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testStopPublishesUnavailableAndIgnoresLaterShellEvents() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
         appServer.onAvailabilityChange = { availability.append($0) }
 
@@ -327,7 +337,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testStopClearsActivityWindowCommandCallbackAndPendingCommands() throws {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var results: [ActivityWindowCommandResult] = []
         appServer.onActivityWindowCommandResult = { results.append($0) }
 
@@ -342,7 +352,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testUnexpectedShellTerminationReportsFatalErrorAndMarksUnavailable() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var fatalMessages: [String] = []
         var availability: [Bool] = []
         appServer.onFatalError = { fatalMessages.append($0) }
@@ -361,7 +371,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testCleanShellTerminationRequestsHostTerminationWithoutFatalAlert() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var fatalMessages: [String] = []
         var hostTerminationRequestCount = 0
         appServer.onFatalError = { fatalMessages.append($0) }
@@ -378,7 +388,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testRendererCrashReportsFatalErrorAndMarksUnavailable() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var fatalMessages: [String] = []
         var availability: [Bool] = []
         appServer.onFatalError = { fatalMessages.append($0) }
@@ -397,7 +407,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
 
     func testActivityRendererCrashDoesNotMarkServerUnavailable() {
         let shell = RecordingElectronShellProcess()
-        let appServer = ElectronBackedAppServer(shell: shell, platformClient: nil)
+        let appServer = ElectronBackedAppServer(shell: shell)
         var fatalMessages: [String] = []
         var availability: [Bool] = []
         appServer.onFatalError = { fatalMessages.append($0) }

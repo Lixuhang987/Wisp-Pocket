@@ -13,30 +13,25 @@ protocol AppServerManaging: AnyObject {
 }
 
 @MainActor
-final class PlatformBridgeConnectionClient {
+final class DynamicToolProviderConnectionClient {
     private let connection: AppServerConnection
-    private let platformBridge: PlatformBridgeService
-    private let retryHelloDelayNanoseconds: UInt64
-    private var helloRetryTask: Task<Void, Never>?
+    private let providerService: DynamicToolProviderService
 
     init(
         connection: AppServerConnection,
-        platformBridge: PlatformBridgeService,
-        retryHelloDelayNanoseconds: UInt64 = 250_000_000
+        providerService: DynamicToolProviderService
     ) {
         self.connection = connection
-        self.platformBridge = platformBridge
-        self.retryHelloDelayNanoseconds = retryHelloDelayNanoseconds
+        self.providerService = providerService
         connection.onStateChange = { [weak self] state in
             Task { @MainActor in
                 guard state == .connected, let self else { return }
                 self.sendHello()
-                self.scheduleHelloRetry()
             }
         }
         connection.onTextMessage = { [weak self] text in
             Task { @MainActor in
-                await self?.platformBridge.handleIncoming(raw: text) { [weak self] response in
+                await self?.providerService.handleIncoming(raw: text) { [weak self] response in
                     self?.connection.send(text: response)
                 }
             }
@@ -48,24 +43,10 @@ final class PlatformBridgeConnectionClient {
     }
 
     func disconnect() {
-        helloRetryTask?.cancel()
-        helloRetryTask = nil
         connection.disconnect()
     }
 
     private func sendHello() {
-        connection.send(text: platformBridge.makeHelloMessage())
-    }
-
-    private func scheduleHelloRetry() {
-        helloRetryTask?.cancel()
-        let delay = retryHelloDelayNanoseconds
-        helloRetryTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: delay)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                self?.sendHello()
-            }
-        }
+        connection.send(text: providerService.makeHelloMessage())
     }
 }

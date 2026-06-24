@@ -18,6 +18,7 @@ import { configureMacOSBackgroundApp } from "./macosBackgroundApp.js";
 import { readAvailableSkillsFromActionsDirectory } from "./availableSkills.js";
 import { readInitialHostTheme } from "./initialHostTheme.js";
 import { request } from "node:http";
+import { DEFAULT_HOST_MACOS_DYNAMIC_TOOLS } from "@handagent/core/protocol/HostDynamicTools.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = process.env.HANDAGENT_REPO_ROOT ?? resolve(currentDir, "../../../..");
@@ -49,6 +50,7 @@ const prewarmer = new ThreadWindowPrewarmer({
   threadWindowURL,
   preloadPath: threadPreloadPath,
   availableSkills: readAvailableSkillsFromActionsDirectory(actionsDirectory),
+  defaultDynamicTools: DEFAULT_HOST_MACOS_DYNAMIC_TOOLS,
   initialTheme,
   onClosed: (event) => {
     if (hasStoppedSupervisor) {

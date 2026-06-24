@@ -1,23 +1,14 @@
-import type { PlatformAdapter } from "../platform/PlatformAdapter.ts";
 import type { WorkspaceRegistry } from "../workspace/Workspace.ts";
 import { filterToolNames, type ToolSettings } from "../config/ToolSettings.ts";
 import type { AgentTool } from "./AgentTool.ts";
 import { ToolRegistry } from "./ToolRegistry.ts";
-import { AccessibilityActionTool } from "./builtins/AccessibilityActionTool.ts";
-import { AccessibilitySnapshotTool } from "./builtins/AccessibilitySnapshotTool.ts";
-import { ClipboardReadTool } from "./builtins/ClipboardReadTool.ts";
 import { FileReadTool } from "./builtins/FileReadTool.ts";
 import { FileWriteTool } from "./builtins/FileWriteTool.ts";
-import { FrontmostAppTool } from "./builtins/FrontmostAppTool.ts";
-import { OCRTool } from "./builtins/OCRTool.ts";
-import { ScreenCaptureTool } from "./builtins/ScreenCaptureTool.ts";
-import { WindowListTool } from "./builtins/WindowListTool.ts";
 import { WorkspaceAskUserTool, type WorkspaceAskResolver } from "./builtins/WorkspaceAskUserTool.ts";
 import { WorkspaceListTool } from "./builtins/WorkspaceListTool.ts";
 
 export type RegisterBuiltinToolsOptions = {
   registry?: ToolRegistry;
-  platform: PlatformAdapter;
   workspaceRegistry?: WorkspaceRegistry;
   workspaceAskResolver?: WorkspaceAskResolver;
   settings?: ToolSettings;
@@ -37,16 +28,7 @@ export type BuiltinToolCandidatesResult = {
 export function buildBuiltinToolCandidates(
   options: Omit<RegisterBuiltinToolsOptions, "registry" | "settings">,
 ): BuiltinToolCandidatesResult {
-  const candidates: AgentTool[] = [
-    ClipboardReadTool.create(options.platform),
-    FrontmostAppTool.create(options.platform),
-    WindowListTool.create(options.platform),
-    ScreenCaptureTool.create(options.platform),
-    OCRTool.create(options.platform),
-    AccessibilitySnapshotTool.create(options.platform),
-    AccessibilityActionTool.create(options.platform),
-  ];
-
+  const candidates: AgentTool[] = [];
   const disabled: { name: string; reason: string }[] = [];
 
   if (options.workspaceRegistry) {

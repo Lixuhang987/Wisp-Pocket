@@ -32,62 +32,6 @@ final class ToolSettingsViewModel {
 
     private static let catalog: [BuiltinToolSetting] = [
         BuiltinToolSetting(
-            id: "clipboard.read",
-            name: "clipboard.read",
-            title: "剪贴板读取",
-            description: "读取当前剪贴板中的文本或富文本内容。",
-            risk: .high,
-            isEnabled: true
-        ),
-        BuiltinToolSetting(
-            id: "app.frontmost",
-            name: "app.frontmost",
-            title: "前台 App",
-            description: "读取当前前台应用的名称与标识符。",
-            risk: .low,
-            isEnabled: true
-        ),
-        BuiltinToolSetting(
-            id: "window.list",
-            name: "window.list",
-            title: "窗口列表",
-            description: "列出当前桌面上可见的窗口信息。",
-            risk: .medium,
-            isEnabled: true
-        ),
-        BuiltinToolSetting(
-            id: "screen.capture",
-            name: "screen.capture",
-            title: "屏幕截图",
-            description: "按需截取屏幕、窗口或区域图像。",
-            risk: .high,
-            isEnabled: true
-        ),
-        BuiltinToolSetting(
-            id: "ocr.read",
-            name: "ocr.read",
-            title: "OCR 识别",
-            description: "识别图片中的文字内容。",
-            risk: .medium,
-            isEnabled: true
-        ),
-        BuiltinToolSetting(
-            id: "accessibility.snapshot",
-            name: "accessibility.snapshot",
-            title: "可访问性快照",
-            description: "读取前台应用的可访问性树结构。",
-            risk: .high,
-            isEnabled: true
-        ),
-        BuiltinToolSetting(
-            id: "accessibility.action",
-            name: "accessibility.action",
-            title: "可访问性操作",
-            description: "执行点击、按压或设置值等界面操作。",
-            risk: .high,
-            isEnabled: true
-        ),
-        BuiltinToolSetting(
             id: "workspace.list",
             name: "workspace.list",
             title: "Workspace 列表",

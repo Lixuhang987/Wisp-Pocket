@@ -11,7 +11,7 @@ describe("ThreadPersistence", () => {
       () => "2026-05-17T00:00:00.000Z",
     );
 
-    const Thread = await persistence.createThread("测试 thread");
+    const Thread = await persistence.createThread({ preview: "测试 thread" });
     expect(Thread.metadata.preview).toBe("测试 thread");
 
     await persistence.renameThread(Thread.metadata.id, "新预览");

@@ -12,13 +12,12 @@
 | `blob/` | [blob/blob.md](/Users/mu9/proj/handAgent/packages/core/src/blob/blob.md) | 大段上下文内容的本地 Blob 持久化与 summary 元数据 |
 | `llm/` | [llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md) | LLMClient 抽象 + Vercel AI SDK 适配 |
 | `mcp/` | [mcp/mcp.md](/Users/mu9/proj/handAgent/packages/core/src/mcp/mcp.md) | 标准 MCP client 与 MCP tool adapter |
-| `tools/` | [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md) | AgentTool 协议 + 11 个 builtin tool + 注册组合根 |
-| `platform/` | [platform/platform.md](/Users/mu9/proj/handAgent/packages/core/src/platform/platform.md) | PlatformAdapter / PlatformBridge / Remote+Offline 实现 |
+| `tools/` | [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md) | AgentTool 协议 + workspace/file builtin tools + dynamic tool adapter + 注册组合根 |
 | `permission/` | [permission/permission.md](/Users/mu9/proj/handAgent/packages/core/src/permission/permission.md) | 权限策略接口 + 三档记忆持久化 |
 | `workspace/` | [workspace/workspace.md](/Users/mu9/proj/handAgent/packages/core/src/workspace/workspace.md) | 显式 workspace 沙箱 + 默认播种 |
 | `config/` | [config/config.md](/Users/mu9/proj/handAgent/packages/core/src/config/config.md) | settings.json 模型与 tool 设置解析 |
 | `logging/` | [logging/logging.md](/Users/mu9/proj/handAgent/packages/core/src/logging/logging.md) | LLM 网络日志 JSONL 落盘 |
-| `protocol/` | [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md) | React ThreadWindow ↔ agent-server 的 Thread 协议、`/api/activity` 轻量活动流，以及独立 `/api/platform` 的 `PlatformBridgeMessage` |
+| `protocol/` | [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md) | React ThreadWindow ↔ agent-server 的 Thread 协议、`/api/activity` 轻量活动流，以及 `/api/dynamic-tools` provider 协议 |
 | `conversation/` | [conversation/conversation.md](/Users/mu9/proj/handAgent/packages/core/src/conversation/conversation.md) | UI / 持久化用 ConversationMessage 模型 |
 | `selection/` | [selection/selection.md](/Users/mu9/proj/handAgent/packages/core/src/selection/selection.md) | 用户主动选区抽象 |
 | `utils/` | 无独立文档 | core 内部小型共享工具：Error 归一化、文件状态戳比较、Node ENOENT 判断 |
@@ -48,10 +47,10 @@
 
 ### 4. tool 阶段
 
-当前生产路径会注册的 builtin tool 共 11 个，按依赖分类：
+当前生产路径会注册的 builtin tool 共 4 个，按依赖分类：
 
-- 平台类（依赖 `PlatformAdapter`）：`clipboard.read`、`app.frontmost`、`window.list`、`screen.capture`、`ocr.read`、`accessibility.snapshot`、`accessibility.action`。
 - 工作区类（依赖 `WorkspaceRegistry`）：`workspace.list`、`workspace.askUser`、`file.read`、`file.write`。
+- macOS 原生能力不再是 core builtin；Swift 默认 provider 在 thread 创建时写入 `dynamicTools`，激活后以 `host_macos.*` 暴露。
 
 外部 MCP 能力由 agent-server 按 `~/.spotAgent/mcp.json` 作为全局 MCP tools 注入 thread tool registry；PromptPanel skill action 只作为 `UserInput.items` 中的 `skill` item 进入 runtime。
 
@@ -74,7 +73,7 @@
 - Electron StatusBubble 和后续桌宠订阅 `/api/activity` WebSocket，只接收 `AgentActivityEvent` 轻量状态，不接收完整 thread 消息。
 - `ThreadCommand` 只表示 UI 主动提交的命令；公开运行期输入统一封装为 `op.submit(UserInput | Interrupt)`；app-server 内部会把 `ClientResponse` 包装为 `client_response` Op 投回 Agent。`ThreadNotification` 只表示 agent-server 向 UI 推送的结果通知。
 - `ServerRequest` / `ClientResponse` 只覆盖少量“server 提问，UI 回执”的跨进程交互，如权限审批与 workspace 选择；Agent 内部对应为 `server.request` event 与 `client_response` Op。
-- Swift desktop 不参与 thread 主协议，只通过 `/api/platform` 处理独立 `PlatformBridgeMessage`，并用 `channel: "platform"` 分流。
+- Swift desktop 持有窄口径 `/api/thread` client 用于 PromptPanel 直连创建和提交初始输入，同时通过 `/api/dynamic-tools` 处理 `host_macos.*` dynamic tools。
 - 字段说明详见 [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)。
 
 ## 当前实现特点与已知改进项
@@ -91,5 +90,5 @@
 
 - core 不允许 `import` 任何 macOS / DOM 模块；只能依赖 Node 标准库和 `package.json` 已声明的运行期依赖。当前直接依赖包含 AI SDK provider、`@modelcontextprotocol/sdk`、`zod`、`eventsource-parser` 与 `fast-json-stable-stringify`；新增直接 import 必须同步声明依赖。
 - core 不反向依赖 `@handagent/thread-store`；持久化包可以依赖 core 的 DTO。
-- 跨子模块依赖必须按图层流动：runtime → {llm, tools, permission}；tools → {platform, workspace}；llm → {config, logging, runtime/AgentMessage}；不要在 platform / config / logging 中反向引用 runtime。
+- 跨子模块依赖必须按图层流动：runtime → {llm, tools, permission}；tools → {protocol, workspace}；llm → {config, logging, runtime/AgentMessage}；不要在 protocol / config / logging 中反向引用 runtime。
 - 每个子目录新增文件时，同步更新对应的 `<module>.md` 文件清单与索引表。
