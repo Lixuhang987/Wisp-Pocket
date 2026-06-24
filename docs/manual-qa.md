@@ -596,7 +596,7 @@
 ### 前端视觉重构 5 阶段验收
 
 - 完成日期：待实机 QA
-- 实现位置：`design/tokens.json`、`apps/desktop/Sources/Theme/GeneratedThemeTokens.swift`、`apps/thread-window-web/src/styles/generated-theme.css`、`apps/desktop/Sources/PromptPanel/PromptPanelStyles.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/Settings/SettingsView.swift`、`apps/desktop/Sources/Settings/SettingsStyles.swift`、`apps/desktop/Sources/Common/CommonComponents.swift`、`apps/thread-window-web/src/styles/tailwind.css`、`apps/thread-window-web/src/components/HistorySidebar.tsx`、`apps/thread-window-web/src/components/MessageBubble.tsx`、`apps/thread-window-web/src/components/MessageList.tsx`、`apps/thread-window-web/src/components/ThreadWorkspacePane.tsx`、`apps/thread-window-web/src/components/Composer.tsx`、`apps/electron-shell/src/activity-window/styles.css`
+- 实现位置：`design/tokens.json`、`apps/desktop/Sources/Theme/GeneratedThemeTokens.swift`、`apps/thread-window-web/src/styles/generated-theme.css`、`apps/desktop/Sources/PromptPanel/PromptPanelStyles.swift`、`apps/desktop/Sources/PromptPanel/PromptPanelView.swift`、`apps/desktop/Sources/Settings/SettingsView.swift`、`apps/desktop/Sources/Settings/SettingsStyles.swift`、`apps/desktop/Sources/Common/CommonComponents.swift`、`apps/thread-window-web/src/styles/tailwind.css`、`apps/thread-window-web/src/components/HistorySidebar.tsx`、`apps/thread-window-web/src/components/ThreadItemBubble.tsx`、`apps/thread-window-web/src/components/MessageList.tsx`、`apps/thread-window-web/src/components/ThreadWorkspacePane.tsx`、`apps/thread-window-web/src/components/Composer.tsx`、`apps/electron-shell/src/activity-window/styles.css`
 - 修复结论：统一 handAgent 全部可见前端为"安静高效的日常工具"。5 个阶段按依赖顺序实施：暗色主题 Token 替换、PromptPanel 重构、Settings 重构、ThreadWindow 重构、StatusBubble 重构。
 - 自动化验证：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均通过。
 - 手工回归步骤：
@@ -607,18 +607,18 @@
   5. **StatusBubble**：确认 StatusBubble 表面颜色跟随主题系统；6 种状态颜色与主题 token 一致（idle=#8e8b82 running=#cc785c tool=#5db8a6 waiting=#e8a55a done=#5db872 error=#c64545）；hover 无位移只变色；pulse 动画为柔和呼吸扩散；label 字重更轻(600)；detail 字号略大(13px)。
   6. **亮色主题交叉验证**：切回亮色主题，确认所有界面暖奶白底色不变，PromptPanel/Settings/ThreadWindow/StatusBubble 视觉更紧凑但功能不变。
 
-### Tool 调用消息默认收起展开交互
+### Tool 调用消息默认收起展开交互 + ThreadItem 重构
 
 - 完成日期：待实机 QA
-- 实现位置：`apps/thread-window-web/src/components/MessageBubble.tsx`
-- 修复结论：Tool 消息从全量展示改为默认收起的紧凑单行布局。收起态只显示工具名和状态图标（运行中为 amber spinner，完成为 green check），点击 header 可展开查看完整输入/输出 JSON。使用 CSS `grid-template-rows: 0fr → 1fr` 过渡实现平滑展开动画。运行中的 tool 自动展开，完成后自动收起；用户手动操作后不再被自动切换覆盖。展开时底部显示复制按钮，收起时隐藏。
+- 实现位置：`apps/thread-window-web/src/store/threadItems.ts`、`apps/thread-window-web/src/store/threadWindowStore.ts`、`apps/thread-window-web/src/components/ThreadItemBubble.tsx`、`apps/thread-window-web/src/components/MessageList.tsx`
+- 修复结论：前端消息模型从扁平 `ThreadMessage`（role + optional fields）重构为 Codex 风格 discriminated union `ThreadItem`（`user_message` | `assistant_message` | `tool_call` | `error`）。每种 item type 字段类型安全。渲染层从单一 `MessageBubble` 拆分为 `ThreadItemBubble` 分派器 + 4 个子组件。`ToolCallItem` 同时持有 `input`（调用参数）和 `output`（执行结果），展开时可分别展示。Tool 消息默认收起，只显示工具名和状态图标；运行中自动展开，完成后自动收起，用户手动操作后不再被自动切换覆盖。
 - 自动化验证：需执行 `bash ./scripts/test.sh`。
 - 手工回归步骤：
   1. 启动桌面 App，提交会触发 tool 调用的 prompt，确认 tool 消息默认以单行紧凑形式展示，只显示 `▶ [toolName]` 和状态图标。
   2. 确认运行中的 tool 消息自动展开，显示 amber 色旋转 spinner 图标。
   3. 确认 tool 运行完成后自动收起，状态图标变为绿色 check。
-  4. 点击收起态的 tool 消息 header，确认内容区平滑展开，显示完整 JSON 文本。
-  5. 再次点击 header，确认内容区平滑收起。
-  6. 手动展开一个已完成的 tool 消息后，确认后续新 tool 消息的自动收起不会影响已手动展开的消息。
-  7. 展开状态下确认底部显示复制按钮，点击可复制 tool 输出内容。
-  8. 确认 assistant 和 user 消息的显示不受影响，行为与之前一致。
+  4. 展开已完成 tool 消息，确认能看到 input 和 output 两部分内容（如果 input 可用）。
+  5. 手动展开一个已完成的 tool 消息后，确认后续新 tool 消息的自动收起不会影响已手动展开的消息。
+  6. 确认 user 消息结构化回显正常（图片 strip、chips、文本）。
+  7. 确认 assistant 消息正常显示，运行中显示 typing indicator。
+  8. 展开状态下确认底部显示复制按钮，点击可复制 tool 输出内容。

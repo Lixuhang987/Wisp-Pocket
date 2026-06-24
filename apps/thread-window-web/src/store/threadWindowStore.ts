@@ -12,6 +12,16 @@ import type {
   ThreadNotification,
   WorkspaceAskCandidate,
 } from "../protocol/threadProtocol.ts";
+import type {
+  AssistantMessageItem,
+  ThreadItem,
+  ToolCallItem,
+  ToolCallStatus,
+  UserMessageItem,
+} from "./threadItems.ts";
+
+export type { ThreadItem } from "./threadItems.ts";
+export { isUserMessage, isAssistantMessage, isToolCall, isError } from "./threadItems.ts";
 
 const EXPANDED_WORKSPACE_IDS_STORAGE_KEY = "handAgent.threadWindow.expandedWorkspaceIds";
 
@@ -32,16 +42,6 @@ function getLocalStorage(): Storage | undefined {
 }
 
 export type ConnectionState = "disconnected" | "connecting" | "connected";
-
-export type ThreadMessage = {
-  id: string;
-  role: "user" | "assistant" | "tool" | "system";
-  text: string;
-  userInputItems?: InputItem[];
-  pending?: boolean;
-  toolName?: string;
-  status?: string;
-};
 
 export type QueuedComposerInput = {
   op: RuntimeOp;
@@ -64,7 +64,7 @@ export type ThreadState = {
   threadId: string;
   title: string | null;
   status: RunStatus;
-  messages: ThreadMessage[];
+  messages: ThreadItem[];
   pendingInitialPrompt: InitialPromptPayload | null;
   queuedComposerInputs: QueuedComposerInput[];
   queuedInputDispatchPending: boolean;
@@ -252,23 +252,48 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
           thread.status = notification.payload.status;
-          thread.messages = notification.payload.messages.map((message) => ({
-            id: message.id,
-            role: message.role,
-            text: message.text,
-            ...(message.role === "user" && message.inputItems ? { userInputItems: message.inputItems.map(cloneInputItem) } : {}),
-            status: message.status,
-            toolName: message.toolCall?.name,
-          }));
+          thread.messages = notification.payload.messages.map((message): ThreadItem => {
+            switch (message.role) {
+              case "tool":
+                return {
+                  type: "tool_call",
+                  id: message.id,
+                  toolName: message.toolCall?.name ?? "unknown",
+                  input: null,
+                  output: message.text,
+                  status: (message.status === "running" ? "running" : message.status === "failed" ? "failed" : "completed") as ToolCallStatus,
+                };
+              case "user":
+                return {
+                  type: "user_message",
+                  id: message.id,
+                  text: message.text,
+                  inputItems: message.inputItems ? message.inputItems.map(cloneInputItem) : [],
+                };
+              case "assistant":
+                return {
+                  type: "assistant_message",
+                  id: message.id,
+                  text: message.text,
+                };
+              default:
+                return {
+                  type: "error",
+                  id: message.id,
+                  message: message.text,
+                };
+            }
+          });
           if (
             thread.pendingInitialPrompt
-            && !thread.messages.some((message) => message.role === "user" && message.pending)
+            && !thread.messages.some((item) => item.type === "user_message" && item.pending)
           ) {
             const pendingText = summarizeInputItems(thread.pendingInitialPrompt.userInput.items);
             thread.messages.unshift({
+              type: "user_message",
               id: `pending-${thread.pendingInitialPrompt.clientRequestId}`,
-              role: "user",
               text: pendingText,
+              inputItems: [],
               pending: true,
             });
           }
@@ -278,13 +303,14 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
         case "user.message.recorded": {
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
-          thread.messages = thread.messages.filter((message) => !message.pending);
-          thread.messages.push({
+          thread.messages = thread.messages.filter((item) => !(item.type === "user_message" && item.pending));
+          const userItem: UserMessageItem = {
+            type: "user_message",
             id: notification.payload.messageId,
-            role: "user",
             text: notification.payload.text,
-            ...(notification.payload.items ? { userInputItems: notification.payload.items.map(cloneInputItem) } : {}),
-          });
+            inputItems: notification.payload.items ? notification.payload.items.map(cloneInputItem) : [],
+          };
+          thread.messages.push(userItem);
           upsertHistoryEntry(draft, notification.threadId, {
             preview: notification.payload.text,
             updatedAt: notification.timestamp,
@@ -307,13 +333,13 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           }
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
-          const existing = thread.messages.find((message) => message.id === notification.itemId);
+          const existing = thread.messages.find((item): item is AssistantMessageItem => item.type === "assistant_message" && item.id === notification.itemId);
           if (existing) {
             existing.text += notification.payload.text;
           } else {
             thread.messages.push({
+              type: "assistant_message",
               id: notification.itemId,
-              role: "assistant",
               text: notification.payload.text,
             });
           }
@@ -324,10 +350,11 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
           thread.messages.push({
+            type: "tool_call",
             id: notification.itemId,
-            role: "tool",
-            text: JSON.stringify(notification.payload.input),
             toolName: notification.payload.name,
+            input: JSON.stringify(notification.payload.input),
+            output: null,
             status: "running",
           });
           break;
@@ -336,18 +363,19 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
         case "tool.finished": {
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
-          const existing = thread.messages.find((message) => message.id === notification.itemId);
+          const existing = thread.messages.find((item): item is ToolCallItem => item.type === "tool_call" && item.id === notification.itemId);
           if (existing) {
-            existing.text = notification.payload.output;
-            existing.status = notification.payload.status;
+            existing.output = notification.payload.output;
+            existing.status = notification.payload.status as ToolCallStatus;
             existing.toolName = notification.payload.name;
           } else {
             thread.messages.push({
+              type: "tool_call",
               id: notification.itemId,
-              role: "tool",
-              text: notification.payload.output,
               toolName: notification.payload.name,
-              status: notification.payload.status,
+              input: null,
+              output: notification.payload.output,
+              status: notification.payload.status as ToolCallStatus,
             });
           }
           break;

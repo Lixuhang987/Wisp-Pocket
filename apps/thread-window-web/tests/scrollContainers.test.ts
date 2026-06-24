@@ -87,10 +87,10 @@ describe("ThreadWindow scroll containers", () => {
   it("uses the message list as the only conversation scroll container", () => {
     const html = render(
       React.createElement(MessageList, {
-        messages: [
+        items: [
           {
+            type: "assistant_message",
             id: "message-1",
-            role: "assistant",
             text: "A long assistant reply should wrap inside the conversation column.",
           },
         ],
@@ -130,7 +130,7 @@ describe("ThreadWindow scroll containers", () => {
       threadsById: {
         "thread-1": {
           ...threadState("thread-1"),
-          messages: [{ id: "m1", role: "assistant", text: "cached delta" }],
+          messages: [{ type: "assistant_message", id: "m1", text: "cached delta" }],
         },
       },
     });

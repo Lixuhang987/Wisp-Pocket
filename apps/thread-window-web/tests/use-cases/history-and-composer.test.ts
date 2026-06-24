@@ -71,7 +71,7 @@ describe("threadWindowStore", () => {
     });
 
     expect(store.getState().threadsById["thread-1"].messages).toEqual([
-      { id: "pending-prompt-1", role: "user", text: "hello", pending: true },
+      { type: "user_message", id: "pending-prompt-1", text: "hello", inputItems: [], pending: true },
     ]);
   });
 
@@ -101,7 +101,7 @@ describe("threadWindowStore", () => {
       },
     });
 
-    expect(store.getState().threadsById["thread-1"].messages[0].userInputItems).toEqual([
+    expect((store.getState().threadsById["thread-1"].messages[0] as any).inputItems).toEqual([
       { type: "skill", id: "skill-1", actionId: "review/code", title: "Review", prompt: "Review this code" },
       { type: "text", id: "text-1", text: "focus on regressions" },
     ]);
@@ -120,7 +120,7 @@ describe("threadWindowStore", () => {
       },
     });
 
-    expect(store.getState().threadsById["thread-1"].messages.at(-1)?.userInputItems).toEqual([
+    expect((store.getState().threadsById["thread-1"].messages.at(-1) as any)?.inputItems).toEqual([
       { type: "text_selection", id: "selection-1", text: "selected code" },
     ]);
   });
@@ -196,7 +196,7 @@ describe("threadWindowStore", () => {
       payload: { text: "lo" },
     });
 
-    expect(store.getState().threadsById["thread-1"].messages[0].text).toBe("hello");
+    expect((store.getState().threadsById["thread-1"].messages[0] as any).text).toBe("hello");
   });
 
   it("queues composer input while the thread is running without appending a user message", () => {
@@ -354,7 +354,7 @@ describe("threadWindowStore", () => {
     store.getState().handleNotification(notification);
     store.getState().handleNotification(notification);
 
-    expect(store.getState().threadsById["thread-1"].messages[0].text).toBe("hel");
+    expect((store.getState().threadsById["thread-1"].messages[0] as any).text).toBe("hel");
   });
 
   it("only removes history and thread state when delete status is deleted", () => {

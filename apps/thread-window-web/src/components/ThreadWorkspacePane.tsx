@@ -74,7 +74,7 @@ export function ThreadWorkspacePane({
         <>
           <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden">
             <MessageList
-              messages={thread.messages}
+              items={thread.messages}
               errorMessage={thread.errorMessage}
               isRunning={thread.status === "running"}
             />
