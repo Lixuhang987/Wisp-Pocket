@@ -32,6 +32,10 @@ final class HandAgentApplicationDelegate: NSObject, NSApplicationDelegate {
     weak var coordinator: AppCoordinator?
     private var hasShutDown = false
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        coordinator?.bootstrap()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         shutdownCoordinatorIfNeeded()
         return .terminateNow

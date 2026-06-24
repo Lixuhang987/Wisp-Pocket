@@ -65,7 +65,7 @@ final class AppServices {
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
     let settingsStore: AgentSettingsStore
     let agentTriggerStore: AgentTriggerStore
-    let agentTriggerRuntime: AgentTriggerRuntime
+    let agentTriggerRuntime: any AgentTriggerRuntimeService
     let appearanceThemeService: AppearanceThemeService
     let appearanceChangeObserver: any AppearanceChangeObserving
     let actionManifestStore: ActionManifestStore
@@ -86,7 +86,7 @@ final class AppServices {
         activityWindowCommandClient: (any ActivityWindowCommanding)? = nil,
         settingsStore: AgentSettingsStore = AgentSettingsStore(),
         agentTriggerStore: AgentTriggerStore = AgentTriggerStore(),
-        agentTriggerRuntime: AgentTriggerRuntime? = nil,
+        agentTriggerRuntime: (any AgentTriggerRuntimeService)? = nil,
         appearanceThemeService: AppearanceThemeService? = nil,
         appearanceChangeObserver: (any AppearanceChangeObserving)? = nil,
         actionManifestStore: ActionManifestStore = ActionManifestStore(),
@@ -136,7 +136,6 @@ final class AppServices {
                 }
             }
         )
-        try? self.agentTriggerRuntime.reload()
         self.appearanceThemeService = resolvedAppearanceThemeService
         self.appearanceChangeObserver = appearanceChangeObserver ?? SystemAppearanceChangeObserver()
         self.actionManifestStore = actionManifestStore
@@ -158,7 +157,7 @@ final class AppServices {
         settingsWindowPresenter: any SettingsWindowPresenting = NopSettingsWindowPresenter(),
         settingsStore: AgentSettingsStore = AgentSettingsStore(),
         agentTriggerStore: AgentTriggerStore = AgentTriggerStore(),
-        agentTriggerRuntime: AgentTriggerRuntime? = nil,
+        agentTriggerRuntime: (any AgentTriggerRuntimeService)? = nil,
         appearanceThemeService: AppearanceThemeService? = nil,
         appearanceChangeObserver: (any AppearanceChangeObserving)? = nil,
         actionManifestStore: ActionManifestStore = ActionManifestStore(

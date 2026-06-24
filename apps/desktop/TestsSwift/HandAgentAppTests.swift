@@ -20,12 +20,16 @@ final class HandAgentAppTests: XCTestCase {
         let delegate = HandAgentApplicationDelegate()
         delegate.coordinator = coordinator
 
+        delegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
         let reply = delegate.applicationShouldTerminate(NSApplication.shared)
         delegate.applicationWillTerminate(
             Notification(name: NSApplication.willTerminateNotification)
         )
 
         XCTAssertEqual(reply, .terminateNow)
+        XCTAssertEqual(appServer.startCount, 1)
         XCTAssertEqual(appServer.stopCount, 1)
     }
 }
@@ -37,9 +41,12 @@ private final class RecordingLifecycleAppServer: AppServerManaging {
     var onAvailabilityChange: ((Bool) -> Void)?
     var onFatalError: ((String) -> Void)?
     var onHostTerminationRequest: (() -> Void)?
+    private(set) var startCount = 0
     private(set) var stopCount = 0
 
-    func start() {}
+    func start() {
+        startCount += 1
+    }
 
     func stop() {
         stopCount += 1

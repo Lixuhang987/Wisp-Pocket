@@ -10,6 +10,8 @@ protocol AgentTriggerSubmitting: AnyObject {
     func submit(_ prompt: PromptSubmission)
 }
 
+typealias AgentTriggerRuntimeService = AgentTriggerRuntimeReloading & AgentTriggerSubmitting
+
 @MainActor
 final class AgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmitting {
     private let registry: AgentTriggerRegistry
