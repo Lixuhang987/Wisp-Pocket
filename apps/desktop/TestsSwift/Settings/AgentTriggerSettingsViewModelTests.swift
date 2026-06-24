@@ -94,6 +94,68 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadsChromeBookmarkFolderOptionsFromSnapshot() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        try writeFolderSnapshot(homeURL: homeURL)
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        store.ensureBuiltinPackagesInstalled()
+        let viewModel = AgentTriggerSettingsViewModel(
+            store: store,
+            chromeBookmarksFolderTreeStore: ChromeBookmarksFolderTreeStore(homeDirectoryURL: homeURL)
+        )
+
+        XCTAssertEqual(viewModel.chromeBookmarkFolders.map(\.title), ["书签栏", "a", "其他书签"])
+        XCTAssertEqual(viewModel.chromeBookmarkFolders.map(\.depth), [0, 1, 0])
+        XCTAssertEqual(viewModel.chromeBookmarkFolders.first(where: { $0.title == "a" })?.childCount, 1)
+    }
+
+    @MainActor
+    func testCreateChromeBookmarkInstanceUsesSelectedFolderIdsAndDisplaysNames() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        try writeFolderSnapshot(homeURL: homeURL)
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        store.ensureBuiltinPackagesInstalled()
+        let viewModel = AgentTriggerSettingsViewModel(
+            store: store,
+            chromeBookmarksFolderTreeStore: ChromeBookmarksFolderTreeStore(homeDirectoryURL: homeURL)
+        )
+        viewModel.selectPackage(id: "chrome-bookmarks")
+
+        let didCreate = viewModel.createChromeBookmarkInstance(
+            title: "Read later",
+            folderIds: ["6"],
+            promptTemplate: "Read {{title}}"
+        )
+
+        XCTAssertTrue(didCreate)
+        let instance = try XCTUnwrap(store.loadInstances().first)
+        XCTAssertEqual(instance.config["folderIds"], .stringList(["6"]))
+        XCTAssertEqual(viewModel.configSummary(instance), "Folders: a (1)")
+    }
+
+    @MainActor
+    func testCreateChromeBookmarkInstanceRequiresFolderSelection() throws {
+        let homeURL = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
+        store.ensureBuiltinPackagesInstalled()
+        let viewModel = AgentTriggerSettingsViewModel(store: store)
+        viewModel.selectPackage(id: "chrome-bookmarks")
+
+        let didCreate = viewModel.createChromeBookmarkInstance(
+            title: "Read later",
+            folderIds: [],
+            promptTemplate: "Read {{title}}"
+        )
+
+        XCTAssertFalse(didCreate)
+        XCTAssertEqual(viewModel.saveErrorMessage, "至少选择一个收藏夹文件夹")
+        XCTAssertTrue(store.loadInstances().isEmpty)
+    }
+
+    @MainActor
     func testCreateInstanceFailsOnEmptyPromptTemplateWithoutTouchingStore() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
@@ -221,6 +283,35 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
 
         XCTAssertNil(viewModel.selectedPackageId)
     }
+}
+
+private func writeFolderSnapshot(homeURL: URL) throws {
+    try ChromeBookmarksFolderTreeStore(homeDirectoryURL: homeURL).save(ChromeBookmarksFolderTreeSnapshot(
+        protocolVersion: 1,
+        profileId: "Default",
+        folders: [
+            ChromeBookmarksFolderTreeNode(
+                id: "1",
+                title: "书签栏",
+                childCount: 2,
+                children: [
+                    ChromeBookmarksFolderTreeNode(
+                        id: "6",
+                        title: "a",
+                        childCount: 1,
+                        children: []
+                    )
+                ]
+            ),
+            ChromeBookmarksFolderTreeNode(
+                id: "2",
+                title: "其他书签",
+                childCount: 0,
+                children: []
+            )
+        ],
+        updatedAt: "2026-06-23T00:00:00.000Z"
+    ))
 }
 
 @MainActor

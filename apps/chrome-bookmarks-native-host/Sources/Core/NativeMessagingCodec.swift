@@ -20,6 +20,8 @@ public struct ChromeBookmarksNativeMessage: Codable, Equatable {
     public let extensionVersion: String?
     public let extensionInstanceId: String?
     public let sentAt: String?
+    public let folders: [ChromeBookmarksFolderTreeNode]?
+    public let updatedAt: String?
 
     public init(
         type: String,
@@ -33,7 +35,9 @@ public struct ChromeBookmarksNativeMessage: Codable, Equatable {
         occurredAt: String? = nil,
         extensionVersion: String? = nil,
         extensionInstanceId: String? = nil,
-        sentAt: String? = nil
+        sentAt: String? = nil,
+        folders: [ChromeBookmarksFolderTreeNode]? = nil,
+        updatedAt: String? = nil
     ) {
         self.type = type
         self.protocolVersion = protocolVersion
@@ -47,6 +51,8 @@ public struct ChromeBookmarksNativeMessage: Codable, Equatable {
         self.extensionVersion = extensionVersion
         self.extensionInstanceId = extensionInstanceId
         self.sentAt = sentAt
+        self.folders = folders
+        self.updatedAt = updatedAt
     }
 
     public func validate() throws {
@@ -54,11 +60,27 @@ public struct ChromeBookmarksNativeMessage: Codable, Equatable {
             throw NativeMessagingCodecError.unsupportedProtocolVersion(protocolVersion)
         }
         switch type {
-        case "handagent.bookmarks.hello", "handagent.bookmarks.created":
+        case "handagent.bookmarks.hello",
+             "handagent.bookmarks.created",
+             "handagent.bookmarks.folderTreeSnapshot":
             return
         default:
             throw NativeMessagingCodecError.unsupportedMessageType(type)
         }
+    }
+}
+
+public struct ChromeBookmarksFolderTreeNode: Codable, Equatable {
+    public let id: String
+    public let title: String
+    public let childCount: Int
+    public let children: [ChromeBookmarksFolderTreeNode]
+
+    public init(id: String, title: String, childCount: Int, children: [ChromeBookmarksFolderTreeNode]) {
+        self.id = id
+        self.title = title
+        self.childCount = childCount
+        self.children = children
     }
 }
 

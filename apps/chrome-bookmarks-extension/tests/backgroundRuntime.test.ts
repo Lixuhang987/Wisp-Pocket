@@ -18,6 +18,41 @@ describe("ChromeBookmarksBackgroundRuntime", () => {
     });
   });
 
+  it("sends a folder tree snapshot after connecting to the native host", async () => {
+    const harness = makeHarness();
+    const runtime = new ChromeBookmarksBackgroundRuntime(harness.options);
+
+    await runtime.start();
+
+    expect(harness.port.messages[1]).toEqual({
+      type: "handagent.bookmarks.folderTreeSnapshot",
+      protocolVersion: 1,
+      profileId: "chrome-default",
+      folders: [
+        {
+          id: "1",
+          title: "书签栏",
+          childCount: 2,
+          children: [
+            {
+              id: "6",
+              title: "a",
+              childCount: 1,
+              children: [],
+            },
+          ],
+        },
+        {
+          id: "2",
+          title: "其他书签",
+          childCount: 1,
+          children: [],
+        },
+      ],
+      updatedAt: "2026-06-23T00:00:00.000Z",
+    });
+  });
+
   it("forwards URL bookmark creation through the native port", async () => {
     const harness = makeHarness();
     const runtime = new ChromeBookmarksBackgroundRuntime(harness.options);
@@ -30,7 +65,7 @@ describe("ChromeBookmarksBackgroundRuntime", () => {
       url: "https://openai.com",
     });
 
-    expect(harness.port.messages[1]).toMatchObject({
+    expect(harness.port.messages[2]).toMatchObject({
       type: "handagent.bookmarks.created",
       protocolVersion: 1,
       bookmarkId: "bookmark-1",
@@ -52,7 +87,7 @@ describe("ChromeBookmarksBackgroundRuntime", () => {
       title: "Reading",
     });
 
-    expect(harness.port.messages).toHaveLength(1);
+    expect(harness.port.messages).toHaveLength(2);
   });
 
   it("schedules reconnect after native port disconnects", async () => {
@@ -77,6 +112,53 @@ function makeHarness() {
 
   const chrome: ChromeBookmarksRuntimeChrome = {
     bookmarks: {
+      async getTree() {
+        return [
+          {
+            id: "0",
+            title: "",
+            children: [
+              {
+                id: "1",
+                title: "书签栏",
+                children: [
+                  {
+                    id: "5",
+                    parentId: "1",
+                    title: "OpenAI",
+                    url: "https://openai.com",
+                  },
+                  {
+                    id: "6",
+                    parentId: "1",
+                    title: "a",
+                    children: [
+                      {
+                        id: "7",
+                        parentId: "6",
+                        title: "PRTS Plus",
+                        url: "https://prts.plus/",
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                id: "2",
+                title: "其他书签",
+                children: [
+                  {
+                    id: "8",
+                    parentId: "2",
+                    title: "Docs",
+                    url: "https://example.com/docs",
+                  },
+                ],
+              },
+            ],
+          },
+        ];
+      },
       onCreated: {
         addListener(listener) {
           bookmarkCreatedListener = listener;

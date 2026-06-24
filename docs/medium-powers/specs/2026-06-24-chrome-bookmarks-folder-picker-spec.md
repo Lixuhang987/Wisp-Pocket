@@ -16,14 +16,14 @@ App 保存配置时仍使用内部文件夹 ID。后续用户收藏网页到已�
 
 - 不向用户展示任何文件夹 ID。
 - 不在 App 中提供收藏夹新增、删除、重命名或移动能力。
-- 不实时同步收藏夹树变化；用户进入相关设置界面时拉取一次当前快照即可。
+- 不实时同步收藏夹树变化；扩展连接 native host 时上报一次当前快照，App 设置页读取最近一次快照即可。
 - 不改变“扩展广播收藏事件，App 负责筛选和触发 Agent”的职责边界。
 - 不要求用户打开 Chrome 扩展配置页完成 trigger 设置。
 
 ## Use Cases
 
-- Trigger：用户打开 App 设置页中的 Chrome Bookmarks trigger 实例。
-- Expected result/effect：App 拉取当前 Chrome 收藏夹文件夹树，在设置页展示可勾选的层级结构。
+- Trigger：Chrome 扩展连接 native host，随后用户打开 App 设置页中的 Chrome Bookmarks trigger 实例。
+- Expected result/effect：扩展上报当前 Chrome 收藏夹文件夹树，App 保存快照并在设置页展示可勾选的层级结构。
 
 - Trigger：用户查看收藏夹文件夹树。
 - Expected result/effect：每个文件夹只展示名称和内部数量，例如 `a (2)`；文件夹 ID 不出现在界面中。

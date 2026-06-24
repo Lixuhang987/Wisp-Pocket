@@ -77,7 +77,7 @@ private struct PackageDetailView: View {
     @Environment(\.appTheme) private var theme
     @State private var isAdding = false
     @State private var title = ""
-    @State private var folderIds = ""
+    @State private var selectedFolderIds: Set<String> = []
     @State private var scheduleAt = ""
     @State private var timezone = "Asia/Shanghai"
     @State private var promptTemplate = ""
@@ -207,8 +207,11 @@ private struct PackageDetailView: View {
                     }
                     if package.providerKind == "chrome.bookmarks" {
                         SettingsRowDivider()
-                        SettingsRow("Folders") {
-                            SettingsTextField(placeholder: "folder-a,folder-b", text: $folderIds)
+                        SettingsRow("文件夹") {
+                            ChromeBookmarkFolderPicker(
+                                folders: viewModel.chromeBookmarkFolders,
+                                selectedIds: $selectedFolderIds
+                            )
                         }
                         SettingsRowDivider()
                         SettingsRow("提示词") {
@@ -236,11 +239,7 @@ private struct PackageDetailView: View {
                         }
                     } trailing: {
                         SettingsActionButton(title: "保存", role: .primary) {
-                            let didCreate = viewModel.createInstanceForCurrentPackage(
-                                title: title,
-                                config: currentConfig(),
-                                promptTemplate: promptTemplate
-                            )
+                            let didCreate = createCurrentInstance()
                             if didCreate {
                                 isAdding = false
                                 resetForm()
@@ -264,10 +263,7 @@ private struct PackageDetailView: View {
     private func currentConfig() -> [String: AgentTriggerConfigValue] {
         switch package.providerKind {
         case "chrome.bookmarks":
-            let ids = folderIds
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
+            let ids = Array(selectedFolderIds).sorted()
             return ["folderIds": .stringList(ids)]
         case "system.clock":
             let schedule = scheduleAt
@@ -284,24 +280,78 @@ private struct PackageDetailView: View {
     }
 
     private func configSummary(_ instance: AgentTriggerInstance) -> String {
-        instance.config
-            .sorted { $0.key < $1.key }
-            .map { key, value in
-                switch value {
-                case .string(let raw):
-                    return "\(key): \(raw)"
-                case .stringList(let values):
-                    return "\(key): \(values.joined(separator: ", "))"
-                }
-            }
-            .joined(separator: " | ")
+        viewModel.configSummary(instance)
+    }
+
+    private func createCurrentInstance() -> Bool {
+        switch package.providerKind {
+        case "chrome.bookmarks":
+            return viewModel.createChromeBookmarkInstance(
+                title: title,
+                folderIds: Array(selectedFolderIds).sorted(),
+                promptTemplate: promptTemplate
+            )
+        default:
+            return viewModel.createInstanceForCurrentPackage(
+                title: title,
+                config: currentConfig(),
+                promptTemplate: promptTemplate
+            )
+        }
     }
 
     private func resetForm() {
         title = ""
-        folderIds = ""
+        selectedFolderIds = []
         scheduleAt = ""
         timezone = "Asia/Shanghai"
         promptTemplate = package.defaultPromptTemplate
+    }
+}
+
+private struct ChromeBookmarkFolderPicker: View {
+    let folders: [ChromeBookmarkFolderOption]
+    @Binding var selectedIds: Set<String>
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        if folders.isEmpty {
+            Text("未收到 Chrome 收藏夹文件夹列表。请确认扩展已连接后重新打开设置页。")
+                .font(theme.typography.captionFont)
+                .foregroundStyle(theme.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                ForEach(folders) { folder in
+                    Toggle(isOn: binding(for: folder.id)) {
+                        HStack(spacing: theme.spacing.xs) {
+                            Text(folder.title)
+                                .font(theme.typography.bodyFont)
+                                .foregroundStyle(theme.colors.ink)
+                                .lineLimit(1)
+                            Text("(\(folder.childCount))")
+                                .font(theme.typography.captionFont)
+                                .foregroundStyle(theme.colors.textSecondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                    .padding(.leading, CGFloat(folder.depth) * 18)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func binding(for id: String) -> Binding<Bool> {
+        Binding {
+            selectedIds.contains(id)
+        } set: { isSelected in
+            if isSelected {
+                selectedIds.insert(id)
+            } else {
+                selectedIds.remove(id)
+            }
+        }
     }
 }
