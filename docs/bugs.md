@@ -89,3 +89,37 @@
 - **发现日期**：2026-06-24
 - **基线结果**：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均返回 `success`。
 - **清理状态**：原 `~/.spotAgent/agent-triggers/` 已移动到 `~/.spotAgent/qa-backup-agent-triggers-20260624-015530`；本轮 QA 创建的临时 `~/.spotAgent/agent-triggers/` 仍保留用于后续修复回归。
+
+
+### 默认 Websearch 工具
+
+- 完成日期：待实机 QA
+- 实现位置：`packages/core/src/tools/web/WebTools.ts`、`packages/core/src/runtime/AgentRuntime.ts`、`apps/agent-server/src/actions/ThreadScopedToolRegistry.ts`、`apps/agent-server/src/server/server.ts`、`packages/core/tests/tools/websearch-use-cases.test.ts`、`apps/agent-server/tests/thread/ThreadScopedToolRegistry.test.ts`、`packages/core/tests/permission/security-use-cases.test.ts`
+- 修复结论：新增默认公开的 `web_search` 与 `fetch_page`。未激活 thread 默认暴露 `use_tools`、`web_search`、`fetch_page`；调用 `use_tools` 后移除 `use_tools`，但继续保留 websearch 工具并合并 builtin / MCP / dynamic tools。两个 web 工具设置 `requiresPermission=false`，runtime 跳过普通权限审批但仍产出 tool 审计事件。`web_search` 使用 Tavily Search API 并缓存结构化结果；`fetch_page` 只抓取公共 HTTP(S) URL，拒绝本机/私网/metadata 地址和危险重定向，移除非正文 HTML 后截断返回。
+- 2026-06-25 修复记录：`fetch_page` 的固定地址 lookup 已兼容 Node 请求层 `all: true` 回调形态，避免在 Node 24 下访问公共网页时抛出 `Invalid IP address: undefined`。
+- 自动化验证：需执行 `pnpm exec vitest run apps/agent-server/tests/thread/ThreadScopedToolRegistry.test.ts packages/core/tests/tools/websearch-use-cases.test.ts packages/core/tests/permission/security-use-cases.test.ts`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 在启动 agent-server 的环境设置 `TAVILY_API_KEY`，启动桌面 App。
+  2. 提交需要近期信息的问题，例如查询某个官方发布说明，确认未先调用 `use_tools` 也能直接出现 `web_search` tool 调用。
+  3. 确认 `web_search` tool result 中每条结果包含 URL、snippet 和 source，最终 assistant 回答引用这些 URL。
+  4. 让模型精读某条搜索结果，确认只调用对应 URL 的 `fetch_page`，tool result 是清洗后的正文，不包含 script/style/nav 等 HTML 噪音。
+  5. 重复同一 query 或同一 URL，确认响应更快且不会重复产生多次外部请求异常；若去掉 `TAVILY_API_KEY` 重启，确认 `web_search` 返回明确缺 key 错误，App 不崩溃。
+  6. 要求模型抓取 `http://localhost`、`http://127.0.0.1` 或私网地址，确认 `fetch_page` 拒绝并返回只支持公共 Web URL 的错误。
+
+### OpenAI-compatible Responses SSE 连续事件解析导致 web_search tool call 前失败
+
+- **严重级别**：P1。真实 LLM 的 Responses tool-call 路径失败，阻塞默认 Websearch 工具实机验收。
+- **复现步骤**：
+  1. 在 main checkout `/Users/mu9/proj/handAgent` 确认工作区干净，执行 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`，三项均返回 `success`。
+  2. 设置环境中已有 `TAVILY_API_KEY` 与 OpenAI-compatible provider，`~/.spotAgent/settings.json` 指向 `provider=openai-compatible`、`api=responses`、`baseUrl=http://127.0.0.1:8090/v1`，本地 8090 服务由 `axonhub` 监听。
+  3. 执行 `bash ./scripts/swiftw run HandAgentDesktop` 启动桌面端，确认 agent-server 监听 `127.0.0.1:4317`，Electron ActivityWindow 可见。
+  4. 因本机全局快捷键未唤起 PromptPanel，本轮通过当前 Electron command socket `/tmp/hae-CDED2EF8-EABF-4EE9-BED9-D77BBD802543.sock` 发送 `thread_window.open_initial_prompt`，prompt 为 `WEBSEARCH_QA_20260625 请先调用 web_search 搜索 OpenAI 官方网站 2026 年 6 月发布说明...`。
+- **实际结果**：ThreadWindow 创建 `thread-01cca829-9154-484d-ad85-bccbe739703c` 并进入运行态；模型先调用 `use_tools`，随后 Responses stream 中产出 `web_search` function_call，但 agent-server 在解析同一 SSE chunk 内连续的 `response.output_item.done` 与 `response.completed` 两个 JSON 对象时抛出 `JSONParseError`，turn 标记为 `failed`，未执行 `web_search`，也未进入 `fetch_page`。
+- **期望结果**：OpenAI-compatible Responses stream 中即使同一 data payload 内包含连续 JSON 事件，也应被拆分/归一化为 AI SDK 可消费的事件；`web_search` tool result 应返回 URL/snippet/source，随后 `fetch_page` 精读一个官方 URL 并产出最终中文回答。
+- **证据**：
+  - Computer Use：Electron `HandAgent ThreadWindow` 可见，新历史项 `WEBSEARCH_QA_20260625...` 显示 `运行中`，Composer 显示 `停止` 按钮。
+  - SQLite：`~/.spotAgent/threads.sqlite` 中 `thread_items` sequence 4 为 `thread.error`，message 以 `JSON parsing failed: Text: {"type":"response.output_item.done"..."name":"web_search"}\n{"type":"response.completed"...` 开头；sequence 5 为 `turn.completed(status:"failed")`，sequence 6 为 `thread.status.changed(value:"failed")`。
+  - Network log：`~/.spotAgent/log/2026-06-25/network-001.jsonl` 记录第二次 `/v1/responses` 请求中 tools 已包含 `web_search` / `fetch_page`，响应为 `text/event-stream`；agent-server stderr 记录 `Unexpected non-whitespace character after JSON at position 436 (line 2 column 1)`。
+  - Cleanup：记录缺陷后已停止本轮 `swiftw run` 进程链，并手动清理残留 Electron / agent-server；`lsof -nP -iTCP:4317 -sTCP:LISTEN` 无输出。
+- **初步调用链 / 根因边界**：`Electron command socket thread_window.open_initial_prompt -> ThreadWindow 创建 thread -> /api/thread op.submit(UserInput) -> agent-server AgentManager -> SettingsBackedLLMClient -> VercelClient.stream -> OpenAI-compatible /v1/responses SSE -> AI SDK parse-json-event-stream`。失败边界在本地 Responses SSE 兼容层：现有包装只处理空 data/event 合并场景，没有处理一个 data payload 内含多个换行分隔 JSON 对象的场景。
+- **发现日期**：2026-06-25
