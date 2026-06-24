@@ -105,8 +105,8 @@ flowchart LR
   - 通过 fake lifecycle running RPC 调用 `context_history.activity_index`，断言请求没有另起进程 executor，而是进入常驻 plugin RPC，并返回查询结果。
 - Integration test need to create: `apps/builtin-plugins/Tests/ContextHistoryPluginCoreTests.swift` 或 SwiftPM 对应 test target
   - 用 fake 原子 plugin client 驱动一次 app/window 变化采样与一次分钟截图采样。
-  - 断言 `~/.spotAgent/context-history` 中写入 activity index、sample detail、thumbnail metadata、original screenshot metadata。
-  - 断言四个 dynamic tool 分层返回：index 不包含完整 AX/图片，details 批量返回 AX 摘要，thumbnail 查询返回缩略图引用或内容，original 只按单个 screenshot id 返回原图。
+  - 断言 `~/.spotAgent/context-history` 中写入 activity index、sample detail、thumbnail file path metadata、original screenshot file path metadata。
+  - 断言四个 dynamic tool 分层返回：index 不包含完整 AX/图片，details 批量返回 AX 摘要，thumbnail 按时间范围查询返回缩略图引用或内容，original 只按单个 screenshot id 返回原图。
 
 ### Implementation tasks
 

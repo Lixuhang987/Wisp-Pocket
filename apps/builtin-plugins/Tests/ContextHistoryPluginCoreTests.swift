@@ -35,6 +35,8 @@ final class ContextHistoryPluginCoreTests: XCTestCase {
         XCTAssertEqual(activities.count, 3)
         XCTAssertEqual(screenshots.count, 1)
         XCTAssertEqual(screenshots[0].sampleId, periodic.activitySampleId)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: screenshots[0].originalPath))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: screenshots[0].thumbnailPath))
     }
 
     func testCollectorWritesActivityAndScreenshotThenToolsReturnLayeredResults() async throws {
@@ -52,6 +54,10 @@ final class ContextHistoryPluginCoreTests: XCTestCase {
             now: Date(timeIntervalSince1970: 120),
             sampleId: sample.id
         )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: screenshot.originalPath))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: screenshot.thumbnailPath))
+        XCTAssertEqual(try String(contentsOfFile: screenshot.originalPath, encoding: .utf8), "original")
+        XCTAssertEqual(try String(contentsOfFile: screenshot.thumbnailPath, encoding: .utf8), "thumbnail")
 
         let index = decodeToolJSON(router.handle(
             namespace: "context_history",
@@ -81,7 +87,33 @@ final class ContextHistoryPluginCoreTests: XCTestCase {
         let thumbnailItems = try XCTUnwrap(thumbnails["thumbnails"] as? [[String: Any]])
         XCTAssertEqual(thumbnailItems[0]["id"] as? String, screenshot.id)
         XCTAssertEqual(thumbnailItems[0]["thumbnailBase64"] as? String, "thumbnail")
+        XCTAssertEqual(thumbnailItems[0]["thumbnailPath"] as? String, screenshot.thumbnailPath)
         XCTAssertNil(thumbnailItems[0]["imageBase64"])
+
+        let excludedThumbnails = decodeToolJSON(router.handle(
+            namespace: "context_history",
+            tool: "thumbnails",
+            arguments: [
+                "limit": 10,
+                "start": "1970-01-01T00:02:30Z",
+                "end": "1970-01-01T00:03:00Z",
+            ]
+        ))
+        XCTAssertEqual((excludedThumbnails["thumbnails"] as? [[String: Any]])?.count, 0)
+
+        let includedThumbnails = decodeToolJSON(router.handle(
+            namespace: "context_history",
+            tool: "thumbnails",
+            arguments: [
+                "limit": 10,
+                "start": "1970-01-01T00:01:30Z",
+                "end": "1970-01-01T00:02:30Z",
+            ]
+        ))
+        let includedThumbnailItems = try XCTUnwrap(includedThumbnails["thumbnails"] as? [[String: Any]])
+        XCTAssertEqual(includedThumbnailItems.count, 1)
+        XCTAssertEqual(includedThumbnailItems[0]["id"] as? String, screenshot.id)
+        XCTAssertEqual(includedThumbnailItems[0]["thumbnailBase64"] as? String, "thumbnail")
 
         let original = decodeToolJSON(router.handle(
             namespace: "context_history",
@@ -91,6 +123,7 @@ final class ContextHistoryPluginCoreTests: XCTestCase {
         let originalScreenshot = try XCTUnwrap(original["screenshot"] as? [String: Any])
         XCTAssertEqual(originalScreenshot["imageBase64"] as? String, "original")
         XCTAssertEqual(originalScreenshot["mimeType"] as? String, "image/png")
+        XCTAssertEqual(originalScreenshot["originalPath"] as? String, screenshot.originalPath)
 
         XCTAssertEqual(try store.loadActivities().count, 1)
         XCTAssertEqual(try store.loadScreenshots().count, 1)

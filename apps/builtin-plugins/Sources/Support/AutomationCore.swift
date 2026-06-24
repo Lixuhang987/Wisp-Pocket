@@ -149,6 +149,11 @@ public protocol AutomationRepairing {
     func repair(request: AutomationRepairRequest) async throws -> AutomationRepairResult
 }
 
+public protocol AutomationLiveEventRecording {
+    func start(recordingId: String) throws
+    func stop(recordingId: String) throws -> [[String: Any]]
+}
+
 public final class AutomationRepairRequestStore: @unchecked Sendable {
     private let store: AutomationStore
 
@@ -202,10 +207,12 @@ public final class AutomationRepairRequestStore: @unchecked Sendable {
 
 public final class AutomationRecordingService: @unchecked Sendable {
     private let capabilityClient: AutomationCapabilityCalling
+    private let liveRecorder: AutomationLiveEventRecording?
     private var sessions: [String: [String: Any]] = [:]
 
-    public init(capabilityClient: AutomationCapabilityCalling) {
+    public init(capabilityClient: AutomationCapabilityCalling, liveRecorder: AutomationLiveEventRecording? = nil) {
         self.capabilityClient = capabilityClient
+        self.liveRecorder = liveRecorder
     }
 
     public func start(arguments: Any?) async -> [String: Any] {
@@ -224,6 +231,15 @@ public final class AutomationRecordingService: @unchecked Sendable {
         if let targetBundleId {
             session["targetBundleId"] = targetBundleId
         }
+        if boolValue(object["captureUserEvents"]) {
+            do {
+                try liveRecorder?.start(recordingId: recordingId)
+                session["liveRecording"] = liveRecorder == nil ? "unavailable" : "running"
+            } catch {
+                session["liveRecording"] = "unavailable"
+                session["liveRecordingError"] = error.localizedDescription
+            }
+        }
         sessions[recordingId] = session
         var response: [String: Any] = [
             "recordingId": recordingId,
@@ -232,6 +248,12 @@ public final class AutomationRecordingService: @unchecked Sendable {
         ]
         if let targetBundleId {
             response["targetBundleId"] = targetBundleId
+        }
+        if let liveRecording = session["liveRecording"] {
+            response["liveRecording"] = liveRecording
+        }
+        if let liveRecordingError = session["liveRecordingError"] {
+            response["liveRecordingError"] = liveRecordingError
         }
         return response
     }
@@ -265,6 +287,26 @@ public final class AutomationRecordingService: @unchecked Sendable {
             try store.saveTrace(id: traceId, payload: object)
             return ["traceId": traceId, "status": "saved"]
         }
+        var liveEventCount = 0
+        if session["liveRecording"] as? String == "running" {
+            do {
+                let liveEvents = try liveRecorder?.stop(recordingId: recordingId) ?? []
+                liveEventCount = liveEvents.count
+                if !liveEvents.isEmpty {
+                    var recordedEvents = session["events"] as? [[String: Any]] ?? []
+                    var previousEvidence = session["lastEvidence"] as? [String: Any] ?? [:]
+                    for event in liveEvents {
+                        let (recorded, after) = await recordedEvent(from: event, previousEvidence: previousEvidence)
+                        recordedEvents.append(recorded)
+                        previousEvidence = after
+                    }
+                    session["events"] = recordedEvents
+                    session["lastEvidence"] = previousEvidence
+                }
+            } catch {
+                session["liveRecordingError"] = error.localizedDescription
+            }
+        }
         if let events = object["events"] as? [[String: Any]], !events.isEmpty {
             var recordedEvents = session["events"] as? [[String: Any]] ?? []
             var previousEvidence = session["lastEvidence"] as? [String: Any] ?? [:]
@@ -285,6 +327,7 @@ public final class AutomationRecordingService: @unchecked Sendable {
             "recordingId": recordingId,
             "status": "saved",
             "eventCount": (session["events"] as? [[String: Any]])?.count ?? 0,
+            "liveEventCount": liveEventCount,
         ]
     }
 
@@ -827,6 +870,15 @@ private func intValue(_ value: Any?) -> Int? {
     if let double = value as? Double { return Int(double) }
     if let string = value as? String { return Int(string) }
     return nil
+}
+
+private func boolValue(_ value: Any?) -> Bool {
+    if let bool = value as? Bool { return bool }
+    if let string = value as? String {
+        return ["1", "true", "yes", "on"].contains(string.lowercased())
+    }
+    if let int = value as? Int { return int != 0 }
+    return false
 }
 
 private func hotkeyValue(_ value: Any?) -> String? {

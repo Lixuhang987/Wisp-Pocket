@@ -200,3 +200,65 @@ flowchart LR
 2. 扩展 `automation.history` 返回 `repairRequests`。
 3. 新增 `automation.repair_apply` tool 路由：解析 `repairRequestId`、branch、evidence，只允许 pending request 构造 patch、调用 `AutomationStore.applyPatch` 并标记 request applied；已 applied request 必须拒绝，避免重复合入。
 4. 更新官方 Automation manifest tool 列表、desktop manifest 测试、builtin plugin 文档和 manual QA。
+
+## 第三阶段：真实用户事件录制
+
+### Goal
+
+把 `automation.record_start` / `record_stop` 从纯结构化事件 API 推进到可录制真实用户输入。用户或 agent 调用 `record_start` 时可请求 `captureUserEvents = true`；Automation always-on plugin 在同一常驻进程中启动 macOS 事件监听，记录鼠标点击、基础 keyDown 文本输入和快捷键。`record_stop` 停止该 session 的事件收集，把真实事件与现有 app/window、AX、截图 evidence 包装后写入 trace。
+
+这一阶段仍不要求 UI 设置页提供录制按钮；动态工具入口已经能表达“开始录制 / 停止录制”。真实事件监听需要 macOS 辅助功能或输入监控权限，权限失败时 runtime 应保留结构化录制能力，并在响应里暴露 live recorder 状态，避免 tool call 崩溃。
+
+### Existing Flow Inventory
+
+- 复用 `AutomationRecordingService` 的 session 存储、`recordedEvent` evidence 包装和 `record_stop -> AutomationStore.saveTrace`。
+- 在 Support target 中新增 `AutomationLiveEventRecording` 协议，让 core 流程可测试；生产实现放在 `Sources/Automation/main.swift`，避免 Support target 直接依赖 macOS event tap API。
+- 复用 `record_event` 作为结构化事件补充入口；live recorder 捕获的事件和 `record_event` 手动事件在 stop 时合并到同一 trace。
+
+### Core structure
+
+```swift
+public protocol AutomationLiveEventRecording {
+    func start(recordingId: String) throws
+    func stop(recordingId: String) throws -> [[String: Any]]
+}
+
+record_start({ recordingId, captureUserEvents: true }) -> {
+  recordingId,
+  status: "recording",
+  liveRecording: "running" | "unavailable",
+  initialEvidence
+}
+
+record_stop({ recordingId, traceId }) -> {
+  traceId,
+  eventCount,
+  liveEventCount,
+  status: "saved"
+}
+```
+
+### Use case map
+
+```mermaid
+flowchart LR
+    A["agent 调用 automation.record_start captureUserEvents=true"] --> B["AutomationRecordingService 创建 session"]
+    B --> C["AutomationLiveEventRecording.start 启动生产 macOS event tap"]
+    C --> D["用户执行点击、输入、快捷键"]
+    D --> E["event tap 写入 live event buffer"]
+    E --> F["agent 调用 automation.record_stop"]
+    F --> G["AutomationRecordingService.stop 读取 live events 并逐条补 before/after evidence"]
+    G --> H["trace.json 包含真实事件、app/window、AX、截图证据"]
+```
+
+- Integration test need to update: `apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
+  - 用 fake `AutomationLiveEventRecording` 启动 `record_start(captureUserEvents: true)`，断言 fake recorder 收到 recordingId，返回 `liveRecording = running`。
+  - fake recorder 在 stop 时返回 click/typeText/hotkey 事件；断言 `record_stop` 保存的 trace 包含这些事件，每个事件都有 before/after evidence，并返回 liveEventCount。
+
+### Implementation tasks
+
+1. 新增 `AutomationLiveEventRecording` 协议，并让 `AutomationRecordingService` 可选持有 live recorder。
+2. `record_start` 在 `captureUserEvents = true` 时启动 live recorder，响应 live recorder 状态；启动失败不终止结构化录制，并清理已登记的 live recording id，避免后续事件写入失败 session。
+3. `record_stop` 停止 live recorder，把捕获事件与 stop 入参 events 合并后保存 trace，并返回 liveEventCount。
+4. 在 `Sources/Automation/main.swift` 增加 macOS CGEvent tap live recorder，捕获 click、基础 keyDown typeText、hotkey 事件；无权限或 tap 创建失败时抛错，由 core 响应降级。
+5. 更新 Automation runtime 测试、builtin plugin 文档和 manual QA。

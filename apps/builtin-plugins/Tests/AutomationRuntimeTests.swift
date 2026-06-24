@@ -378,6 +378,69 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertNil(trace["targetBundleId"])
     }
 
+    func testLiveUserEventRecordingMergesCapturedEventsIntoTrace() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let liveRecorder = RecordingAutomationLiveEventRecorder(events: [
+            [
+                "kind": "click",
+                "source": "macos_event_tap",
+                "position": ["x": 120.0, "y": 240.0],
+            ],
+            [
+                "kind": "typeText",
+                "source": "macos_event_tap",
+                "text": "a",
+            ],
+            [
+                "kind": "hotkey",
+                "source": "macos_event_tap",
+                "keys": ["command", "s"],
+            ],
+        ])
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: RecordingAutomationCapabilityClient(),
+            repairer: RecordingAutomationRepairer()
+        )
+        let router = AutomationToolRouter(
+            store: store,
+            runtime: runtime,
+            recorder: AutomationRecordingService(
+                capabilityClient: RecordingAutomationCapabilityClient(),
+                liveRecorder: liveRecorder
+            )
+        )
+
+        let start = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "record_start",
+            arguments: ["recordingId": "live-recording", "captureUserEvents": true]
+        ))
+        XCTAssertEqual(start["recordingId"] as? String, "live-recording")
+        XCTAssertEqual(start["liveRecording"] as? String, "running")
+        XCTAssertEqual(liveRecorder.startedRecordingIds, ["live-recording"])
+
+        let stop = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "record_stop",
+            arguments: ["recordingId": "live-recording", "traceId": "live-trace"]
+        ))
+        XCTAssertEqual(stop["traceId"] as? String, "live-trace")
+        XCTAssertEqual(stop["eventCount"] as? Int, 3)
+        XCTAssertEqual(stop["liveEventCount"] as? Int, 3)
+        XCTAssertEqual(liveRecorder.stoppedRecordingIds, ["live-recording"])
+
+        let trace = try store.loadTrace(id: "live-trace")
+        let events = try XCTUnwrap(trace["events"] as? [[String: Any]])
+        XCTAssertEqual(events.map { $0["kind"] as? String }, ["click", "typeText", "hotkey"])
+        for event in events {
+            XCTAssertEqual(event["source"] as? String, "macos_event_tap")
+            XCTAssertNotNil(event["before"] as? [String: Any])
+            XCTAssertNotNil(event["after"] as? [String: Any])
+        }
+    }
+
     func testZRecordEventFailsForUnknownRecordingSession() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
@@ -498,5 +561,24 @@ private final class PersistingAutomationRepairer: AutomationRepairing {
             ),
             evidence: evidence
         )
+    }
+}
+
+private final class RecordingAutomationLiveEventRecorder: AutomationLiveEventRecording {
+    private let events: [[String: Any]]
+    private(set) var startedRecordingIds: [String] = []
+    private(set) var stoppedRecordingIds: [String] = []
+
+    init(events: [[String: Any]]) {
+        self.events = events
+    }
+
+    func start(recordingId: String) throws {
+        startedRecordingIds.append(recordingId)
+    }
+
+    func stop(recordingId: String) throws -> [[String: Any]] {
+        stoppedRecordingIds.append(recordingId)
+        return events
     }
 }

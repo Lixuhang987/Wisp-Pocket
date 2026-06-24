@@ -12,8 +12,8 @@ public struct ContextHistoryActivitySample: Codable, Equatable {
 public struct ContextHistoryScreenshotRecord: Codable, Equatable {
     public var id: String
     public var timestamp: Date
-    public var originalBase64: String
-    public var thumbnailBase64: String
+    public var originalPath: String
+    public var thumbnailPath: String
     public var width: Int
     public var height: Int
     public var sampleId: String?
@@ -77,11 +77,15 @@ public final class ContextHistoryStore: @unchecked Sendable {
         sampleId: String?
     ) throws -> ContextHistoryScreenshotRecord {
         try ensureDirectories()
+        let originalURL = originalScreenshotsDirectoryURL.appendingPathComponent("\(id).b64")
+        let thumbnailURL = thumbnailScreenshotsDirectoryURL.appendingPathComponent("\(id).b64")
+        try originalBase64.write(to: originalURL, atomically: true, encoding: .utf8)
+        try thumbnailBase64.write(to: thumbnailURL, atomically: true, encoding: .utf8)
         let screenshot = ContextHistoryScreenshotRecord(
             id: id,
             timestamp: timestamp,
-            originalBase64: originalBase64,
-            thumbnailBase64: thumbnailBase64,
+            originalPath: originalURL.path,
+            thumbnailPath: thumbnailURL.path,
             width: width,
             height: height,
             sampleId: sampleId
@@ -131,15 +135,21 @@ public final class ContextHistoryStore: @unchecked Sendable {
             }
     }
 
-    public func thumbnails(limit: Int) throws -> [[String: Any]] {
+    public func thumbnails(limit: Int, start: Date? = nil, end: Date? = nil) throws -> [[String: Any]] {
         try loadScreenshots()
+            .filter { screenshot in
+                if let start, screenshot.timestamp < start { return false }
+                if let end, screenshot.timestamp > end { return false }
+                return true
+            }
             .sorted { $0.timestamp > $1.timestamp }
             .prefix(max(0, limit))
             .map { screenshot in
                 [
                     "id": screenshot.id,
                     "timestamp": iso8601(screenshot.timestamp),
-                    "thumbnailBase64": screenshot.thumbnailBase64,
+                    "thumbnailBase64": readTextFile(path: screenshot.thumbnailPath) ?? "",
+                    "thumbnailPath": screenshot.thumbnailPath,
                     "width": screenshot.width,
                     "height": screenshot.height,
                     "sampleId": screenshot.sampleId as Any,
@@ -154,8 +164,9 @@ public final class ContextHistoryStore: @unchecked Sendable {
                 [
                     "id": screenshot.id,
                     "timestamp": iso8601(screenshot.timestamp),
-                    "imageBase64": screenshot.originalBase64,
+                    "imageBase64": readTextFile(path: screenshot.originalPath) ?? "",
                     "mimeType": "image/png",
+                    "originalPath": screenshot.originalPath,
                     "width": screenshot.width,
                     "height": screenshot.height,
                     "sampleId": screenshot.sampleId as Any,
@@ -174,6 +185,8 @@ public final class ContextHistoryStore: @unchecked Sendable {
     private func ensureDirectories() throws {
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: axDirectoryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: originalScreenshotsDirectoryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: thumbnailScreenshotsDirectoryURL, withIntermediateDirectories: true)
     }
 
     private func saveActivities(_ samples: [ContextHistoryActivitySample]) throws {
@@ -205,6 +218,10 @@ public final class ContextHistoryStore: @unchecked Sendable {
         return object
     }
 
+    private func readTextFile(path: String) -> String? {
+        try? String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8)
+    }
+
     private var activitiesURL: URL {
         directoryURL.appendingPathComponent("activities.json")
     }
@@ -215,6 +232,18 @@ public final class ContextHistoryStore: @unchecked Sendable {
 
     private var axDirectoryURL: URL {
         directoryURL.appendingPathComponent("ax", isDirectory: true)
+    }
+
+    private var screenshotsDirectoryURL: URL {
+        directoryURL.appendingPathComponent("screenshots", isDirectory: true)
+    }
+
+    private var originalScreenshotsDirectoryURL: URL {
+        screenshotsDirectoryURL.appendingPathComponent("original", isDirectory: true)
+    }
+
+    private var thumbnailScreenshotsDirectoryURL: URL {
+        screenshotsDirectoryURL.appendingPathComponent("thumbnails", isDirectory: true)
     }
 }
 
@@ -375,7 +404,11 @@ public final class ContextHistoryToolRouter: @unchecked Sendable {
             case "sample_details":
                 return .json(["samples": try store.sampleDetails(ids: stringArrayArgument(arguments, "ids"))])
             case "thumbnails":
-                return .json(["thumbnails": try store.thumbnails(limit: intArgument(arguments, "limit", defaultValue: 20))])
+                return .json(["thumbnails": try store.thumbnails(
+                    limit: intArgument(arguments, "limit", defaultValue: 20),
+                    start: dateArgument(arguments, "start"),
+                    end: dateArgument(arguments, "end")
+                )])
             case "screenshot_original":
                 let id = stringArgument(arguments, "id")
                 return .json(["screenshot": try store.screenshotOriginal(id: id) as Any])
@@ -408,6 +441,17 @@ private func stringArgument(_ arguments: Any?, _ key: String) -> String {
 private func stringArrayArgument(_ arguments: Any?, _ key: String) -> [String] {
     let object = arguments as? [String: Any]
     return object?[key] as? [String] ?? []
+}
+
+private func dateArgument(_ arguments: Any?, _ key: String) -> Date? {
+    let object = arguments as? [String: Any]
+    if let timestamp = object?[key] as? TimeInterval {
+        return Date(timeIntervalSince1970: timestamp)
+    }
+    if let string = object?[key] as? String {
+        return ISO8601DateFormatter().date(from: string)
+    }
+    return nil
 }
 
 private func iso8601(_ date: Date) -> String {
