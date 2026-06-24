@@ -240,6 +240,7 @@ struct BuiltinPluginInstaller {
                 "dataDirectoryName": "automation",
                 "tools": [
                     tool("automation", "record_start", "Start recording an automation trace."),
+                    tool("automation", "record_event", "Record a single automation user event with context evidence."),
                     tool("automation", "record_stop", "Stop recording and save the trace."),
                     tool("automation", "policy_create", "Create an Automation Policy from a trace."),
                     tool("automation", "run", "Run an Automation Policy."),

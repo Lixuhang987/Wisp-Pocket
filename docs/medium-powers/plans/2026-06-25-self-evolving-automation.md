@@ -4,7 +4,7 @@
 
 ### Goal
 
-在 Context History 的原子 plugin 基础上，新增独立 Automation plugin runtime。用户可以录制真实操作或让 agent 基于 trace 创建 Automation Policy；运行时解释执行受限 policy，优先走 AX selector 与断言；失败时收集 AX 树、截图、失败步骤和目标交给 agent/computer use repair；repair 成功后生成可审计 policy patch，并自动合入当前 policy 版本。
+在 Context History 的原子 plugin 基础上，新增独立 Automation plugin runtime。第一阶段由 runtime API 接收结构化操作事件并采集前后证据，再基于 trace 创建受限 Automation Policy；运行时解释执行受限 policy，优先走 AX selector 与断言；失败时收集 AX 树、截图、失败步骤、已执行步骤和目标，保存 agent/computer use repair request；repair fallback 成功后生成可审计 policy patch，并自动合入当前 policy 版本。
 
 ### Existing Flow Inventory
 
@@ -66,17 +66,18 @@ struct AutomationPolicyPatch: Codable {
 - `~/.spotAgent/automation/runs/<run-id>.json`
 - `~/.spotAgent/automation/traces/<trace-id>/trace.json`
 - `~/.spotAgent/automation/patches/<patch-id>.json`
+- `~/.spotAgent/automation/repair-requests/<repair-request-id>.json`
 
 官方 plugin manifest：
 
-- `handagent-automation-runtime`：`kind = automation`，`lifecycle = alwaysOn`，默认 `enabled = false`；依赖 `app_window`、`ax`、`screenshot`；提供 `automation.record_start`、`automation.record_stop`、`automation.policy_create`、`automation.run`、`automation.history`、`automation.apply_patch`。
+- `handagent-automation-runtime`：`kind = automation`，`lifecycle = alwaysOn`，默认 `enabled = false`；依赖 `app_window`、`ax`、`screenshot`；提供 `automation.record_start`、`automation.record_event`、`automation.record_stop`、`automation.policy_create`、`automation.run`、`automation.history`、`automation.apply_patch`。
 
 ### Use case map
 
 ```mermaid
 flowchart LR
-    A["用户点击录制自动化"] --> B["automation.record_start dynamic tool / plugin RPC"]
-    B --> C["Automation runtime 通过原子 plugin 记录 app/window、AX、截图和用户输入事件"]
+    A["用户或 agent 开始结构化录制"] --> B["automation.record_start dynamic tool / plugin RPC"]
+    B --> C["Automation runtime 保存结构化事件并通过原子 plugin 采集 app/window、AX、截图证据"]
     C --> D["record_stop 生成 trace.json"]
     D --> E["automation.policy_create 使用 trace 生成受限 AutomationPolicy"]
     E --> F["policy 写入 ~/.spotAgent/automation/policies"]
@@ -100,10 +101,10 @@ flowchart LR
   - 用 fake app/window、AX、screenshot plugin client 执行一条 policy：激活 app、点击 selector、set value、断言成功。
   - 断言运行记录包含目标、步骤、AX/截图引用、成功状态。
   - 构造 selector 失败，fake repair 返回成功分支；断言 runtime 生成 patch、自动合入 policy version + 1，并写入 patch evidence 与 run repair 结果。
-- Integration test need to create: `apps/desktop/TestsSwift/AppServices/PlatformBridge/AutomationPluginTests.swift`
+- Integration test need to update: `apps/desktop/TestsSwift/AppServices/PlatformBridge/PluginDynamicToolsTests.swift`
   - 官方 installer 写入 Automation runtime manifest，默认 `enabled = false`。
-  - 启用后 reload 启动 Automation runtime always-on plugin，provider hello 包含 `automation.*` tools。
-  - 调用 `automation.run` 时请求进入常驻 plugin RPC，不走一次性 executor。
+  - 覆盖 Automation manifest 的 `alwaysOn`、`kind = automation`、原子 plugin 依赖和 `automation.*` tool 集合。
+  - always-on plugin 的 reload / 常驻 RPC 路由行为沿用同文件中的通用 lifecycle 测试覆盖；Automation runtime 的 tool 路由、policy 执行和 history 由 `AutomationRuntimeTests.swift` 覆盖。
 
 ### Implementation tasks
 
@@ -113,7 +114,7 @@ flowchart LR
 4. 实现录制 trace 存储接口：第一版以 runtime API 接收 structured user events，并在每个 event 前后读取 app/window、AX、截图引用。
 5. 实现 failure collection 与 `AutomationRepairing` 边界：失败时收集当前 AX tree、截图、失败步骤、已执行步骤和目标。
 6. 实现 repair 成功后的 patch 生成与自动合入：更新 policy version，保存 patch、run history 和证据引用。
-7. 暴露 `automation.*` dynamic tools：record_start、record_stop、policy_create、run、history、apply_patch。
+7. 暴露 `automation.*` dynamic tools：record_start、record_event、record_stop、policy_create、run、history、apply_patch。
 8. 更新 `platform-bridge.md`、`app-services.md`、builtin plugin 文档和 `docs/manual-qa.md`。
 
 ### Self-review

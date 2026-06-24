@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 @testable import HandAgentPluginSupport
 
@@ -54,16 +55,52 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertEqual(typeTextSelector["role"] as? String, "AXTextField")
     }
 
+    func testRuntimeUsesJSONSerializableArgumentsForOptionalStepValues() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let capabilityClient = RecordingAutomationCapabilityClient()
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: capabilityClient,
+            repairer: RecordingAutomationRepairer()
+        )
+        let policy = AutomationPolicy(
+            id: "policy-json-args",
+            title: "Optional Values",
+            targetBundleId: nil,
+            branches: [
+                AutomationBranch(
+                    id: "main",
+                    steps: [
+                        AutomationStep(kind: .activateApp),
+                        AutomationStep(kind: .setValue, selector: AXSelector(role: "AXTextField")),
+                        AutomationStep(kind: .typeText, selector: AXSelector(role: "AXTextField")),
+                        AutomationStep(kind: .hotkey),
+                    ],
+                    assertions: []
+                ),
+            ]
+        )
+        try store.savePolicy(policy)
+
+        let run = try await runtime.run(policyId: "policy-json-args")
+
+        XCTAssertEqual(run.status, "completed")
+        for call in capabilityClient.calls {
+            XCTAssertTrue(JSONSerialization.isValidJSONObject(["arguments": call.arguments]))
+        }
+    }
+
     func testRuntimeRepairsFailureAndAutomaticallyMergesPolicyPatch() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
         let capabilityClient = RecordingAutomationCapabilityClient(failAXAction: true)
-        let repairer = RecordingAutomationRepairer()
+        let repairer = PersistingAutomationRepairer(store: store)
         let runtime = AutomationRuntime(store: store, capabilityClient: capabilityClient, repairer: repairer)
         let policy = AutomationPolicy(
             id: "policy-2",
             title: "Submit Form",
-            targetBundleId: "com.example.app",
+            targetBundleId: nil,
             branches: [
                 AutomationBranch(
                     id: "main",
@@ -84,9 +121,19 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertEqual(updatedPolicy.version, 2)
         XCTAssertEqual(updatedPolicy.branches.count, 2)
         XCTAssertEqual(patch.basePolicyVersion, 1)
-        XCTAssertEqual(patch.evidence["repair"], "fake-success")
-        XCTAssertEqual(repairer.requests.count, 1)
-        XCTAssertEqual(repairer.requests[0].failedStep.kind, .click)
+        XCTAssertEqual(patch.evidence["repair"], "agent-computer-use-request")
+        XCTAssertEqual(patch.evidence["route"], "agent_computer_use")
+        let repairRequestId = try XCTUnwrap(patch.evidence["repairRequestId"])
+        let repairRequest = try store.loadRepairRequest(id: repairRequestId)
+        XCTAssertEqual(repairRequest["policyId"] as? String, "policy-2")
+        XCTAssertEqual(repairRequest["route"] as? String, "agent_computer_use")
+        XCTAssertEqual(repairRequest["runId"] as? String, run.id)
+        XCTAssertEqual(repairRequest["failedStepIndex"] as? Int, 0)
+        XCTAssertNotNil(repairRequest["completedSteps"] as? [[String: Any]])
+        XCTAssertNil(repairRequest["targetBundleId"])
+        XCTAssertNotNil(repairRequest["appWindow"] as? [String: Any])
+        XCTAssertNotNil(repairRequest["axSnapshot"] as? [String: Any])
+        XCTAssertNotNil(repairRequest["screenshot"] as? [String: Any])
     }
 
     func testAutomationToolRouterRecordsTraceCreatesPolicyAndListsHistory() async throws {
@@ -97,23 +144,44 @@ final class AutomationRuntimeTests: XCTestCase {
             capabilityClient: RecordingAutomationCapabilityClient(),
             repairer: RecordingAutomationRepairer()
         )
-        let router = AutomationToolRouter(store: store, runtime: runtime)
+        let router = AutomationToolRouter(
+            store: store,
+            runtime: runtime,
+            recorder: AutomationRecordingService(capabilityClient: RecordingAutomationCapabilityClient())
+        )
 
-        let start = decodeToolJSON(await router.handle(namespace: "automation", tool: "record_start", arguments: [:]))
+        let start = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "record_start",
+            arguments: ["recordingId": "recording-1", "targetBundleId": "com.example.app"]
+        ))
         let recordingId = try XCTUnwrap(start["recordingId"] as? String)
-        XCTAssertFalse(recordingId.isEmpty)
+        XCTAssertEqual(recordingId, "recording-1")
+        XCTAssertNotNil(start["initialEvidence"] as? [String: Any])
+
+        let event = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "record_event",
+            arguments: [
+                "recordingId": "recording-1",
+                "event": [
+                    "kind": "click",
+                    "selector": ["role": "AXButton", "title": "Save"],
+                ],
+            ]
+        ))
+        XCTAssertEqual(event["eventIndex"] as? Int, 0)
+        let recordedEvent = try XCTUnwrap(event["event"] as? [String: Any])
+        XCTAssertNotNil(recordedEvent["before"] as? [String: Any])
+        XCTAssertNotNil(recordedEvent["after"] as? [String: Any])
 
         let stop = decodeToolJSON(await router.handle(
             namespace: "automation",
             tool: "record_stop",
             arguments: [
+                "recordingId": "recording-1",
                 "traceId": "trace-1",
-                "targetBundleId": "com.example.app",
                 "events": [
-                    [
-                        "kind": "click",
-                        "selector": ["role": "AXButton", "title": "Save"],
-                    ],
                     [
                         "kind": "setValue",
                         "selector": ["role": "AXTextField"],
@@ -141,6 +209,14 @@ final class AutomationRuntimeTests: XCTestCase {
             ]
         ))
         XCTAssertEqual(stop["traceId"] as? String, "trace-1")
+        XCTAssertEqual(stop["eventCount"] as? Int, 6)
+        let trace = try store.loadTrace(id: "trace-1")
+        XCTAssertNotNil(trace["initialEvidence"] as? [String: Any])
+        let traceEvents = try XCTUnwrap(trace["events"] as? [[String: Any]])
+        for traceEvent in traceEvents {
+            XCTAssertNotNil(traceEvent["before"] as? [String: Any])
+            XCTAssertNotNil(traceEvent["after"] as? [String: Any])
+        }
 
         let create = decodeToolJSON(await router.handle(
             namespace: "automation",
@@ -171,6 +247,62 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertNotNil(history["patches"] as? [[String: Any]])
     }
 
+    func testRecordingWithoutTargetBundleIdStillReturnsJSONAndSavesTrace() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: RecordingAutomationCapabilityClient(),
+            repairer: RecordingAutomationRepairer()
+        )
+        let router = AutomationToolRouter(
+            store: store,
+            runtime: runtime,
+            recorder: AutomationRecordingService(capabilityClient: RecordingAutomationCapabilityClient())
+        )
+
+        let start = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "record_start",
+            arguments: ["recordingId": "recording-without-target"]
+        ))
+        XCTAssertEqual(start["recordingId"] as? String, "recording-without-target")
+        XCTAssertNil(start["targetBundleId"])
+
+        let stop = decodeToolJSON(await router.handle(
+            namespace: "automation",
+            tool: "record_stop",
+            arguments: ["recordingId": "recording-without-target", "traceId": "trace-without-target"]
+        ))
+        XCTAssertEqual(stop["traceId"] as? String, "trace-without-target")
+        let trace = try store.loadTrace(id: "trace-without-target")
+        XCTAssertNil(trace["targetBundleId"])
+    }
+
+    func testZRecordEventFailsForUnknownRecordingSession() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let runtime = AutomationRuntime(
+            store: store,
+            capabilityClient: RecordingAutomationCapabilityClient(),
+            repairer: RecordingAutomationRepairer()
+        )
+        let router = AutomationToolRouter(
+            store: store,
+            runtime: runtime,
+            recorder: AutomationRecordingService(capabilityClient: RecordingAutomationCapabilityClient())
+        )
+
+        let result = await router.handle(
+            namespace: "automation",
+            tool: "record_event",
+            arguments: ["recordingId": "missing", "event": ["kind": "click"]]
+        )
+
+        XCTAssertFalse(result.success)
+        XCTAssertEqual(result.contentItems.first?["text"] as? String, "automation recording session was not found")
+    }
+
     private func makeDirectory() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("automation-runtime-tests-\(UUID().uuidString)", isDirectory: true)
@@ -194,15 +326,22 @@ private final class RecordingAutomationCapabilityClient: AutomationCapabilityCal
         let arguments: [String: Any]
     }
 
-    private(set) var calls: [Call] = []
+    private let callsQueue = DispatchQueue(label: "RecordingAutomationCapabilityClient.calls")
+    private var recordedCalls: [Call] = []
     let failAXAction: Bool
+
+    var calls: [Call] {
+        callsQueue.sync { recordedCalls }
+    }
 
     init(failAXAction: Bool = false) {
         self.failAXAction = failAXAction
     }
 
     func call(namespace: String, tool: String, arguments: [String: Any]) async throws -> [String: Any] {
-        calls.append(Call(namespace: namespace, tool: tool, arguments: arguments))
+        callsQueue.sync {
+            recordedCalls.append(Call(namespace: namespace, tool: tool, arguments: arguments))
+        }
         if namespace == "ax", tool == "action", failAXAction {
             throw NSError(domain: "RecordingAutomationCapabilityClient", code: 1)
         }
@@ -237,6 +376,28 @@ private final class RecordingAutomationRepairer: AutomationRepairing {
                 assertions: []
             ),
             evidence: ["repair": "fake-success"]
+        )
+    }
+}
+
+private final class PersistingAutomationRepairer: AutomationRepairing {
+    private let requestStore: AutomationRepairRequestStore
+
+    init(store: AutomationStore) {
+        self.requestStore = AutomationRepairRequestStore(store: store)
+    }
+
+    func repair(request: AutomationRepairRequest) async throws -> AutomationRepairResult {
+        let evidence = try requestStore.saveRepairRequest(request)
+        return AutomationRepairResult(
+            branch: AutomationBranch(
+                id: "\(request.policy.id):repair",
+                steps: [
+                    AutomationStep(kind: .click, selector: AXSelector(role: "AXButton", title: "Submit Now")),
+                ],
+                assertions: []
+            ),
+            evidence: evidence
         )
     }
 }

@@ -44,6 +44,7 @@ final class PluginDynamicToolsTests: XCTestCase {
         XCTAssertEqual(Set(automation.tools.map(\.namespace)), ["automation"])
         XCTAssertEqual(Set(automation.tools.map(\.name)), [
             "record_start",
+            "record_event",
             "record_stop",
             "policy_create",
             "run",

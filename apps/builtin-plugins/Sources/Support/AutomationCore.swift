@@ -125,8 +125,12 @@ public protocol AutomationCapabilityCalling {
 
 public struct AutomationRepairRequest {
     public var policy: AutomationPolicy
+    public var runId: String
     public var failedStep: AutomationStep
+    public var failedStepIndex: Int
+    public var completedSteps: [AutomationStepRecord]
     public var failureReason: String
+    public var appWindow: [String: Any]
     public var axSnapshot: [String: Any]
     public var screenshot: [String: Any]
 }
@@ -143,6 +147,159 @@ public struct AutomationRepairResult {
 
 public protocol AutomationRepairing {
     func repair(request: AutomationRepairRequest) async throws -> AutomationRepairResult
+}
+
+public final class AutomationRepairRequestStore: @unchecked Sendable {
+    private let store: AutomationStore
+
+    public init(store: AutomationStore) {
+        self.store = store
+    }
+
+    public func saveRepairRequest(_ request: AutomationRepairRequest) throws -> [String: String] {
+        let id = UUID().uuidString
+        var payload: [String: Any] = [
+            "id": id,
+            "policyId": request.policy.id,
+            "policyVersion": request.policy.version,
+            "runId": request.runId,
+            "failedStep": try encodeDictionary(request.failedStep),
+            "failedStepIndex": request.failedStepIndex,
+            "completedSteps": try request.completedSteps.map(encodeDictionary),
+            "failureReason": request.failureReason,
+            "appWindow": request.appWindow,
+            "axSnapshot": request.axSnapshot,
+            "screenshot": request.screenshot,
+            "createdAt": iso8601(Date()),
+            "route": "agent_computer_use",
+        ]
+        if let targetBundleId = request.policy.targetBundleId {
+            payload["targetBundleId"] = targetBundleId
+        }
+        try store.saveRepairRequest(id: id, payload: payload)
+        return [
+            "repair": "agent-computer-use-request",
+            "repairRequestId": id,
+            "route": "agent_computer_use",
+            "failureReason": request.failureReason,
+        ]
+    }
+}
+
+public final class AutomationRecordingService: @unchecked Sendable {
+    private let capabilityClient: AutomationCapabilityCalling
+    private var sessions: [String: [String: Any]] = [:]
+
+    public init(capabilityClient: AutomationCapabilityCalling) {
+        self.capabilityClient = capabilityClient
+    }
+
+    public func start(arguments: Any?) async -> [String: Any] {
+        let object = dictionaryArgument(arguments)
+        let recordingId = stringArgument(arguments, "recordingId", fallback: UUID().uuidString)
+        let evidence = await captureEvidence()
+        let targetBundleId = stringValue(object["targetBundleId"])
+            ?? ((evidence["appWindow"] as? [String: Any])?["app"] as? [String: Any])?["bundleId"] as? String
+        var session: [String: Any] = [
+            "recordingId": recordingId,
+            "startedAt": iso8601(Date()),
+            "initialEvidence": evidence,
+            "lastEvidence": evidence,
+            "events": [],
+        ]
+        if let targetBundleId {
+            session["targetBundleId"] = targetBundleId
+        }
+        sessions[recordingId] = session
+        var response: [String: Any] = [
+            "recordingId": recordingId,
+            "status": "recording",
+            "initialEvidence": evidence,
+        ]
+        if let targetBundleId {
+            response["targetBundleId"] = targetBundleId
+        }
+        return response
+    }
+
+    public func recordEvent(arguments: Any?) async throws -> [String: Any] {
+        let object = dictionaryArgument(arguments)
+        let recordingId = stringArgument(arguments, "recordingId")
+        guard var session = sessions[recordingId] else {
+            throw AutomationRuntimeError.recordingNotFound
+        }
+        let event = dictionaryArgument(object["event"]).merging(metadataArguments(from: object)) { current, _ in current }
+        let (recorded, after) = await recordedEvent(from: event, previousEvidence: session["lastEvidence"] as? [String: Any] ?? [:])
+        var events = session["events"] as? [[String: Any]] ?? []
+        events.append(recorded)
+        session["events"] = events
+        session["lastEvidence"] = after
+        sessions[recordingId] = session
+        return [
+            "recordingId": recordingId,
+            "status": "recording",
+            "eventIndex": events.count - 1,
+            "event": recorded,
+        ]
+    }
+
+    public func stop(arguments: Any?, store: AutomationStore) async throws -> [String: Any] {
+        let object = dictionaryArgument(arguments)
+        let recordingId = stringArgument(arguments, "recordingId")
+        let traceId = stringArgument(arguments, "traceId", fallback: recordingId.isEmpty ? UUID().uuidString : recordingId)
+        guard !recordingId.isEmpty, var session = sessions.removeValue(forKey: recordingId) else {
+            try store.saveTrace(id: traceId, payload: object)
+            return ["traceId": traceId, "status": "saved"]
+        }
+        if let events = object["events"] as? [[String: Any]], !events.isEmpty {
+            var recordedEvents = session["events"] as? [[String: Any]] ?? []
+            var previousEvidence = session["lastEvidence"] as? [String: Any] ?? [:]
+            for event in events {
+                let (recorded, after) = await recordedEvent(from: event, previousEvidence: previousEvidence)
+                recordedEvents.append(recorded)
+                previousEvidence = after
+            }
+            session["events"] = recordedEvents
+            session["lastEvidence"] = previousEvidence
+        }
+        session["traceId"] = traceId
+        session["completedAt"] = iso8601(Date())
+        session["finalEvidence"] = await captureEvidence()
+        try store.saveTrace(id: traceId, payload: session)
+        return [
+            "traceId": traceId,
+            "recordingId": recordingId,
+            "status": "saved",
+            "eventCount": (session["events"] as? [[String: Any]])?.count ?? 0,
+        ]
+    }
+
+    private func captureEvidence() async -> [String: Any] {
+        async let appWindow = optionalCall(namespace: "app_window", tool: "frontmost", arguments: [:])
+        async let axSnapshot = optionalCall(namespace: "ax", tool: "snapshot", arguments: [:])
+        async let screenshot = optionalCall(namespace: "screenshot", tool: "capture", arguments: [:])
+        return [
+            "appWindow": await appWindow,
+            "axSnapshot": await axSnapshot,
+            "screenshot": await screenshot,
+        ]
+    }
+
+    private func optionalCall(namespace: String, tool: String, arguments: [String: Any]) async -> [String: Any] {
+        (try? await capabilityClient.call(namespace: namespace, tool: tool, arguments: arguments)) ?? [:]
+    }
+
+    private func recordedEvent(
+        from event: [String: Any],
+        previousEvidence: [String: Any]
+    ) async -> (recorded: [String: Any], after: [String: Any]) {
+        let after = await captureEvidence()
+        var recorded = event
+        recorded["timestamp"] = iso8601(Date())
+        recorded["before"] = previousEvidence
+        recorded["after"] = after
+        return (recorded, after)
+    }
 }
 
 public final class AutomationStore: @unchecked Sendable {
@@ -209,6 +366,19 @@ public final class AutomationStore: @unchecked Sendable {
         return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
     }
 
+    public func saveRepairRequest(id: String, payload: [String: Any]) throws {
+        let url = repairRequestsURL.appendingPathComponent("\(id).json")
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: url, options: .atomic)
+    }
+
+    public func loadRepairRequest(id: String) throws -> [String: Any] {
+        let url = repairRequestsURL.appendingPathComponent("\(id).json")
+        let data = try Data(contentsOf: url)
+        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+
     private func write<T: Encodable>(_ value: T, to url: URL) throws {
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try encoder.encode(value).write(to: url, options: .atomic)
@@ -231,6 +401,7 @@ public final class AutomationStore: @unchecked Sendable {
     private var runsURL: URL { directoryURL.appendingPathComponent("runs", isDirectory: true) }
     private var patchesURL: URL { directoryURL.appendingPathComponent("patches", isDirectory: true) }
     private var tracesURL: URL { directoryURL.appendingPathComponent("traces", isDirectory: true) }
+    private var repairRequestsURL: URL { directoryURL.appendingPathComponent("repair-requests", isDirectory: true) }
 }
 
 public final class AutomationRuntime: @unchecked Sendable {
@@ -271,10 +442,15 @@ public final class AutomationRuntime: @unchecked Sendable {
             return run
         } catch {
             let failedStep = branch.steps[min(records.count, max(branch.steps.count - 1, 0))]
+            let failedStepIndex = min(records.count, max(branch.steps.count - 1, 0))
             let request = AutomationRepairRequest(
                 policy: policy,
+                runId: runId,
                 failedStep: failedStep,
+                failedStepIndex: failedStepIndex,
+                completedSteps: records,
                 failureReason: error.localizedDescription,
+                appWindow: (try? await capabilityClient.call(namespace: "app_window", tool: "frontmost", arguments: [:])) ?? [:],
                 axSnapshot: (try? await capabilityClient.call(namespace: "ax", tool: "snapshot", arguments: [:])) ?? [:],
                 screenshot: (try? await capabilityClient.call(namespace: "screenshot", tool: "capture", arguments: [:])) ?? [:]
             )
@@ -311,7 +487,7 @@ public final class AutomationRuntime: @unchecked Sendable {
             _ = try await capabilityClient.call(
                 namespace: "app_window",
                 tool: "activate",
-                arguments: ["bundleId": step.bundleId as Any]
+                arguments: optionalStringArgument("bundleId", step.bundleId)
             )
         case .click:
             _ = try await capabilityClient.call(
@@ -326,7 +502,7 @@ public final class AutomationRuntime: @unchecked Sendable {
                 arguments: [
                     "action": "set_value",
                     "selector": selectorDictionary(step.selector),
-                    "value": step.value as Any,
+                    "value": step.value ?? "",
                 ]
             )
         case .typeText:
@@ -336,14 +512,14 @@ public final class AutomationRuntime: @unchecked Sendable {
                 arguments: [
                     "action": "type_text",
                     "selector": selectorDictionary(step.selector),
-                    "text": step.value as Any,
+                    "text": step.value ?? "",
                 ]
             )
         case .hotkey:
             _ = try await capabilityClient.call(
                 namespace: "ax",
                 tool: "action",
-                arguments: ["action": "hotkey", "keys": step.value as Any]
+                arguments: ["action": "hotkey", "keys": step.value ?? ""]
             )
         case .waitFor:
             try await waitFor(condition: step.condition, timeoutMs: step.timeoutMs ?? 2_000)
@@ -376,10 +552,12 @@ public final class AutomationRuntime: @unchecked Sendable {
 public final class AutomationToolRouter: @unchecked Sendable {
     private let store: AutomationStore
     private let runtime: AutomationRuntime
+    private let recorder: AutomationRecordingService?
 
-    public init(store: AutomationStore, runtime: AutomationRuntime) {
+    public init(store: AutomationStore, runtime: AutomationRuntime, recorder: AutomationRecordingService? = nil) {
         self.store = store
         self.runtime = runtime
+        self.recorder = recorder
     }
 
     public func handle(namespace: String, tool: String, arguments: Any?) async -> PluginToolResult {
@@ -397,8 +575,19 @@ public final class AutomationToolRouter: @unchecked Sendable {
                     "patches": try store.listPatches().map(encodeDictionary),
                 ])
             case "record_start":
+                if let recorder {
+                    return .json(await recorder.start(arguments: arguments))
+                }
                 return .json(["recordingId": UUID().uuidString, "status": "recording"])
+            case "record_event":
+                guard let recorder else {
+                    return .text("recording service is not available", success: false)
+                }
+                return .json(try await recorder.recordEvent(arguments: arguments))
             case "record_stop":
+                if let recorder {
+                    return .json(try await recorder.stop(arguments: arguments, store: store))
+                }
                 let traceId = stringArgument(arguments, "traceId", fallback: UUID().uuidString)
                 try store.saveTrace(id: traceId, payload: dictionaryArgument(arguments))
                 return .json(["traceId": traceId, "status": "saved"])
@@ -433,6 +622,7 @@ public enum AutomationRuntimeError: LocalizedError {
     case emptyPolicy
     case conditionFailed
     case assertionFailed
+    case recordingNotFound
 
     public var errorDescription: String? {
         switch self {
@@ -442,6 +632,8 @@ public enum AutomationRuntimeError: LocalizedError {
             return "automation condition failed"
         case .assertionFailed:
             return "automation assertion failed"
+        case .recordingNotFound:
+            return "automation recording session was not found"
         }
     }
 }
@@ -452,6 +644,11 @@ private func selectorDictionary(_ selector: AXSelector?) -> [String: Any] {
     if let role = selector.role { result["role"] = role }
     if let title = selector.title { result["title"] = title }
     return result
+}
+
+private func optionalStringArgument(_ key: String, _ value: String?) -> [String: Any] {
+    guard let value else { return [:] }
+    return [key: value]
 }
 
 private func snapshotRoot(_ snapshot: [String: Any]) -> [String: Any] {
@@ -478,6 +675,12 @@ private func stringArgument(_ arguments: Any?, _ key: String, fallback: String =
 
 private func dictionaryArgument(_ arguments: Any?) -> [String: Any] {
     arguments as? [String: Any] ?? [:]
+}
+
+private func metadataArguments(from object: [String: Any]) -> [String: Any] {
+    object.filter { key, _ in
+        key != "recordingId" && key != "traceId" && key != "event"
+    }
 }
 
 private func automationBranch(from trace: [String: Any]) -> AutomationBranch {
@@ -559,4 +762,8 @@ private func hotkeyValue(_ value: Any?) -> String? {
         return keys.joined(separator: "+")
     }
     return stringValue(value)
+}
+
+private func iso8601(_ date: Date) -> String {
+    ISO8601DateFormatter().string(from: date)
 }
