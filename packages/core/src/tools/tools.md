@@ -9,7 +9,7 @@
 | `AgentTool.ts` | `AgentTool<TInput, TOutput>` 接口：`name / description / inputSchema (JSON Schema) / call(input, context?)`；`context` 当前包含 `threadId / turnId / toolCallId`；可选 `stubByDefault` 声明 runtime 可把结果写成 Blob/Stub |
 | `defineTool.ts` | `defineTool({ name, description, inputSchema (zod), stubByDefault?, run })` 工厂：`zod` schema 自动转 JSON Schema 2019-09；`.create(deps)` 生成的 `call(input, context?)` 会先用同一个 schema 做运行时入参校验，再调用 `run` |
 | `ToolRegistry.ts` | Map 包装；`register / replaceAll / get / list`，单次注册重名抛错，`replaceAll()` 供 settings 热加载原地刷新；`list()` 返回 `RegisteredTool`（去掉 `call`），供 `LLMClient.stream` 使用 |
-| `MetaToolUseTool.ts` | meta-tool `use_tools`，未激活 thread 默认只暴露它；首次调用后由 thread-scoped registry 注入完整 builtin + MCP 工具集 |
+| `MetaToolUseTool.ts` | meta-tool `use_tools`，未激活 thread 默认只暴露它；首次调用后由 thread-scoped registry 注入完整 builtin + MCP + dynamic tools 工具集 |
 | `DynamicToolAdapter.ts` | 把 `DynamicToolSpec` 适配成 `AgentTool`，调用时通过 `DynamicToolBridge` 按 `clientId` 转发给 provider |
 | `registerBuiltins.ts` | 组合根：根据可选 `WorkspaceRegistry` + `ToolSettings` 装配 workspace/file candidates，过 allowlist/denylist 后注册 |
 | `registerTools.ts` | 当前等同于 builtin 注册组合根：按 `WorkspaceRegistry` 生成 builtin candidates，再统一套 `allowlist / denylist` |
