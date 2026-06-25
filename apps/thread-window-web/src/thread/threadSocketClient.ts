@@ -5,7 +5,6 @@ import {
   encodeOpSubmit,
   encodeWorkspaceList,
   type InitialPromptPayload,
-  type DynamicToolSpec,
   type RuntimeOp,
   isServerRequest,
   isThreadNotification,
@@ -40,7 +39,6 @@ export class ThreadSocketClient {
     WebSocketImpl?: WebSocketConstructor;
     now?: () => string;
     id?: () => string;
-    defaultDynamicTools?: DynamicToolSpec[];
     onConnectionState: (state: ConnectionState) => void;
     onNotification: (notification: ThreadNotification) => void;
     onRequest: (request: ServerRequest) => void;
@@ -94,7 +92,6 @@ export class ThreadSocketClient {
       commandId: prompt.clientRequestId,
       timestamp: this.now(),
       workspaceId: null,
-      dynamicTools: this.options.defaultDynamicTools,
     }));
   }
 

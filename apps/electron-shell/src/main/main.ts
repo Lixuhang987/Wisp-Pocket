@@ -29,7 +29,6 @@ const activityWindowHTMLPath = join(currentDir, "../activity-window/index.html")
 const activityPreloadPath = join(currentDir, "../preload/activityWindowPreload.cjs");
 const commandSocketPath = process.env.HANDAGENT_ELECTRON_COMMAND_SOCKET;
 const initialTheme = readInitialHostTheme(process.env.HANDAGENT_INITIAL_THEME);
-const defaultDynamicTools = readDefaultDynamicTools(process.env.HANDAGENT_DEFAULT_DYNAMIC_TOOLS);
 
 const bridge = new JsonLineBridge({ input: process.stdin, output: process.stdout });
 let commandSocketServer: CommandSocketServer | null = null;
@@ -48,7 +47,6 @@ const prewarmer = new ThreadWindowPrewarmer({
   threadWindowURL,
   preloadPath: threadPreloadPath,
   availableSkills: readAvailableSkillsFromActionsDirectory(actionsDirectory),
-  defaultDynamicTools,
   initialTheme,
   onClosed: (event) => {
     if (hasStoppedSupervisor) {
@@ -72,21 +70,6 @@ const prewarmer = new ThreadWindowPrewarmer({
     return window;
   },
 });
-
-function readDefaultDynamicTools(value: string | undefined) {
-  if (!value) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch {
-    // Fall through to no host tools.
-  }
-  return [];
-}
 
 const activityWindow = new ActivityWindowController({
   activityWindowHTMLPath,

@@ -114,9 +114,11 @@ describe("ThreadSocketClient", () => {
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       { type: "op.submit", threadId: "thread-1", commandId: "input-1", payload: { op: { type: "user_input", opId: "prompt-1", payload: { items: [{ type: "text", id: "text-1", text: "hello" }] } } } },
     ]);
+    const startCommand = socket.sent.map((raw) => JSON.parse(raw)).find((command) => command.type === "thread.start");
+    expect(startCommand.payload).not.toHaveProperty("dynamicTools");
   });
 
-  it("includes default dynamic tools when starting an initial prompt thread", () => {
+  it("does not include dynamic tools when starting an initial prompt thread", () => {
     const client = new ThreadSocketClient({
       url: "ws://127.0.0.1:4317/api/thread",
       WebSocketImpl: FakeWebSocket as never,
@@ -124,15 +126,6 @@ describe("ThreadSocketClient", () => {
       id: vi.fn()
         .mockReturnValueOnce("workspace-list-1")
         .mockReturnValueOnce("list-1"),
-      defaultDynamicTools: [
-        {
-          clientId: "swift-host",
-          namespace: "host_macos",
-          name: "screen_capture",
-          description: "Capture screen",
-          inputSchema: { type: "object", properties: {} },
-        },
-      ],
       onConnectionState: () => {},
       onNotification: () => {},
       onRequest: () => {},
@@ -148,22 +141,12 @@ describe("ThreadSocketClient", () => {
       },
     });
 
-    expect(socket.sent.map((raw) => JSON.parse(raw))).toContainEqual({
+    const startCommand = socket.sent.map((raw) => JSON.parse(raw)).find((command) => command.type === "thread.start");
+    expect(startCommand).toEqual({
       type: "thread.start",
       commandId: "prompt-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      payload: {
-        workspaceId: null,
-        dynamicTools: [
-          {
-            clientId: "swift-host",
-            namespace: "host_macos",
-            name: "screen_capture",
-            description: "Capture screen",
-            inputSchema: { type: "object", properties: {} },
-          },
-        ],
-      },
+      payload: { workspaceId: null },
     });
   });
 

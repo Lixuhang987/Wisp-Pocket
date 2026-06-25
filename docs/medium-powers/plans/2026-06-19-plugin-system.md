@@ -204,7 +204,7 @@ Swift desktop 默认注册 `host_macos` namespace：
 flowchart LR
   A["Swift App 启动"] --> B["连接 /api/dynamic-tools"]
   B --> C["provider_hello: host_macos tools"]
-  C --> D["Swift/Electron/React 创建 thread 时携带默认 dynamicTools"]
+  C --> D["Swift PromptPanel/AgentTrigger 创建 thread 时携带默认 dynamicTools"]
   D --> E["LLM use_tools 后看到 host_macos.*"]
   E --> F["tool_call_request 回到 Swift 执行 MacPlatformProvider 等价能力"]
 ```
@@ -218,10 +218,10 @@ flowchart LR
 
 **Loop 2: default tools 传递**
 - Swift 生成默认 `DynamicToolSpec[]`。
-- Electron ThreadWindow preload config 增加 `defaultDynamicTools`，来源是 Swift host/provider 当前可用工具集合。
+- 2026-06-25 后续变更：Electron ThreadWindow preload config 不再包含 `defaultDynamicTools`，React ThreadWindow 不读取、保存或发送 `DynamicToolSpec[]`；详见 [React Dynamic Tools Removal Spec](/Users/mu9/proj/handAgent/docs/medium-powers/specs/2026-06-25-react-dynamic-tools-removal-spec.md)。
 - Swift PromptPanel 提交时直接向 agent-server 发送 `thread.start { dynamicTools }`，再发送首轮 `op.submit`。
 - Swift 只有在收到 `thread.started.threadId` 后才向 Electron 发送 ThreadWindow open/focus command；command 只携带 `threadId` / open / focus 意图，不携带完整 prompt 或消息副本。
-- React ThreadWindow 新建空白 thread 时从 preload config 读取 `defaultDynamicTools`，写入 `thread.start.payload.dynamicTools`。
+- React ThreadWindow 新建空白 thread 不携带 `thread.start.payload.dynamicTools`；fallback initial prompt 流程同样不携带。
 - 后台 AgentTrigger 创建 thread 时也必须携带默认 host dynamic tools，避免入口不一致。
 
 **Loop 3: remove platform abstractions**
@@ -235,7 +235,7 @@ flowchart LR
 - Swift `MacHostDynamicToolsTests`：默认 tool specs 与 provider dispatch table 一致。
 - Swift thread client tests：PromptPanel 提交会发送 `thread.start { dynamicTools }` 和首轮 `op.submit`。
 - Electron protocol tests：ThreadWindow open/focus command 只携带 `threadId`，不携带消息副本。
-- ThreadWindow new-thread flow tests：React 新建 thread 时 `thread.start` 携带 `defaultDynamicTools`。
+- ThreadWindow new-thread flow tests：React 新建 thread 时 `thread.start` 不携带 `defaultDynamicTools` / `payload.dynamicTools`。
 - agent-server server tests：`/api/platform` 不再挂载，`/api/dynamic-tools` 可连接。
 
 ---
@@ -426,7 +426,7 @@ flowchart LR
 3. 调整 `/api/thread` `thread.started` 广播和 `ServerRequest` 的 `acceptServerRequests=1` owner 语义。
 4. 实现 core `DynamicToolAdapter` 和 agent-server `WebSocketDynamicToolBridge`。
 5. 保持 `use_tools` 懒加载语义，激活后注册 dynamic tools。
-6. Swift 新增 host dynamic tool provider 和 direct thread client，并让所有 thread 创建入口携带默认 host dynamic tools。
+6. Swift 新增 host dynamic tool provider 和 direct thread client，并让 Swift PromptPanel / AgentTrigger 创建入口携带默认 host dynamic tools。
 7. 迁移 macOS 平台工具，删除 `/api/platform`。
 8. Swift plugin manager 接管 plugin manifest、生命周期和 provider dispatch。
 9. 更新架构文档和 manual QA。

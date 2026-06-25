@@ -157,17 +157,10 @@ final class AppServicesTests: XCTestCase {
     }
 
     @MainActor
-    func testDefaultElectronShellLaunchPassesDefaultDynamicToolsThroughEnvironment() throws {
+    func testDefaultElectronShellLaunchDoesNotPassDefaultDynamicToolsThroughEnvironment() throws {
         let repoRoot = URL(fileURLWithPath: "/repo/worktree", isDirectory: true)
         let configuration = AppServices.defaultElectronShellLaunchConfiguration(
-            environment: [:],
-            defaultDynamicTools: [[
-                "clientId": "swift-host",
-                "namespace": "screen_reader",
-                "name": "snapshot",
-                "description": "Read the current screen.",
-                "inputSchema": ["type": "object"],
-            ]],
+            environment: ["HANDAGENT_DEFAULT_DYNAMIC_TOOLS": "[{\"name\":\"legacy\"}]"],
             currentDirectoryURL: repoRoot,
             bundleExecutableURL: nil,
             bundleResourceURL: nil,
@@ -178,12 +171,7 @@ final class AppServicesTests: XCTestCase {
             }
         )
 
-        let raw = try XCTUnwrap(configuration.environment[AppServices.defaultDynamicToolsEnvironmentKey])
-        let data = try XCTUnwrap(raw.data(using: .utf8))
-        let tools = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
-        XCTAssertEqual(tools.count, 1)
-        XCTAssertEqual(tools[0]["namespace"] as? String, "screen_reader")
-        XCTAssertEqual(tools[0]["name"] as? String, "snapshot")
+        XCTAssertNil(configuration.environment["HANDAGENT_DEFAULT_DYNAMIC_TOOLS"])
     }
 
     @MainActor
