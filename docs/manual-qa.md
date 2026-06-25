@@ -38,6 +38,18 @@
   11. 再次编辑官方 manifest 的其他字段为错误值但保留 `enabled`，重启 App，确认 installer 会修复官方 manifest，同时保留用户的 `enabled` 选择。
   12. 将已启用的 Context History 或 Automation manifest 改回 `enabled: false` 并重启 App，确认对应 always-on plugin 停止，dynamic tool 列表不再包含对应 namespace。
 
+### Desktop 启动时序清晰度回归
+
+- 完成日期：待实机 QA
+- 实现位置：`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/desktop/desktop.md`、`apps/desktop/Sources/AppServices/app-services.md`、`apps/desktop/Sources/Coordinator/coordinator.md`
+- 修复结论：`AppServices.init` 中无监听器的磁盘准备被收敛到 `AppServices.prepareLaunchSupportFiles(...)`，只补齐内置 AgentTrigger package 和 Chrome Native Messaging manifest；运行期副作用仍只允许从 `HandAgentApplicationDelegate.applicationDidFinishLaunching -> AppCoordinator.bootstrap()` 进入。次级文档明确区分构造期 support files 准备、bootstrap 运行期启动、shutdown 停止链路，并记录 Chrome Bookmarks bridge endpoint 时序问题：live `bridge.json` 只能由当前存活 listener 写入，不得通过提前 reload provider 解决扩展刷新后才连接的问题。
+- 自动化验证：需执行 `bash ./scripts/swiftw test --filter AppServicesTests`、`bash ./scripts/swiftw test --filter AppCoordinatorTests`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- 手工回归步骤：
+  1. 启动桌面 App，确认启动后 PromptPanel 可提交状态最终变为可用，Electron ThreadWindow 可打开。
+  2. 读取 `~/.spotAgent/agent-triggers/chrome-bookmarks-extension/bridge.json`，确认其中 `port` 是当前 HandAgentDesktop 进程正在监听的 loopback 端口。
+  3. 退出桌面 App，确认 `bridge.json` 不保留已停止 listener 的 endpoint。
+  4. 重启桌面 App 后再次确认新的 `bridge.json.port` 对应当前进程监听端口，不依赖刷新扩展或旧进程遗留端口作为成功依据。
+
 ### OpenAI-compatible Responses NDJSON SSE 兼容回归
 
 - 完成日期：待实机 QA

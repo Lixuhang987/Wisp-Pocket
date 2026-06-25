@@ -51,7 +51,8 @@ Swift 原生 UI 只保留 PromptPanel 和 Settings：
 
 `HandAgentApp.swift` 是 SwiftUI `@main`：
 
-- 持有 `AppCoordinator` 为 `@State`；非测试态先完成依赖装配，等 macOS `applicationDidFinishLaunching` 后由 AppDelegate 调用 `coordinator.bootstrap()`。
+- 持有 `AppCoordinator` 为 `@State`；非测试态先完成依赖装配与 launch support files 准备，等 macOS `applicationDidFinishLaunching` 后由 AppDelegate 调用 `coordinator.bootstrap()`。
+- 依赖装配阶段允许 `AppServices.prepareLaunchSupportFiles(...)` 写入内置 AgentTrigger package 和 Chrome Native Messaging manifest；这一阶段禁止启动 Electron、AgentTrigger provider、Chrome Bookmarks bridge listener、系统外观监听或热键监听。
 - 通过 `HandAgentApplicationDelegate` 接入 macOS termination 回调；`applicationShouldTerminate` / `applicationWillTerminate` 会幂等调用 `AppCoordinator.shutdown()`，确保 AgentTrigger runtime 与 Electron shell 进入 stop 链路。
 - 当 Electron ThreadWindow 是前台 App 并先收到 `Command+Q` 时，Electron shell clean exit 会反向请求 Swift 宿主退出；Swift 再进入同一个 `applicationShouldTerminate` / `shutdown()` 链路，避免把 status 0 当作 agent-server fatal alert。
 - `Settings` scene 仅放空占位，实际设置窗口由 Coordinator 用 `NSWindow` 托管（需要主动 `openOrFocus` 控制）。
@@ -60,13 +61,17 @@ Swift 原生 UI 只保留 PromptPanel 和 Settings：
 ```mermaid
 sequenceDiagram
   participant App as HandAgentApp (@main)
+  participant Services as AppServices
   participant Coord as AppCoordinator
   participant Electron as ElectronBackedAppServer
   participant Shell as apps/electron-shell
 
-  App->>Coord: @State 初始化，仅装配依赖
+  App->>Services: 构造依赖 + prepareLaunchSupportFiles
+  Services-->>App: 不启动进程 / provider / listener
+  App->>Coord: @State 初始化，仅保存依赖
   App->>Coord: applicationDidFinishLaunching → bootstrap()
-  Coord->>Coord: setupPromptPanel + setupHotkey + setupAgentServerHealth
+  Coord->>Coord: setupAppearanceTheme + setupPromptPanel + setupHotkey + setupAgentServerHealth
+  Coord->>Coord: AgentTriggerRuntime.reload()
   Coord->>Electron: start()
   Electron->>Shell: launch Electron
   Shell->>Shell: supervise agent-server + prewarm hidden ThreadWindow
