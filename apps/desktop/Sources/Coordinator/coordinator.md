@@ -18,6 +18,7 @@
 - 唯一入口是 `send(_ action: Action)`；所有模块向 Coordinator 报告意图都必须通过该入口。
 - Action 是封闭枚举；新增协调事件必须显式声明分支，不要用 `NotificationCenter` 绕开。
 - `AppCoordinator.init` 只保存依赖，不启动进程、provider 或监听器；`HandAgentApplicationDelegate.applicationDidFinishLaunching` 调用幂等的 `bootstrap()` 后，才安装子模块回调并启动真实运行期副作用。
+- `bootstrap()` 是运行期副作用的唯一入口，当前顺序是：安装外观回调并启动外观监听、设置 PromptPanel 回调、注册热键和应用内快捷键、安装 app-server health 回调、`AgentTriggerRuntime.reload()` 启动 provider、`AgentServerHealth.start()` 启动 Electron shell health 链路。不要把这些步骤移动到 `AppCoordinator.init` 或 `AppServices.init`。
 - 子模块回调统一在 `bootstrap()` 阶段注入闭包；外观系统回调只转给 `AppearanceThemeService.systemAppearanceDidChange()`，其他闭包内只允许 `send(.xxx)` 或打开 PromptPanel。
 - 应用退出由 `HandAgentApplicationDelegate` 接收 macOS termination 回调并调用幂等 `shutdown()`；`shutdown()` 必须停止 AgentTrigger runtime、app-server health、窗口 lifecycle 和外观监听，不要绕过 Coordinator 直接 stop Electron shell 或 AgentTrigger provider。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一 AppDelegate shutdown 链路。
 - 测试模式走 `AppServices.testing()` 注入 nop 替身，跳过窗口/进程/激活策略副作用。
@@ -31,7 +32,7 @@
 - Settings 打开时会创建模型、外观、builtin tool、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel。Coordinator 只负责注入，不直接读写 `~/.spotAgent/actions` 或 `~/.spotAgent/mcp.json`。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
 - `AppCoordinator` 在 app-server available 后调用 `ActivityWindowCommanding.showActivityWindow()`；show 失败不回退到 Swift StatusBubble。Electron StatusBubble 点击不再回调 Coordinator 打开 PromptPanel，Coordinator 也不解析 `/api/activity` 状态。
-- `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving`、AgentTrigger runtime 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。AgentTrigger runtime reload 也必须留在 bootstrap 内，避免构造期 Chrome Bookmarks provider 写出不属于当前 live listener 的 `bridge.json`；shutdown 必须调用 runtime `stop()`，避免退出 / 重启后留下无 live listener 的 Chrome Bookmarks bridge endpoint。
+- `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving`、AgentTrigger runtime 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。AgentTrigger runtime reload 也必须留在 bootstrap 内，避免构造期 Chrome Bookmarks provider 写出不属于当前 live listener 的 `bridge.json`；shutdown 必须调用 runtime `stop()`，避免退出 / 重启后留下无 live listener 的 Chrome Bookmarks bridge endpoint。若未来仍出现“刷新扩展后才连接”的现象，优先检查扩展/native host 是否在 bootstrap 前读取了旧 endpoint，而不是把 provider 启动提前到构造期。
 
 ## 当前 Action 列表
 

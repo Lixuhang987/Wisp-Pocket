@@ -122,8 +122,10 @@ final class AppServices {
         self.activityWindowCommandClient = activityWindowCommandClient ?? runtime?.activityWindowCommandClient
         self.settingsStore = settingsStore
         self.agentTriggerStore = agentTriggerStore
-        self.agentTriggerStore.ensureBuiltinPackagesInstalled()
-        ChromeBookmarksNativeHostInstaller.fromEnvironment(environment).ensureInstalled()
+        AppServices.prepareLaunchSupportFiles(
+            agentTriggerStore: agentTriggerStore,
+            environment: environment
+        )
         self.agentTriggerRuntime = agentTriggerRuntime ?? AgentTriggerRuntime(
             registry: AgentTriggerRegistry(factories: [
                 ChromeBookmarksAgentTriggerProviderFactory(),
@@ -186,6 +188,14 @@ final class AppServices {
             showsFatalAlert: false,
             promptPanelPresentationMode: .hiddenForTesting
         )
+    }
+
+    private static func prepareLaunchSupportFiles(
+        agentTriggerStore: AgentTriggerStore,
+        environment: [String: String]
+    ) {
+        agentTriggerStore.ensureBuiltinPackagesInstalled()
+        ChromeBookmarksNativeHostInstaller.fromEnvironment(environment).ensureInstalled()
     }
 
     static func defaultRuntime(
