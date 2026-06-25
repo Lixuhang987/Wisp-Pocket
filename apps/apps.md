@@ -4,7 +4,7 @@
 
 `apps` 层负责可执行产品入口与用户交互壳层，不承载跨平台业务规则。
 
-当前包含五个可执行单元和两个 Web / 扩展前端包：
+当前包含一组桌面可执行单元、内置 plugin 可执行单元和两个 Web / 扩展前端包：
 
 - [desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md) —— macOS 原生入口（Swift / SwiftUI），负责 PromptPanel、Settings、热键、焦点恢复、host dynamic tools 和 Electron 生命周期。
 - [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md) —— Electron UI shell，监督 agent-server，承载 Electron ThreadWindow 和 React StatusBubble。
@@ -12,12 +12,14 @@
 - [agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md) —— 本地 WebSocket thread 桥（Node / TypeScript），由 electron-shell 监督。
 - [chrome-bookmarks-extension/chrome-bookmarks-extension.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-extension/chrome-bookmarks-extension.md) —— Chrome MV3 扩展，监听 `chrome.bookmarks.onCreated` 并通过 Native Messaging 转发 URL 书签新增事件；连接后还会上报当前收藏夹文件夹树快照。
 - [chrome-bookmarks-native-host/chrome-bookmarks-native-host.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-native-host/chrome-bookmarks-native-host.md) —— Chrome Native Messaging stdio helper，把扩展 hello、文件夹树快照和书签新增消息转发给 Swift desktop 的本地 Chrome Bookmarks bridge。
+- [builtin-plugins/builtin-plugins.md](/Users/mu9/proj/handAgent/apps/builtin-plugins/builtin-plugins.md) —— 随 HandAgent 发布的官方 Swift plugin：AX、screenshot、app/window 原子能力，Context History 查询/存储核心，以及 Automation Policy runtime 核心。
 
 ## 在整体架构中的位置
 
 ```mermaid
 flowchart LR
   A[apps/desktop<br/>macOS 原生入口] -->|Swift command bridge| E[apps/electron-shell<br/>Electron shell]
+  A -->|install / start / RPC| P[apps/builtin-plugins<br/>官方 Swift plugin]
   X[apps/chrome-bookmarks-extension<br/>Chrome 扩展] -->|Native Messaging| H[apps/chrome-bookmarks-native-host<br/>stdio helper]
   H -->|loopback HTTP| A
   E -->|BrowserWindow host| W[apps/thread-window-web<br/>React ThreadWindow]
@@ -50,6 +52,7 @@ flowchart LR
 ### 3. Host Dynamic Tools
 
 - Swift desktop 作为默认 dynamic tool provider 连接 `/api/dynamic-tools`，用 `provider_hello` 注册 `host_macos.*` 工具。
+- Swift desktop 启动时会安装或修复官方 plugin manifest 到 `~/.spotAgent/plugins`，并通过 `PluginDynamicToolManager` 启停 enabled 的 always-on plugin。官方原子 plugin 默认启用；Context History 与 Automation runtime 默认关闭，用户显式启用后才暴露对应 dynamic tools。
 - `thread.start.payload.dynamicTools` 保存 thread 创建时允许的动态工具候选；LLM 调用 `use_tools` 后，agent-server 将 builtin workspace/file tools、MCP tools 与 dynamic tools 一起暴露。
 - LLM 调用 `host_macos.screen_capture` 等 dynamic tool 时，agent-server 按 `clientId` 转发给 Swift provider，Swift 复用 `MacPlatformProvider` 执行并回写 `tool_call_response`。
 
@@ -67,9 +70,10 @@ flowchart LR
 - `ThreadCommand` / `ThreadNotification` / `ServerRequest` / `ClientResponse`
 - `AgentActivityEvent`
 - `DynamicToolSpec` / `DynamicToolProviderMessage`
+- `PluginManifestDefinition` / `AutomationPolicy` / `ContextHistoryActivitySample`
 
 ## 模块边界
 
 - 宿主层不负责编排 LLM/tool 循环。
 - `agent-server` 不负责宿主 UI；只用 `~/.spotAgent/settings.json` 与 desktop 交换配置，不直接读宿主进程状态。
-- Runtime、tool、dynamic tool 与协议抽象统一下沉到 `packages/core`；macOS 原生实现留在 Swift host dynamic tools。
+- Runtime、tool、dynamic tool 与协议抽象统一下沉到 `packages/core`；macOS 原生实现仍保留在 Swift host dynamic tools，同时官方原子 plugin 开始承接 AX / screenshot / app-window 能力迁移。
