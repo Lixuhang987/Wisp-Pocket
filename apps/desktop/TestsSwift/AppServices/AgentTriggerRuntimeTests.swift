@@ -106,28 +106,6 @@ final class AgentTriggerRuntimeTests: XCTestCase {
     }
 
     @MainActor
-    func testStopStopsActiveProvidersAndAllowsReload() throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-        let store = AgentTriggerStore(homeDirectoryURL: homeURL)
-        XCTAssertTrue(store.installPackage(makeManifest(id: "chrome-bookmarks", kind: "chrome.bookmarks")))
-        let chromeProvider = RecordingAgentTriggerProvider(kind: "chrome.bookmarks")
-        let runtime = AgentTriggerRuntime(
-            registry: AgentTriggerRegistry(factories: [
-                RecordingAgentTriggerProviderFactory(provider: chromeProvider),
-            ]),
-            store: store
-        )
-
-        try runtime.reload()
-        try runtime.stop()
-        try runtime.reload()
-
-        XCTAssertEqual(chromeProvider.startCallCount, 2)
-        XCTAssertEqual(chromeProvider.stopCallCount, 1)
-    }
-
-    @MainActor
     func testRendersBookmarkPayloadFieldsIntoPromptTemplate() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }

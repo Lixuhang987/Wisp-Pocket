@@ -29,7 +29,6 @@ final class AppCoordinator {
     @ObservationIgnored private var registeredActionShortcutNames: Set<KeyboardShortcuts.Name> = []
     @ObservationIgnored private var showThreadWindowMonitor: Any?
     @ObservationIgnored private var hasBootstrapped = false
-    @ObservationIgnored private var hasShutDown = false
     @ObservationIgnored private let promptPanelController: any PromptPanelControlling
     @ObservationIgnored private lazy var captureCoordinator = PromptCaptureCoordinator(
         controller: promptPanelController,
@@ -73,12 +72,9 @@ final class AppCoordinator {
     }
 
     func shutdown() {
-        guard !hasShutDown else { return }
-        hasShutDown = true
         if let showThreadWindowMonitor {
             NSEvent.removeMonitor(showThreadWindowMonitor)
         }
-        try? services.agentTriggerRuntime.stop()
         services.appearanceChangeObserver.stop()
         unregisterActionShortcuts()
         agentServerHealth.stop()

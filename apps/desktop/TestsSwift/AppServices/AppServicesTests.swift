@@ -283,8 +283,6 @@ private final class RecordingAgentTriggerRuntime: AgentTriggerRuntimeReloading, 
         reloadCount += 1
     }
 
-    func stop() throws {}
-
     func submit(_ prompt: PromptSubmission) {
         submittedPrompts.append(prompt)
     }

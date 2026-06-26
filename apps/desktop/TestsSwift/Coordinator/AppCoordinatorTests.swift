@@ -401,24 +401,6 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testShutdownStopsAgentTriggerRuntimeOnce() throws {
-        let triggerRuntime = RecordingAgentTriggerRuntime()
-        let coordinator = AppCoordinator(
-            services: electronServices(
-                commandClient: RecordingThreadWindowCommandClient(),
-                agentTriggerRuntime: triggerRuntime
-            )
-        )
-
-        coordinator.bootstrap()
-        coordinator.shutdown()
-        coordinator.shutdown()
-
-        XCTAssertEqual(triggerRuntime.reloadCount, 1)
-        XCTAssertEqual(triggerRuntime.stopCount, 1)
-    }
-
-    @MainActor
     func testHostTerminationRequestTerminatesApplication() {
         let appServer = TriggerableAppServer()
         var terminateCount = 0
@@ -634,15 +616,10 @@ private final class TriggerableAppServer: AppServerManaging {
 @MainActor
 private final class RecordingAgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmitting {
     private(set) var reloadCount = 0
-    private(set) var stopCount = 0
     private(set) var submittedPrompts: [PromptSubmission] = []
 
     func reload() throws {
         reloadCount += 1
-    }
-
-    func stop() throws {
-        stopCount += 1
     }
 
     func submit(_ prompt: PromptSubmission) {
