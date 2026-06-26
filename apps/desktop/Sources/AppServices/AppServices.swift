@@ -270,8 +270,16 @@ final class AppServices {
         let electronMain = explicitElectronMain
             ?? bundledElectronMainPath
             ?? defaultElectronMain
+        let explicitElectronBinary = environment["HANDAGENT_ELECTRON_BINARY"]
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let usableElectronBinary = explicitElectronBinary.flatMap { binary in
+            binary == "/usr/bin/env" || fileExists(binary) ? binary : nil
+        }
         var launchEnvironment = environment
         launchEnvironment.removeValue(forKey: "HANDAGENT_DEFAULT_DYNAMIC_TOOLS")
+        if explicitElectronBinary != nil && usableElectronBinary == nil {
+            launchEnvironment.removeValue(forKey: "HANDAGENT_ELECTRON_BINARY")
+        }
         if let repoRoot {
             launchEnvironment["HANDAGENT_REPO_ROOT"] = repoRoot.path
         }
@@ -281,7 +289,7 @@ final class AppServices {
             launchEnvironment[initialThemeEnvironmentKey] = initialThemeJSON
         }
 
-        if let electronBinary = environment["HANDAGENT_ELECTRON_BINARY"].flatMap({ $0.isEmpty ? nil : $0 }) {
+        if let electronBinary = usableElectronBinary {
             return ElectronShellLaunchConfiguration(
                 launchPath: electronBinary,
                 arguments: electronBinary == "/usr/bin/env" ? ["electron", electronMain] : [electronMain],

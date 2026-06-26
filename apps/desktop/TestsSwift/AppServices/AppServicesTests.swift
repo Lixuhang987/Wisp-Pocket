@@ -238,11 +238,44 @@ final class AppServicesTests: XCTestCase {
             bundleExecutableURL: nil,
             bundleResourceURL: nil,
             bundleURL: nil,
-            fileExists: { _ in false }
+            fileExists: { path in path == "/custom/electron" }
         )
 
         XCTAssertEqual(configuration.launchPath, "/custom/electron")
         XCTAssertEqual(configuration.arguments, ["/custom/main.js"])
+    }
+
+    @MainActor
+    func testMissingElectronBinaryOverrideFallsBackToWorkspaceElectron() throws {
+        let repoRoot = URL(fileURLWithPath: "/repo/worktree", isDirectory: true)
+        let staleBinary = repoRoot
+            .appendingPathComponent("node_modules/.pnpm/electron@42.3.3/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron")
+            .path
+        let electronMain = repoRoot.appendingPathComponent("apps/electron-shell/dist/main/main.js").path
+        let configuration = AppServices.defaultElectronShellLaunchConfiguration(
+            environment: [
+                "HANDAGENT_ELECTRON_BINARY": staleBinary,
+            ],
+            currentDirectoryURL: repoRoot,
+            bundleExecutableURL: nil,
+            bundleResourceURL: nil,
+            bundleURL: nil,
+            fileExists: { path in
+                path == repoRoot.appendingPathComponent("Package.swift").path ||
+                    path == repoRoot.appendingPathComponent("apps/electron-shell/package.json").path
+            }
+        )
+
+        XCTAssertEqual(configuration.launchPath, "/usr/bin/env")
+        XCTAssertEqual(configuration.arguments, [
+            "pnpm",
+            "--filter",
+            "handagent-electron-shell",
+            "exec",
+            "electron",
+            electronMain,
+        ])
+        XCTAssertNil(configuration.environment["HANDAGENT_ELECTRON_BINARY"])
     }
 
     @MainActor
