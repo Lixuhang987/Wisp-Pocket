@@ -28,7 +28,6 @@ final class AppCoordinator {
     @ObservationIgnored private var isPromptPanelCountedInActivationPolicy = false
     @ObservationIgnored private var registeredActionShortcutNames: Set<KeyboardShortcuts.Name> = []
     @ObservationIgnored private var showThreadWindowMonitor: Any?
-    @ObservationIgnored private var hasBootstrapped = false
     @ObservationIgnored private let promptPanelController: any PromptPanelControlling
     @ObservationIgnored private lazy var captureCoordinator = PromptCaptureCoordinator(
         controller: promptPanelController,
@@ -58,16 +57,14 @@ final class AppCoordinator {
         self.promptPanelController = promptPanelController ?? PromptPanelController(
             presentationMode: services.promptPanelPresentationMode
         )
+        bootstrap()
     }
 
     func bootstrap() {
-        guard !hasBootstrapped else { return }
-        hasBootstrapped = true
         setupAppearanceTheme()
         setupPromptPanel()
         setupHotkey()
         setupAgentServerHealth()
-        try? services.agentTriggerRuntime.reload()
         agentServerHealth.start()
     }
 

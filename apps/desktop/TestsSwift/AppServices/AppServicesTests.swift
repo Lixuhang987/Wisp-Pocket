@@ -32,24 +32,6 @@ final class AppServicesTests: XCTestCase {
     }
 
     @MainActor
-    func testConstructingServicesDoesNotReloadAgentTriggerRuntime() {
-        let runtime = RecordingAgentTriggerRuntime()
-        let services = AppServices(
-            appServer: NopAppServer(),
-            threadWindowCommandClient: NopThreadWindowCommandClient(),
-            agentTriggerRuntime: runtime,
-            hotkeyRegistrar: NopHotkeyRegistrar(),
-            settingsWindowPresenter: NopSettingsWindowPresenter(),
-            fatalAlertPresenter: NopFatalAlertPresenter(),
-            setActivationPolicy: { _ in },
-            showsFatalAlert: false
-        )
-
-        XCTAssertEqual(runtime.reloadCount, 0)
-        _ = services
-    }
-
-    @MainActor
     func testAgentTriggerRuntimeSubmitsThroughSwiftThreadClient() async throws {
         let threadClient = RecordingSwiftThreadClient(threadId: "trigger-thread")
         let services = AppServices.testing(swiftThreadClient: threadClient)
@@ -271,19 +253,5 @@ private final class RecordingSwiftThreadClient: SwiftThreadSubmitting {
     func submitInitialPrompt(_ prompt: PromptSubmission) async throws -> String {
         submittedPrompts.append(prompt)
         return threadId
-    }
-}
-
-@MainActor
-private final class RecordingAgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmitting {
-    private(set) var reloadCount = 0
-    private(set) var submittedPrompts: [PromptSubmission] = []
-
-    func reload() throws {
-        reloadCount += 1
-    }
-
-    func submit(_ prompt: PromptSubmission) {
-        submittedPrompts.append(prompt)
     }
 }
