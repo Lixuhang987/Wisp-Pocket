@@ -5,3 +5,5 @@ packages:
   - apps/electron-shell
   - packages/core
   - packages/thread-store
+allowBuilds:
+  esbuild: true
