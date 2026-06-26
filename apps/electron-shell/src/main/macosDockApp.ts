@@ -1,18 +1,18 @@
-type MacOSBackgroundElectronApp = {
+type MacOSDockElectronApp = {
   setActivationPolicy(policy: "regular" | "accessory" | "prohibited"): void;
   dock?: {
-    hide(): void;
+    show(): Promise<void> | void;
   };
 };
 
-export function configureMacOSBackgroundApp(
-  app: MacOSBackgroundElectronApp,
+export function configureMacOSDockApp(
+  app: MacOSDockElectronApp,
   platform: NodeJS.Platform = process.platform,
 ): void {
   if (platform !== "darwin") {
     return;
   }
 
-  app.setActivationPolicy("accessory");
-  app.dock?.hide();
+  app.setActivationPolicy("regular");
+  void app.dock?.show();
 }

@@ -14,7 +14,7 @@ import { JsonLineBridge } from "./swiftBridge/jsonLineBridge.js";
 import { CommandSocketServer } from "./swiftBridge/commandSocketServer.js";
 import { ActivityWindowController } from "./windows/activityWindowController.js";
 import { ThreadWindowPrewarmer } from "./windows/threadWindowPrewarmer.js";
-import { configureMacOSBackgroundApp } from "./macosBackgroundApp.js";
+import { configureMacOSDockApp } from "./macosDockApp.js";
 import { readAvailableSkillsFromActionsDirectory } from "./availableSkills.js";
 import { readInitialHostTheme } from "./initialHostTheme.js";
 
@@ -201,7 +201,7 @@ void bootElectronShell();
 async function bootElectronShell(): Promise<void> {
   try {
     await app.whenReady();
-    configureMacOSBackgroundApp(app);
+    configureMacOSDockApp(app);
     if (commandSocketPath) {
       commandSocketServer = new CommandSocketServer(commandSocketPath);
       commandSocketServer.onLine((line) => {

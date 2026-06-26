@@ -10,7 +10,7 @@
 | `../use-cases/thread-window-commands.test.ts` | `src/main/electronShellRuntime.ts` 的 command ack、theme fan-out、window close 和 shutdown 主路径 |
 | `initialHostTheme.test.ts` | `src/main/initialHostTheme.ts` 的启动期 host theme 解析、非法 env fallback 和 system/dark 保留 |
 | `activityWindowIpc.test.ts` | `src/main/activityWindowIpc.ts` 的 sender 校验与 `string | null` thread id 限制 |
-| `macosBackgroundApp.test.ts` | `src/main/macosBackgroundApp.ts` 的 macOS accessory activation policy 与 Dock 隐藏 |
+| `macosDockApp.test.ts` | `src/main/macosDockApp.ts` 的 macOS regular activation policy 与 Dock 显示 |
 
 ## 测试前提
 

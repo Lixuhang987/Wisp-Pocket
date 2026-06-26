@@ -24,8 +24,6 @@ final class AppCoordinator {
     @ObservationIgnored private let activityWindowCommandClient: (any ActivityWindowCommanding)?
     @ObservationIgnored private let settingsLifecycle: SettingsLifecycle
     @ObservationIgnored private let activationPolicy = AppActivationPolicyCoordinator()
-    @ObservationIgnored private var isThreadWindowCountedInActivationPolicy = false
-    @ObservationIgnored private var isPromptPanelCountedInActivationPolicy = false
     @ObservationIgnored private var registeredActionShortcutNames: Set<KeyboardShortcuts.Name> = []
     @ObservationIgnored private var showThreadWindowMonitor: Any?
     @ObservationIgnored private var hasBootstrapped = false
@@ -90,17 +88,11 @@ final class AppCoordinator {
         switch action {
         case .showPromptPanel:
             refreshActionDefinitions()
-            handlePromptPanelShown()
             promptPanelController.show()
         case .hidePromptPanel:
             promptPanelController.hide()
         case .togglePromptPanel:
             refreshActionDefinitions()
-            if promptPanelController.isVisible {
-                handlePromptPanelHidden()
-            } else {
-                handlePromptPanelShown()
-            }
             promptPanelController.toggle()
         case .submitPrompt(let inputItems, let attachments):
             handleSubmitPrompt(inputItems, attachments: attachments)
@@ -249,10 +241,7 @@ final class AppCoordinator {
 
         threadWindowLifecycle.createTabWithInitialPrompt(
             prompt,
-            onOpened: { [weak self] in
-                guard let self else { return }
-                self.handleThreadWindowOpened()
-            },
+            onOpened: {},
             onFailed: { [weak self] message in
                 self?.handleThreadWindowOpenFailure(message)
             },
@@ -265,10 +254,7 @@ final class AppCoordinator {
     private func focusThreadWindowAfterSwiftThreadStart(threadId: String) {
         threadWindowLifecycle.openOrFocusThread(
             threadID: threadId,
-            onOpened: { [weak self] in
-                guard let self else { return }
-                self.handleThreadWindowOpened()
-            },
+            onOpened: {},
             onFailed: { [weak self] message in
                 self?.handleThreadWindowOpenFailure(message)
             },
@@ -300,9 +286,7 @@ final class AppCoordinator {
         ThreadWindowDiagnostics.emit("coordinator.open_history promptPanelVisible=\(promptPanelController.isVisible)")
         promptPanelController.hide(restoringFocus: false)
         threadWindowLifecycle.openOrFocusHistory(
-            onOpened: { [weak self] in
-                self?.handleThreadWindowOpened()
-            },
+            onOpened: {},
             onFailed: { [weak self] message in
                 self?.handleThreadWindowOpenFailure(message)
             },
@@ -318,28 +302,11 @@ final class AppCoordinator {
     }
 
     private func handlePromptPanelHidden() {
-        guard isPromptPanelCountedInActivationPolicy else { return }
-        isPromptPanelCountedInActivationPolicy = false
-        services.setActivationPolicy(activationPolicy.policyAfterUpdatingOpenThreadWindows(by: -1))
-    }
-
-    private func handlePromptPanelShown() {
-        guard !isPromptPanelCountedInActivationPolicy else { return }
-        isPromptPanelCountedInActivationPolicy = true
-        services.setActivationPolicy(activationPolicy.policyAfterUpdatingOpenThreadWindows(by: 1))
-    }
-
-    private func handleThreadWindowOpened() {
-        guard !isThreadWindowCountedInActivationPolicy else { return }
-        isThreadWindowCountedInActivationPolicy = true
-        services.setActivationPolicy(activationPolicy.policyAfterUpdatingOpenThreadWindows(by: 1))
+        services.setActivationPolicy(activationPolicy.currentPolicy())
     }
 
     private func handleThreadWindowClosed() {
         threadWindowLifecycle.close()
-        guard isThreadWindowCountedInActivationPolicy else { return }
-        isThreadWindowCountedInActivationPolicy = false
-        services.setActivationPolicy(activationPolicy.policyAfterUpdatingOpenThreadWindows(by: -1))
     }
 
     private func refreshActionDefinitions() {
