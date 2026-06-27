@@ -66,7 +66,7 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testThreadWindowOpenAckPromotesRegularPolicy() {
+    func testThreadWindowOpenAckDoesNotPromoteSwiftHostPolicy() {
         var appliedPolicies: [NSApplication.ActivationPolicy] = []
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(
@@ -79,11 +79,11 @@ final class AppCoordinatorTests: XCTestCase {
         coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
 
-        XCTAssertEqual(appliedPolicies.last, .regular)
+        XCTAssertEqual(appliedPolicies, [])
     }
 
     @MainActor
-    func testThreadWindowClosedDemotesAccessoryPolicyWhenSettingsIsClosed() {
+    func testThreadWindowClosedDoesNotDemoteSwiftHostPolicy() {
         var appliedPolicies: [NSApplication.ActivationPolicy] = []
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(
@@ -97,27 +97,26 @@ final class AppCoordinatorTests: XCTestCase {
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
         coordinator.send(.threadWindowClosed)
 
-        XCTAssertEqual(appliedPolicies, [.regular, .accessory])
+        XCTAssertEqual(appliedPolicies, [])
     }
 
     @MainActor
-    func testRepeatedThreadWindowOpenAcksDoNotOvercountActivationPolicy() {
+    func testPromptPanelHideRestoresAccessoryPolicyWhenSettingsIsClosed() {
         var appliedPolicies: [NSApplication.ActivationPolicy] = []
-        let client = RecordingThreadWindowCommandClient()
+        let promptPanel = RecordingPromptPanelController()
         let coordinator = AppCoordinator(
             services: electronServices(
-                commandClient: client,
+                commandClient: RecordingThreadWindowCommandClient(),
                 setActivationPolicy: { appliedPolicies.append($0) }
-            )
+            ),
+            promptPanelController: promptPanel
         )
+        coordinator.bootstrap()
 
-        coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
-        client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
-        coordinator.send(.openHistory)
-        client.complete(commandId: "open-history-1", kind: .openHistory, ok: true)
-        coordinator.send(.threadWindowClosed)
+        coordinator.send(.showPromptPanel)
+        coordinator.send(.hidePromptPanel)
 
-        XCTAssertEqual(appliedPolicies, [.regular, .accessory])
+        XCTAssertEqual(appliedPolicies, [.accessory])
     }
 
     @MainActor

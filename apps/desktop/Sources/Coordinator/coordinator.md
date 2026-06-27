@@ -24,7 +24,7 @@
 - 测试模式走 `AppServices.testing()` 注入 nop 替身，跳过窗口/进程/激活策略副作用。
 - 窗口生命周期由 lifecycle 控制器闭环：Electron ThreadWindow 由 `ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 管理，`SettingsLifecycle` 管 Settings；Coordinator 不持有 AppKit 对象。
 - 应用内快捷键（如 `showThreadWindow` ⌘L 唤起 ThreadWindow）使用 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)` 在 `setupHotkey()` 中注册，仅当 handAgent 持有焦点时生效。不走 `HotkeyRegistering` 协议和 Carbon Events 全局通道。配置 UI 复用 `KeyboardShortcuts.Recorder`，监听通过 `KeyboardShortcuts.Shortcut(event:)` 比对。`shutdown()` 中 `NSEvent.removeMonitor` 清理。
-- Electron ThreadWindow 打开成功以 `command.ack ok` 为准；首次 visible ThreadWindow 打开后，Coordinator 通过 `AppActivationPolicyCoordinator` 把 Swift 宿主切到 `.regular`，让 HandAgent 出现在 Dock / Cmd+Tab。重复 open/focus ack 不重复增加窗口计数，最后一个 visible ThreadWindow 关闭后再按 Settings 状态回落到 `.accessory`。
+- Electron ThreadWindow 打开成功以 `command.ack ok` 为准；Swift 宿主不再把 Electron ThreadWindow 计入自身 Dock / Cmd+Tab 可见性。ThreadWindow 的 Dock / app switcher 入口属于 Electron app；Swift 宿主的持久 `.regular` 状态只由 Settings 窗口决定，PromptPanel 隐藏后按 Settings 状态回落。
 - 历史入口语义：`openHistory` 聚焦全局 Electron ThreadWindow 并刷新左侧历史，不打开独立窗口；若此时 PromptPanel 仍可见，Coordinator 必须先执行 `hide(restoringFocus: false)` 再把控制权交给 Electron，避免首次 show/focus 时被 PromptPanel 的失焦恢复抢回旧前台应用。右侧当前展示哪个 thread 由 React `App` 本地 state 编排。
 - PromptPanel show/toggle 只负责显示原生输入面板和刷新 action 定义，不触发 ThreadWindow prepare。ThreadWindow 预热由 Electron main 在 agent-server ready 后主动完成。
 - PromptPanel 与 ThreadWindow handoff 语义：无论是提交首轮 prompt，还是 PromptPanel 仍可见时触发 `openHistory`，都必须先用 `hide(restoringFocus: false)` 隐藏 PromptPanel，不恢复唤起前的前台应用。提交首轮 prompt 的生产路径先由 Swift `/api/thread` client 创建 thread 并提交首轮 `UserInput`，拿到 `thread.started.threadId` 后再发送 `thread_window.focus(threadId)` 给 Electron main；`openHistory` 仍发送 `thread_window.open_history`。这样 Electron `BrowserWindow.show()/focus()` 后不会被 PromptPanel 的焦点恢复逻辑推到后台。
@@ -53,7 +53,7 @@ openHistory / threadWindowClosed
 - 通过 `AgentTriggerRuntimeService.reload()` 启动已安装 AgentTrigger provider，通过 `AgentTriggerRuntimeService.stop()` 停止 provider；启动调用由 `bootstrap()` 幂等保护，停止调用由 `shutdown()` 幂等保护。
 - 通过 `ActivityWindowCommanding` 显示 Electron ActivityWindow；该 command client 只承载 ActivityWindow show 命令回执，不承载 activity 数据。
 - 通过 `AppearanceChangeObserving` 接收 macOS 外观变化，并交给 `AppearanceThemeService` 生成宿主主题 payload。
-- `AppActivationPolicyCoordinator` 实例由 Coordinator 创建；SettingsWindow 由 `SettingsLifecycle` 推送激活策略，Electron ThreadWindow 由 Coordinator 在 open/close ack 回调中推送激活策略。
+- `AppActivationPolicyCoordinator` 实例由 Coordinator 创建；SettingsWindow 由 `SettingsLifecycle` 推送激活策略。Electron ThreadWindow open/close ack 只更新 Electron command lifecycle，不再改变 Swift 宿主 activation policy。
 - Coordinator 不再保留 TCA `Store` 或 Swift 侧 thread 状态；Electron ThreadWindow 的消息、历史和运行态都由 React / agent-server 持有。
 
 ## 编辑此目录的约束

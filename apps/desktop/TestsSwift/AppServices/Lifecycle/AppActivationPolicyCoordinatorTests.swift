@@ -4,37 +4,10 @@ import XCTest
 
 final class AppActivationPolicyCoordinatorTests: XCTestCase {
     @MainActor
-    func testUsesAccessoryPolicyWithoutThreadWindows() {
+    func testUsesAccessoryPolicyWithoutSettingsWindow() {
         let coordinator = AppActivationPolicyCoordinator()
 
-        XCTAssertEqual(
-            coordinator.policyAfterUpdatingOpenThreadWindows(by: 0),
-            .accessory
-        )
-    }
-
-    @MainActor
-    func testSwitchesToRegularPolicyWhenFirstThreadWindowOpens() {
-        let coordinator = AppActivationPolicyCoordinator()
-
-        _ = coordinator.policyAfterUpdatingOpenThreadWindows(by: 1)
-
-        XCTAssertEqual(
-            coordinator.policyAfterUpdatingOpenThreadWindows(by: 0),
-            .regular
-        )
-    }
-
-    @MainActor
-    func testReturnsToAccessoryPolicyWhenLastThreadWindowCloses() {
-        let coordinator = AppActivationPolicyCoordinator()
-
-        _ = coordinator.policyAfterUpdatingOpenThreadWindows(by: 1)
-
-        XCTAssertEqual(
-            coordinator.policyAfterUpdatingOpenThreadWindows(by: -1),
-            .accessory
-        )
+        XCTAssertEqual(coordinator.currentPolicy(), .accessory)
     }
 
     @MainActor
@@ -58,5 +31,4 @@ final class AppActivationPolicyCoordinatorTests: XCTestCase {
             .accessory
         )
     }
-
 }
