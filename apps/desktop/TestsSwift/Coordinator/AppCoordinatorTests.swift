@@ -188,7 +188,6 @@ final class AppCoordinatorTests: XCTestCase {
     func testAppearancePreferenceChangeSendsThemeToElectron() {
         let client = RecordingThreadWindowCommandClient()
         let coordinator = AppCoordinator(services: electronServices(commandClient: client))
-        coordinator.bootstrap()
 
         coordinator.makeAppearanceSettingsViewModel().themePreference = .dark
 
@@ -220,7 +219,6 @@ final class AppCoordinatorTests: XCTestCase {
                 setActivationPolicy: { _ in }
             )
         )
-        coordinator.bootstrap()
 
         XCTAssertEqual(observer.startCount, 1)
 
@@ -257,7 +255,6 @@ final class AppCoordinatorTests: XCTestCase {
                 activityClient: activityClient
             )
         )
-        coordinator.bootstrap()
 
         XCTAssertEqual(activityClient.showCount, 0)
 
@@ -283,7 +280,6 @@ final class AppCoordinatorTests: XCTestCase {
                 activityClient: activityClient
             )
         )
-        coordinator.bootstrap()
 
         appServer.publishAvailability(true)
         try await Task.sleep(for: .milliseconds(10))
@@ -330,7 +326,6 @@ final class AppCoordinatorTests: XCTestCase {
         let client = RecordingThreadWindowCommandClient()
         let services = electronServices(appServer: stub, commandClient: client)
         let coordinator = AppCoordinator(services: services)
-        coordinator.bootstrap()
 
         stub.publishAvailability(false)
         try await Task.sleep(for: .milliseconds(10))
@@ -365,56 +360,9 @@ final class AppCoordinatorTests: XCTestCase {
     @MainActor
     func testInjectedAgentServerStartIsCalledOnBootstrap() throws {
         let stub = TriggerableAppServer()
-        let coordinator = AppCoordinator(
-            services: electronServices(
-                appServer: stub,
-                commandClient: RecordingThreadWindowCommandClient()
-            )
-        )
-
-        coordinator.bootstrap()
+        _ = AppCoordinator(services: electronServices(appServer: stub, commandClient: RecordingThreadWindowCommandClient()))
 
         XCTAssertEqual(stub.startCount, 1)
-    }
-
-    @MainActor
-    func testBootstrapReloadsAgentTriggerRuntimeOnce() throws {
-        let appServer = TriggerableAppServer()
-        let triggerRuntime = RecordingAgentTriggerRuntime()
-        let coordinator = AppCoordinator(
-            services: electronServices(
-                appServer: appServer,
-                commandClient: RecordingThreadWindowCommandClient(),
-                agentTriggerRuntime: triggerRuntime
-            )
-        )
-
-        XCTAssertEqual(triggerRuntime.reloadCount, 0)
-        XCTAssertEqual(appServer.startCount, 0)
-
-        coordinator.bootstrap()
-        coordinator.bootstrap()
-
-        XCTAssertEqual(triggerRuntime.reloadCount, 1)
-        XCTAssertEqual(appServer.startCount, 1)
-    }
-
-    @MainActor
-    func testShutdownStopsAgentTriggerRuntimeOnce() throws {
-        let triggerRuntime = RecordingAgentTriggerRuntime()
-        let coordinator = AppCoordinator(
-            services: electronServices(
-                commandClient: RecordingThreadWindowCommandClient(),
-                agentTriggerRuntime: triggerRuntime
-            )
-        )
-
-        coordinator.bootstrap()
-        coordinator.shutdown()
-        coordinator.shutdown()
-
-        XCTAssertEqual(triggerRuntime.reloadCount, 1)
-        XCTAssertEqual(triggerRuntime.stopCount, 1)
     }
 
     @MainActor
@@ -428,7 +376,6 @@ final class AppCoordinatorTests: XCTestCase {
                 terminateApplication: { terminateCount += 1 }
             )
         )
-        coordinator.bootstrap()
 
         appServer.requestHostTermination()
 
@@ -504,7 +451,6 @@ private func electronServices(
     commandClient: RecordingThreadWindowCommandClient,
     activityClient: RecordingActivityWindowCommandClient? = nil,
     swiftThreadClient: (any SwiftThreadSubmitting)? = nil,
-    agentTriggerRuntime: (any AgentTriggerRuntimeReloading & AgentTriggerSubmitting)? = nil,
     fatalAlertPresenter: any FatalAlertPresenting = NopFatalAlertPresenter(),
     setActivationPolicy: @escaping @MainActor (NSApplication.ActivationPolicy) -> Void = { _ in },
     terminateApplication: @escaping @MainActor () -> Void = {}
@@ -515,7 +461,6 @@ private func electronServices(
         threadWindowCommandClient: commandClient,
         activityWindowCommandClient: activityClient,
         settingsStore: settingsStore,
-        agentTriggerRuntime: agentTriggerRuntime,
         appearanceThemeService: AppearanceThemeService(store: settingsStore, systemResolver: { .light }),
         swiftThreadClient: swiftThreadClient,
         hotkeyRegistrar: NopHotkeyRegistrar(),
@@ -627,25 +572,6 @@ private final class TriggerableAppServer: AppServerManaging {
 
     func requestHostTermination() {
         onHostTerminationRequest?()
-    }
-}
-
-@MainActor
-private final class RecordingAgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmitting {
-    private(set) var reloadCount = 0
-    private(set) var stopCount = 0
-    private(set) var submittedPrompts: [PromptSubmission] = []
-
-    func reload() throws {
-        reloadCount += 1
-    }
-
-    func stop() throws {
-        stopCount += 1
-    }
-
-    func submit(_ prompt: PromptSubmission) {
-        submittedPrompts.append(prompt)
     }
 }
 
