@@ -1,5 +1,7 @@
 # 手工验收清单
 
+本文记录已实现、自动化测试不足以证明真实系统行为的回归项。仍未修复的缺陷放 [bugs.md](/Users/mu9/proj/handAgent/docs/bugs.md)。
+
 ## 验收前提
 
 - 已完成依赖安装。
@@ -9,22 +11,61 @@
 
 ## 待验收项
 
+### 文档卫生回归
+
+- **范围**：`AGENTS.md`、`README.md`、`DESIGN.md`、`docs/docs.md`、`docs/bugs.md`、`docs/manual-qa.md`。
+- **验收步骤**：
+  1. 按 `AGENTS.md -> handAgent.md -> docs/docs.md` 阅读，确认 `docs/` 入口只列直接子节点和放置规则。
+  2. 打开 `README.md`，确认不再引用缺失的截图资源。
+  3. 打开 `DESIGN.md`，确认它只说明设计边界，并把 token 源指向 `design/tokens.json`。
+  4. 打开 Settings 相关文档，确认 `SettingsTextField` / `SettingsPage`、dark theme 可读性和 `SwiftLint` 约束仍在模块文档或本文中可追踪。
+  5. 打开 `bugs.md`，确认只保留未修复缺陷；已实现待验收项在本文。
+
+### ThreadWindow Radix UI 弹出层迁移
+
+- **状态**：已实现，待实机 QA。
+- **自动化验证**：`pnpm --filter handagent-thread-window-web exec vitest run tests/composerInputItems.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
+- **验收步骤**：
+  1. 打开 Electron ThreadWindow，在 Composer 输入 `/`，确认 slash popover 在输入框附近显示且不被裁剪。
+  2. 用过滤词、`ArrowUp`、`ArrowDown` 和 `Tab` 验证候选高亮、选择和 textarea 焦点。
+  3. 用 `Escape` 和点击外部区域验证 popover 关闭并清除 `/` 前缀。
+  4. 缩小窗口高度，确认 popover 自动避让或保持在视口内可滚动。
+  5. 点击历史 thread 删除按钮，确认 Radix AlertDialog 居中、`Escape` / 取消不删除、确认后删除。
+
+### AgentTrigger 设置二级菜单与默认内置触发器
+
+- **状态**：已实现，待实机 QA。
+- **自动化验证**：`bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- **验收步骤**：
+  1. 备份并删除 `~/.spotAgent/agent-triggers/`，启动桌面 App，确认 Settings -> 触发器一级页直接显示 `Chrome Bookmarks` 与 `System Clock`。
+  2. 进入 Chrome Bookmarks 二级页，确认顶部 name / description、空态、新增自动化和返回一级可用。
+  3. 创建 Chrome Bookmarks 自动化，验证标题、收藏夹选择和提示词的必填校验；保存后确认列表和 `instances.json` 同步。
+  4. 进入 System Clock 二级页连续创建两条自动化，确认列表和磁盘持久化都包含两条。
+  5. 删除某条自动化，确认列表立即移除且 runtime reload。
+  6. 删除内置 package 目录后重启，确认启动期恢复内置 manifest，且不覆盖用户已有实例。
+
+### 默认 Websearch 与 Responses SSE 回归
+
+- **状态**：已实现，待真实 provider 实机 QA；上次阻塞在本地 provider 返回 401 invalidated oauth token。
+- **自动化验证**：`pnpm exec vitest run apps/agent-server/tests/thread/ThreadScopedToolRegistry.test.ts packages/core/tests/tools/websearch-use-cases.test.ts packages/core/tests/permission/security-use-cases.test.ts packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`。
+- **验收步骤**：
+  1. 在启动 agent-server 的环境提供有效 `TAVILY_API_KEY`，并配置可用的 OpenAI-compatible `responses` provider。
+  2. 提交需要近期信息的问题，确认模型未先调用 `use_tools` 也能直接使用 `web_search`。
+  3. 确认 `web_search` 返回 URL、snippet、source；随后让模型用 `fetch_page` 精读其中一个公共 URL。
+  4. 确认 Responses SSE 中连续 JSON 事件不会再触发 `JSONParseError`，并能生成最终回答。
+  5. 去掉 `TAVILY_API_KEY` 后重启，确认 `web_search` 返回明确缺 key 错误且 App 不崩溃。
+  6. 请求抓取 localhost、127.0.0.1 或私网地址，确认 `fetch_page` 拒绝。
+
 ### Context History 与自进化 Automation 官方 plugin
 
-- 关键 commit：0b88e68、187c867、12d2201、8b60245、ac018d5、5534f8b、839d70d、9526d31、d678037
-- 实现位置：`apps/desktop/Sources/AppServices/PlatformBridge/PluginDynamicTools.swift`、`apps/desktop/Sources/AppServices/AppServices.swift`、`apps/builtin-plugins/`、`Package.swift`、`apps/desktop/TestsSwift/AppServices/PlatformBridge/PluginDynamicToolsTests.swift`、`apps/builtin-plugins/Tests/ContextHistoryPluginCoreTests.swift`、`apps/builtin-plugins/Tests/AutomationRuntimeTests.swift`
-- 验收结果：新增官方 Swift plugin 安装/修复流程；AX、screenshot、app/window 原子 plugin 默认启用，其中 app/window plugin 提供 frontmost、list_windows、activate；Context History 与 Automation runtime 默认关闭，启用 manifest 后由 Swift desktop 启动 always-on plugin，并通过常驻 stdin/stdout RPC 响应 dynamic tool 调用。Context History core 已覆盖前台 app/window 变化采样、30 秒周期 activity sample、60 秒截图文件记录和 activity index / sample details / thumbnails / original screenshot 分层查询；Automation 已覆盖 record_start / record_event / record_stop / policy_create / run / history / apply_patch / repair_apply 的 tool 路由、结构化存储、`captureUserEvents` fake live recorder 合并、macOS event tap 生产接入、操作前后 app/window + AX + 截图 evidence 采集、trace events 到受限 Automation Policy 的 fallback 生成、agent 归纳 policy / branch 回填、branch conditions 匹配、conditions 不匹配时进入 repair、受限 AX Policy 执行、waitFor、断言、失败 repair request 落盘、fallback repair patch 自动合入、repair request 队列查询、agent/computer-use branch 回填合入，以及包含目标、匹配 branch/conditions、AX/截图 evidence、repair evidence 的 run/patch history 写入。真实点击、基础 keyDown 文本输入和快捷键录制仍需实机 QA；runtime 自己驱动 LLM 或直接执行 computer use 仍需后续接入与实机 QA 验证。
-- 自动化验证：需执行 `bash ./scripts/swiftw test --filter PluginDynamicToolsTests`、`bash ./scripts/swiftw test --filter ContextHistoryPluginCoreTests`、`bash ./scripts/swiftw test --filter AutomationRuntimeTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
-- 手工回归步骤：
-  1. 启动桌面 App 后确认 `~/.spotAgent/plugins/handagent-atomic-app-window/plugin.json`、`handagent-atomic-screenshot/plugin.json`、`handagent-atomic-ax/plugin.json`、`handagent-context-history/plugin.json`、`handagent-automation-runtime/plugin.json` 被写入。
-  2. 确认三个原子 plugin 的 `enabled` 为 `true`，Context History 与 Automation runtime 的 `enabled` 为 `false`。
-  3. 手工把 `handagent-context-history/plugin.json` 的 `enabled` 改为 `true` 后重启桌面 App，新建 thread，确认 dynamic tool 列表包含 `context_history.activity_index`、`sample_details`、`thumbnails`、`screenshot_original`。
-  4. 调用 `context_history.activity_index`，确认 tool call 由同一个 always-on Context History plugin 进程响应，且 index 不返回完整 AX 树或原图。
-  5. 切换前台 app/window 后等待一个采样 tick，再调用 `context_history.activity_index`，确认新增 activity sample；不切换窗口持续 30 秒后确认会补一条周期 sample；持续 60 秒后确认 `context_history.thumbnails` 出现截图记录。
-  6. 手工把 `handagent-automation-runtime/plugin.json` 的 `enabled` 改为 `true` 后重启桌面 App，新建 thread，确认 dynamic tool 列表包含 `automation.record_start`、`record_event`、`record_stop`、`policy_create`、`run`、`history`、`apply_patch`、`repair_apply`。
-  7. 调用 `automation.record_start`，用 `automation.record_event` 写入 click / setValue / typeText / hotkey / waitFor / assertion 等结构化事件，确认每个 event 含 before/after app-window、AX、screenshot evidence；再调用 `automation.record_stop` 和 `automation.policy_create`，确认生成的 policy branch 包含对应受限 steps 与 assertions；传入 agent 归纳的 `policy` 或 `branch` 时应按该 payload 保存，并在包含多个带 conditions 的 branch 时只执行当前 AX 状态匹配的分支；若没有 branch conditions 匹配，应进入 repair request / patch 路径。
-  8. 调用 `automation.record_start` 时传入 `captureUserEvents: true`，执行一次真实点击、基础 keyDown 文本输入和快捷键；再调用 `automation.record_stop`，确认 trace 包含 `source: "macos_event_tap"` 的 click / typeText / hotkey event，并且每个 event 含 before/after evidence。若 macOS 权限不足，确认响应含 `liveRecording: "unavailable"` 或 `liveRecordingError`，结构化录制仍可继续。
-  9. 准备一个最小 policy 写入 `~/.spotAgent/automation/policies/`，调用 `automation.run`；若执行失败，确认 runtime 会写入 run 记录、保存 repair request、生成 fallback policy patch 并自动合入，且 `automation.history` 返回 pending repair request。
-  10. 模拟 agent/computer-use 完成当前失败任务后，调用 `automation.repair_apply` 提交 repair branch，确认 policy version 增加、patch 写入，repair request 状态变为 `applied` 并记录 `patchId`；再次对同一 repair request 调用 `repair_apply` 应失败且不重复递增 policy version。
-  11. 再次编辑官方 manifest 的其他字段为错误值但保留 `enabled`，重启 App，确认 installer 会修复官方 manifest，同时保留用户的 `enabled` 选择。
-  12. 将已启用的 Context History 或 Automation manifest 改回 `enabled: false` 并重启 App，确认对应 always-on plugin 停止，dynamic tool 列表不再包含对应 namespace。
+- **状态**：已实现，待实机 QA。
+- **自动化验证**：`bash ./scripts/swiftw test --filter PluginDynamicToolsTests`、`bash ./scripts/swiftw test --filter ContextHistoryPluginCoreTests`、`bash ./scripts/swiftw test --filter AutomationRuntimeTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- **验收步骤**：
+  1. 启动桌面 App，确认官方 plugin manifest 写入 `~/.spotAgent/plugins/`；原子 plugin 默认 enabled，Context History 与 Automation runtime 默认 disabled。
+  2. 启用 Context History 后重启，确认 dynamic tool 列表包含 activity index、sample details、thumbnails、original screenshot，并且 index 不返回完整 AX 树或原图。
+  3. 切换前台 app/window 并等待采样 tick，确认 activity sample、周期 sample 和 60 秒截图记录按预期出现。
+  4. 启用 Automation runtime 后重启，确认 record、policy、run、history、repair tools 暴露。
+  5. 录制 click / setValue / typeText / hotkey / waitFor / assertion，确认每个 event 含 before/after app-window、AX、screenshot evidence。
+  6. 用最小 policy 调用 `automation.run`，失败时确认 run 记录、repair request、fallback patch 和 `automation.history` 都可追踪。
+  7. 调用 `automation.repair_apply`，确认 policy version 增加、repair request 变为 `applied`，重复 apply 会失败。
+  8. 修改官方 manifest 的非 enabled 字段后重启，确认 installer 修复 manifest 且保留用户 enabled 选择。

@@ -10,7 +10,7 @@
 
 仓库文档是一棵 DFS 索引树：每个 `<dir>.md` 只列**直接子节点**，更深层细节由子节点自己继续展开。AI / 新人按 `AGENTS.md → handAgent.md → ...` 一路向下读，需要哪一层就钻到哪一层，不必预先吞下所有路径。
 
-本文件只列根目录的直接入口；所有 `apps/` 下的模块、`packages/` 下的源码细节，由各自的 `<dir>.md` 接力展开。`docs/` 下的平铺开发说明在本文件列为叶文件；`docs/human/`、`docs/superpowers/`、`docs/medium-powers/` 是例外嵌套集合，只在此处标出集合入口。
+本文件只列根目录的直接入口；所有 `apps/`、`packages/`、`docs/` 下的细节，由各自的 `<dir>.md` 接力展开。
 
 ### 根目录入口
 
@@ -23,7 +23,7 @@
 - `apps/apps.md`：应用层总览，索引 desktop、thread-window-web 与 agent-server。
 - `packages/packages.md`：包层总览，索引 core 跨平台核心。
 - `examples/examples.md`：可复制到 `~/.spotAgent/` 的 Append Prompt / MCP 配置示例。
-- `docs/`：开发说明集合
+- `docs/docs.md`：开发说明、待办、QA、spec / plan 与设计资料入口。
 - `codex/`：本地 code agent 的参考项目（权限系统 / tool 系统 / UI 流式展示 / 子 agent 系统等可借鉴）。
 
 ## 文档维护约定

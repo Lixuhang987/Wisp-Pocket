@@ -58,4 +58,4 @@ flowchart LR
 3. Change the streaming wrapper to feed chunks through `eventsource-parser` and emit complete normalized SSE messages, carrying pending empty event metadata across chunk boundaries.
 4. Run targeted LLM tests and full `bash ./scripts/test.sh`.
 5. Update `packages/core/src/llm/llm.md` to mention both Responses SSE compatibility shapes and the streaming boundary requirement.
-6. Re-run live QA for the original Websearch item; if it passes, move the item from `docs/bugs.md` to `docs/archive.md` or record any remaining defect.
+6. Re-run live QA for the original Websearch item; if it passes, remove it from `docs/bugs.md` and keep any remaining manual regression steps in `docs/manual-qa.md`.
