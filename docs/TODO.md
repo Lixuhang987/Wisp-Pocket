@@ -5,7 +5,7 @@
 - **完成即迁移**：当本文中的待办项被代码实现并通过测试覆盖后，必须将该项**从本文移除**，并按主题分组追加到 manual-qa
 - **同步更新模块文档**：若条目跨多个模块，迁移时同步更新对应 `<dir>.md` 索引。
 
-最后核对日期：2026-06-08。
+最后核对日期：2026-09-01。
 
 ---
 
@@ -20,27 +20,27 @@
   - Settings 的 AgentTrigger 详情页不要只在进入页面时读取 `status.json` / `folders.json`；应使用 observable 状态加文件 watcher 或轻量轮询，实时刷新连接状态和文件夹树。
   - 验证顺序覆盖：先启动 App 后启动扩展、先启动扩展后启动 App、App 重启、Chrome 重启、native host helper 转发失败、Swift bridge generation 变化、断线后新增书签事件恢复。
 
-## thread / turn 破坏性重构遗留
+## Thread / Turn 破坏性重构遗留
 
-- 对齐 codex 更完整 thread / turn 语义：
+- 对齐 codex 更完整 Thread / Turn 语义：
   - `thread.archive` / `thread.unarchive`：本轮已选择 `thread.delete` 作为最小可用删除语义，归档能力后续单独设计。
   - `thread.read`：按 threadId 拉取完整 thread 快照或分页读取历史。
   - `thread.fork`：从指定消息或 turn 分叉新 thread。
   - `thread.rollback`：回滚到指定消息或 turn，并明确持久化与 UI 展示规则。
-  - thread metadata 更新：标题、preview、workspace 等字段的更新命令与通知。
-  - thread settings 更新与通知：模型、工具范围、运行参数等 thread 级配置变更。
+  - Thread metadata 更新：标题、preview、Workspace 等字段的更新命令与通知。
+  - Thread settings 更新与通知：模型、Tool 范围、运行参数等 Thread 级配置变更。
   - goal / budget：目标状态、预算、用量统计及 UI 呈现。
   - realtime：语音、低延迟流式输入输出或实时通道。
   - codex-style `item.*`：细粒度 item 生命周期、局部更新、折叠与重放语义。
   - archived/list/search：归档 thread 的列表、搜索、恢复和删除管理。
-  - thread-level event replay、notification 去重与 request 生命周期。
+  - Thread-level event replay、notification 去重与 request 生命周期。
   - auth refresh request / response：server 触发鉴权刷新、desktop 回执结果的 `ServerRequest` / `ClientResponse` 语义。
-  - 子 agent / 多 turn 并行语义。
-  - run hooks 输入记录：把输入写进 thread 历史，并触发用户配置的 Hooks，例如审计、提示注入。
-  - 历史保存顺序：明确 thread history 初始输入、hook 注入内容与后续消息的持久化顺序。
-  - MCP server 激活来源：除全局配置外，后续可由动态 tool / skill 声明启用。
-- 补一轮端到端实机验证：thread 创建、thread 恢复、thread 列表、thread 删除、turn 中断、permission / workspace 回流。
-- 补一轮端到端实机验证：React ThreadWindow 只通过 `/api/thread?acceptServerRequests=1` 承载 thread/turn 主协议与交互式请求，Swift PromptPanel 直连 `/api/thread` 创建 thread 并提交首轮输入，Swift host provider 只通过 `/api/dynamic-tools` 承载 dynamic tool request / response，确认旧 `/api/platform` 不再可用。
+  - 子 agent / 多 Turn 并行语义。
+  - run hooks 输入记录：把输入写进 Thread 历史，并触发用户配置的 Hooks，例如审计、提示注入。
+  - 历史保存顺序：明确 Thread history 初始输入、hook 注入内容与后续消息的持久化顺序。
+  - MCP server 激活来源：除全局配置外，后续可由 Dynamic Tool 或显式配置声明启用。
+- 补一轮端到端实机验证：Thread 创建、恢复、列表、删除、Turn 中断、Permission / Workspace 回流。
+- 补一轮端到端实机验证：React ThreadWindow 只通过 `/api/thread?acceptServerRequests=1` 承载 Thread / Turn 主协议与交互式请求，Swift PromptPanel 直连 `/api/thread` 创建 Thread 并提交首轮输入，Swift Dynamic Tool Provider 只通过 `/api/dynamic-tools` 承载调用，确认旧 `/api/platform` 不再可用。
 
 ---
 

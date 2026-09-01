@@ -10,12 +10,10 @@
 - [dev.md](/Users/mu9/proj/handAgent/docs/dev.md)：本地启动、排查和验证边界。
 - [dependency-audit.md](/Users/mu9/proj/handAgent/docs/dependency-audit.md)：依赖收敛后仍保留的独立迁移项。
 - [llm-api-integration.md](/Users/mu9/proj/handAgent/docs/llm-api-integration.md)：真实 LLM API 集成测试说明。
-- [visual-refactor-spec.md](/Users/mu9/proj/handAgent/docs/visual-refactor-spec.md)：前端视觉重构 spec。
-- [visual-refactor-design.md](/Users/mu9/proj/handAgent/docs/visual-refactor-design.md)：前端视觉重构实施设计资料。
 - [agents/agents.md](/Users/mu9/proj/handAgent/docs/agents/agents.md)：工程 skills 的 issue tracker、triage 标签与领域文档消费规则。
-- `human/`：面向人工操作和系统能力的补充说明。
-- `medium-powers/`：历史 spec / plan 集合；完成后应压缩为当前事实或 QA 条目。
-- `superpowers/`：历史视觉 / 输入资料资产。
+- [human/human.md](/Users/mu9/proj/handAgent/docs/human/human.md)：面向人工操作和系统能力的补充说明。
+- [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：历史 spec / plan 集合。
+- [superpowers/superpowers.md](/Users/mu9/proj/handAgent/docs/superpowers/superpowers.md)：历史视觉 / 输入资料资产。
 
 ## 放置规则
 

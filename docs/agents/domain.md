@@ -1,43 +1,31 @@
 # 领域文档
 
-本仓库采用 multi-context 领域文档布局。工程 skills 探索代码前，按本文件读取领域术语和架构决策。
+本仓库采用 multi-context 布局。根目录 [CONTEXT-MAP.md](/Users/mu9/proj/handAgent/CONTEXT-MAP.md) 是唯一上下文路由入口。
 
-## 读取顺序
+## 探索前读取
 
-1. 若根目录存在 `CONTEXT-MAP.md`，读取它并定位当前任务涉及的上下文。
-2. 读取相关上下文目录中的 `CONTEXT.md`。
-3. 读取 `docs/adr/` 中影响当前任务的系统级 ADR。
-4. 读取相关上下文目录 `docs/adr/` 中的局部 ADR。
+1. 读取 `CONTEXT-MAP.md`，定位任务涉及的上下文与关系。
+2. 读取相关 `CONTEXT.md`，使用其中的规范术语和 Avoid 列表。
+3. 读取 `docs/adr/` 中相关系统级 ADR，以及上下文目录 `docs/adr/` 中的局部 ADR。
 
-这些文件尚未创建时直接继续，不要把缺失本身报告为问题，也不要预先创建空文档。`domain-modeling` skill 会在术语或决策真正形成时按需创建。
+文件尚不存在时直接继续；`domain-modeling` 只在术语或不可轻易逆转的决策真正形成时按需创建。
 
-## 布局
+## 当前布局
 
 ```text
 /
 ├── CONTEXT-MAP.md
-├── docs/
-│   └── adr/                         # 系统级决策
 ├── apps/
-│   └── <app>/
-│       ├── CONTEXT.md
-│       └── docs/adr/                # 应用上下文决策
-└── packages/
-    └── <package>/
-        ├── CONTEXT.md
-        └── docs/adr/                # 包上下文决策
+│   ├── desktop/CONTEXT.md
+│   └── builtin-plugins/CONTEXT.md
+├── packages/
+│   └── core/CONTEXT.md
+└── docs/adr/                  # 有系统级决策时再创建
 ```
 
-`CONTEXT-MAP.md` 是上下文路由入口，只索引实际存在的上下文文档。并非每个 app 或 package 都必须预先创建 `CONTEXT.md`。
+## 消费规则
 
-## 使用领域词汇
-
-Issue 标题、重构方案、假设和测试名称涉及领域概念时，使用相关 `CONTEXT.md` 定义的术语，避免改用其明确排除的同义词。
-
-需要的概念尚未进入 glossary 时，先判断是否误用了项目语言；若确有领域缺口，记录给 `domain-modeling`。
-
-## 标明 ADR 冲突
-
-输出与现有 ADR 冲突时必须明确指出，不得静默覆盖。例如：
-
-> 与 ADR-0007 的既有决策冲突；建议重新讨论，因为……
+- 一个术语只在 owning context 定义；其他文档链接术语表，不复制定义。
+- Issue、方案、测试和文档使用 glossary 的规范词，避免重新引入被排除的同义词。
+- `CONTEXT.md` 只定义项目专有概念，不写类名、文件路径、协议字段或实现步骤。
+- 输出与 ADR 冲突时明确指出 ADR 编号和重新讨论的理由，不静默覆盖。

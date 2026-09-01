@@ -1,120 +1,40 @@
 # agent-server
 
-`apps/agent-server` 是 desktop 派生的本地 Node 服务。它只做本地 bridge、路由、持久化封装和 runtime 驱动：不渲染 ThreadWindow UI，不实现 macOS 原生能力，也不在本包定义跨进程 DTO。
-
-同一端口 `127.0.0.1:4317` 暴露四类入口：
-
-| 入口 | 消费方 | 消息边界 |
-|------|------|------|
-| `ws://127.0.0.1:4317/api/thread` | React ThreadWindow；Swift PromptPanel / AgentTrigger 窄口径 client | 接收 `ThreadCommand` / `ClientResponse`，发送 `ThreadNotification`；`ServerRequest` 只发给 `acceptServerRequests=1` 的交互式 owner |
-| `ws://127.0.0.1:4317/api/activity` | Electron StatusBubble；后续桌宠 | 只发送 `AgentActivityEvent`，连接后先发 `activity.snapshot`，状态变化时发 `activity.changed` |
-| `ws://127.0.0.1:4317/api/dynamic-tools` | Swift desktop；后续 plugin / 外部 provider | 只承载 `DynamicToolProviderMessage`，按 `clientId` 路由 dynamic tool call |
-| `http://127.0.0.1:4317/thread-window/*` | Electron ThreadWindow `BrowserWindow` | 返回 React 静态资源，不参与 thread 协议 |
+`apps/agent-server` 是 Conversation Runtime 的本地服务组合根。它拥有连接、Agent 生命周期、协议翻译、Tool 组合和 Thread 持久化适配，不拥有产品 UI 或 macOS 能力。
 
 ## 直接子节点
 
-| 子节点 | 文档 | 职责 |
-|------|------|------|
-| `src/` | [src/src.md](/Users/mu9/proj/handAgent/apps/agent-server/src/src.md) | agent-server 源码；按 `server / thread / protocol / settings / actions / bridges` 拆分 |
-| `tests/` | [tests/tests.md](/Users/mu9/proj/handAgent/apps/agent-server/tests/tests.md) | agent-server 单元测试；目录结构跟 `src/` 职责对齐 |
-| `package.json` | 无独立文档 | workspace 包声明；`main` 和 `start` 指向 `src/server/server.ts` |
-| `node_modules/` | 不纳入仓库文档 | pnpm 安装产物，不提交、不维护文档 |
+- [src/src.md](/Users/mu9/proj/handAgent/apps/agent-server/src/src.md)：生产源码索引与依赖方向。
+- [tests/tests.md](/Users/mu9/proj/handAgent/apps/agent-server/tests/tests.md)：server、Thread、Tool 与 bridge 测试。
+- `package.json`：workspace scripts 与依赖。
 
-## 启动与组合
+## 通道
 
-Electron main 作为唯一 supervisor，会在桌面 App 启动时定位仓库根目录并启动：
+| 路径 | 消费方 | 内容 |
+| --- | --- | --- |
+| `/api/thread` | React、Swift 窄口径 client | ThreadCommand、ThreadNotification、ServerRequest、ClientResponse |
+| `/api/activity` | StatusBubble | Agent Activity |
+| `/api/dynamic-tools` | Swift Host / Provider | Dynamic Tool 注册与调用 |
 
-```bash
-node --experimental-transform-types --experimental-specifier-resolution=node apps/agent-server/src/server/server.ts
-```
+三条通道语义隔离；不要用 Dynamic Tool 通道承载 UI 请求，也不要在 Activity 中复制 Thread 内容。
 
-启动后 `src/server/server.ts` 是组合根，负责把 core 和本目录模块接起来：
+## 组合边界
 
-1. 构造 `ThreadStore({ dbPath: ~/.spotAgent/threads.sqlite })`、`FilesystemBlobStore`、`FileNetworkLogger`、`FileWorkspaceRegistry`。
-2. 读取 `~/.spotAgent/mcp.json` 并创建 `MCPServerRegistry`。
-3. 创建 `WebSocketDynamicToolBridge` 与 `AgentRequestBroker`；permission/workspace ask 先进入 Agent `rx_event`。
-4. 通过 `SettingsBackedToolRegistry` 注册 builtin tools，并通过 core `createDefaultWebTools()` 创建默认公开的 web tools。
-5. 通过 `SettingsBackedLLMClient` 或 `MockLLMClient` 选择 LLM 模式。
-6. 按 thread 缓存 `AgentRuntime`，注入 thread 级 tool registry、permission policy、blob store 和 turn summarizer；mock 模式使用 `MockLLMClient` 且不启用 summarizer。
-7. 创建 `AgentManager` 作为持久 Agent owner；每个 Agent 暴露 `tx_sub`、`rx_event`、`agent_status`、`session`，并在内部复用 `ThreadRuntimeOrchestrator` 执行 ReAct turn。
-8. 创建 `AgentActivityPublisher`、`ThreadPersistence`、`ThreadNotificationPublisher`、`ThreadCommandRouter`。
-9. 启动同端口 HTTP + WebSocket 服务：`/api/thread` 挂载 thread command/response handler，`/api/activity` 挂载 activity subscriber handler，`/api/dynamic-tools` 挂载 dynamic tool provider handler，`/thread-window/*` 提供 React 静态资源，未知 path 直接关闭或返回 404。AgentTrigger 命中由 Swift 复用 `/api/thread`，不再有 `/api/agent-trigger/fire` 兼容入口。
+- `startDefaultServer` 创建设置、LLM、Workspace、Permission、Blob、MCP、Tool registry、ThreadStore、Agent manager 和三条 socket 通道。
+- Agent 是运行中 Thread 的持久 owner；外部输入统一经 `op.submit`，UI 回执在 server 内包装为内部 Op。
+- core runtime event 先在本包翻译成协议通知和审计，再发布或落盘；UI 不直接看到 runtime event。
+- Dynamic Tool spec 可随 Thread 持久化，实际调用按 `clientId` 转发给在线 Provider。
 
-## 主消息流
+## 本地数据
 
-```mermaid
-flowchart TD
-  A["React /api/thread socket"] --> B["server/attachThreadSocketHandlers"]
-  ACT["Electron StatusBubble /api/activity socket"] --> AP["server/attachActivitySocketHandlers"]
-  P["Swift /api/dynamic-tools socket"] --> D["server/attachDynamicToolSocketHandlers"]
-  D --> PB["bridges/WebSocketDynamicToolBridge"]
-  B --> C{"ClientResponse / ThreadCommand"}
-  C -- "ClientResponse" --> E["ThreadCommandRouter.handleResponse<br/>wrap client_response Op"]
-  E --> AM
-  C -- "ThreadCommand" --> F["thread/ThreadCommandRouter"]
-  F --> AM["agent/AgentManager"]
-  AM --> G["thread/ThreadRuntimeOrchestrator<br/>Agent 内部 turn 执行器"]
-  F --> H["thread/ThreadNotificationPublisher"]
-  G --> I["@handagent/core AgentRuntime"]
-  I --> J["protocol/MessageTranslator"]
-  J --> RX["Agent rx_event"]
-  RX --> H
-  H --> K["React ThreadWindow"]
-  H --> APub["activity/AgentActivityPublisher"]
-  APub --> AP
-  G --> L["thread/ThreadPersistence"]
-```
+- `~/.spotAgent/settings.json`：模型与 Tool 设置。
+- `~/.spotAgent/threads.sqlite`：Thread rollout。
+- `~/.spotAgent/mcp.json`：全局 MCP 配置。
+- Workspace、Permission、Blob 与日志路径由对应 src 子模块文档说明。
 
-`op.submit` 是公开运行期输入入口，payload 内的 `op` 只能是 `UserInput` 或 `Interrupt`。`thread.start` 只负责创建 thread 并注册持久 Agent；PromptPanel/Composer 的 action 信息已经作为 `UserInput.items` 中的 `skill` item 随首轮或后续 `op.submit` 进入 server。React 回传的 `ClientResponse` 不直接触碰 request broker，server 会将其包装为 `client_response` Op 再投递到同一个 Agent `tx_sub`。router 不再因为 thread running 拒绝用户 follow-up；是否排队由 Agent / 内部 turn 执行器处理。
-
-## 协议主干
-
-- `/api/thread` 顶层只接收 `ThreadCommand`、`ClientResponse`。
-- `/api/activity` 顶层只发送 `AgentActivityEvent`，新连接立即收到 `activity.snapshot`，后续状态变化收到 `activity.changed`。
-- `/api/dynamic-tools` 顶层只接收 `DynamicToolProviderMessage`；`provider_hello` 绑定 provider `clientId`，`tool_call_response` 唤醒 pending dynamic tool call。
-- thread 通知主干统一走 `ThreadNotification`；`thread.snapshot` 是用户打开历史 thread 或初始 prompt 建立 thread 后的状态入口，不是 React 断线恢复入口。
-- activity 状态由 `AgentActivityPublisher` 从 `ThreadNotification` / `ServerRequest` 派生；activity subscriber 发送失败只影响该 subscriber，不影响 `/api/thread` 分发。
-- permission / workspace 的交互式请求统一由 Agent `rx_event` 产出 `server.request`，app-server 只发布给设置了 `acceptServerRequests=1` 的 `/api/thread` 连接；当前 React 回 `ClientResponse` 后由 app-server 包装成 `client_response` Op。
-- `workspace.listed` 是 `workspace.list` 的连接级响应，不带 `threadId`，只发给发起命令的 `/api/thread` 连接。
-- `op.submit` 是运行期输入 envelope；`input.submit` 与 `turn.interrupt` 不再属于公开 `ThreadCommand`。
-- permission / workspace request-response 都绑定到 thread 当前连接；断线或旧 token 回包不能影响新连接。
-- 单条 React thread socket 可以同时接收多个已订阅 thread 的通知；当前协议不承诺显式 unsubscribe。
-
-## 与文件系统约定
-
-| 路径 | 写入方 | 读取方 | 说明 |
-|------|--------|--------|------|
-| `~/.spotAgent/settings.json` | desktop settings | `settings/` | LLM provider/model/API 与 builtin tool 开关；按文件 stamp 热加载 |
-| `~/.spotAgent/threads.sqlite` | `@handagent/thread-store` / `thread/ThreadPersistence` | agent-server / React ThreadWindow 历史列表 | SQLite thread rollout items，派生 messages、events 与 history summary |
-| `~/.spotAgent/blobs/` | `protocol/composeUserContent`、core runtime summary | LLM adapter / 后续 tool | 图片附件、大段 tool 输出与 summary 元数据 |
-| `~/.spotAgent/log/` | `FileNetworkLogger` | 人工排查 | LLM 请求/响应 JSONL |
-| `~/.spotAgent/workspaces.json` | desktop settings + core registry | agent-server / desktop | workspace 注册表 |
-| `~/.spotAgent/permissions.json` | core `FilePermissionPolicy` | agent-server | 永久权限规则 |
-| `~/.spotAgent/mcp.json` | 用户/安装流程 | `server/readMCPConfig` | 全局 MCP server 配置 |
-
-## LLM 模式
-
-- 默认是 `settings`：读取 `~/.spotAgent/settings.json`，使用 `SettingsBackedLLMClient`，并启用 `TurnSummarizer`。
-- `HANDAGENT_LLM_MODE=mock` 时使用 core `MockLLMClient`，关闭 summarizer，并允许未激活 thread 暴露 builtin tools，方便 mock QA 触发固定 tool 场景。
-- 打包 mock QA 可执行：
+## 验证
 
 ```bash
-bash ./scripts/package-app.sh --mock-llm
-open dist/HandAgentDesktop.app
+pnpm --filter handagent-agent-server test
+bash ./scripts/test.sh
 ```
-
-## 编辑约束
-
-- 不在 `agent-server` 内定义跨进程 DTO；thread 命令走 `@handagent/core/protocol/ThreadCommand.ts`，thread 通知走 `@handagent/core/protocol/ThreadNotification.ts`，请求回流走 `ServerRequest` / `ClientResponse`，Agent 内部事件走 `AgentEvent` / `Op`，dynamic tool provider 帧走 `@handagent/core/protocol/DynamicTool.ts`。
-- 不 import macOS、Swift、AppKit、SwiftUI 或 browser-only 模块；原生能力一律经 dynamic tool provider 转发。
-- 不在这里实现 UI 状态；ThreadWindow 后台 thread 状态缓存、当前展示 thread、composer、请求面板和消息展示属于 React 前端。
-- 不在这里实现平台原生能力；`/api/dynamic-tools` 只按 `clientId` 转发 dynamic tool 请求给 provider。
-- 新增源码子目录时，更新 [src/src.md](/Users/mu9/proj/handAgent/apps/agent-server/src/src.md)；新增测试子目录时，更新 [tests/tests.md](/Users/mu9/proj/handAgent/apps/agent-server/tests/tests.md)。
-- 修改 TypeScript 后必须重启 desktop app 才能生效，无 hot reload。
-- 验证命令：`bash ./scripts/test.sh`；涉及 desktop 启动路径时同时跑 `bash ./scripts/swiftw test` 与 `bash ./scripts/swiftw build`。
-
-## 调试入口
-
-- thread / notification 问题先看 `~/.spotAgent/threads.sqlite` 中的 `threads` / `thread_items`。
-- LLM provider 或 tool calling 问题先看 `~/.spotAgent/log/<YYYY-MM-DD>/network-NNN.jsonl`。
-- Host dynamic tool 无响应先看 `/api/dynamic-tools` provider 是否已 hello，再看 desktop `DynamicToolProviderService`。

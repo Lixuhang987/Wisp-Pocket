@@ -6,4 +6,4 @@
 
 ## 子节点
 
-- `append-prompts/append-prompts.md`：Append Prompt 示例，作为输入框 skill chip 追加到本次 `UserInput.items`。
+- `append-prompts/append-prompts.md`：Append Prompt 示例，作为输入框 chip 追加到本次 `UserInput.items`，协议类型为 `skill`。

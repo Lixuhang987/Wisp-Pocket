@@ -1,77 +1,35 @@
 # electron-shell
 
-`apps/electron-shell` 是桌面端唯一 Electron UI shell。Swift 启动它后，由它监督 agent-server，承载 Electron ThreadWindow 和 React StatusBubble。
-
-## 职责
-
-- 通过 command socket 接收 Swift command，通过 stdout newline-delimited JSON 回写 Electron event。
-- 作为唯一的 agent-server supervisor。
-- 在 agent-server 可用后创建隐藏 ThreadWindow `BrowserWindow` 并加载现有 React bundle。
-- 处理 `thread_window.open_initial_prompt`、`thread_window.open_history` 和 `thread_window.focus`；`thread_window.prepare` 不是 Swift command。
-- 启动时读取 Swift 通过 `HANDAGENT_INITIAL_THEME` 传入的当前 host theme，作为 ThreadWindow 和 ActivityWindow controller 的初始主题；缺失或非法时回退为 `system/light`，等待后续 `theme.changed` 纠正。
-- 处理 Swift 宿主发送的 `theme.changed`，保存当前 host theme，并广播给已准备好的 ThreadWindow renderer。
-- 同一 `theme.changed` 还会同步给 ActivityWindow renderer；StatusBubble 不持久化主题，只跟随 Electron main 保存的当前 host theme。
-- 处理 `activity_window.show`，创建并展示 React StatusBubble ActivityWindow。
-- visible ThreadWindow 关闭后回报 `thread_window.closed wasVisible=true`，并在 agent-server 仍可用时重新预热隐藏窗口。
-- 向 Swift 回报 `electron.ready`、`agent_server.health`、`thread_window.prepared`、`thread_window.prepare_failed`、`thread_window.closed`、`renderer.crashed` 和 `command.ack`。
-- 使用 `contextIsolation: true` 与 preload，把 React 需要的 `handAgentThreadWindowConfig`、`handAgentTheme`、theme change subscription 和初始 prompt receiver 安装到 renderer main world。preload 源文件使用 `.cts` 编译为 CommonJS `.cjs`，由 sandboxed renderer 加载；`handAgentThreadWindowConfig` 现在同时承载 `/api/thread` URL 与只读 `availableSkills`。
-- macOS 下 Electron main 以 regular activation policy 运行并显示 Dock 图标；Electron 是 ThreadWindow 的 Dock / app switcher 入口，Swift HandAgentDesktop 只在 Settings 等原生窗口需要时进入 Dock。
-
-## Supervisor
-
-- Electron main 在 `app.whenReady()` 后先应用 macOS Dock activation policy，再启动唯一 agent-server supervisor。
-- supervisor 优先使用 `utilityProcess` 的构建后 JS entry；当前没有 `apps/agent-server/dist/server/server.js` 时，使用 Node child process，并在启动日志中记录 blocker。
-- `utilityProcess` supervisor 候选与 Node child fallback 都承载同一套语义：等待 agent-server ready 后发 health、转写 stdout/stderr、非主动退出后指数退避重启、最多 5 次重启后上报最终 unavailable 诊断，Electron shutdown 时停止后台服务且不再调度重启。
-- agent-server 是唯一承载 `packages/core` thread/runtime/tool 循环的后台进程。
-- 关闭 ThreadWindow 或 ActivityWindow 不停止 agent-server；只有 Electron shutdown 会停止后台服务。
-- hidden ThreadWindow 预热由 Electron main 在 agent-server ready 后主动执行。
-- ThreadWindow 创建时通过 preload `additionalArguments` 获得当前 host theme；进程启动初值来自 `HANDAGENT_INITIAL_THEME`，后续 `theme.changed` 通过 `handagent:theme-changed` IPC 推送给同一个 renderer。
-- Electron main 启动时还会读取本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）下的配置，把启用项整理成只读 `availableSkills`，随 ThreadWindow preload 一起注入 renderer；ThreadWindow renderer 不再向 agent-server 额外请求 skill 列表。
-
-## StatusBubble
-
-- `ActivityWindowController` 创建 frameless/transparent Electron `BrowserWindow`，加载 `dist/activity-window/index.html`。
-- ActivityWindow 使用 `showInactive()` 非激活展示，窗口 `focusable: true`、`acceptFirstMouse: true`、`skipTaskbar: true`、`alwaysOnTop: true`。
-- activity renderer 直接连接 `ws://127.0.0.1:4317/api/activity`，只消费 `AgentActivityEvent`。
-- ActivityWindow 的 `webPreferences` 固定为 `contextIsolation: true`、`nodeIntegration: false`。
-- preload 暴露 activity WebSocket URL、当前 host theme、过滤后的 theme change subscription 和 `focusThread(threadId)`；renderer 不获得 Node/Electron 全量能力。
-- 点击气泡后 Electron main 只尝试聚焦 visible ThreadWindow；如果没有可聚焦窗口，点击不再唤起 Swift PromptPanel。
-
-## 边界
-
-- 不迁移 PromptPanel、Settings、Hotkey、焦点恢复或 macOS host dynamic tools；这些仍由 Swift 宿主负责。
-- 不实现 macOS 原生能力，也不管理 plugin 生命周期；host / plugin 能力仍走 Swift `/api/dynamic-tools` provider。
-- 不让 renderer 直接执行 runtime 或平台 tool；React ThreadWindow 仍直接连接 `/api/thread`。
-- 不把完整 thread 状态 mirror 到 Electron main；StatusBubble renderer 只订阅 `/api/activity`。
+`apps/electron-shell` 是 [Electron UI Shell](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md)：承载 ThreadWindow、StatusBubble，并作为 agent-server 的唯一 supervisor。
 
 ## 直接子节点
 
-| 子节点 | 文档 | 职责 |
-|------|------|------|
-| `src/` | [src/src.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/src.md) | Electron main、preload、ActivityWindow renderer 源码 |
-| `tests/` | [tests/tests.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/tests.md) | Electron shell 的 Vitest 单元测试 |
-| `package.json` | 无独立文档 | workspace 包声明；`test` 会先编译 main/preload 产物供 preload 测试加载，`build` 再额外检查 activity renderer 并打包 `dist/activity-window` |
-| `tsconfig.json` | 无独立文档 | main 与 preload 的 NodeNext TypeScript 编译，输出到 `dist/` |
-| `tsconfig.activity-window.json` | 无独立文档 | ActivityWindow renderer 的 React/Vite TypeScript 检查，不直接输出 |
-| `vite.activity-window.config.ts` | 无独立文档 | 以 `src/activity-window` 为 root，输出 `dist/activity-window` |
-| `vitest.config.ts` | 无独立文档 | Node 环境运行 `tests/**/*.test.ts` |
-| `dist/` | 不纳入仓库文档 | build 产物；packaged app 会复制其中 `main/main.js` |
-| `node_modules/` | 不纳入仓库文档 | pnpm 安装产物 |
+- [src/src.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/src.md)：main、preload 与 StatusBubble renderer。
+- [tests/tests.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/tests.md)：Electron shell 测试索引。
+- `package.json`：test/build 入口与运行依赖。
+- `tsconfig*.json`、`vite.activity-window.config.ts`：main/preload 与 renderer 构建边界。
 
-## 构建约束
+## 所有权
 
-- `pnpm --filter handagent-electron-shell build` 先用 `tsc -p tsconfig.json` 编译 main/preload 到 `dist/`，其中 `src/preload/*.cts` 必须输出为 `dist/preload/*.cjs`，再用 `tsc -p tsconfig.activity-window.json` 检查 ActivityWindow renderer，最后用 Vite 输出 `dist/activity-window`。
-- Swift packaged app 路径依赖 `dist/main/main.js`；修改 main/preload 后必须重新 build，不能只跑 ActivityWindow Vite。
-- `src/activity-window` 可以使用 React 和 browser API；`src/main` 可以使用 Electron/Node；`src/preload` 只能暴露受控 globals，不把 Node/Electron 全量能力泄漏给 renderer。
+- command socket 接收 Swift 意图，stdout NDJSON 回写 shell event。
+- agent-server ready 后由 Electron main 预热 hidden ThreadWindow；Swift 不发送 prepare command。
+- ThreadWindow 的 open/focus/close 和 StatusBubble 的显示、点击聚焦都由 Electron main 管理。
+- 关闭 UI 窗口不停止 agent-server；Electron shutdown 才停止 supervisor。
+- 主题初值来自 `HANDAGENT_INITIAL_THEME`，后续 `theme.changed` 同步到两个 renderer；renderer 不持久化偏好。
 
-## 验证命令
+## 安全边界
+
+- renderer 使用 `contextIsolation: true`、`nodeIntegration: false`；preload 只暴露受控配置与回调。
+- React ThreadWindow 直接连接 `/api/thread`，StatusBubble 直接连接 `/api/activity`。Electron main 不 mirror Thread 消息。
+- Swift Host 继续拥有 PromptPanel、Settings、AgentTrigger、焦点恢复和 Dynamic Tool Provider；本包不实现 macOS 能力或 Plugin 生命周期。
+- ThreadWindow 当前不做断线恢复；StatusBubble 的 activity client 可独立重连。不要统一两者语义。
+
+## Supervisor 与构建
+
+- supervisor 优先使用构建后的 agent-server entry；不可用时走 Node child fallback。两条路径必须保持 health、日志、退避重启和 shutdown 语义一致。
+- main/preload 修改后必须运行完整 build，确保 `.cts` preload 输出为 sandbox 可加载的 `.cjs`，并生成 ActivityWindow bundle。
 
 ```bash
 pnpm --filter handagent-electron-shell test
 pnpm --filter handagent-electron-shell build
 ```
-
-## 实现约束
-
-- **ActivityWindow 重连**：`activitySocketClient.ts` 自行实现 WebSocket 重连逻辑（指数退避、状态展示、heartbeat），未使用 `reconnecting-websocket` 等第三方库。ThreadWindow 按产品约束不做断线恢复。
-- **跨进程共享常量**：`fallbackTheme`（5 处）、`HostTheme` 类型与 `isHostTheme` 验证器（各 4 处）、`isPromiseLike`（2 处）、NDJSON 换行分割解析（2 处）分散在 renderer、preload、main 多处，当前未做统一抽象。修改这些逻辑时需同步更新所有出现位置。

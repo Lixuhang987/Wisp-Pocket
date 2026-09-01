@@ -1,134 +1,53 @@
 # 开发说明
 
-## 启动项目
+本文只记录本地启动、排障和打包边界。架构所有权从 [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md) 进入，统一术语从 [CONTEXT-MAP.md](/Users/mu9/proj/handAgent/CONTEXT-MAP.md) 进入。
 
-1. 先配置模型设置。
+## 首次启动
 
-```json
-{
-  "llm": {
-    "provider": "openai-compatible",
-    "model": "gpt-5-mini",
-    "apiKey": "你的 OpenAI API key",
-    "baseUrl": "https://你的模型提供商兼容 OpenAI 的入口/v1",
-    "api": "responses"
-  }
-}
-```
+1. 安装依赖：`pnpm install`。
+2. 运行 Swift Host：`bash ./scripts/swiftw run HandAgentDesktop`。
+3. 在 Settings 配置模型 provider、model、API key 和可选 base URL。
 
-推荐直接通过桌面应用的 `Settings...` 页面编辑这份 `~/.spotAgent/settings.json`。说明：
+`swiftw run` 会按需安装依赖、生成主题 token，并构建 ThreadWindow 与 Electron UI Shell。成功路径保持安静，失败时回放对应子命令输出。
 
-- `baseUrl` 可留空，运行时会自动回退到 `https://api.openai.com/v1`。
-- `provider` 当前支持 `openai-compatible` 与 `anthropic`；缺失时默认按旧配置走 `openai-compatible`。
-- `api` 当前支持 `responses`、`chat`、`completion`。
-- `agent-server` 会在每次模型请求前检查这份文件的文件戳；文件变化后会重新读取，因此修改设置后无需重启桌面宿主。
-- 默认公开的 `web_search` 需要启动 `agent-server` 的环境提供 `TAVILY_API_KEY`；缺失时 App 仍可启动，但模型调用 `web_search` 会返回明确错误。`fetch_page` 不依赖该变量，但会请求模型指定的目标 URL。
+## 模型设置
 
-2. 安装 workspace 依赖。
+- 设置文件是 `~/.spotAgent/settings.json`，优先通过 Settings 修改。
+- provider 支持 `openai-compatible` 与 `anthropic`；OpenAI-compatible API 支持 `responses`、`chat`、`completion`。
+- agent-server 按文件戳热加载模型与 Tool 设置；正常修改无需重启。
+- 图片输入要求支持多模态的 API；`completion` 路径不支持图片。
+- `web_search` 需要 agent-server 环境中的 `TAVILY_API_KEY`；`fetch_page` 会请求目标公共 URL。
 
-```bash
-pnpm install
-```
+## 验证入口
 
-3. 启动桌面宿主。
+| 改动范围 | 命令 |
+| --- | --- |
+| TypeScript、React、Electron、agent-server、core | `bash ./scripts/test.sh` |
+| Swift 行为 | `bash ./scripts/swiftw test` |
+| Swift 构建或桌面启动链路 | `bash ./scripts/swiftw build` |
+| 本地打包 QA | `bash ./scripts/package-app.sh --mock-llm` |
 
-```bash
-bash ./scripts/swiftw run HandAgentDesktop
-```
+`swiftw` 默认复用主 checkout 的 SwiftPM 依赖缓存，并为每个 worktree 隔离 Swift/Clang module cache。只有明确需要时才设置 `HANDAGENT_SWIFTPM_CACHE_DIR` 或 `HANDAGENT_SWIFT_MODULE_CACHE_DIR`。
 
-说明：
+## 排障顺序
 
-- `bash ./scripts/swiftw run HandAgentDesktop` 会先自动执行 `pnpm generate:theme-tokens`、`pnpm --filter handagent-thread-window-web build` 与 `pnpm --filter handagent-electron-shell build`，确保 Swift / Tailwind v4 主题 token 适配层、React 静态资源和 `apps/electron-shell/dist/main/main.js` 都存在。
-- 如果根目录缺少 `node_modules`，`swiftw run HandAgentDesktop` 会先自动执行 `pnpm install`，再生成主题 token、构建 ThreadWindow Web 与 Electron shell；这些前置步骤成功时不打印正常构建日志，失败时才回放对应命令输出。
-- `ThreadWindow` 由 Electron `BrowserWindow` 承载，默认走 `http://127.0.0.1:4317/thread-window/index.html`。这个静态入口由 Electron 监督的 `agent-server` 同端口提供。
+- 无法启动：先检查完整 Xcode、`xcode-select` 和 Electron/ThreadWindow build 输出。
+- 无法提交：区分 agent-server health、hidden ThreadWindow prepared 与模型 API key；不要把连接失败归因于 provider。
+- provider 地址错误：检查 `baseUrl` 和 `api` 是否匹配服务端协议。
+- 图片失败：确认模型 API 支持多模态，并区分 Blob 落盘、STUB 展开和 provider 拒绝。
+- 窗口或热键：检查辅助功能权限，再观察 PromptPanel、ThreadWindow 和 StatusBubble 的实际所有者。
+- 平台 Tool：先跑对应 core/Swift 测试，真实屏幕录制、AX 和焦点行为进入 manual QA。
 
-4. 如果 `swiftw run` 在当前机器报错，优先检查 Xcode 版本与 `xcode-select` 是否指向完整 Xcode，再执行同样流程。
+## 打包边界
 
-### 模型配置排查
+- `package-app.sh` 会构建 React、Electron 和 Swift release，并签名 app bundle。
+- 默认 ad-hoc 签名使用稳定 designated requirement，减少重建后 TCC 身份漂移。
+- 正式签名通过 `HANDAGENT_PACKAGE_CODESIGN_IDENTITY` 配置；bundle id 或 requirement 变化时同步设置 `HANDAGENT_PACKAGE_CODESIGN_REQUIREMENT`。
+- TypeScript 产物不会被运行中 desktop 自动热替换；修改后重新构建并重启。
 
-- 本地 `apps/agent-server/src/server/server.ts` 会通过 `SettingsBackedLLMClient` 在每次请求前检查 `~/.spotAgent/settings.json` 的文件戳，配置变化后重新读取。
-- core 的 `LLMClientFactory` 会根据配置里的 `provider` 创建 OpenAI 兼容或 Anthropic client；OpenAI 兼容路径会继续根据 `api` 选择 `responses`、`chat` 或 `completion` provider model。
-- 图片附件会先保存为本地 blob 与 image stub；进入 LLM 请求前才展开为多模态 image part。`api=completion` 不支持图片，请使用 `responses` 或 `chat`。
-- 如果提交 prompt 后看到 `Missing apiKey in ~/.spotAgent/settings.json. 请先在设置页完成模型配置。`，说明当前设置文件里没有有效的 `apiKey`。
-- 如果提交 prompt 后看到 `Could not connect to the server`，优先检查本地 `agent-server` 是否成功启动，而不要先把问题归因到 API key。
-- 如果模型请求打到了错误的 provider 地址，先检查 `baseUrl` 是否与目标服务要求的 OpenAI 兼容入口一致。
+## 代码边界
 
-## 调试方式
-
-### TypeScript / Web 侧
-
-- 修改 `apps/thread-window-web/`、`apps/agent-server/`、`packages/core/` 或跨端协议后，先跑：
-
-```bash
-bash ./scripts/test.sh
-```
-
-- 新 worktree 初始化后的默认基线先跑这一项即可。该脚本会真实执行 ThreadWindow Web test/build、Electron shell test 和 agent-server/core vitest；其中 ThreadWindow Web build 会跑 `tsc -p tsconfig.json`。只有任务涉及 Swift desktop、`Package.swift`、Swift 相关脚本、打包脚本或桌面启动链路时，才在开始阶段追加 Swift build。
-- `bash ./scripts/test.sh` 成功时只输出 `success`；任一子步骤失败时输出该失败步骤的 stdout/stderr 并返回原始退出码。
-
-### Swift 宿主
-
-- 修改 `apps/desktop/HandAgentApp.swift` 后，先跑：
-
-```bash
-bash ./scripts/swiftw build
-```
-
-- `swiftw` 会把 SwiftPM 依赖缓存写到主 checkout 的 `.cache/swiftpm/`，所以多个 `.worktrees/` 能复用依赖下载缓存。Swift/Clang module cache 默认仍在当前 worktree 的 `.cache/swift/`，避免不同源码状态互相污染。
-- 如果需要主动跨 worktree 共享 module cache，可设置 `HANDAGENT_SWIFT_MODULE_CACHE_DIR=/path/to/cache`；如需自定义 SwiftPM 依赖缓存，可设置 `HANDAGENT_SWIFTPM_CACHE_DIR=/path/to/cache`。两个变量同样适用于 `bash ./scripts/package-app.sh`。
-- 如果需要观察窗口与热键行为，优先用 PromptPanel、Electron ThreadWindow 和 React StatusBubble 的可见状态来定位问题。
-- 热键相关问题先确认辅助功能权限是否已授权。
-
-### 端到端
-
-- 文本链路：热键唤起 -> PromptPanel 输入 prompt -> Electron ThreadWindow -> bubble 输出结果。
-- 状态链路：React StatusBubble 展示 -> 点击后尝试聚焦已有 visible ThreadWindow；没有可聚焦窗口时不唤起 PromptPanel。
-- 工具链路：先通过 `packages/core/tests/*` 里对应测试验证，再考虑接到 ThreadWindow。
-
-### 打包与系统权限
-
-- 本地 QA 打包使用 `bash ./scripts/package-app.sh --mock-llm`。
-- 打包脚本会在缺少 `node_modules` 时自动执行 `pnpm install`，并按需构建 ThreadWindow Web、Electron shell、Swift release binary 与 app bundle 签名。成功时只输出 `success`；失败时才回放失败步骤的 stdout/stderr。
-- 脚本默认用 ad-hoc 签名，但会显式写入 `designated => identifier "com.yourname.HandAgentDesktop"`，避免默认 requirement 退化成随二进制变化的 `cdhash`。这样屏幕录制、辅助功能等 macOS TCC 权限在多次重构建后仍能复用同一个 App 身份。
-- 如果需要换正式签名身份，可设置 `HANDAGENT_PACKAGE_CODESIGN_IDENTITY`；如果 bundle id 或签名策略变化，也要同步设置 `HANDAGENT_PACKAGE_CODESIGN_REQUIREMENT`。
-
-## 代码规范
-
-### 目录边界
-
-- `apps/desktop/HandAgentApp.swift` 只放 macOS 宿主入口与顶层协调逻辑。
-- `apps/desktop/Sources/` 按 `AppServices`、`PromptPanel`、`Settings`、`Theme` 等分目录放 Swift 宿主实现；不要新增 Swift ThreadWindow 或 Swift StatusBubble。
-- `apps/electron-shell/` 承载 Electron ThreadWindow、React StatusBubble 与 agent-server supervisor。
-- `apps/thread-window-web/` 承载 React ThreadWindow；Tailwind v4 theme token 由 `design/tokens.json` 生成。
-- `packages/core/` 只放跨平台的 Agent Core、tool 协议和通用测试。
-- macOS 平台能力放在 `apps/desktop/Sources/AppServices/PlatformBridge/MacPlatformProvider.swift`，由 Swift host dynamic tools 注册为 `host_macos.*` 并通过 `/api/dynamic-tools` 回写结果。
-
-### 依赖边界
-
-- Core 代码不要直接依赖宿主 UI。
-- 平台实现只通过 dynamic tool spec / provider response 暴露能力，不要把 macOS 细节泄漏到 core。
-- LLM provider 通过 `LLMClient` 抽象接入，不要把具体 provider 绑死在 runtime。
-
-### 行为边界
-
-- 只有用户主动输入和用户主动选区可以作为初始上下文。
-- 屏幕、窗口、文件、剪贴板、App 状态一律通过 tool 按需读取。
-- 新 tool 默认要保持小而清晰：输入、输出、错误语义要明确。
-
-### 命名和格式
-
-- 文档默认中文，除非是 API、协议字段或原始命名。
-- tool 名称尽量使用稳定的点号风格，例如 `file.read`、`screen.capture`。
-- 测试名称要直接描述行为，不要只写“should work”。
-- 新增代码优先保持最小闭环，避免把后续任务提前塞进当前任务里。
-
-## 常用命令
-
-```bash
-# TypeScript / Web 检查
-bash ./scripts/test.sh
-
-# 桌面宿主测试与构建
-bash ./scripts/swiftw test
-bash ./scripts/swiftw build
-```
+- 用户主动输入才可进入初始上下文；宿主状态通过 Tool 按需读取。
+- core 不依赖产品 UI 或 macOS；平台能力通过 Dynamic Tool Provider 接入。
+- Tool 名称使用稳定点号形式，输入、输出、Permission 和错误语义必须明确。
+- 视觉常量只修改 `design/tokens.json`，再运行 `pnpm generate:theme-tokens`。

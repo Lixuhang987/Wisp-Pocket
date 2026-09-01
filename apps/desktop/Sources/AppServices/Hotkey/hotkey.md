@@ -28,7 +28,7 @@
 - Action 快捷键使用 `KeyboardShortcuts.Recorder` 配置，存储仍由 KeyboardShortcuts 写入 UserDefaults。
 - Action 快捷键是系统级全局快捷键，由 `ProductionHotkeyRegistrar.registerActionShortcut(...)` 注册。
 - 默认值来自 action manifest prompt 级 `globalShortcut`，仅当用户未自定义时写入。
-- Action 快捷键触发后由 Coordinator 打开 PromptPanel，并把对应 action 追加为输入框内的 skill chip；用户可继续输入，也可直接提交 skill-only 输入。
+- Append Prompt 快捷键触发后由 Coordinator 打开 PromptPanel，并把对应模板追加为 chip；用户可继续输入，也可直接提交只含 Append Prompt 的输入（协议类型为 `skill`）。
 
 ### 应用内快捷键（app-scoped）
 

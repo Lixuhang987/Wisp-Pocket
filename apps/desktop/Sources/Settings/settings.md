@@ -38,7 +38,7 @@ Coordinator.send(.openSettings)
             └─ WorkspaceSettingsView    → ~/.spotAgent/workspaces.json
 ```
 
-Append Prompt 只定义 prompt action 的 trigger/title/description/template/globalShortcut。PromptPanel 选择 action 后会追加 skill chip，提交时进入 `UserInput.items`；Settings 不再创建参数声明、运行期类型或 MCP 绑定字段。
+Append Prompt 只定义 trigger/title/description/template/globalShortcut。PromptPanel 选择后会追加 chip，提交时以 `skill` Input Item 进入 `UserInput.items`；Settings 不创建参数声明、运行期类型或 MCP 绑定字段。
 
 ## 编辑此目录的约束
 

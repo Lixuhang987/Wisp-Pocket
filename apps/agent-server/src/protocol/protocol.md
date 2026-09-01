@@ -1,112 +1,27 @@
 # protocol
 
-## 目录职责
+`protocol/` 是 agent-server 的翻译层。跨进程 DTO 的真相在 core；本目录只在 runtime、UI projection 和持久化表达之间转换。
 
-`protocol/` 是 agent-server 内部的翻译层。它不定义跨进程协议 DTO，只把 core runtime 事件翻译成 React ThreadWindow 消费的 `ThreadNotification`、把 runtime 事件翻译成持久化审计 `ThreadAuditEvent`，并处理用户附件与持久化 STUB 的双向转换。
+## 直接文件
 
-## 文件
+- `MessageTranslator.ts`：runtime event 到 ThreadNotification / ThreadAuditEvent、AgentMessage 到 ConversationMessage、Input Item 与 image STUB 的转换。
 
-| 文件 | 职责 |
-|------|------|
-| `MessageTranslator.ts` | `AgentRuntimeEvent -> ThreadNotification / 审计 ThreadAuditEvent` 翻译；`AgentMessage` ↔ `ConversationMessage` 映射；user attachment 入库；`UserInput.items` 结构化 round-trip；image STUB 进入 runtime 前展开为多模态 image part |
+## 边界
 
-## 运行位置
+- `AgentRuntimeEvent` 是执行视角；`ThreadNotification` 是 UI 协议视角；`ThreadAuditEvent` 是持久化审计视角。三者不可互换。
+- assistant 与 Tool item ID 必须包含 Turn 身份；notification ID 还要在 active Turn 内唯一，避免流式片段被误去重。
+- 图片先写 BlobStore，Thread 中保存可恢复 STUB；进入 LLM 前才展开为多模态内容。
+- user message 同时保留扁平内容和结构化 Input Item，保证 live 与 snapshot round-trip。
+- Permission/Workspace 的 ServerRequest 由 request broker 产生；workspace list 与 Dynamic Tool frame 不经过本目录。
 
-- 上游：Agent 内部的 `thread/ThreadRuntimeOrchestrator.ts` 在 runtime event 回调中调用 `toThreadNotification()` 和 `toAuditEvent()`。
-- 下游：React ThreadWindow store 消费 `assistant.delta`、`tool.started`、`tool.finished`、`thread.error` 等 `ThreadNotification`；`ThreadPersistence` 把通知写成 `event_msg`，把审计写成 `turn_context.auditEvents`。
-- 旁路：`thread/ThreadPersistence.ts` 调 `composeUserContent()` 和 `agentMessagesToConversation()`。
-- 不处理：`permission.requested` / `workspace.requested` 由 `agent/AgentRequestBroker` 包装为 Agent `server.request` event，再由 app-server 从 `rx_event` 发布；`workspace.listed` 由 `thread/ThreadCommandRouter` 构造；`DynamicToolProviderMessage` 由 `server/` 与 `bridges/WebSocketDynamicToolBridge.ts` 处理。
+## 修改约束
 
-## 关键机制
+- 新 runtime event 必须判断 UI notification 与审计是否都需要映射。
+- 新 Input Item 必须同时覆盖持久化、snapshot、live notification 与 LLM 输入转换。
+- 本目录不创建 BlobStore、不读真实配置路径、不发送 WebSocket。
 
-### Runtime event 到 `ThreadNotification`
+## 相关文档
 
-```ts
-case "assistant_message_delta":
-  return {
-    type: "assistant.delta",
-    threadId,
-    notificationId: `${threadId}-${event.messageId}-${timestamp}-${notificationSequence}-delta`,
-    turnId,
-    itemId: `${threadId}-${turnId}-${event.messageId}`,
-    timestamp,
-    payload: { text: event.payload.text },
-  };
-
-case "tool_result":
-  return {
-    type: "tool.finished",
-    threadId,
-    notificationId: `${threadId}-${event.toolCallId}-${timestamp}-${notificationSequence}-finish`,
-    turnId,
-    itemId: `${threadId}-${event.toolCallId}`,
-    timestamp,
-    payload: {
-      name: event.toolName,
-      status: event.status === "success" ? "completed" : "failed",
-      output: event.output,
-      durationMs: event.durationMs,
-    },
-  };
-```
-
-`AgentRuntime` 的 assistant `messageId` 只保证单次 run 内部递增；同一 thread 后续 turn 可能再次出现 `assistant-1`。因此 `assistant.delta.itemId` 必须拼入 `turnId`，保证 React `ThreadWindow` 的 message identity 在多轮会话中稳定唯一。`notificationId` 还必须包含 active run 内单调递增的 `notificationSequence`，避免多段 `assistant_message_delta` 在同一毫秒内共用同一个 ID，被 React store 的重复通知保护误判为重复消息。
-
-core runtime 只知道 `tool_result` 成功或失败；React UI 需要的是 `tool.finished(status)`。这个映射集中在这里，新增工具事件字段时只改一个地方。
-
-### Runtime event 到审计事件
-
-```ts
-case "permission_decision":
-  return {
-    type: "permission_request",
-    timestamp,
-    toolName: event.toolName,
-    action: event.decision,
-    granted: event.decision === "allow",
-  };
-```
-
-审计事件不是 UI 事件。权限决策不会直接变成桌面消息流，但会落进 thread `events`，供后续排查 tool 调用和权限记忆行为。
-
-### 图片附件先落 Blob，再保存 STUB
-
-```ts
-const record = await blobStore.put({
-  kind: "image",
-  bytes: Buffer.from(attachment.base64, "base64"),
-  extension: imageExtension(attachment.mimeType),
-});
-parts.push(renderStub({
-  id: record.id,
-  kind: record.kind,
-  size: record.size,
-  path: record.path,
-}));
-```
-
-用户主动提交的图片不会直接塞入 thread JSON。`composeUserContent()` 先把 bytes 写入 BlobStore，再把可恢复的 STUB 文本写入 user message。图片扩展名和 MIME 反推使用 `mime-types`，只在识别失败时回退到安全默认值。进入下一轮 runtime 前，`agentMessagesToRuntimeMessages()` 会解析 STUB 并转成 `{ type: "image", blobId, mimeType }`。
-
-### user message 保留结构化 items
-
-- `composeUserInputContent()` 仍负责把 `UserInput.items` 组合成持久化 / LLM 可消费的扁平 `content`。
-- 同时 `agentMessagesToConversation()` 会在 user role 上透传 `inputItems`，让 `thread.snapshot` 保留 skill、image、text_selection、text 的原始结构。
-- `user.message.recorded` 也会携带 `payload.items?`，这样 React 可以在首轮 live 通知和后续 snapshot 恢复时得到同一份结构化 user 输入。
-
-## 数据边界
-
-- `ConversationMessage` 是快照视角；`AgentMessage` 是 LLM/runtime 视角。
-- core 协议里的 `ThreadNotification` 是 thread 通知主干；`@handagent/thread-store` 里的 `ThreadAuditEvent` 是审计事件，两者职责不同。
-- STUB 是持久化占位，不是 LLM 最终输入；真正 LLM 请求前才展开成多模态 content part。
-- `ThreadNotification`、`ServerRequest`、`ClientResponse`、`DynamicToolProviderMessage` 的类型真相在 `packages/core/src/protocol/`；本目录只引用和适配。
-
-## 编辑约束
-
-- 新增 `AgentRuntimeEvent` 类型时，必须同时判断是否需要更新 `toThreadNotification()` 与 `toAuditEvent()`。
-- 新增用户附件类型时，必须同时处理 `composeUserContent()`、持久化表达和进入 runtime 前的展开逻辑；能用 `structuredClone` 复制的结构化输入不要再手写 variant clone。
-- 不在这里读写真实文件路径；BlobStore 由 `thread/ThreadPersistence` 或 `server/startDefaultServer` 注入。
-
-## 下一步阅读
-
-- core 协议定义：[packages/core/src/protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)
-- core runtime 事件：[packages/core/src/runtime/runtime.md](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md)
+- [core protocol](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)
+- [core runtime](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md)
+- [thread persistence](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)

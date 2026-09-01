@@ -1,74 +1,43 @@
-# PromptPanel 模块
+# PromptPanel
 
-全局热键唤起的命令面板：输入普通 prompt、追加用户主动附件，或通过 `ActionDefinition` 把 prompt action 追加为输入框下方统一 chip row 中的 skill chip。架构是 **View + ViewModel + Controller + Styles** 四件套。
+PromptPanel 是 [Desktop Experience](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md) 的瞬时输入界面。它编辑结构化 UserInput、展示用户主动 Attachment，并把 Append Prompt 追加为 chip。
 
-## 文件
+## 直接文件
 
-| 文件 | 职责 |
-|------|------|
-| `PromptPanelView.swift` | 纯 UI：输入框、chip row、action 列表、server 不可用提示和设置按钮 |
-| `PromptPanelGrowingTextView.swift` | `NSViewRepresentable` 输入控件：封装 `NSTextView + NSScrollView`，支持自动增高、键盘命令转发 |
-| `PromptPanelInputCommand.swift` | 输入区 AppKit command selector 到 PromptPanel 意图的纯解析：Return、Shift/Option+Return、Tab、上下键 |
-| `PromptPanelInputLayout.swift` | 输入区布局辅助：根据 editable text 是否有可见内容决定文字编辑区域宽度 |
-| `PromptPanelViewModel.swift` | `@Observable` 状态：`inputItems` / 唯一 editable `draft` / `attachments` / `chipItems` / `filteredActions` / `selectedActionId`；Tab/点击/快捷键追加 skill item，提交完整 item 数组 |
-| `PromptPanelController.swift` | `NSPanel` 生命周期、ESC 监听、ViewModel 注入、QuickLook 预览和回调出口 |
-| `PromptPanelFocusRestorer.swift` | 记录 PromptPanel 唤起前的前台应用，并在面板因失焦或 ESC 收起后恢复应用焦点 |
-| `PromptPanelInputFocusRetrier.swift` | 输入框 AppKit 焦点重试器 |
-| `PromptPanelWindow.swift` | `NSPanel` 子类，处理失焦自动隐藏 |
-| `PromptPanelStyles.swift` | PromptPanel 容器、action row、trigger pill、icon button 样式 |
-| `PromptAttachmentResult.swift` | `PromptAttachmentResult` 枚举；描述 PromptPanel 提交时附带的用户主动输入附件 |
-| `ActionDefinition.swift` | prompt action manifest 定义：trigger、title、description、template、globalShortcut、icon、校验和 trigger 冲突处理 |
-| `ActionManifestStore.swift` | 从 `~/.spotAgent/actions/*/action.json` 读取 prompt action manifests |
-| `ActionInvocation.swift` | 把 `ActionDefinition` 转成 `PromptPanelSkillInputItem` |
-| `QuickLookPreviewController.swift` | 把 `imageRegion` 的 base64 写入临时文件，并通过 `QLPreviewPanel` 预览 |
+- `PromptPanelView.swift`、`PromptPanelStyles.swift`：SwiftUI 展示与主题样式。
+- `PromptPanelViewModel.swift`：Input Item、Attachment、Append Prompt 候选和提交状态。
+- `PromptPanelController.swift`、`PromptPanelWindow.swift`：NSPanel 生命周期与事件出口。
+- `PromptPanelGrowingTextView.swift`、`PromptPanelInputCommand.swift`、`PromptPanelInputLayout.swift`：文本输入、键盘命令和布局。
+- `PromptPanelFocusRestorer.swift`、`PromptPanelInputFocusRetrier.swift`：AppKit 焦点边界。
+- `PromptAttachmentResult.swift`、`QuickLookPreviewController.swift`：用户主动 Attachment 与图片预览。
+- `ActionDefinition.swift`、`ActionManifestStore.swift`、`ActionInvocation.swift`：Append Prompt manifest、候选和 Input Item 转换。
 
-## 数据流
+## 输入模型
 
-```
-Coordinator
-  └─ 读取 ActionManifestStore → Controller.register(actions:)
-                            └─ 创建或刷新 ViewModel(actions:)
-                            └─ ViewModel.onSubmit(inputItems, attachments) 回调到 Controller
-                                                                       └─ 转发给 Coordinator.send(.submitPrompt)
-ActionShortcut → Coordinator.performActionShortcut(ActionDefinition)
-              └─ PromptPanelController.selectActionAndShow(action)
-                   └─ ViewModel.appendSkill(action) + show()
-PromptPanelGrowingTextView command
-  ├─ 上/下键 → ViewModel.moveSelectedAction
-  ├─ Return → ViewModel.submit
-  ├─ Tab → ViewModel.submitSelectedAction（追加 skill chip，不提交）
-  └─ Shift/Option + Return → 插入换行
-```
+- Input Item 数组始终只有一个可编辑 text item；Append Prompt 在协议中序列化为 `skill` item。
+- chip row 同时展示 Append Prompt 与 Attachment，但两者保留独立身份和删除行为。
+- Return 提交完整输入；Shift/Option+Return 插入换行；Tab 只追加当前 Append Prompt。
+- 手写 trigger 没有特殊语义。只有选择候选、点击或已注册快捷键才追加 Append Prompt。
+- server 不可用时保留草稿、Input Item 和 Attachment，不执行清空。
 
-输入框模型是数组：
+## 提交与焦点
 
-- 数组里始终只有一个 editable text item。
-- `PromptPanelChipItem` 是展示层模型，把 `inputItems` 中的 skill 与 `attachments` 中的用户主动附件统一渲染为输入框下方 chip row。
-- 用户可以添加多个 skill chip，也可以用 chip 的删除按钮删除对应 skill 或附件；Backspace 只编辑文本，不删除 chip。
-- Return 提交完整 `inputItems + attachments`；如果只有 skill chip 没有文本，也可以提交。
-- 手写 trigger 或 `[name: value]` 不再有特殊语义，只是普通文本。
+1. Controller 先以 `hide(restoringFocus: false)` 隐藏 PromptPanel。
+2. Swift thread client 创建 Thread 并提交首轮 UserInput。
+3. 收到 Thread ID 后，Electron UI Shell 打开或聚焦 ThreadWindow。
 
-提交后由 Coordinator 调用 Swift `/api/thread` client，先发送带默认 dynamic tools 的 `thread.start`，收到 `thread.started` 后发送首轮 `op.submit(UserInput)`，再让 Electron open/focus 对应 React ThreadWindow。`thread.start` 不携带 action binding。
+这个顺序是强约束：handoff 期间恢复旧前台 App 会导致 ThreadWindow 被带离焦点。打开历史时也要先无恢复地隐藏 PromptPanel。
 
-## 编辑此目录的约束
+## 模块边界
 
-- **View 只读 ViewModel**：不要让 View 直接调 `NSEvent` / `NSPanel` / `KeyboardShortcuts.*` API。
-- **ViewModel 不持有 SwiftUI 类型**：只暴露 plain Swift 状态与回调。
-- **Controller 是窗口管理 + 事件监听层**：不直接写 thread/turn 逻辑，跨模块意图通过 `onSubmit` / `onOpenSettings` 闭包出口给 Coordinator。
-- **后台热键展示语义**：`show()` 负责所有“后台宿主 -> PromptPanel”入口的前台展示，包括 `showPromptPanel`、用户主动 capture 和 Action 全局快捷键。宿主仍是 `.accessory` 时，Controller 必须先做最小宿主激活，再展示 `.nonactivatingPanel`；宿主已经是 `.regular` 时，不得再次激活整个 App，避免把 Settings 等无关窗口一起带到前台。
-- **Action 全局快捷键**：每个 `ActionDefinition` 通过 `shortcutName = "action.<id>"` 获得可配置全局快捷键名；触发后只追加输入框下方 chip row 中的 skill chip 并显示 PromptPanel。
-- **动态 action 刷新**：Controller 可多次 `register(actions:)`；首次创建 ViewModel，后续只刷新 ViewModel action 列表。
-- **焦点语义**：凡是从 PromptPanel 把控制权切给 Electron ThreadWindow 的路径，都必须避免恢复旧前台应用。提交 prompt 时，Coordinator 必须先调用 `hide(restoringFocus: false)`，再发起 Swift `/api/thread` 首轮提交并在拿到 `threadId` 后聚焦 Electron ThreadWindow；PromptPanel 仍可见时若触发 `openHistory`，也必须先 `hide(restoringFocus: false)` 再发送 `thread_window.open_history`。
-- **首次 handoff 是高频回归点**：上面这条不能退化成”最终调用过 hide 就行”，而必须保证顺序是”先 hide(restoringFocus: false)，再 open/focus ThreadWindow”。这个 bug 已多次出现；以后改 PromptPanel 焦点恢复或失焦自动隐藏时，必须把它当强制回归项。
-- **server 不可用时不丢草稿**：`submissionDisabledMessage != nil` 时输入框禁用并显示提示，`submit()` 直接返回，不清空 `inputItems` / `attachments`。
-- **滚动条样式走 Shared**：PromptPanel 输入框内部 `NSScrollView` 与 action 列表 `ScrollView` 都复用 `Sources/Shared/OverlayScrollbar.swift`；不要在 `PromptPanelStyles.swift` 再维护一份局部滚动条实现。`OverlayScrollbar` 需要同时把 `NSScrollView` 和其 `contentView` 设为透明，并按 overlay 所在区域与各 `NSScrollView` 的几何重叠选择目标；对 SwiftUI `HostingScrollView` 还要在首次更新后做一次短延迟重试，覆盖系统 scroller 的后置装配。
-- **Common 复用边界**：PromptPanel 可复用 [Common](/Users/mu9/proj/handAgent/apps/desktop/Sources/Common/common.md) 的基础控件和 theme-safe 样式，但 growing text view、chip row、action 搜索/选择、窗口布局和焦点恢复保留在 PromptPanel。不要为了统一组件而磨平 PromptPanel 专用输入和 hover 语义。
-- **这次回归的教训**：PromptPanel 这类“输入框滚动区 + 列表滚动区”并存的界面，不能再用“找到第一个 scroll view”或“靠 sibling 顺序猜目标”的方式注入样式。白底既可能来自系统 `NSScroller`，也可能来自 `NSClipView`；只有同时验证“命中的是正确 scroll view、`contentView` 透明、最终 scroller 已替换”三件事，才算真正修好。
-- **测试**：`PromptPanelViewModelTests` 覆盖输入 item 数组、统一 chip 展示/删除/预览、skill-only 提交、过滤和附件；`PromptPanelInputCommandTests` 覆盖键盘命令解析；`PromptPanelControllerTests` 额外覆盖 accessory/regular 宿主下的 PromptPanel 展示激活语义；`OverlayScrollbarTests` 覆盖共享 overlay 滚动条的透明背景、palette、`contentView` 透明化和 PromptPanel 多滚动容器下的几何命中；`PromptPanelAppearanceTests` 覆盖真实渲染后的 action 列表 `HostingScrollView` 透明背景与 `OverlayScroller` 注入；`ActionDefinitionTests` / `ActionInvocationTests` / `ActionManifestStoreTests` 覆盖 manifest 与 skill item 构造。
+- View 只读取 ViewModel；AppKit window/event API 留在 Controller 和专用 adapter。
+- ViewModel 只暴露 plain Swift 状态与回调，不持有 SwiftUI 类型或 Thread 生命周期。
+- 跨模块意图通过 Coordinator；PromptPanel 不组装 LLM message、不读取 runtime 状态。
+- 通用控件和 theme-safe 样式复用 `Sources/Common`；输入、chip、窗口和焦点语义留在本模块。
+- 多滚动容器的 overlay scroller 选择必须按几何归属，不能依赖“第一个 scroll view”或 sibling 顺序。
 
-## 与其他模块的关系
+## 验证
 
-- 由 [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 持有并注入 actions。
-- 提交 prompt 后由 Coordinator 通过 [SwiftThreadClient](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/AgentServer/SwiftThreadClient.swift) 直连 `/api/thread` 创建并提交首轮输入，再通过 [ElectronThreadWindowLifecycle](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/ElectronThreadWindowLifecycle.swift) 按 `threadId` 聚焦 Electron ThreadWindow。
-- [AgentServer](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/AgentServer/agent-server.md) 可用性变化会同步到 `setSubmissionEnabled`。
-- 全局热键来自 [AppServices/Hotkey](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/Hotkey/hotkey.md)。
+- ViewModel/Input Item：`PromptPanelViewModelTests`、`ActionDefinitionTests`、`ActionInvocationTests`。
+- 键盘与焦点：`PromptPanelInputCommandTests`、`PromptPanelControllerTests`。
+- 主题和滚动容器：`PromptPanelAppearanceTests`、`OverlayScrollbarTests`。

@@ -1,21 +1,17 @@
 # core
 
-## 目录职责
-
-`packages/core` 是 `@handagent/core` workspace 包，承载跨平台 Agent 核心：thread / turn 数据模型、runtime、LLM 抽象、tool 协议、dynamic tool 协议、protocol、workspace 与 permission。
-
-core 不依赖 AppKit，不实现 UI，不直接读取屏幕、窗口、剪贴板或 macOS 状态；这些能力由应用层作为 dynamic tools 注册并执行。
+`@handagent/core` 定义 [Conversation Runtime](/Users/mu9/proj/handAgent/packages/core/CONTEXT.md) 的跨平台类型与纯逻辑，不拥有 UI、WebSocket server、数据库或 macOS 能力。
 
 ## 直接子节点
 
-- [src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)：core 源码模块索引与跨模块架构约束。
-- `package.json`：包名为 `@handagent/core`，`exports` 当前为 `"./*": "./src/*"`。
-- `tests/`：core Vitest 测试目录。`runtime/runtime-use-cases.test.ts`、`mcp/mcp-use-cases.test.ts`、`permission/security-use-cases.test.ts` 和 `protocol/protocol-boundaries.test.ts` 覆盖主要 use-case / 合约边界；LLM adapter、logging、workspace、blob、MCP transport、builtin tools 等外部边界仍保留模块级测试。
+- [CONTEXT.md](/Users/mu9/proj/handAgent/packages/core/CONTEXT.md)：Conversation Runtime glossary。
+- [src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)：源码模块索引与依赖方向。
+- `tests/`：runtime、LLM、Tool、协议、Workspace 与 Permission 用例测试。
+- `package.json`：`@handagent/core` exports 与依赖声明。
 
-## 包级边界
+## 边界
 
-- 应用层 TypeScript 代码通过 `@handagent/core/...` exports 引用 core，不使用跨包相对路径进入 `packages/core/src/...`。
-- core 可以定义 dynamic tool DTO 与 adapter，但不能实现 macOS 平台细节；Swift desktop 通过 `/api/dynamic-tools` 处理默认 host dynamic tools。
-- core 可以定义 `ThreadCommand`、`ThreadNotification`、`ServerRequest`、`ClientResponse` 等协议 DTO，但 WebSocket 连接管理、thread 路由、UI 状态和平台 socket 分流属于应用层。
-- core 不实现 thread 持久化后端；thread rollout 持久化由 `@handagent/thread-store` 负责。core 仍保留 workspace、permission、blob 等跨平台数据能力。
-- 新增源码子目录时，同步更新 [src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)；本文件只列 core 的直接子节点，不平铺 `src/` 下的孙目录。
+- core 可以依赖 Node 标准库和已声明的跨平台运行依赖，但不依赖 AppKit、Electron 或 DOM。
+- core 定义 DTO 和端口；agent-server 负责连接、组合、持久化与平台 adapter。
+- Dynamic Tool 只在 core 定义协议和 adapter，执行权属于外部 Provider。
+- `@handagent/thread-store` 可以依赖 core；core 不反向依赖持久化包。

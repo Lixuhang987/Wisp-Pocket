@@ -15,13 +15,14 @@
 ### 根目录入口
 
 - `README.md`：项目简介、当前能力、本地验证命令。
-- `handAgent.md`：仓库级架构总览、主调用链路、分层 DTO 索引；后续向 `apps/` 与 `packages/` 分叉。
+- `CONTEXT-MAP.md`：统一术语入口；按任务定位 Conversation Runtime、Desktop Experience 或 Host Automation glossary。
+- `handAgent.md`：跨上下文架构、分层所有权、通道合约与阅读路由。
 - `AGENTS.md`：本文件，工作约定 + 文档维护规则。
 
 ### 一级子目录（每个目录由其内 `<dir>.md` 接力）
 
-- `apps/apps.md`：应用层总览，索引 desktop、thread-window-web 与 agent-server。
-- `packages/packages.md`：包层总览，索引 core 跨平台核心。
+- `apps/apps.md`：应用入口、UI、宿主适配与本地服务索引。
+- `packages/packages.md`：跨平台核心与 Thread 持久化索引。
 - `examples/examples.md`：可复制到 `~/.spotAgent/` 的 Append Prompt / MCP 配置示例。
 - `docs/docs.md`：开发说明、待办、QA、spec / plan 与设计资料入口。
 - `codex/`：本地 code agent 的参考项目（权限系统 / tool 系统 / UI 流式展示 / 子 agent 系统等可借鉴）。
@@ -33,10 +34,11 @@
 - 新增子目录或子模块时，更新所在目录的 `<dir>.md` 索引；上层文档无需改动。
 - 跨模块约定（协议字段、设置文件路径等）必须在双方文档相互引用，避免单边漂移。
 - 当代码与文档冲突时，优先以代码为真相并立即修文档；不要在 PR 描述里只写"待补文档"。
+- 项目专有术语只在 owning `CONTEXT.md` 定义；架构文档引用规范术语，不复制 glossary。
 
 ## 架构事实入口
 
-主调用链路、分层职责和跨进程 DTO 以 [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md) 为准。本文件只保留协作、文档维护和开发流程约束，避免和架构文档双写。
+跨上下文架构、分层职责和通道合约以 [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md) 为准；协议字段以 owning 类型定义为准。本文件只保留协作、文档维护和开发流程约束。
 
 ## Agent skills
 

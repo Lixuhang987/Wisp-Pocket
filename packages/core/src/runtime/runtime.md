@@ -1,107 +1,37 @@
 # runtime
 
-Thread turn 循环、消息模型、tool call 编排。是整个 Agent 的"主心脏"。
+`runtime/` 实现一个 Turn 内的 LLM/Tool 循环，以及持续消费 Op 的 Agent 运行壳。术语见 [Conversation Runtime](/Users/mu9/proj/handAgent/packages/core/CONTEXT.md)。
 
-## 文件
+## 直接文件
 
-| 文件 | 职责 |
-|------|------|
-| `AgentMessage.ts` | LLM 面向的消息判别联合：`user / assistant(+toolCalls?) / tool / system`；user content 支持字符串或 `text/image` 多模态 parts，并可带 `inputItems?` 供 UI / 持久化 round-trip |
-| `ToolCallEnvelope.ts` | `{ id, name, arguments }` 三元组，连接 LLM 输出与 ToolRegistry |
-| `AgentThread.ts` | 把 `AgentThreadInput`（prompt + 可选选区）归一化为首轮 user message；当前未在 agent-server 主链路使用，仅作为脚本入口 |
-| `AgentRuntime.ts` | 单次 ReAct 主循环：消费 `LLMClient.stream` → 按 delta 发 assistant runtime 事件 → 收集 toolCalls → 逐个交给 `handleToolCall` 处理权限、执行、结果回灌；`requiresPermission=false` 的 tool 跳过普通权限审批；同一次用户输入内最多循环 `maxTimes` 次；支持 `AbortSignal` 中断 |
-| `AgentRunner.ts` | 持续消费 `Op` 的外层运行壳，协调 thread port、active turn 与状态 |
-| `AgentSession.ts` | Agent 静态配置与服务容器 |
-| `AgentThreadPort.ts` | thread 端口：记录用户输入、发事件、等待 summary |
-| `SystemPrompt.ts` | system prompt 分段组装器：以 `SystemPromptSection[]` 表达默认策略，按 LLM 请求临时解析成 `system` messages，不写回 thread 历史 |
-| `Stub.ts` | 统一渲染 / 解析 `[STUB ...]...[/STUB]` 文本，占位引用 Blob 内容 |
-| `TurnSummarizer.ts` | turn 结束后用固定并发 worker pool 压缩 `cached=turn` 的 tool message，写回 Blob summary 并重渲染消息 |
+- `AgentMessage.ts`：LLM 消息与多模态 user content。
+- `AgentRuntime.ts`：单次 Turn 的 LLM/Tool 循环、Permission 和中断检查。
+- `AgentRunner.ts`：持续消费 Op，协调 Thread port 和状态。
+- `AgentSession.ts`、`AgentThreadPort.ts`：运行配置、服务和 Thread 端口。
+- `SystemPrompt.ts`：按 section 组装临时 system message。
+- `Stub.ts`、`TurnSummarizer.ts`：大内容引用与 Turn 后压缩。
+- `ToolCallEnvelope.ts`：LLM Tool call 的归一化表达。
+- `AgentThread.ts`：旧脚本入口的初始文本归一化，不属于 agent-server 主路径。
 
-## 主循环
+## Turn 循环
 
-```mermaid
-flowchart TD
-  A[AgentRuntime.runWithMessages(messages, onEvent, {threadId, turnId?, signal?})] --> A1[await pending turn summaries]
-  A1 --> B0[time ← 0]
-  B0 --> B1[SystemPrompt sections + messages -> LLM messages]
-  B1 --> C[LLMClient.stream(llmMessages, registry.list(), {blobStore?})]
-  C --> C1[emit assistant start / delta / end]
-  C1 --> D[push assistant message]
-  D --> E{toolCalls.length > 0?}
-  E -- 否 --> S[start async TurnSummarizer]
-  S --> F[return AgentRunResult.messages]
-  E -- 是 --> G[for each toolCall]
-  G --> H[PermissionPolicy.check]
-  H --> I{decision}
-  I -- ask --> J[resolveAsk + remember]
-  I -- deny --> K[push tool message (拒绝文案)]
-  I -- allow --> L[ToolRegistry.get(name).call(arguments)]
-  L --> M[push tool message (序列化结果或错误)]
-  K --> G1[all tool calls handled]
-  M --> G1
-  J --> I
-  G1 --> N[time ← time + 1]
-  N --> O{time < maxTimes}
-  O -- 是 --> C
-  O -- 否 --> P[throw exceeded maxTimes]
-```
+1. 等待前一轮异步 summary，并把 system sections 临时前置到 LLM 输入。
+2. 流式接收 assistant 内容和 Tool call，发出 runtime event。
+3. 对普通 Tool 执行 Permission policy，再经 ToolRegistry 调用并回灌结果。
+4. 无 Tool call 时结束 Turn；有 Tool call 时继续下一次 LLM 迭代，最多 `maxTimes`。
+5. Abort 后停止追加消息和事件；无法硬取消的 Tool 返回也不能写回已中断 Turn。
 
-## 事件
+## 边界
 
-`AgentRuntimeEvent` 是 runtime 内部回调流，由 agent-server 的 Agent 内部 turn 执行器翻译为 `ThreadNotification` 与审计事件：
+- runtime event 是内部执行事件，由 agent-server 翻译为 ThreadNotification 与审计。
+- AgentRuntime 不处理 WebSocket、持久化、UI projection 或 provider 私有 stream。
+- Tool 只能经 ToolRegistry 查找；Dynamic Tool 在外部先适配成普通 AgentTool。
+- system message 不写入 Thread 历史；Input Item 结构只作 round-trip，模型消费归一化后的 content。
+- `use_tools` 是激活完整 Tool 集的 meta-tool，跳过普通 Permission；其他 Tool 默认进入 policy。
 
-- `assistant_message_start | assistant_message_delta | assistant_message_end`：由 `LLMStreamEvent.text_delta` 逐段转发；legacy `complete()` client 会经 `streamLLM()` 兼容层退化为单段 delta；中断时 `_end` status 为 `interrupted`。
-- `tool_call`：tool 调用前埋点；agent-server 会翻译成 `tool.started`。
-- `tool_result`：成功 / 失败 + 序列化输出（`MAX_OUTPUT_BYTES = 8 KiB` 截断）+ duration；agent-server 会翻译成 `tool.finished`。
-- `permission_decision`：进入 `ask` 路径后的解析结果；用于审计事件，不直接发 UI 消息。
-- `runtime_error`：仅类型预留，目前未在循环内主动 emit；若出现，会由 agent-server 归一化为 `thread.error`。
+## 修改约束
 
-## Thread 编排边界
-
-- `AgentRuntime` 只负责单次 LLM/tool loop，不直接暴露给 UI，也不直接处理 WebSocket 协议。
-- 新主路径由 `AgentRunner` / agent-server 持久 Agent 持续消费 `Op`，并把 `AgentRuntimeEvent` 交给 thread port 处理持久化与通知；跨进程待回执请求由 app-server request broker 作为 Agent `server.request` event 输出。
-- runtime 不负责 agent-server socket 协议翻译、持久化审计事件模型、server 侧中断补帧策略或 desktop 展示状态推断。
-
-## meta-tool 激活分支
-
-`AgentRuntime.handleToolCall` 在分派 tool call 前先检查 tool name 是否等于 `META_TOOL_NAME`（`"use_tools"`）：
-
-- 命中时跳过 `PermissionPolicy.check`，直接触发激活回调，不走普通 tool 执行路径。
-- 两个可选回调由 agent-server 注入：
-  - `onMetaToolActivate(threadId)`：激活时通知 `ThreadScopedToolRegistry` 扩展工具集。
-  - `isThreadActivated(threadId)`：每次 LLM 请求前判断当前 thread 是否已激活，用于决定传入完整工具集还是仅 meta-tool。
-- tool-use-policy system prompt section 仅在 `hasRealTools`（registry 中存在非 meta-tool）为真时出现；未激活 thread 不注入该 section，避免引导模型调用尚不存在的工具。
-
-## 无需审批工具
-
-普通 tool call 默认进入 `PermissionPolicy.check`。如果 `AgentTool.requiresPermission === false`，runtime 会跳过 `PermissionPolicy`，直接执行工具并照常发送 `tool_call` / `tool_result` 审计事件。当前用于默认公开且低风险的 `use_tools`、`web_search`、`fetch_page`；新增工具不得随意复用该开关。
-
-## 运行约定
-
-- `maxTimes = 100`：限制一次 ReAct loop 内的 LLM/tool 循环次数，防止无限循环。
-- `permissionPolicy = AllowAllPermissionPolicy()`：仅在测试 / 脚本场景默认放行；生产由 `agent-server` 注入 `FilePermissionPolicy(askResolver)`。
-- `systemPromptSections = buildDefaultSystemPromptSections()`：默认包含 tool-use policy section；当 `ToolRegistry` 中存在可用 tool 时，每次 LLM 请求前临时前置 system message，要求模型在需要外部状态或多步流程时返回结构化 tool call，而不是只用 assistant 文本描述计划。该 system message 只进入本次 LLM 输入，不进入 `AgentRunResult.messages`，因此不会被 UI 或 thread 持久化重复保存。
-- `serializeToolResult` 把非字符串结果用 `JSON.stringify`，循环引用降级为 `[unserializable tool result]`。
-- 带 `stubByDefault` 的 tool 若输入里显式传 `cached=turn|persist`，runtime 会把序列化结果写入注入的 `BlobStore`，并把 tool message content 渲染成 STUB。
-- runtime 不解析持久化 image STUB；agent-server 会在调用 runtime 前把用户主动提交的 image STUB 转成多模态 image part，runtime 只负责把注入的 `BlobStore` 继续透传给 `LLMClient`。
-- `cached=turn` 的 tool message 在本 turn 内保留完整 body；turn 自然结束后 `TurnSummarizer` 异步压缩，下一次 LLM 调用前 `waitForPendingSummaries()` 会等待并应用 summary。
-- `AgentRunner` 通过 thread port 先持久化 `user_input`，然后由 thread port 负责发 `user.message.recorded`；如果该输入唤醒 idle thread，再发 `turn.started`。run 结束后补 `turn.completed` 和 `thread.status.changed`。`client_response` Op 属于 app-server request broker 的内部输入，不进入 LLM message history。
-- `UserAgentMessage.inputItems?` 只是 user 输入的结构化旁路，不参与 runtime 推理顺序；真正喂给模型的仍是 `content`（纯文本或已展开的多模态 parts）。
-- 单个 tool call 的处理拆在 `handleToolCall` / `resolveToolPermission` / `callTool` / `appendDeniedToolResult` 内：主循环只负责 turn 推进与消息顺序，权限记忆、拒绝回灌、执行计时和错误序列化各自独立。
-- `truncateOutput` 按 UTF-8 字节判长度，但截断时按 JS 字符索引切片（已知潜在 bug，见架构改进）。
-- `runOptions.signal` 被 abort 后，runtime 抛 `AbortError`，停止后续 assistant / tool 事件与消息追加；无法硬取消的 tool 返回后也不会再写入本 run。
-
-## 编辑此目录的约束
-
-- 不要在 runtime 里 `import` 任何 `node:fs` / `ai` / `@ai-sdk/*`，保持纯逻辑层。
-- BlobStore 与 TurnSummarizer 由组合根注入；runtime 不创建磁盘 store、不选择具体模型。
-- 不要把 provider 私有 stream / SSE 细节写进 `AgentRuntime`，provider 必须先归一化成 `LLMStreamEvent`。
-- tool 调用以 `ToolRegistry.get(name)` 为唯一入口，不允许直接 `import` builtin tool。
-- 新增 system prompt 规则时优先放入 `SystemPrompt.ts` 的 section builder，不要在 `AgentRuntime.completeAssistantResponse()` 里直接拼接策略字符串。
-- 新增事件类型时，agent-server 的协议转发层与审计落盘层必须同步更新。
-
-## 相关文档
-
-- 上游接口：[llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md)
-- 下游接口：[tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md) / [permission/permission.md](/Users/mu9/proj/handAgent/packages/core/src/permission/permission.md)
-- 协议翻译：[apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)
+- 保持 runtime 不依赖 `node:fs`、AI SDK provider、AppKit 或 DOM。
+- 新 runtime event 要同步检查 agent-server 的 UI 与审计翻译。
+- 新 system rule 放入 section builder，不在主循环拼接策略文本。
+- BlobStore、TurnSummarizer、LLM 和 Permission 都由组合根注入。

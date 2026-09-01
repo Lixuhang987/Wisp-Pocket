@@ -1,128 +1,32 @@
 # desktop
 
-`apps/desktop` 是 macOS 原生入口层：应用生命周期、PromptPanel、Settings、全局热键、焦点恢复、host dynamic tools，以及 Swift 到 Electron 的 command bridge。ThreadWindow、StatusBubble 和 agent-server supervision 都由 `apps/electron-shell` 承载。
+`apps/desktop` 是 [Desktop Experience](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md) 的 Swift Host：拥有 macOS 生命周期、PromptPanel、Settings、AgentTrigger、焦点恢复和宿主能力。常驻界面与 agent-server supervision 属于 Electron UI Shell。
 
-## 架构红线（编辑此目录前必读）
+## 直接子节点
 
-### 1. 状态：Observation 框架（`@Observable`）
+- [CONTEXT.md](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md)：Desktop Experience glossary。
+- `HandAgentApp.swift`：SwiftUI 入口与系统 termination 接入。
+- [Sources/sources.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/sources.md)：生产源码索引。
+- `TestsSwift/`：与 `Sources/` 对齐的 Swift 测试。
 
-- **不要**新增 `ObservableObject` / `@Published` / `@StateObject` / `@ObservedObject` / Combine。所有状态类用 `@Observable`，View 用 `@Bindable`、`@State`。
-- 非状态依赖（store、回调闭包、socket client）用 `@ObservationIgnored` 标注，避免无意义的 SwiftUI 重渲染。
-- `@MainActor` 用在 UI 相关的 `@Observable` 类；纯进程/IO 服务保持非 MainActor。
+## 架构红线
 
-### 2. 原生 UI 范围
+- 状态模型使用 Observation：`@Observable`、`@Bindable`、`@State`；非状态依赖标记 `@ObservationIgnored`。不要引入 Combine 状态栈。
+- Swift 原生 UI 只保留 PromptPanel 和 Settings。ThreadWindow、StatusBubble 与完整 Thread 状态属于 Electron/React。
+- 模块协调统一进入 `AppCoordinator.send(.action)`；窗口生命周期由专用 lifecycle 对象持有。
+- 初始上下文只允许用户主动提交的 Input Item。屏幕、窗口、文件、剪贴板和 App 状态通过 Tool 读取。
+- Swift 的 `/api/thread` client 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`；持续通知和交互式请求由 React 处理。
+- Swift 通过 `/api/dynamic-tools` 暴露原生与 Plugin Dynamic Tool，不在宿主层编排 LLM/Tool 循环。
 
-Swift 原生 UI 只保留 PromptPanel 和 Settings：
+## 所有权
 
-- **PromptPanel**：全局热键唤起、输入、用户主动附件采集、提交。
-- **Settings**：模型、外观主题、工具、Append Prompt、MCP、权限、workspace 和快捷键配置。
+- `AppServices` 是生产依赖组合点；测试使用 `AppServices.testing(...)` 隔离窗口、进程和系统策略。
+- Swift 启动 Electron UI Shell，但不直接启动 agent-server。可提交状态同时依赖 agent-server health 与 hidden ThreadWindow prepared。
+- `~/.spotAgent/settings.json` 的模型、Tool 和主题偏好由 Settings 写入；主题由 Swift 解析后同步给 Electron/React。
+- Append Prompt manifest 位于 `~/.spotAgent/actions`；Plugin manifest 位于 `~/.spotAgent/plugins`。二者是不同能力。
 
-不要新增 Swift ThreadWindow、Swift StatusBubble 或 Swift 侧 thread 状态 mirror。复杂常驻 UI 走 Electron/React。
+## 验证
 
-### 3. 协调：AppCoordinator 单向事件流
-
-- 全局唯一 `AppCoordinator`（`@Observable @MainActor`）由 `HandAgentApp` 持有为 `@State`。
-- 模块间一切协调通过 `coordinator.send(.action)`，禁止 `NotificationCenter` / 全局单例 / 直接调 Coordinator 的 private 方法绕开。
-- 窗口生命周期下沉到 lifecycle 控制器：`ElectronThreadWindowLifecycle` 只发送 Electron command，`SettingsLifecycle` 管 Settings。
-- 测试态用 `AppServices.testing(...)` 注入 nop 服务，跳过窗口/进程/激活策略副作用；非测试态 `init()` 自动装配生产 `AppServices` 并 `bootstrap()`。
-
-### 4. 输入边界（产品红线）
-
-- 只有用户主动输入和用户主动选区可以作为 thread 初始上下文；屏幕 / 窗口 / 文件 / 剪贴板 / App 状态一律通过 tool 按需读取。
-- 宿主层不组装 LLM 消息、不读取 runtime 内部状态、不直接执行 tool 编排。React ThreadWindow 的 thread 协议由 React 前端通过 `/api/thread` 处理；Swift 宿主只用窄口径 `/api/thread` client 创建 PromptPanel thread，并通过 `/api/dynamic-tools` 处理默认 host dynamic tools 与 plugin dynamic tools。
-- 快捷键配置只保存在宿主层本地（UserDefaults，由 `KeyboardShortcuts` 库管理），不下沉到 runtime。外观主题偏好由 Swift 宿主持久化到 `~/.spotAgent/settings.json`，并把解析后的主题通过 Electron command bridge 传给 React。
-
-### 5. 测试与验证
-
-- `TestsSwift/` 按 `Sources/` 目录结构分组；每个 ViewModel / 协调器都有对应 `*Tests.swift`，共享测试辅助放在 `TestsSwift/TestSupport/`。
-- 新增 ViewModel 必须配测试；不把依赖系统权限或真实屏幕状态的 spike 放进自动化测试，真实平台能力走 `docs/manual-qa.md` 与模块 QA 步骤。
-- 提交前在当前 shell 跑：`bash ./scripts/swiftw test` + `bash ./scripts/swiftw build` + `bash ./scripts/test.sh`。Stop hook 不跑 Swift 校验，必须手动。
-
-## 目录索引
-
-`apps/desktop` 的直接子节点：
-
-- `HandAgentApp.swift` — SwiftUI `@main` 入口。
-- `Sources/` — Swift 源码目录；由 [Sources/sources.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/sources.md) 继续索引直接子模块。
-- `TestsSwift/` — Swift 测试目录。
-- `desktop.md` — 本文件。
-
-## 入口与启动流程
-
-`HandAgentApp.swift` 是 SwiftUI `@main`：
-
-- 持有 `AppCoordinator` 为 `@State`；非测试态初始化 `AppServices` 时会准备 launch support files 并 reload AgentTrigger runtime，随后 `AppCoordinator.init` 自动 `bootstrap()`。
-- 通过 `HandAgentApplicationDelegate` 接入 macOS termination 回调；`applicationShouldTerminate` / `applicationWillTerminate` 会幂等调用 `AppCoordinator.shutdown()`，确保 Electron shell 进入 stop 链路。
-- 当 Electron ThreadWindow 是前台 App 并先收到 `Command+Q` 时，Electron shell clean exit 会反向请求 Swift 宿主退出；Swift 再进入同一个 `applicationShouldTerminate` / `shutdown()` 链路，避免把 status 0 当作 agent-server fatal alert。
-- `Settings` scene 仅放空占位，实际设置窗口由 Coordinator 用 `NSWindow` 托管（需要主动 `openOrFocus` 控制）。
-- `CommandGroup(replacing: .appSettings)` 把 ⌘, 路由到 `coordinator.send(.openSettings)`。
-
-```mermaid
-sequenceDiagram
-  participant App as HandAgentApp (@main)
-  participant Services as AppServices
-  participant Coord as AppCoordinator
-  participant Electron as ElectronBackedAppServer
-  participant Shell as apps/electron-shell
-
-  App->>Services: 构造依赖 + prepareLaunchSupportFiles
-  Services->>Services: AgentTriggerRuntime.reload()
-  App->>Coord: @State 初始化 → 自动 bootstrap()
-  Coord->>Coord: setupAppearanceTheme + setupPromptPanel + setupHotkey + setupAgentServerHealth
-  Coord->>Electron: start()
-  Electron->>Shell: launch Electron
-  Shell->>Shell: supervise agent-server + prewarm hidden ThreadWindow
-  Shell-->>Electron: agent_server.health + thread_window.prepared
-  Electron-->>Coord: available=true
-  Coord->>Electron: activity_window.show
-```
-
-`AppServices.defaultRuntime` 创建同一个 `ElectronBackedAppServer` 实例作为 app-server health source、Electron ThreadWindow command client 和 ActivityWindow command client。Swift 不直接启动 agent-server，也不创建 WKWebView ThreadWindow；Electron shell 作为唯一 supervisor 启动 agent-server，在 agent-server ready 后主动预热隐藏 ThreadWindow，并在 PromptPanel submit/openHistory/focus 时展示或聚焦 Electron `BrowserWindow`。PromptPanel show/toggle 不触发 ThreadWindow prepare；可提交状态由 `agent_server.health` 与 `thread_window.prepared` 共同控制。Electron shell 会在 app-server available 后通过 `activity_window.show` 展示 Electron React StatusBubble。
-
-## 主调用链路
-
-```mermaid
-sequenceDiagram
-  participant User as 用户
-  participant Hotkey as KeyboardShortcuts
-  participant Coord as AppCoordinator
-  participant Panel as PromptPanel
-  participant Electron as Electron main
-  participant React as React ThreadWindow
-  participant Server as agent-server
-
-  User->>Hotkey: 全局热键
-  Hotkey->>Coord: send(.togglePromptPanel)
-  Coord->>Panel: show()
-  User->>Panel: 输入并提交
-  Panel->>Coord: send(.submitPrompt)
-  Coord->>Server: /api/thread thread.start(dynamicTools)
-  Server-->>Coord: thread.started(threadId)
-  Coord->>Server: /api/thread op.submit(UserInput)
-  Coord->>Electron: thread_window.focus(threadId)
-  Electron->>React: show/focus BrowserWindow
-  React->>Server: /api/thread ThreadCommand / ClientResponse
-  Server-->>React: ThreadNotification / ServerRequest
-```
-
-## 跨层数据
-
-### `~/.spotAgent/settings.json`
-
-desktop 与 agent-server 共享的模型、builtin tool 和外观主题配置文件。desktop 侧由 [AgentSettings](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/AgentSettings/agent-settings.md) 读写；agent-server 在下一次 LLM 请求或 tool registry 刷新时按文件戳读取 LLM/tool 配置，无需重启。外观主题只由 Swift 读取和写入，并经 `theme.changed` 同步给 Electron/React。
-
-### `PromptAttachmentResult` / `ActionDefinition`
-
-`PromptAttachmentResult` 是 PromptPanel 提交时能进入首轮 `UserInput.items` 的用户主动附件，只包含 5 类：`.noAttachment`、`.textToken`、`.textSelection`、`.imageRegion`、`.selectionError`。屏幕、剪贴板、App 状态不能在这里默认注入。
-
-`ActionDefinition` 来自 `~/.spotAgent/actions/*/action.json` 的 `prompts[]`。desktop 负责 trigger、标题、描述、prompt 文本和快捷键；Tab、点击 action 或 Action 全局快捷键只会把 action 追加为输入框内的 skill chip。提交时 Swift 通过 `/api/thread` 发送完整 `UserInput.items`，不再发送 `actionBinding`，也不在 desktop 侧渲染参数。
-
-## 注意事项
-
-- 修改 TS 源码必须重启 desktop app 才能让受监督 agent-server 重新加载。
-- Swift 宿主的持久 Dock / Cmd+Tab 可见性只由 Settings 窗口决定；Electron ThreadWindow 使用 Electron app 自己的 Dock / app switcher 入口。PromptPanel 从后台唤起时可短暂提升宿主以完成展示，隐藏后按 Settings 状态回落。
-- desktop 持有窄口径 thread client，用于 PromptPanel 和 AgentTrigger 创建 thread 与提交初始输入；只有 PromptPanel handoff 会通过 `ElectronThreadWindowLifecycle` / `ThreadWindowCommanding` 按 threadId 打开或聚焦 Electron ThreadWindow。
-- PromptPanel show/toggle 只打开原生输入面板，不触发 Electron ThreadWindow 预热。
-- React ThreadWindow 负责 `/api/thread` 上的 command / notification / request / response 编解码和 UI 状态。
-- ActivityWindow 负责 React StatusBubble；Swift 只发送 `activity_window.show`，show 失败不再回退到 Swift StatusBubble。
-- `DynamicToolProviderConnectionClient` 连接 `/api/dynamic-tools`，发送 host / plugin `provider_hello`，并把 `tool_call_request` 分派给 `DynamicToolProviderService`。
+- Swift 行为：`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`。
+- 跨端或 TypeScript 行为：`bash ./scripts/test.sh`。
+- 需要真实辅助功能、屏幕录制或窗口行为的项目进入 [manual-qa.md](/Users/mu9/proj/handAgent/docs/manual-qa.md)。

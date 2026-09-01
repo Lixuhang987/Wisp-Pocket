@@ -16,9 +16,9 @@ HandAgent 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 PromptP
 
 ThreadWindow 展示完整对话流，包括 assistant 回复、工具调用过程与权限审批。支持历史侧栏和后台 thread 管理。
 
-### Skill 与 MCP 扩展
+### Append Prompt 与 MCP 扩展
 
-通过本地 manifest 定义 Skill（Append Prompt），通过 MCP 协议接入外部工具。PromptPanel 中选中 Skill 即作为 chip 附加到输入。
+通过本地 manifest 定义 Append Prompt，通过 MCP 协议接入外部工具。PromptPanel 中选中的 Append Prompt 会作为 chip 附加到输入。
 
 ### Web 搜索
 
@@ -48,9 +48,9 @@ bash ./scripts/swiftw run HandAgentDesktop
 
 | 层 | 职责 |
 |---|---|
-| **Desktop Shell** (Swift) | macOS 宿主、PromptPanel、Settings、全局热键 |
-| **Electron Shell** | ThreadWindow / StatusBubble 容器、agent-server 进程管理 |
-| **Thread Window** (React) | 对话 UI、历史管理、权限审批 |
+| **Swift Host** | macOS 生命周期、PromptPanel、Settings、全局热键与宿主能力 |
+| **Electron UI Shell** | ThreadWindow / StatusBubble 容器、agent-server 进程管理 |
+| **ThreadWindow** (React) | 对话 UI、历史管理、权限审批 |
 | **Agent Server** (Node) | AgentRuntime 驱动、tool 注册、MCP 注入、thread 持久化 |
 | **Core** (TypeScript) | 跨平台 Agent 核心、工具编排、LLM adapter |
 
@@ -67,7 +67,7 @@ bash ./scripts/swiftw test
 bash ./scripts/swiftw build
 ```
 
-详细开发文档见 [handAgent.md](handAgent.md) 和 [docs/docs.md](docs/docs.md)。
+统一术语见 [CONTEXT-MAP.md](CONTEXT-MAP.md)，架构与开发入口见 [handAgent.md](handAgent.md) 和 [docs/docs.md](docs/docs.md)。
 
 ---
 
