@@ -13,13 +13,14 @@
 
 ### 文档卫生回归
 
-- **范围**：`AGENTS.md`、`README.md`、`DESIGN.md`、`docs/docs.md`、`docs/bugs.md`、`docs/manual-qa.md`。
+- **范围**：`AGENTS.md`、`README.md`、`DESIGN.md`、`docs/docs.md`、`docs/agents/*.md`、`docs/bugs.md`、`docs/manual-qa.md`。
 - **验收步骤**：
   1. 按 `AGENTS.md -> handAgent.md -> docs/docs.md` 阅读，确认 `docs/` 入口只列直接子节点和放置规则。
   2. 打开 `README.md`，确认不再引用缺失的截图资源。
   3. 打开 `DESIGN.md`，确认它只说明设计边界，并把 token 源指向 `design/tokens.json`。
   4. 打开 Settings 相关文档，确认 `SettingsTextField` / `SettingsPage`、dark theme 可读性和 `SwiftLint` 约束仍在模块文档或本文中可追踪。
   5. 打开 `bugs.md`，确认只保留未修复缺陷；已实现待验收项在本文。
+  6. 从 `AGENTS.md` 的 `Agent skills` 区块进入 `docs/agents/`，确认 issue tracker 为 GitHub Issues、triage 使用五个默认标签，领域文档采用 multi-context 布局。
 
 ### ThreadWindow Radix UI 弹出层迁移
 

@@ -38,6 +38,20 @@
 
 主调用链路、分层职责和跨进程 DTO 以 [handAgent.md](/Users/mu9/proj/handAgent/handAgent.md) 为准。本文件只保留协作、文档维护和开发流程约束，避免和架构文档双写。
 
+## Agent skills
+
+### Issue tracker
+
+工程 skills 管理的 issue 与 spec 使用 GitHub Issues。详见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+Triage 使用五个默认角色标签。详见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+领域文档采用 multi-context 布局，由根目录 `CONTEXT-MAP.md` 路由到相关上下文及 ADR。详见 `docs/agents/domain.md`。
+
 ## 开发规范
 ### Since the project hasn’t gone live yet, there’s no need to consider compatibility.
 
