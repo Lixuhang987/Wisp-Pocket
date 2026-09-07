@@ -1,4 +1,4 @@
-# handAgent
+# Wisp Pocket 架构
 
 统一术语从 [CONTEXT-MAP.md](/Users/mu9/proj/handAgent/CONTEXT-MAP.md) 进入；本文只记录跨上下文架构、所有权和不可从单个模块看出的合约。
 

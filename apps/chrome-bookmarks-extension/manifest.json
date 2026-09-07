@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "HandAgent Chrome Bookmarks",
-  "description": "Forward Chrome bookmark creation events to HandAgent.",
+  "name": "Wisp Pocket Chrome Bookmarks",
+  "description": "Forward Chrome bookmark creation events to Wisp Pocket.",
   "version": "0.1.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs/4K03nPxNpnkAT7R1xi9DVGqaHApRhRfC/dk9dS0/pGTwtoXyCF3we71I3ZaJ6lNWiV6wfANMaXVNmtmcYSUwhthRfPGDi9a28ux2BYjc6KprpB7Fy3mnBXDTQUPLwwumV2qXGEZM8P32fr5ox+ffvIdopiMwDVLdfPbqd8edjVK1H5/nel8gLuuAqEGswjHlnPrIPqCKSWsukp/M41JN0293Wbm37cvgH4/RDTr1QfTFfMro6lBwnoA1nWERUwVGpb+GITfe44Ntb9+L4m7Pg0R89lqbDTxnre62SVE5rZyVYVG2hD0nOe0/lVc6VHR775cjs8L5JldVu0fcDUhQIDAQAB",
   "permissions": ["bookmarks", "nativeMessaging", "storage"],

@@ -11,6 +11,16 @@
 
 ## 待验收项
 
+### Wisp Pocket 品牌与桌宠命名
+
+- **状态**：已实现，待打包与实机确认。
+- **自动化验证**：`bash ./scripts/test.sh`、`bash ./scripts/package-app.test.sh`、`bash ./scripts/swiftw build`。
+- **验收步骤**：
+  1. 打包后确认产物名称为 `dist/Wisp Pocket.app`，Finder、Dock 和菜单栏显示名为 `Wisp Pocket`。
+  2. 打开 PromptPanel、ThreadWindow、权限错误提示和 Chrome Bookmarks 扩展相关界面，确认用户可见产品名统一为 `Wisp Pocket`。
+  3. 确认桌宠相关文案使用“桌宠”或“月见八千代”，不把桌宠称为“Wisp”。
+  4. 确认 Swift target、npm package、环境变量和协议事件等内部构建标识仍可正常工作。
+
 ### 文档卫生回归
 
 - **范围**：`AGENTS.md`、`CONTEXT-MAP.md`、三个 `CONTEXT.md`、`handAgent.md`、`README.md`、`DESIGN.md`、各级目录指南与 `docs/*.md`。

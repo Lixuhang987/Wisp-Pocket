@@ -2,13 +2,14 @@
 set -euo pipefail
 
 APP_NAME="HandAgentDesktop"
+APP_DISPLAY_NAME="Wisp Pocket"
 CHROME_BOOKMARKS_NATIVE_HOST_NAME="HandAgentChromeBookmarksNativeHost"
 BUNDLE_ID="com.yourname.HandAgentDesktop"
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT_DIR="${HANDAGENT_PACKAGE_ROOT_DIR:-$SCRIPT_ROOT}"
 BUILD_DIR="${HANDAGENT_PACKAGE_BUILD_DIR:-.build/release}"
 DIST_DIR="${HANDAGENT_PACKAGE_DIST_DIR:-dist}"
-APP_DIR="$DIST_DIR/$APP_NAME.app"
+APP_DIR="$DIST_DIR/$APP_DISPLAY_NAME.app"
 WEB_DIST_DIR="${HANDAGENT_THREAD_WINDOW_WEB_DIST_DIR:-$ROOT_DIR/apps/thread-window-web/dist}"
 ELECTRON_SHELL_DIST_DIR="${HANDAGENT_ELECTRON_SHELL_DIST_DIR:-$ROOT_DIR/apps/electron-shell/dist}"
 SWIFT_BIN="${HANDAGENT_PACKAGE_SWIFT_BIN:-swift}"
@@ -139,10 +140,10 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>$APP_NAME</string>
+  <string>$APP_DISPLAY_NAME</string>
 
   <key>CFBundleDisplayName</key>
-  <string>$APP_NAME</string>
+  <string>$APP_DISPLAY_NAME</string>
 
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>

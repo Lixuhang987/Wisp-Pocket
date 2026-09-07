@@ -47,7 +47,7 @@
     *   删除显眼的 "新建对话" 占据的独立一行和全宽大按钮。
 *   **新布局 (顶部第一行，高度 ~40px)：**
     *   采用 `flex items-center justify-between` 布局。
-    *   **左侧：** 缩小 Logo 尺寸至 `h-5 w-5`（20px），去掉外层 border 和 shadow；紧跟的 "HandAgent" 标题字号降级为 `text-[14px] font-medium`（使用 Sans 字体，不要使用 Display 字体）。
+    *   **左侧：** 缩小 Logo 尺寸至 `h-5 w-5`（20px），去掉外层 border 和 shadow；紧跟的 "Wisp Pocket" 标题字号降级为 `text-[14px] font-medium`（使用 Sans 字体，不要使用 Display 字体）。
     *   **右侧：** 将“新建对话”收敛为一个次级图标按钮（Icon Button），只需一个 `+` 号图标，尺寸 `h-7 w-7`，平时透明，`hover:bg-app-surface-muted`，`text-app-text-secondary`。
 *   **新布局 (搜索栏第二行，高度 ~36px)：**
     *   高度从 `h-10` 降为 `h-8` 左右（32-36px）。
@@ -67,7 +67,7 @@
     *   **核心对比：** 应用 `DESIGN.md` 中的 `surface-dark` 概念。将 Tool Bubble 的背景改为暗色调（如 `#181715` 或深灰），文字改为 `text-app-text-muted` (或 `text-on-dark-soft`)，强制使用 `font-code`。圆角 `rounded-md` (8px)。这样能与正常的自然语言对话产生极强的视觉区隔，快速划过时一目了然。
 *   **空状态 (Empty State) 的重构：**
     *   当前的 30px Display 字体过于突兀。
-    *   **修改为：** 居中放置一个极低对比度（opacity 20%）的 HandAgent Logo (SVG)，下方配一行 13px 或 14px 的中性提示语（如 `text-app-text-muted` 的 "按 Cmd/Ctrl + N 新建或选择历史对话"）。无需卡片边框包裹，直接融入背景。
+    *   **修改为：** 居中放置一个极低对比度（opacity 20%）的 Wisp Pocket Logo (SVG)，下方配一行 13px 或 14px 的中性提示语（如 `text-app-text-muted` 的 "按 Cmd/Ctrl + N 新建或选择历史对话"）。无需卡片边框包裹，直接融入背景。
 
 #### 4.4 Composer 底部输入区优化 (悬浮工作台)
 输入框是工具的核心，需要显得专业且紧凑，不再像消费级聊天软件的“椭圆胶囊”。
@@ -109,7 +109,7 @@ Electron BrowserWindow 承载的 React 对话窗口。左侧历史栏 + 右侧�
 ### HistorySidebar（HistorySidebar.tsx）
 - aside: flex flex-col，border-r border-app-hairline，bg-app-surface/95，p-sm，shadow
 - header mb-sm 包含：
-  1. logo区: 28×28 SVG图标（六边形+十字，border+shadow）+ 'HandAgent' 显示字体标题(25px)
+  1. logo区: 28×28 SVG图标（六边形+十字，border+shadow）+ 'Wisp Pocket' 显示字体标题(25px)
   2. 描述: '本地 thread 工作台'，12px，mt-xs
   3. 新建按钮: '新建对话'，h-10全宽，bg-app-accent，mt-sm
   4. 搜索框: h-10全宽，mb-sm

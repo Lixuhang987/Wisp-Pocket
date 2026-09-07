@@ -1,8 +1,8 @@
-# HandAgent
+# Wisp Pocket
 
 **macOS 原生 Agent Runtime — 一键唤起，随处可用。**
 
-HandAgent 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 PromptPanel，选中文本或截取屏幕区域作为上下文，提交后由本地 Agent Runtime 驱动工具调用与多轮对话。线程、附件、权限和工作区数据默认保留在本机；模型请求按你的 provider 配置发送，启用 Web 搜索时查询会发送给 Tavily，抓页时会请求目标 URL。
+Wisp Pocket 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 PromptPanel，选中文本或截取屏幕区域作为上下文，提交后由本地 Agent Runtime 驱动工具调用与多轮对话。线程、附件、权限和工作区数据默认保留在本机；模型请求按你的 provider 配置发送，启用 Web 搜索时查询会发送给 Tavily，抓页时会请求目标 URL。
 
 ---
 
@@ -37,6 +37,7 @@ Agent 默认可调用 `web_search` 与 `fetch_page` 查询公共 Web。`web_sear
 pnpm install
 
 # 启动桌面应用
+# Swift 内部 executable target 仍名为 HandAgentDesktop
 bash ./scripts/swiftw run HandAgentDesktop
 ```
 
@@ -49,7 +50,7 @@ bash ./scripts/swiftw run HandAgentDesktop
 | 层 | 职责 |
 |---|---|
 | **Swift Host** | macOS 生命周期、PromptPanel、Settings、全局热键与宿主能力 |
-| **Electron UI Shell** | ThreadWindow / StatusBubble 容器、agent-server 进程管理 |
+| **Electron UI Shell** | ThreadWindow / 桌宠容器、agent-server 进程管理 |
 | **ThreadWindow** (React) | 对话 UI、历史管理、权限审批 |
 | **Agent Server** (Node) | AgentRuntime 驱动、tool 注册、MCP 注入、thread 持久化 |
 | **Core** (TypeScript) | 跨平台 Agent 核心、工具编排、LLM adapter |

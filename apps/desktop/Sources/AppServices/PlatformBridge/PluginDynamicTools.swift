@@ -132,7 +132,7 @@ struct BuiltinPluginInstaller {
             manifest: [
                 "version": 1,
                 "id": "handagent-atomic-app-window",
-                "title": "HandAgent App/Window Atomic Plugin",
+                "title": "Wisp Pocket App/Window Atomic Plugin",
                 "description": "Provides frontmost app and window metadata.",
                 "lifecycle": "alwaysOn",
                 "kind": "atomicCapability",
@@ -156,7 +156,7 @@ struct BuiltinPluginInstaller {
             manifest: [
                 "version": 1,
                 "id": "handagent-atomic-screenshot",
-                "title": "HandAgent Screenshot Atomic Plugin",
+                "title": "Wisp Pocket Screenshot Atomic Plugin",
                 "description": "Provides screenshot and thumbnail capture.",
                 "lifecycle": "alwaysOn",
                 "kind": "atomicCapability",
@@ -179,7 +179,7 @@ struct BuiltinPluginInstaller {
             manifest: [
                 "version": 1,
                 "id": "handagent-atomic-ax",
-                "title": "HandAgent Accessibility Atomic Plugin",
+                "title": "Wisp Pocket Accessibility Atomic Plugin",
                 "description": "Provides Accessibility snapshots and actions.",
                 "lifecycle": "alwaysOn",
                 "kind": "atomicCapability",
@@ -202,7 +202,7 @@ struct BuiltinPluginInstaller {
             manifest: [
                 "version": 1,
                 "id": "handagent-context-history",
-                "title": "HandAgent Context History",
+                "title": "Wisp Pocket Context History",
                 "description": "Collects and serves recent desktop context history.",
                 "lifecycle": "alwaysOn",
                 "kind": "dynamicTool",
@@ -228,7 +228,7 @@ struct BuiltinPluginInstaller {
             manifest: [
                 "version": 1,
                 "id": "handagent-automation-runtime",
-                "title": "HandAgent Automation Runtime",
+                "title": "Wisp Pocket Automation Runtime",
                 "description": "Runs and evolves auditable Automation Policy files.",
                 "lifecycle": "alwaysOn",
                 "kind": "automation",

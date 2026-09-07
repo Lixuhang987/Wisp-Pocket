@@ -9,9 +9,9 @@
 
 ---
 
-## Wisp 桌宠交互
+## Wisp Pocket 桌宠交互
 
-- 已确认规格：[Wisp：以月见八千代桌宠承接拖入与 Thread 轻量对话 #1](https://github.com/Lixuhang987/SpotAgent/issues/1)，标记 `ready-for-agent`；设计与验收以该 Issue 为准，尚未实现。
+- 已确认规格：[Wisp Pocket：以月见八千代桌宠承接拖入与 Thread 轻量对话 #1](https://github.com/Lixuhang987/SpotAgent/issues/1)，标记 `ready-for-agent`；设计与验收以该 Issue 为准，尚未实现。
 - 重要后续 TODO：用户习惯记忆系统，只改善建议，不产生自动执行权。
 - 后续 TODO：桌宠内切换 Thread；决定是否呈现工具调用及呈现方式。
 - [ ] 实现前读取目录文档链，从主 checkout 创建并初始化 worktree，确认 CodeGraph 路径并运行分层基线。

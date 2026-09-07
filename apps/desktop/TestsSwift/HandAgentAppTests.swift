@@ -17,7 +17,7 @@ final class HandAgentAppTests: XCTestCase {
                 showsFatalAlert: false
             )
         )
-        let delegate = HandAgentApplicationDelegate()
+        let delegate = WispPocketApplicationDelegate()
         delegate.coordinator = coordinator
 
         let reply = delegate.applicationShouldTerminate(NSApplication.shared)

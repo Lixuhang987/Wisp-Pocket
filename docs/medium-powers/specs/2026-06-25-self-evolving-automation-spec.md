@@ -2,7 +2,7 @@
 
 ## Background
 
-HandAgent 当前已有 macOS host dynamic tools，可通过 Swift 读取前台 app、截图、OCR、Accessibility 快照并执行有限 AX action。本组 spec 要求把自进化自动化依赖的桌面能力拆成原子化 Swift plugin，例如 AX plugin、screenshot plugin、app/window plugin。现有 plugin 系统主要面向 dynamic tools：LLM 调用 tool，Swift provider 转发请求，plugin 或 provider 返回结果。
+Wisp Pocket 当前已有 macOS host dynamic tools，可通过 Swift 读取前台 app、截图、OCR、Accessibility 快照并执行有限 AX action。本组 spec 要求把自进化自动化依赖的桌面能力拆成原子化 Swift plugin，例如 AX plugin、screenshot plugin、app/window plugin。现有 plugin 系统主要面向 dynamic tools：LLM 调用 tool，Swift provider 转发请求，plugin 或 provider 返回结果。
 
 用户希望新增一种更强的自动化能力：用户录制一段真实操作，系统保存截图、AX 树变化、前台 app/window、用户输入和操作前后状态；随后 agent 把 trace 归纳成可执行自动化流程。该流程不追求坐标级完全重放，而是优先使用 AX selector、条件和断言来控制 UI；当当前 UI 状态不匹配时，路由到 agent / 通用 computer use 修复；修复成功后，把新情况沉淀成可审计的新分支，使自动化逐步覆盖更多边界情况。
 

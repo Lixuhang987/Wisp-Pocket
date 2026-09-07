@@ -44,7 +44,7 @@ pnpm exec vitest run packages/core/tests/llm/vercel-client.integration.test.ts
 
 ```bash
 bash ./scripts/package-app.sh --mock-llm
-open dist/HandAgentDesktop.app
+open "dist/Wisp Pocket.app"
 ```
 
 ## 默认测试

@@ -631,7 +631,7 @@ enum MacPlatformAccessibilityPermission {
     static func deniedError() -> PlatformBridgeError {
         PlatformBridgeError(
             code: "permission_denied",
-            message: "HandAgent 没有辅助功能权限。请打开「系统设置 → 隐私与安全性 → 辅助功能」，允许 HandAgent 后重试。"
+            message: "Wisp Pocket 没有辅助功能权限。请打开「系统设置 → 隐私与安全性 → 辅助功能」，允许 Wisp Pocket 后重试。"
         )
     }
 }
@@ -661,7 +661,7 @@ enum MacPlatformScreenCapturePermission {
     static func deniedError() -> PlatformBridgeError {
         PlatformBridgeError(
             code: "permission_denied",
-            message: "HandAgent 没有屏幕录制权限。请打开「系统设置 → 隐私与安全性 → 屏幕录制」，允许 HandAgent 后重试。"
+            message: "Wisp Pocket 没有屏幕录制权限。请打开「系统设置 → 隐私与安全性 → 屏幕录制」，允许 Wisp Pocket 后重试。"
         )
     }
 

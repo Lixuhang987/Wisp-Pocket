@@ -76,7 +76,7 @@ final class AgentServerRuntimeModeTests: XCTestCase {
     func testRepositoryRootLocatorFallsBackToBundleWhenCurrentDirectoryIsRoot() throws {
         let repo = URL(fileURLWithPath: "/repo/worktree-repo", isDirectory: true)
         let bundleExecutableURL = repo
-            .appendingPathComponent("dist/HandAgentDesktop.app/Contents/MacOS", isDirectory: true)
+            .appendingPathComponent("dist/Wisp Pocket.app/Contents/MacOS", isDirectory: true)
             .appendingPathComponent("HandAgentDesktop")
 
         let resolved = AgentServerRepositoryRootLocator(
@@ -87,8 +87,8 @@ final class AgentServerRuntimeModeTests: XCTestCase {
             }
         ).locate(
             bundleExecutableURL: bundleExecutableURL,
-            bundleResourceURL: repo.appendingPathComponent("dist/HandAgentDesktop.app/Contents/Resources", isDirectory: true),
-            bundleURL: repo.appendingPathComponent("dist/HandAgentDesktop.app", isDirectory: true),
+            bundleResourceURL: repo.appendingPathComponent("dist/Wisp Pocket.app/Contents/Resources", isDirectory: true),
+            bundleURL: repo.appendingPathComponent("dist/Wisp Pocket.app", isDirectory: true),
             currentDirectoryURL: URL(fileURLWithPath: "/", isDirectory: true)
         )
 

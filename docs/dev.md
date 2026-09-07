@@ -5,7 +5,7 @@
 ## 首次启动
 
 1. 安装依赖：`pnpm install`。
-2. 运行 Swift Host：`bash ./scripts/swiftw run HandAgentDesktop`。
+2. 运行 Wisp Pocket Swift Host：`bash ./scripts/swiftw run HandAgentDesktop`（Swift 内部 executable target 名称暂保留）。
 3. 在 Settings 配置模型 provider、model、API key 和可选 base URL。
 
 `swiftw run` 会按需安装依赖、生成主题 token，并构建 ThreadWindow 与 Electron UI Shell。成功路径保持安静，失败时回放对应子命令输出。

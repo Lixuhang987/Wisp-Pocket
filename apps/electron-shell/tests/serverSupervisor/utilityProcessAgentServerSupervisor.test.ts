@@ -23,7 +23,7 @@ describe("UtilityProcessAgentServerSupervisor", () => {
         cwd: "/repo",
         env: expect.objectContaining({ HANDAGENT_LLM_MODE: "mock" }),
         stdio: "pipe",
-        serviceName: "HandAgent agent-server",
+        serviceName: "Wisp Pocket agent-server",
       },
     );
   });

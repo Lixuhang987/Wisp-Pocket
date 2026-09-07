@@ -1,6 +1,6 @@
 # chrome-bookmarks-extension
 
-Chrome MV3 扩展，只负责把 Chrome 官方收藏夹事件转发给 HandAgent 本机 Native Messaging Host。
+Chrome MV3 扩展，只负责把 Chrome 官方收藏夹事件转发给 Wisp Pocket 本机 Native Messaging Host。
 
 ## 文件
 
@@ -31,7 +31,7 @@ Chrome MV3 扩展，只负责把 Chrome 官方收藏夹事件转发给 HandAgent
 iidkhdjaboimibeplbeanlklgakmfebb
 ```
 
-`scripts/swiftw run HandAgentDesktop` 默认使用该 ID 写 Chrome Native Messaging Host manifest，并自动构建 / 指向开发态 `HandAgentChromeBookmarksNativeHost`。如需测试其他扩展 ID，可显式设置 `HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID` 覆盖。
+`scripts/swiftw run HandAgentDesktop` 默认使用该 ID 写 Chrome Native Messaging Host manifest，并自动构建 / 指向开发态 `HandAgentChromeBookmarksNativeHost`。这里的 Swift executable target 名称是内部构建标识，产品显示名为 Wisp Pocket。如需测试其他扩展 ID，可显式设置 `HANDAGENT_CHROME_BOOKMARKS_EXTENSION_ID` 覆盖。
 
 ## 验证命令
 

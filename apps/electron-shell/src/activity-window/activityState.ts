@@ -83,7 +83,7 @@ export function activityDisplay(state: ActivityState): ActivityDisplay {
     case "idle":
       return {
         label: "点击开始",
-        detail: state.latestSummary ?? "HandAgent 空闲",
+        detail: state.latestSummary ?? "Wisp Pocket 空闲",
         tone: "idle",
       };
   }

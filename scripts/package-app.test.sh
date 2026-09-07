@@ -109,7 +109,7 @@ HANDAGENT_ELECTRON_SHELL_DIST_DIR="$ELECTRON_SHELL_DIST_DIR" \
 HANDAGENT_PACKAGE_LOG_FILE="$LOG_FILE" \
 "$ROOT_DIR/scripts/package-app.sh" --mock-llm >/dev/null
 
-APP_DIR="$DIST_DIR/HandAgentDesktop.app"
+APP_DIR="$DIST_DIR/Wisp Pocket.app"
 MARKER_FILE="$APP_DIR/Contents/Resources/HandAgentRuntimeMode.json"
 ELECTRON_MAIN_FILE="$APP_DIR/Contents/Resources/ElectronShell/dist/main/main.js"
 
@@ -118,6 +118,8 @@ test -x "$APP_DIR/Contents/Resources/HandAgentChromeBookmarksNativeHost"
 test -f "$MARKER_FILE"
 test -f "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 test -f "$ELECTRON_MAIN_FILE"
+grep -q '<string>Wisp Pocket</string>' "$APP_DIR/Contents/Info.plist"
+grep -q '<key>CFBundleDisplayName</key>' "$APP_DIR/Contents/Info.plist"
 grep -q '"llmMode":"mock"' "$MARKER_FILE"
 grep -q 'mock web' "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 grep -q 'mock electron shell' "$ELECTRON_MAIN_FILE"
@@ -149,6 +151,7 @@ test -x "$APP_DIR/Contents/Resources/HandAgentChromeBookmarksNativeHost"
 test ! -f "$MARKER_FILE"
 test -f "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 test -f "$ELECTRON_MAIN_FILE"
+grep -q '<string>Wisp Pocket</string>' "$APP_DIR/Contents/Info.plist"
 grep -q 'built web' "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 grep -q 'built electron shell' "$ELECTRON_MAIN_FILE"
 grep -q 'pnpm:install' "$LOG_FILE"

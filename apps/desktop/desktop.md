@@ -5,7 +5,7 @@
 ## 直接子节点
 
 - [CONTEXT.md](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md)：Desktop Experience glossary。
-- `HandAgentApp.swift`：SwiftUI 入口与系统 termination 接入。
+- `HandAgentApp.swift`：Wisp Pocket SwiftUI 入口与系统 termination 接入。
 - [Sources/sources.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/sources.md)：生产源码索引。
 - `TestsSwift/`：与 `Sources/` 对齐的 Swift 测试。
 

@@ -8,7 +8,7 @@ final class ChromeBookmarksNativeHostInstallerTests: XCTestCase {
         let status = installer.installationStatus()
 
         XCTAssertFalse(status.isAvailable)
-        XCTAssertEqual(status.message, "扩展连接不可用：未配置 HandAgent Chrome 扩展 ID。")
+        XCTAssertEqual(status.message, "扩展连接不可用：未配置 Wisp Pocket Chrome 扩展 ID。")
     }
 
     func testEnsureInstalledWritesManifestAndReportsAvailable() throws {

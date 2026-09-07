@@ -81,7 +81,7 @@ export class UtilityProcessAgentServerSupervisor implements AgentServerSuperviso
       cwd: this.options.repoRoot,
       env: { ...process.env, ...this.options.env },
       stdio: "pipe",
-      serviceName: "HandAgent agent-server",
+      serviceName: "Wisp Pocket agent-server",
     });
     this.process = utilityProcess;
     utilityProcess.on("exit", (code: number | null) =>

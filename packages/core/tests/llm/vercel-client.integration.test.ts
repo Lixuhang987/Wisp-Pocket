@@ -67,7 +67,7 @@ describe("VercelClient real API integration", () => {
         {
           role: "user",
           content:
-            "You are running a HandAgent integration test. Call file.write exactly once with workspaceId qa-workspace, relativePath api-integration.txt, and content hello from real api integration test. Do not provide a final answer until after the tool result is provided.",
+            "You are running a Wisp Pocket integration test. Call file.write exactly once with workspaceId qa-workspace, relativePath api-integration.txt, and content hello from real api integration test. Do not provide a final answer until after the tool result is provided.",
         },
       ];
 
@@ -175,7 +175,7 @@ function parseApiOverride(value: string | undefined): OpenAIApiType | undefined 
 function referenceFileWriteTool(): RegisteredTool {
   return {
     name: "file.write",
-    description: "Write a UTF-8 text file inside a named HandAgent workspace.",
+    description: "Write a UTF-8 text file inside a named Wisp Pocket workspace.",
     inputSchema: {
       type: "object",
       properties: {

@@ -3,8 +3,8 @@ import KeyboardShortcuts
 import SwiftUI
 
 @main
-struct HandAgentApp: App {
-    @NSApplicationDelegateAdaptor(HandAgentApplicationDelegate.self) private var appDelegate
+struct WispPocketApp: App {
+    @NSApplicationDelegateAdaptor(WispPocketApplicationDelegate.self) private var appDelegate
     @State private var coordinator: AppCoordinator
 
     init() {
@@ -28,7 +28,7 @@ struct HandAgentApp: App {
 }
 
 @MainActor
-final class HandAgentApplicationDelegate: NSObject, NSApplicationDelegate {
+final class WispPocketApplicationDelegate: NSObject, NSApplicationDelegate {
     weak var coordinator: AppCoordinator?
     private var hasShutDown = false
 

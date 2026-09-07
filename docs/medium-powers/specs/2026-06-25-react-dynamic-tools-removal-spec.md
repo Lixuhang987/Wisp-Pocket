@@ -2,7 +2,7 @@
 
 ## Background
 
-HandAgent 当前 dynamic tool 的真实 provider 在 Swift desktop：Swift 通过 `/api/dynamic-tools` 发送 provider hello，处理 `host_macos.*` 和 plugin namespace 的 tool call。Swift PromptPanel 和 AgentTrigger 创建 thread 时，会通过 Swift `/api/thread` client 在 `thread.start.payload.dynamicTools` 中带上当前 host / plugin dynamic tool specs。
+Wisp Pocket 当前 dynamic tool 的真实 provider 在 Swift desktop：Swift 通过 `/api/dynamic-tools` 发送 provider hello，处理 `host_macos.*` 和 plugin namespace 的 tool call。Swift PromptPanel 和 AgentTrigger 创建 thread 时，会通过 Swift `/api/thread` client 在 `thread.start.payload.dynamicTools` 中带上当前 host / plugin dynamic tool specs。
 
 React ThreadWindow 当前也收到一份默认 dynamic tools：Swift 启动 Electron 时把 dynamic tools 写入环境变量，Electron main 解析后通过 ThreadWindow preload 注入 `window.handAgentThreadWindowConfig.defaultDynamicTools`，React 再在 initial prompt fallback 或 React 新建 thread 时把它写入 `thread.start.payload.dynamicTools`。
 

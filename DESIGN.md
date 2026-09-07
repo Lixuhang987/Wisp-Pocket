@@ -1,10 +1,10 @@
-# HandAgent 设计系统
+# Wisp Pocket 设计系统
 
 `DESIGN.md` 只记录跨界面设计原则和使用边界。可执行 token 的源头是 [design/tokens.json](/Users/mu9/proj/handAgent/design/tokens.json)；修改颜色、间距、圆角、字体或动画值时先改 token，再运行 `pnpm generate:theme-tokens`。
 
 ## 视觉基调
 
-HandAgent 是本地 AI agent 桌面工具，界面应安静、高效、适合长时间使用。它不是营销页，不用大字号英雄区、装饰性渐变、光晕或展示型动效。
+Wisp Pocket 是本地 AI agent 桌面工具，界面应安静、高效、适合长时间使用。它不是营销页，不用大字号英雄区、装饰性渐变、光晕或展示型动效。
 
 亮暗主题都使用暖色画布：亮色是奶白，暗色是暖深棕灰，不整页黑化。珊瑚橘是唯一主强调色，只用于主要按钮、选中态和关键运行状态；teal / amber / success / warning / error 只表达状态，不扩展成新的品牌色。
 

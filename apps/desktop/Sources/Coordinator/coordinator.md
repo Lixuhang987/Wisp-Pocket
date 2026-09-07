@@ -1,6 +1,6 @@
 # Coordinator 模块
 
-`AppCoordinator` 是宿主层的单向事件流总线，全局只有一份，由 `HandAgentApp` 持有。所有模块间协调（PromptPanel ↔ Electron ThreadWindow ↔ Electron StatusBubble ↔ Settings ↔ ElectronBackedAppServer）走 `send(.action)` 一条通路。
+`AppCoordinator` 是宿主层的单向事件流总线，全局只有一份，由 Wisp Pocket App 持有。所有模块间协调（PromptPanel ↔ Electron ThreadWindow ↔ Electron 桌宠 ↔ Settings ↔ ElectronBackedAppServer）走 `send(.action)` 一条通路。
 
 ## 文件
 
@@ -20,7 +20,7 @@
 - `AppCoordinator.init` 保存依赖后会调用 `bootstrap()`；不要在外部重复手动调用。
 - `bootstrap()` 会安装外观回调并启动外观监听、设置 PromptPanel 回调、注册热键和应用内快捷键、安装 app-server health 回调，并启动 Electron shell health 链路。AgentTrigger runtime reload 由 `AppServices.init` 负责。
 - 子模块回调统一在 `bootstrap()` 阶段注入闭包；外观系统回调只转给 `AppearanceThemeService.systemAppearanceDidChange()`，其他闭包内只允许 `send(.xxx)` 或打开 PromptPanel。
-- 应用退出由 `HandAgentApplicationDelegate` 接收 macOS termination 回调并调用 `shutdown()`；不要绕过 Coordinator 直接 stop Electron shell。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一 AppDelegate shutdown 链路。
+- 应用退出由 `WispPocketApplicationDelegate` 接收 macOS termination 回调并调用 `shutdown()`；不要绕过 Coordinator 直接 stop Electron shell。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一 AppDelegate shutdown 链路。
 - 测试模式走 `AppServices.testing()` 注入 nop 替身，跳过窗口/进程/激活策略副作用。
 - 窗口生命周期由 lifecycle 控制器闭环：Electron ThreadWindow 由 `ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 管理，`SettingsLifecycle` 管 Settings；Coordinator 不持有 AppKit 对象。
 - 应用内快捷键（如 `showThreadWindow` ⌘L 唤起 ThreadWindow）使用 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)` 在 `setupHotkey()` 中注册，仅当 handAgent 持有焦点时生效。不走 `HotkeyRegistering` 协议和 Carbon Events 全局通道。配置 UI 复用 `KeyboardShortcuts.Recorder`，监听通过 `KeyboardShortcuts.Shortcut(event:)` 比对。`shutdown()` 中 `NSEvent.removeMonitor` 清理。

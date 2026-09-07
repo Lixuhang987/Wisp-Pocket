@@ -54,10 +54,10 @@
 
 - `mcp.json` 中配置的所有 server 默认作为**全局** MCP server，会被注入每个 thread 的 tool registry。
 - MCP exposed tool name 统一为 `mcp.<serverId>.<toolName>`，避免与 builtin tool 冲突。
-- `computer_use` / `computer-use` 不再有 HandAgent 原生兼容 client；如需使用，必须在 `~/.spotAgent/mcp.json` 中配置真实 MCP transport。macOS host 能力走 Swift dynamic tools，不走 MCP 兼容层。
+- `computer_use` / `computer-use` 不再有 Wisp Pocket 原生兼容 client；如需使用，必须在 `~/.spotAgent/mcp.json` 中配置真实 MCP transport。macOS host 能力走 Swift dynamic tools，不走 MCP 兼容层。
 - stdio server 可配置 `cwd`；也可配置 `requestTimeoutMs`，默认 60s，避免外部 server 卡死时拖挂当前 thread run。
 - stdio server 可配置 `elicitation.autoAcceptEmptyForm: true`。该选项只自动接受 `requestedSchema` 为空对象且无必填字段的 form-mode `elicitation/create`，用于 Computer Use 这类本地 App 授权握手；带字段表单或 URL mode 仍返回 decline，不代替用户填写敏感信息或打开外部 URL。
-- stdio 与 Streamable HTTP 的 JSON-RPC 编码、初始化握手、session header、SSE 响应处理和 transport lifecycle 由官方 `@modelcontextprotocol/sdk` 承担；本模块只保留 HandAgent 配置、DTO 转换和 timeout 文案。
+- stdio 与 Streamable HTTP 的 JSON-RPC 编码、初始化握手、session header、SSE 响应处理和 transport lifecycle 由官方 `@modelcontextprotocol/sdk` 承担；本模块只保留 Wisp Pocket 配置、DTO 转换和 timeout 文案。
 - `MCPConfig.ts` 只解析配置；client 生命周期、capability 缓存与 prompt/resource 调用由 agent-server 的 `MCPServerRegistry` 管理。
 - Streamable HTTP headers 支持 `${ENV_NAME}` 插值，未设置的环境变量会替换为空字符串。
 - stdio 与 Streamable HTTP 的 description 归一化必须复用 `MCPDescriptions.ts`，避免 prompt/resource/tool 字段默认值漂移。
@@ -71,4 +71,4 @@
 
 ## 实现约束
 
-- `StdioMCPClient` 和 `StreamableHttpMCPClient` 不直接拼装 JSON-RPC 消息；新增 MCP transport 能力时优先复用官方 SDK transport，再在 `SDKMCPClientAdapter` 中做 HandAgent 接口适配。
+- `StdioMCPClient` 和 `StreamableHttpMCPClient` 不直接拼装 JSON-RPC 消息；新增 MCP transport 能力时优先复用官方 SDK transport，再在 `SDKMCPClientAdapter` 中做 Wisp Pocket 接口适配。

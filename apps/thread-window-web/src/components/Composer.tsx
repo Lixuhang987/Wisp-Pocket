@@ -194,7 +194,7 @@ export function Composer({
                 value={textItem.text}
                 onChange={handleInput}
                 onKeyDown={handleKeyDown}
-                placeholder={chipItems.length > 0 ? "" : "Ask HandAgent"}
+                placeholder={chipItems.length > 0 ? "" : "Ask Wisp Pocket"}
                 disabled={disabled}
                 className="min-h-[52px] min-w-[180px] flex-1 resize-none overflow-y-auto overflow-x-hidden bg-transparent px-xs py-xs text-[16px] leading-[1.5] text-app-text-primary placeholder:text-app-text-muted outline-none disabled:cursor-not-allowed disabled:text-app-text-muted/50"
                 style={{ minHeight: '52px', maxHeight: `${MAX_ROWS * LINE_HEIGHT}px` }}

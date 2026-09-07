@@ -2,7 +2,7 @@
 
 ## Background
 
-HandAgent 当前已经有 dynamic tool 机制：Swift desktop 作为默认 provider 连接 `/api/dynamic-tools`，把 `host_macos.*` 能力和 `~/.spotAgent/plugins/<id>/plugin.json` 声明的 plugin tools 合并后暴露给 core。agent-server 只负责保存 tool spec、路由 tool call request、等待 provider response；plugin 生命周期归 Swift desktop 管理。
+Wisp Pocket 当前已经有 dynamic tool 机制：Swift desktop 作为默认 provider 连接 `/api/dynamic-tools`，把 `host_macos.*` 能力和 `~/.spotAgent/plugins/<id>/plugin.json` 声明的 plugin tools 合并后暴露给 core。agent-server 只负责保存 tool spec、路由 tool call request、等待 provider response；plugin 生命周期归 Swift desktop 管理。
 
 现有 plugin 形态仍偏被动 tool provider。`alwaysOn` plugin 可以由 Swift desktop 启动并保活，但当前 tool 调用仍通过 stdin/stdout 另起进程执行。Context History 需要走向真正的独立 plugin 进程：plugin 本身是 Swift 可执行进程，通过 plugin RPC 响应 tool 查询，并调用 AX、screenshot、app/window 等原子 plugin 完成采集。
 
@@ -10,7 +10,7 @@ HandAgent 当前已经有 dynamic tool 机制：Swift desktop 作为默认 provi
 
 ## Goal
 
-提供一个内置官方 Context History plugin，随 HandAgent 发布，并自动安装或修复到 `~/.spotAgent/plugins`。用户在设置中显式启用后，Swift desktop 启动该 always-on Swift plugin 进程；禁用后停止 plugin，但已保存历史按保留策略继续存在。
+提供一个内置官方 Context History plugin，随 Wisp Pocket 发布，并自动安装或修复到 `~/.spotAgent/plugins`。用户在设置中显式启用后，Swift desktop 启动该 always-on Swift plugin 进程；禁用后停止 plugin，但已保存历史按保留策略继续存在。
 
 Context History 依赖一组必做的原子化 Swift plugin：AX plugin、screenshot plugin 和 app/window plugin。它们分别负责 AX/UI 树快照、截图/缩略图、前台 app/window 信息和必要的权限状态查询。Swift desktop 只负责安装、启停、健康状态和 dynamic tool provider 桥接，不承载 Context History 的采集能力实现。
 

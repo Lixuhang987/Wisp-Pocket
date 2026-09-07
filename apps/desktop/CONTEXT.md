@@ -24,10 +24,13 @@ _Avoid_: Chat Window、Conversation Window、PromptPanel
 显示 Agent Activity 并聚焦已有 ThreadWindow 的轻量状态界面。
 _Avoid_: ActivityWindow（指代用户可见界面时）
 
-## 设计中术语（尚未实现）
+## 产品命名
 
-**Wisp**:
-以桌宠和聊天气泡呈现 Thread 的轻量交互界面，也接收用户拖入内容以发起或继续交互；自动读取后可以提出建议，执行建议必须由用户明确选择。
+**Wisp Pocket**:
+本产品的名称。它包含 PromptPanel、ThreadWindow、常驻桌面交互和宿主自动化能力。
+
+**桌宠**:
+Wisp Pocket 的常驻轻量交互界面，当前使用月见八千代形象；它不是产品名称，也不称为“Wisp”。
 
 ## Input
 

@@ -32,7 +32,7 @@ struct ChromeBookmarksNativeHostInstaller {
         }
         let manifest = NativeHostManifest(
             name: nativeHostName,
-            description: "HandAgent Chrome bookmarks native messaging host",
+            description: "Wisp Pocket Chrome bookmarks native messaging host",
             path: nativeHostExecutableURL.path,
             type: "stdio",
             allowedOrigins: [expectedAllowedOrigin(extensionId: normalizedExtensionId)]
@@ -51,7 +51,7 @@ struct ChromeBookmarksNativeHostInstaller {
         guard let normalizedExtensionId else {
             return ChromeBookmarksNativeHostInstallationStatus(
                 isAvailable: false,
-                message: "扩展连接不可用：未配置 HandAgent Chrome 扩展 ID。"
+                message: "扩展连接不可用：未配置 Wisp Pocket Chrome 扩展 ID。"
             )
         }
         guard fileManager.fileExists(atPath: manifestURL.path) else {

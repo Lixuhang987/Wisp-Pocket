@@ -6,4 +6,4 @@
 
 ## 子节点
 
-- `mcp.json`：包含 `filesystem` 与 HandAgent 原生兼容的 `computer_use` 两个 stdio server 示例。
+- `mcp.json`：包含 `filesystem` 与 Wisp Pocket 原生兼容的 `computer_use` 两个 stdio server 示例。
