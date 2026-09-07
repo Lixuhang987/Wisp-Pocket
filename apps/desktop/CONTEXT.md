@@ -24,6 +24,11 @@ _Avoid_: Chat Window、Conversation Window、PromptPanel
 显示 Agent Activity 并聚焦已有 ThreadWindow 的轻量状态界面。
 _Avoid_: ActivityWindow（指代用户可见界面时）
 
+## 设计中术语（尚未实现）
+
+**Wisp**:
+接收并持久保留用户拖入内容、通过轻量对话提出处理建议的桌宠；任何执行都必须由用户明确选择，习惯学习不会产生自动执行权。
+
 ## Input
 
 **Attachment**:
