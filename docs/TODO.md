@@ -30,6 +30,16 @@
 
 ## Thread / Turn 破坏性重构遗留
 
+### 状态归属与分层重构（设计讨论中）
+
+- 目标：明确状态的唯一所有者与生命周期，明确依赖方向，减少跨层状态传递和不产生新职责的转发。
+- [ ] 对照 Codex 核验当前实现，逐轮确定重构范围、状态归属和并发语义；形成共识后记录必要的领域术语与 ADR。
+- [ ] 实现前读取涉及目录的文档链，从主 checkout 执行 `scripts/create-worktree.sh`，确认 CodeGraph 路径并运行分层基线。
+- [ ] 完成实现、验证和相关文档更新；若实现 spec，由独立且不继承上下文的子 agent 审核 spec、代码与文档。
+- [ ] 将完成项迁移到 `manual-qa.md`，执行提交前检查并提交。
+
+### 后续能力与验证
+
 - 对齐 codex 更完整 Thread / Turn 语义：
   - `thread.archive` / `thread.unarchive`：本轮已选择 `thread.delete` 作为最小可用删除语义，归档能力后续单独设计。
   - `thread.read`：按 threadId 拉取完整 thread 快照或分页读取历史。
