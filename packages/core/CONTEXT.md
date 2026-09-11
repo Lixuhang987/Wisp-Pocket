@@ -43,7 +43,7 @@ _Avoid_: LLM Provider、Tool Registry
 _Avoid_: Project、Repository（指代文件访问边界时）
 
 **Permission**:
-对一次 Tool 调用的授权决定，可限定为单次、当前 Thread 或持久记忆。
+对 Tool 调用的允许或拒绝决定，可仅用于本次调用，或按 Tool 名称持久记忆；持久决定不区分调用参数。
 _Avoid_: Confirmation、Approval（指代协议概念时）
 
 ## Protocol
