@@ -11,6 +11,7 @@
 - [dependency-audit.md](/Users/mu9/proj/handAgent/docs/dependency-audit.md)：依赖收敛后仍保留的独立迁移项。
 - [llm-api-integration.md](/Users/mu9/proj/handAgent/docs/llm-api-integration.md)：真实 LLM API 集成测试说明。
 - [agents/agents.md](/Users/mu9/proj/handAgent/docs/agents/agents.md)：工程 skills 的 issue tracker、triage 标签与领域文档消费规则。
+- [adr/adr.md](/Users/mu9/proj/handAgent/docs/adr/adr.md)：跨模块架构决策及尚未实现的目标原则。
 - [human/human.md](/Users/mu9/proj/handAgent/docs/human/human.md)：面向人工操作和系统能力的补充说明。
 - [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：历史 spec / plan 集合。
 - [superpowers/superpowers.md](/Users/mu9/proj/handAgent/docs/superpowers/superpowers.md)：历史视觉 / 输入资料资产。
