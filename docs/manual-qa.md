@@ -33,6 +33,15 @@
   6. 打开 `bugs.md`，确认只保留未修复缺陷；已实现待验收项在本文。
   7. 从 `AGENTS.md` 的 `Agent skills` 区块进入 `docs/agents/`，确认 GitHub Issues、默认 triage 标签和 multi-context 消费规则仍一致。
 
+### README 产品介绍
+
+- **状态**：已按当前代码重写，待 GitHub 页面展示验收；本次仅修改文档。
+- **验证结果（2026-09-13）**：README 的 9 个链接、锚点和 Markdown 结构检查通过；`bash ./scripts/test.sh`、`bash ./scripts/swiftw build` 通过。`bash ./scripts/swiftw test` 执行 312 项，其中 `AppCoordinatorTests.testThreadWindowOpenAckDoesNotPromoteSwiftHostPolicy` 与 `testThreadWindowClosedDoesNotDemoteSwiftHostPolicy` 失败，复跑一致；对应代码与测试未修改。
+- **验收步骤**：
+  1. 从首页阅读使用场景，确认能理解快捷键输入、近期活动检索和收藏触发任务各自解决的问题。
+  2. 确认 Context History 默认关闭、书签连接仍在完善；桌宠拖入、分享 / 标记入口与个人记忆属于后续规划。
+  3. 检查顶部导航、工程设计表格、开发验证折叠区及文档链接，确认在 GitHub 页面可正常阅读与跳转。
+
 ### ThreadWindow Radix UI 弹出层迁移
 
 - **状态**：已实现，待实机 QA。

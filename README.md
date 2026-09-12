@@ -1,76 +1,99 @@
+<div align="center">
+
 # Wisp Pocket
 
-**macOS 原生 Agent Runtime — 一键唤起，随处可用。**
+**少解释背景，让 AI 接上你的工作。**
 
-Wisp Pocket 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 PromptPanel，选中文本或截取屏幕区域作为上下文，提交后由本地 Agent Runtime 驱动工具调用与多轮对话。线程、附件、权限和工作区数据默认保留在本机；模型请求按你的 provider 配置发送，启用 Web 搜索时查询会发送给 Tavily，抓页时会请求目标 URL。
+macOS 15+ · 桌面 AI 助手 · 开发中
 
----
+[使用场景](#从当前工作开始) · [产品方向](#接下来) · [本地体验](#本地体验) · [工程设计](#实现背后的设计)
 
-## 功能
+</div>
 
-### 全局唤起
+在浏览器、文档和聊天之间切换时，你已经知道事情的来龙去脉，却常常需要向 AI 重新解释一遍。
 
-随时随地通过热键呼出 PromptPanel，无需切换窗口。支持文本选区和区域截图作为附件。
+Wisp Pocket 希望减少这段重复劳动：从随手唤起的输入面板开始，让 Agent 按需读取当前应用状态、查询已记录的近期活动，把你的请求放回正在进行的工作里。简单问题随时问，复杂任务可以在同一段对话中继续推进。
 
-### 多轮对话与工具调用
+## 从当前工作开始
 
-ThreadWindow 展示完整对话流，包括 assistant 回复、工具调用过程与权限审批。支持历史侧栏和后台 thread 管理。
+### 随时唤起，带上正在看的内容
 
-### Append Prompt 与 MCP 扩展
+按 **⌘ ⇧ Space** 呼出 Spotlight 式输入面板，直接提问；也可以通过文本选区或区域截图入口，把要处理的内容附在请求中，确认后提交。选区与截图快捷键可在 Settings 中配置。
 
-通过本地 manifest 定义 Append Prompt，通过 MCP 协议接入外部工具。PromptPanel 中选中的 Append Prompt 会作为 chip 附加到输入。
+> 选中一段文字，再说：「把这段改得更简洁，保留原来的语气。」
 
-### Web 搜索
+### 接上刚才的线索
 
-Agent 默认可调用 `web_search` 与 `fetch_page` 查询公共 Web。`web_search` 使用 Tavily Search API，需要在运行 agent-server 的环境中设置 `TAVILY_API_KEY`；`fetch_page` 只在需要精读单个 URL 时抓取并清洗正文。
+请求涉及桌面环境时，Agent 可以调用工具读取应用、窗口、屏幕或剪贴板。启用 **Context History** 后，还可以查询近期应用与窗口活动，按需读取记录详情、缩略图和原始截图，为「刚才看的内容」补充线索。
 
-### 灵活的模型配置
+Context History 是默认关闭的实验性插件；已实现活动采样与分级查询，仍待实机验收。
 
-支持 OpenAI Compatible / Anthropic 等多种 provider，在设置页即可切换模型、配置 API Key，保存后立即生效，无需重启。
+### 让一次收藏成为任务的起点
 
----
+配置 Chrome Bookmarks 触发器后，将网页收藏到指定文件夹，就能把标题和链接交给 Agent，按预设提示词发起后台任务。也支持通过 System Clock 在设定时间触发任务。
 
-## 快速开始
+> 例如，为一个收藏夹配置：「总结新收藏的文章，列出值得继续阅读的问题。」
+
+书签入口需要安装并连接配套 Chrome 扩展，目前仍在完善连接可靠性。
+
+## 让任务继续推进
+
+- **从问答到执行**：支持多轮对话、工具调用、流式结果、执行中断和历史查看。应用保持运行时，关闭对话窗口不影响已启动任务继续执行。
+- **按你的需要扩展**：通过 MCP 接入外部工具，通过 Append Prompt 保存可复用的提示模板；内置文件读写、网页搜索与正文抓取能力。
+- **模型由你选择**：支持 OpenAI-compatible 与 Anthropic API，可在 Settings 配置模型、API Key 和服务地址，修改后无需重启。
+
+## 关于上下文与数据
+
+初始上下文来自你确认提交的内容；当前桌面状态由工具按需读取，历史活动仅在启用 Context History 后采集。普通工具调用经过权限策略，可选择本次授权或按工具名称记住决定；内置文件工具限定在所选工作区内操作。
+
+对话、附件、配置与采集的活动记录保存在本机。模型请求及其中的上下文会发送至你配置的模型服务；网页搜索使用 Tavily，正文抓取会访问目标网站。
+
+## 接下来
+
+以下为后续规划：
+
+- **桌宠与拖拽入口**：将文件、图片或链接拖给桌宠，从对象本身发起任务，再延伸到分享、标记等自然操作。当前常驻界面为任务状态气泡，桌宠拖入尚未实现。
+- **可积累的个人记忆**：将稳定偏好、任务进展与历史对话分开管理，按当前问题和近期线索召回、更新，让历史决策逐步成为可复用的协作背景。
+- **可复用的处理流程**：已有实验性的操作录制、策略回放与修复接口，后续探索从重复任务中归纳处理流程，并在失败后辅助修正。
+
+## 本地体验
+
+需要 **macOS 15+、完整 Xcode（Swift 6）与 pnpm 10**；推荐使用 **Node.js 24**。
 
 ```bash
-# 安装依赖
 pnpm install
-
-# 启动桌面应用
-# Swift 内部 executable target 仍名为 HandAgentDesktop
 bash ./scripts/swiftw run HandAgentDesktop
 ```
 
-首次启动后打开 Settings 配置模型 provider 和 API Key，即可开始使用。
+启动后，在 **Settings** 中配置模型服务与 API Key，再按 **⌘ ⇧ Space** 发起第一个请求。截图、屏幕读取与系统操作需要对应的 macOS 权限；图片输入需要支持多模态的模型 API。
 
----
+网页搜索需要在启动环境中设置 `TAVILY_API_KEY`。启动排障与打包说明从 [开发文档](docs/docs.md) 进入，提示模板与 MCP 配置见 [示例](examples/examples.md)。
 
-## 架构概览
+## 实现背后的设计
 
-| 层 | 职责 |
-|---|---|
-| **Swift Host** | macOS 生命周期、PromptPanel、Settings、全局热键与宿主能力 |
-| **Electron UI Shell** | ThreadWindow / 桌宠容器、agent-server 进程管理 |
-| **ThreadWindow** (React) | 对话 UI、历史管理、权限审批 |
-| **Agent Server** (Node) | AgentRuntime 驱动、tool 注册、MCP 注入、thread 持久化 |
-| **Core** (TypeScript) | 跨平台 Agent 核心、工具编排、LLM adapter |
+技术栈：**Swift / SwiftUI · TypeScript · React · Electron · Node.js · SQLite**。
 
----
+| 工程问题 | 当前设计 |
+| --- | --- |
+| 上下文体积与相关性 | 主动附件与环境读取分开；历史查询提供活动索引、详情、缩略图和原图，供 Agent 按需逐层读取。 |
+| 原生交互与持续任务 | Swift 负责快捷键、输入面板和系统能力；Electron 承载常驻界面并管理本地服务；React 展示对话，独立的 Agent Runtime 驱动执行。 |
+| 跨进程状态一致性 | 核心层统一拥有 Thread / Turn 生命周期、输入队列与中断；SQLite 追加保存历史，输入与完成状态在持久化后确认，保存失败会暂停后续推进。 |
+| 工具扩展与权限控制 | 核心层通过接口使用模型、存储和工具；MCP 与 Dynamic Tool 接入外部能力，权限策略和工作区边界约束相应调用。 |
 
-## 开发
+架构与模块入口见 [handAgent.md](handAgent.md)，统一术语见 [CONTEXT-MAP.md](CONTEXT-MAP.md)。
+
+<details>
+<summary>开发验证</summary>
 
 ```bash
-# TypeScript / Web 测试
 bash ./scripts/test.sh
-
-# Swift 测试 & 构建
 bash ./scripts/swiftw test
 bash ./scripts/swiftw build
 ```
 
-统一术语见 [CONTEXT-MAP.md](CONTEXT-MAP.md)，架构与开发入口见 [handAgent.md](handAgent.md) 和 [docs/docs.md](docs/docs.md)。
+自动化检查覆盖核心运行逻辑、跨进程协议及 UI 行为；系统权限、焦点与真实模型链路仍需实机验收，清单见 [开发文档](docs/docs.md)。
 
----
+</details>
 
 ## 许可
 
