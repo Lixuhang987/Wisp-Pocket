@@ -10,11 +10,11 @@
 |------|------|
 | `use-cases/` | 主路径用例测试；当前 `thread-lifecycle.test.ts` 从 socket handler 入口覆盖 `/api/thread`、`/api/activity`、request/response 回流和 server-level MCP/LLM mode 选择 |
 | `activity/` | `AgentActivityPublisher` 的 snapshot、状态派生和 subscriber 广播边界 |
-| `agent/` | `AgentRequestBroker` 的等待队列、thread cancel 和 `client_response` 唤醒边界 |
-| `thread/` | `ThreadCommandRouter`、`ThreadRuntimeOrchestrator`、`ThreadPersistence`、thread 级工具激活状态等边界语义 |
+| `agent/` | （已移除）Thread 请求与运行边界由 core Thread 用例覆盖 |
+| `thread/` | Thread 生命周期、持久化、请求、工具激活和所有权主路径 |
 | `protocol/` | `MessageTranslator` 的 `ThreadNotification`、审计事件、用户附件和 image STUB 翻译 |
 | `settings/` | `SettingsBackedLLMClient` 与 `SettingsBackedToolRegistry` 的 stamp 缓存和热加载 |
-| `actions/` | `MCPServerRegistry`、`ThreadScopedToolRegistry` |
+| `actions/` | `MCPServerRegistry` |
 | `bridges/` | dynamic tool bridge 的 token fencing、超时和断线语义 |
 | `support/` | 测试辅助实现，目前包含内存 BlobStore |
 | `path-alias.test.ts` | 扫描测试目录内跨包 import，验证 `@handagent/core/*` path alias 能覆盖测试引用 |

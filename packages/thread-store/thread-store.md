@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- `src/types.ts`：rollout、元数据、审计和结果类型。
+- `src/types/ThreadStore.ts`：rollout、元数据、审计和结果类型。
 - `src/ThreadStore.ts`：SQLite schema、Thread 生命周期与派生视图。
 - `src/CurrentThread.ts`：当前 open Thread 的顺序写入语义。
 - `src/index.ts`：包导出。

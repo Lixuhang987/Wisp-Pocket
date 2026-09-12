@@ -20,7 +20,7 @@
 
 ## 组合规则
 
-- 启动时创建一次 Workspace、Permission、Blob、ThreadStore、Agent manager、Tool registry 和 publisher；关闭时按反向所有权释放。
+- 启动时创建一次 Workspace、Permission、Blob、ThreadStore、ThreadRegistry、Tool registry 和 publisher；关闭时先关闭 ThreadRegistry，再按反向所有权释放共享服务。
 - socket handler 只做 decode、身份绑定、路由和错误回写，不承载 runtime 业务。
 - `ThreadNotificationPublisher` 持有订阅关系，不持有 WebSocket；发送函数由本目录注入。
 - Provider 断线必须拒绝其 pending Dynamic Tool call，并从 registry 移除连接身份。

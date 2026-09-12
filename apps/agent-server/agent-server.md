@@ -1,6 +1,6 @@
 # agent-server
 
-`apps/agent-server` 是 Conversation Runtime 的本地服务组合根。它拥有连接、Agent 生命周期、协议翻译、Tool 组合和 Thread 持久化适配，不拥有产品 UI 或 macOS 能力。
+`apps/agent-server` 是 Conversation Runtime 的本地服务组合根。它拥有连接、协议翻译、依赖组合和 Thread 持久化适配，不拥有 Thread 业务生命周期、产品 UI 或 macOS 能力。
 
 ## 直接子节点
 
@@ -20,8 +20,8 @@
 
 ## 组合边界
 
-- `startDefaultServer` 创建设置、LLM、Workspace、Permission、Blob、MCP、Tool registry、ThreadStore、Agent manager 和三条 socket 通道。
-- Agent 是运行中 Thread 的持久 owner；外部输入统一经 `op.submit`，UI 回执在 server 内包装为内部 Op。
+- `startDefaultServer` 创建设置、LLM、Workspace、Permission、Blob、MCP、Tool registry、ThreadStore、ThreadRegistry 和三条 socket 通道。
+- ThreadRegistry / Thread 是运行中及空闲 Thread 的唯一 owner；外部输入统一经 `op.submit`，UI 回执在 server 内包装为内部 Op。
 - core runtime event 先在本包翻译成协议通知和审计，再发布或落盘；UI 不直接看到 runtime event。
 - Dynamic Tool spec 可随 Thread 持久化，实际调用按 `clientId` 转发给在线 Provider。
 
