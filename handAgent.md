@@ -26,7 +26,7 @@ flowchart TD
 | `apps/desktop` | macOS 生命周期、PromptPanel、Settings、AgentTrigger、宿主能力与 Electron 启停 |
 | `apps/electron-shell` | 常驻 UI 容器、agent-server supervisor、ThreadWindow 预热与窗口生命周期 |
 | `apps/thread-window-web` | Thread 历史、消息、请求、Composer 和当前展示状态 |
-| `apps/agent-server` | WebSocket 路由、Agent 编排、协议翻译、Tool 组合与持久化适配 |
+| `apps/agent-server` | WebSocket 路由、协议翻译、依赖组合与持久化适配 |
 | `packages/core` | Conversation Runtime、协议 DTO、LLM/Tool/Workspace/Permission 抽象 |
 | `packages/thread-store` | SQLite rollout 与 Thread 派生视图 |
 | `apps/builtin-plugins` | 宿主原子能力、Context History 与 Automation |
@@ -44,7 +44,7 @@ flowchart TD
 
 - Swift Host 持久化模型设置、主题偏好、AgentTrigger 与 Plugin enablement；React 只消费解析后的主题。
 - React ThreadWindow 持有完整 UI Thread 状态；Swift 与 Electron main 不 mirror 消息或历史。
-- agent-server 持有运行中的 Agent、订阅和请求路由；core 不持有 socket 或数据库。
+- core ThreadRegistry / Thread 持有运行中的 Thread、历史、Turn、请求和工具状态；agent-server 仅持有订阅、连接和请求路由。
 - Thread 历史主文件是 `~/.spotAgent/threads.sqlite`；其他本地配置和数据路径由 owning 模块文档说明。
 
 ## 阅读路由

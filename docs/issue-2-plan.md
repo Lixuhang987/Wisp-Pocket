@@ -20,9 +20,9 @@
 ## TODO
 
 - [x] 主 checkout 脚本建立 worktree、CodeGraph 初始化及 TypeScript/Web、Swift build 基线。
-- [ ] 统一 Thread 生命周期、历史、故障恢复、请求和工具状态；精简 server 路由及装配。
-- [ ] 同步永久权限协议、后端、Web 和 Swift。
-- [ ] 复用并调整已有协议主路径、runtime、SQLite、权限和界面测试；补充连接断开继续执行、保存失败暂停、删除晚到隔离等关键公开行为。依用户指示不为纯移动或内部拆分另写测试。
-- [ ] 完整 TypeScript/Web/server/core、Swift test/build 检查。
-- [ ] 独立 Standards/Spec 代码审查；独立无上下文文档审核、DAG 与逐层文档更新。
-- [ ] 更新 manual-qa，移除已完成 TODO，提交。
+- [x] 统一 Thread 生命周期、历史、故障恢复、请求和工具状态；精简 server 路由及装配。
+- [x] 同步永久权限协议、后端、Web 和 Swift。
+- [x] 复用并调整已有协议主路径、runtime、SQLite、权限和界面测试；补充关键公开行为。
+- [x] 完整 TypeScript/Web/server/core、Swift test/build 检查。
+- [x] 独立 Standards/Spec 代码审查；独立无上下文文档审核、DAG 与逐层文档更新。
+- [x] 更新 manual-qa，移除已完成 TODO，提交。

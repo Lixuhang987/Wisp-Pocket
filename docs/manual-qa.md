@@ -59,7 +59,7 @@
 ### 默认 Websearch 与 Responses SSE 回归
 
 - **状态**：已实现，待真实 provider 实机 QA；上次阻塞在本地 provider 返回 401 invalidated oauth token。
-- **自动化验证**：`pnpm exec vitest run apps/agent-server/tests/thread/ThreadScopedToolRegistry.test.ts packages/core/tests/tools/websearch-use-cases.test.ts packages/core/tests/permission/security-use-cases.test.ts packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`。
+- **自动化验证**：`pnpm exec vitest run packages/core/tests/tools/websearch-use-cases.test.ts packages/core/tests/permission/security-use-cases.test.ts packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`。
 - **验收步骤**：
   1. 在启动 agent-server 的环境提供有效 `TAVILY_API_KEY`，并配置可用的 OpenAI-compatible `responses` provider。
   2. 提交需要近期信息的问题，确认模型未先调用 `use_tools` 也能直接使用 `web_search`。
@@ -83,6 +83,8 @@
   8. 修改官方 manifest 的非 enabled 字段后重启，确认 installer 修复 manifest 且保留用户 enabled 选择。
 
 ## Issue #2 后端 Thread 所有权重构
+
+- **自动化状态**：实现与自动化回归已提交；以下项目保留为真实 agent-server / UI 环境的人工验收。
 
 - [ ] 启动 agent-server，创建两个 Thread；分别连续提交两轮输入，确认历史和流式通知不串线。
 - [ ] 执行期间关闭全部 Thread UI 连接，确认 Turn 继续运行；重新连接后用 `thread.resume` 读取结果。
