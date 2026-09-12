@@ -174,12 +174,12 @@ export function App() {
               payload: { reason: "user" },
             });
           }}
-          onAnswerPermission={(requestId, decision) => {
+          onAnswerPermission={(requestId, decision, scope) => {
             clientRef.current?.sendRaw(encodePermissionAnswer({
               requestId,
               timestamp: now(),
               decision,
-              scope: "thread",
+              scope,
             }));
             createThreadWindowStore.getState().resolvePermissionRequest(requestId);
           }}

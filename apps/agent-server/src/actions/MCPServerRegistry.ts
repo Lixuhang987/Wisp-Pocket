@@ -1,4 +1,4 @@
-import type { AgentTool } from "@handagent/core/tools/AgentTool.ts";
+import type { AgentTool } from "@handagent/core/tools/types/AgentTool.ts";
 import type {
   MCPClient,
   MCPPromptDescription,
@@ -11,6 +11,8 @@ import { MCPToolAdapter } from "@handagent/core/mcp/MCPToolAdapter.ts";
 
 export class MCPServerRegistry {
   private readonly clients = new Map<string, MCPClient>();
+  private readonly initializing = new Map<string, Promise<MCPClient>>();
+  private closing = false;
   private readonly toolCache = new Map<string, AgentTool[]>();
 
   constructor(
@@ -20,13 +22,25 @@ export class MCPServerRegistry {
   ) {}
 
   async getClient(serverId: string): Promise<MCPClient> {
-    let client = this.clients.get(serverId);
-    if (!client) {
-      client = this.options.createClient(serverId);
-      await client.initialize();
-      this.clients.set(serverId, client);
-    }
-    return client;
+    if (this.closing) throw new Error("MCP service closed");
+    const existing = this.clients.get(serverId);
+    if (existing) return existing;
+    const pending = this.initializing.get(serverId);
+    if (pending) return pending;
+    const client = this.options.createClient(serverId);
+    const initialization = (async () => {
+      try {
+        await client.initialize();
+        if (this.closing) throw new Error("MCP service closed");
+        this.clients.set(serverId, client);
+        return client;
+      } catch (error) {
+        await client.close();
+        throw error;
+      } finally { this.initializing.delete(serverId); }
+    })();
+    this.initializing.set(serverId, initialization);
+    return initialization;
   }
 
   getServerInfo(serverId: string): MCPServerInfo | undefined {
@@ -46,6 +60,7 @@ export class MCPServerRegistry {
           callTool: (name, args) => client.callTool(name, args),
         }),
     );
+    if (this.closing) throw new Error("MCP service closed");
     this.toolCache.set(serverId, tools);
     return tools;
   }
@@ -75,10 +90,12 @@ export class MCPServerRegistry {
   }
 
   async closeAll(): Promise<void> {
-    for (const client of this.clients.values()) {
-      await client.close();
-    }
+    this.closing = true;
+    const clients = [...this.clients.values()];
     this.clients.clear();
     this.toolCache.clear();
+    await Promise.allSettled(clients.map((client) => client.close()));
+    // In-flight initialization closes its own client before settling.
+    await Promise.allSettled(this.initializing.values());
   }
 }

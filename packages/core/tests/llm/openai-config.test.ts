@@ -3,7 +3,7 @@ import {
   defaultOpenAIBaseURL,
   resolveOpenAIApiKey,
   resolveOpenAIBaseURL,
-} from "../../src/llm/OpenAIConfig";
+} from "../../src/adapters/providers/OpenAIConfig";
 
 describe("OpenAIConfig", () => {
   it("returns the explicit apiKey without reading environment variables", () => {

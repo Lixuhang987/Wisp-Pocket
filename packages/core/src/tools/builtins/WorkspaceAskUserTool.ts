@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineTool } from "../defineTool.ts";
-import type { WorkspaceRegistry, WorkspaceSummary } from "../../workspace/Workspace.ts";
+import type { WorkspaceRegistry, WorkspaceSummary } from "../../workspace/types/Workspace.ts";
 
 const InputSchema = z.object({
   prompt: z.string().trim().min(1),

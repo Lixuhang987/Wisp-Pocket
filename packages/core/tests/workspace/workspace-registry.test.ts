@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FileWorkspaceRegistry } from "../../src/workspace/FileWorkspaceRegistry.ts";
+import { FileWorkspaceRegistry } from "../../src/adapters/filesystem/FileWorkspaceRegistry.ts";
 
 describe("FileWorkspaceRegistry", () => {
   let dir: string;

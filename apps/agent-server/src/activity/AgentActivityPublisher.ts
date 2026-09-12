@@ -2,9 +2,9 @@ import type {
   AgentActivityEvent,
   AgentActivityStatus,
   AgentActivityWaitingRequest,
-} from "@handagent/core/protocol/AgentActivity.ts";
-import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
-import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+} from "@handagent/core/protocol/types/AgentActivity.ts";
+import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest.ts";
+import type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
 
 export type ActivitySourceEvent = ThreadNotification | ServerRequest;
 

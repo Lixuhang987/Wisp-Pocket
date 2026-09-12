@@ -71,11 +71,11 @@ describe("thread protocol helpers", () => {
       requestId: "thread-1:req-1",
       timestamp: "2026-06-06T00:00:03.000Z",
       decision: "allow",
-      scope: "thread",
+      scope: "once",
     }))).toMatchObject({
       type: "permission.answered",
       requestId: "thread-1:req-1",
-      payload: { decision: "allow", scope: "thread" },
+      payload: { decision: "allow", scope: "once" },
     });
   });
 

@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect } from "vitest";
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import { ThreadStore } from "../src/ThreadStore.ts";
-import type { ThreadStoreResult } from "../src/types.ts";
+import type { ThreadStoreResult } from "../src/types/ThreadStore.ts";
 
 export const fixedNow = () => "2026-06-14T00:00:00.000Z";
 

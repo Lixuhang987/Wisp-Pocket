@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { MockLLMClient } from "@handagent/core/llm/MockLLMClient.ts";
+import { MockLLMClient } from "@handagent/core/adapters/providers/MockLLMClient.ts";
 import { AgentRuntime, type AgentRuntimeEvent } from "@handagent/core/runtime/AgentRuntime.ts";
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
-import type { AgentTool } from "@handagent/core/tools/AgentTool.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
+import type { AgentTool } from "@handagent/core/tools/types/AgentTool.ts";
 import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
 import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
-import type { DynamicToolBridge } from "@handagent/core/protocol/DynamicTool.ts";
-import { ThreadScopedToolRegistry } from "../../src/actions/ThreadScopedToolRegistry.ts";
+import type { DynamicToolBridge } from "@handagent/core/protocol/types/DynamicTool.ts";
+import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
+
+// Test fixture models independent owners while preserving the existing tool-behavior cases.
+class ThreadScopedToolRegistry {
+  private tools = new Map<string, ThreadTools>();
+  constructor(private options: ConstructorParameters<typeof ThreadTools>[0], private dependencies: ConstructorParameters<typeof ThreadTools>[2] = {}) {}
+  private get(id: string) {
+    let tools = this.tools.get(id);
+    if (!tools) { tools = new ThreadTools(this.options, [], this.dependencies); this.tools.set(id, tools); }
+    return tools;
+  }
+  registryForThread(id: string) { return this.get(id).registry; }
+  refreshForThread(id: string) { return this.get(id).refresh(); }
+  activate(id: string) { return this.get(id).activate(); }
+  isActivated(id: string) { return this.get(id).isActivated(); }
+  setDynamicTools(id: string, specs: ConstructorParameters<typeof ThreadTools>[1]) {
+    this.tools.set(id, new ThreadTools(this.options, specs, this.dependencies));
+  }
+  forgetThread(id: string) { this.tools.delete(id); }
+}
 
 function fakeTool(name: string): AgentTool {
   return {

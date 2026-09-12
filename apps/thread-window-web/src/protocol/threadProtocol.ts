@@ -1,9 +1,9 @@
-import type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
-import type { InputItem, RuntimeOp, UserInput } from "@handagent/core/protocol/Op.ts";
-import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
-import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
-import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type { ThreadAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
+import type { ClientResponse } from "@handagent/core/protocol/types/ClientResponse.ts";
+import type { InputItem, RuntimeOp, UserInput } from "@handagent/core/protocol/types/Op.ts";
+import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest.ts";
+import type { ThreadCommand } from "@handagent/core/protocol/types/ThreadCommand.ts";
+import type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
+import type { ThreadAttachment } from "@handagent/core/protocol/types/ThreadProtocolShared.ts";
 
 export type {
   RunStatus,
@@ -11,12 +11,12 @@ export type {
   ThreadListEntry,
   ThreadSnapshotPayload,
   WorkspaceAskCandidate,
-} from "@handagent/core/protocol/ThreadProtocolShared.ts";
-export type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
-export type { InputItem, RuntimeOp, UserInput } from "@handagent/core/protocol/Op.ts";
-export type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
-export type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
-export type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+} from "@handagent/core/protocol/types/ThreadProtocolShared.ts";
+export type { ClientResponse } from "@handagent/core/protocol/types/ClientResponse.ts";
+export type { InputItem, RuntimeOp, UserInput } from "@handagent/core/protocol/types/Op.ts";
+export type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest.ts";
+export type { ThreadCommand } from "@handagent/core/protocol/types/ThreadCommand.ts";
+export type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
 
 export type InitialPromptPayload = {
   clientRequestId: string;
@@ -115,7 +115,7 @@ export function encodePermissionAnswer(input: {
   requestId: string;
   timestamp: string;
   decision: "allow" | "deny";
-  scope?: "once" | "thread" | "always";
+  scope?: "once" | "always";
   reason?: string;
 }): string {
   return encode({

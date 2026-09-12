@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLoggingFetch } from "../../src/logging/createLoggingFetch";
-import type { NetworkLogEntry } from "../../src/logging/NetworkLogger";
+import type { NetworkLogEntry } from "../../src/logging/types/NetworkLogger";
 
 describe("createLoggingFetch", () => {
   it("returns streaming responses immediately without waiting for the body to close", async () => {

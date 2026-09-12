@@ -2,9 +2,9 @@ import type {
   DynamicToolBridge,
   DynamicToolCallResponsePayload,
   DynamicToolSpec,
-} from "../protocol/DynamicTool.ts";
-import { dynamicToolName } from "../protocol/DynamicTool.ts";
-import type { AgentTool, AgentToolCallContext } from "./AgentTool.ts";
+} from "../protocol/types/DynamicTool.ts";
+import { dynamicToolName } from "../protocol/types/DynamicTool.ts";
+import type { AgentTool, AgentToolCallContext } from "./types/AgentTool.ts";
 
 export class DynamicToolAdapter implements AgentTool<unknown, DynamicToolCallResponsePayload> {
   readonly name: string;

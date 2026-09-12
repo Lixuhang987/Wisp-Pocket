@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { DynamicToolProviderMessage } from "@handagent/core/protocol/DynamicTool.ts";
+import type { DynamicToolProviderMessage } from "@handagent/core/protocol/types/DynamicTool.ts";
 import {
   DynamicToolProviderOfflineError,
   DynamicToolProviderTimeoutError,

@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isNotFoundError } from "../../utils/nodeErrors.ts";
-import type { Workspace, WorkspaceRegistry } from "../../workspace/Workspace.ts";
+import type { Workspace, WorkspaceRegistry } from "../../workspace/types/Workspace.ts";
 
 export async function resolveWorkspace(
   registry: WorkspaceRegistry,

@@ -1,6 +1,6 @@
-import type { WorkspaceRegistry } from "../workspace/Workspace.ts";
+import type { WorkspaceRegistry } from "../workspace/types/Workspace.ts";
 import { filterToolNames, type ToolSettings } from "../config/ToolSettings.ts";
-import type { AgentTool } from "./AgentTool.ts";
+import type { AgentTool } from "./types/AgentTool.ts";
 import { ToolRegistry } from "./ToolRegistry.ts";
 import { FileReadTool } from "./builtins/FileReadTool.ts";
 import { FileWriteTool } from "./builtins/FileWriteTool.ts";

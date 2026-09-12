@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [thread/thread.md](/Users/mu9/proj/handAgent/packages/core/src/thread/thread.md)：Thread 注册表与生命周期。
+- [adapters/adapters.md](/Users/mu9/proj/handAgent/packages/core/src/adapters/adapters.md)：文件系统、Provider 与 MCP 适配。
 - [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)：跨进程 DTO 与消息族。
 - [runtime/runtime.md](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md)：Turn、消息与 LLM/Tool 循环。
 - [llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md)：provider-neutral LLM 接口与适配。

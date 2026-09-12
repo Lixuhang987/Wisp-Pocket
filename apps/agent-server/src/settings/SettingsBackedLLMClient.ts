@@ -7,16 +7,16 @@ import type {
   LLMStreamEvent,
 } from "@handagent/core/llm/LLMClient.ts";
 import { completeLLM, streamLLM } from "@handagent/core/llm/LLMClient.ts";
-import { createLLMClient } from "@handagent/core/llm/LLMClientFactory.ts";
+import { createLLMClient } from "@handagent/core/adapters/providers/LLMClientFactory.ts";
 import {
   loadModelSettings,
   modelSettingsFilePath,
 } from "@handagent/core/config/ModelSettings.ts";
 import type { ModelSettings } from "@handagent/core/config/ModelSettings.ts";
 import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import type { RegisteredTool } from "@handagent/core/tools/ToolRegistry.ts";
-import type { NetworkLogger } from "@handagent/core/logging/NetworkLogger.ts";
+import type { NetworkLogger } from "@handagent/core/logging/types/NetworkLogger.ts";
 
 type SettingsBackedLLMClientOptions = {
   networkLogger?: NetworkLogger;

@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FileReadTool } from "../../../src/tools/builtins/FileReadTool";
 import { FileWriteTool } from "../../../src/tools/builtins/FileWriteTool";
-import { FileWorkspaceRegistry } from "../../../src/workspace/FileWorkspaceRegistry";
-import type { WorkspaceRegistry } from "../../../src/workspace/Workspace";
+import { FileWorkspaceRegistry } from "../../../src/adapters/filesystem/FileWorkspaceRegistry";
+import type { WorkspaceRegistry } from "../../../src/workspace/types/Workspace";
 
 async function makeRegistryWithDefault(): Promise<{
   registry: WorkspaceRegistry;

@@ -28,7 +28,7 @@
 
 ## 默认公开 web tools
 
-这些工具不属于 workspace/file builtin 注册表，不受 settings allowlist / denylist 控制，由 agent-server 的 `ThreadScopedToolRegistry` 作为 `defaultTools` 注入。未激活 thread 默认暴露 `use_tools`、`web_search`、`fetch_page`；激活后移除 `use_tools`，但继续保留 `web_search` 与 `fetch_page`，再合并 builtin + MCP + dynamic tools。
+这些工具不属于 workspace/file builtin 注册表，不受 settings allowlist / denylist 控制，由 agent-server 的 `ThreadTools` 作为 `defaultTools` 注入。未激活 thread 默认暴露 `use_tools`、`web_search`、`fetch_page`；激活后移除 `use_tools`，但继续保留 `web_search` 与 `fetch_page`，再合并 builtin + MCP + dynamic tools。
 
 | name | 入参 | 依赖 | 说明 |
 |------|------|------|------|
@@ -55,7 +55,7 @@ flowchart LR
 
 ## Dynamic tools
 
-macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicToolSpec` 暴露，不进入 builtin 注册流程。`ThreadScopedToolRegistry` 在 agent-server 侧把 thread metadata 中的 dynamic tools 适配为 `DynamicToolAdapter`；模型可见名称是 `namespace.name`，例如 `host_macos.screen_capture`。adapter 会用 `threadId / turnId / toolCallId` 生成 provider-facing 唯一 call id，避免多个 thread 并发复用同一个 LLM tool call id 时互相覆盖；返回给 runtime 的 tool message 仍使用原始 `toolCallId`。
+macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicToolSpec` 暴露，不进入 builtin 注册流程。`ThreadTools` 在 agent-server 侧把 thread metadata 中的 dynamic tools 适配为 `DynamicToolAdapter`；模型可见名称是 `namespace.name`，例如 `host_macos.screen_capture`。adapter 会用 `threadId / turnId / toolCallId` 生成 provider-facing 唯一 call id，避免多个 thread 并发复用同一个 LLM tool call id 时互相覆盖；返回给 runtime 的 tool message 仍使用原始 `toolCallId`。
 
 ## 编辑此目录的约束
 
@@ -73,7 +73,7 @@ macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicT
 
 `MetaToolUseTool`（常量 `META_TOOL_NAME = "use_tools"`）是工具集的激活入口，与普通 builtin tool 有以下本质区别：
 
-- 不进入 `registerBuiltins` / `registerTools` 的 builtin 注册流程，由 `ThreadScopedToolRegistry` 单独管理。
+- 不进入 `registerBuiltins` / `registerTools` 的 builtin 注册流程，由 `ThreadTools` 单独管理。
 - 不受 `~/.spotAgent/settings.json` 的 `allowlist` / `denylist` 影响；无论 settings 如何配置，未激活 thread 始终暴露 `use_tools` 以及 agent-server 注入的默认公开工具。
 - 首次激活返回 `META_TOOL_FIRST_ACTIVATION_RESULT`，runtime 随即把完整 builtin + MCP + dynamic tools 工具集注入当前 thread。
 - 激活后 provider 可见 registry 会移除 `use_tools`，避免后续轮次重复暴露 meta-tool；若模型或历史回放仍提交晚到的 `use_tools` 调用，runtime 走幂等兜底并返回 `META_TOOL_ALREADY_ACTIVE_RESULT`，不会重复扩展工具集。

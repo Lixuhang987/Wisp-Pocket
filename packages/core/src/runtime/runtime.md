@@ -6,12 +6,12 @@
 
 - `AgentMessage.ts`：LLM 消息与多模态 user content。
 - `AgentRuntime.ts`：单次 Turn 的 LLM/Tool 循环、Permission 和中断检查。
-- `AgentRunner.ts`：持续消费 Op，协调 Thread port 和状态。
-- `AgentSession.ts`、`AgentThreadPort.ts`：运行配置、服务和 Thread 端口。
+- `AgentRuntime.ts`：单次 Turn 的模型与工具循环；Thread 在 `thread/` 统一消费 Op。
+- 运行配置和服务由 `thread/types` 端口定义。
 - `SystemPrompt.ts`：按 section 组装临时 system message。
 - `Stub.ts`、`TurnSummarizer.ts`：大内容引用与 Turn 后压缩。
 - `ToolCallEnvelope.ts`：LLM Tool call 的归一化表达。
-- `AgentThread.ts`：旧脚本入口的初始文本归一化，不属于 agent-server 主路径。
+- Thread 生命周期由 `thread/Thread.ts` 和 `thread/ThreadRegistry.ts` 拥有。
 
 ## Turn 循环
 

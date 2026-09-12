@@ -1,7 +1,7 @@
-import type { AgentMessage, AssistantAgentMessage } from "../runtime/AgentMessage.ts";
-import type { ToolCallEnvelope } from "../runtime/ToolCallEnvelope.ts";
+import type { AgentMessage, AssistantAgentMessage } from "../runtime/types/AgentMessage.ts";
+import type { ToolCallEnvelope } from "../runtime/types/ToolCallEnvelope.ts";
 import type { RegisteredTool } from "../tools/ToolRegistry.ts";
-import type { BlobStore } from "../blob/BlobStore.ts";
+import type { BlobStore } from "../blob/types/BlobStore.ts";
 
 export type LLMCompletion = {
   message: AssistantAgentMessage;

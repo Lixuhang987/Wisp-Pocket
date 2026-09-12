@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { defineTool } from "../defineTool.ts";
-import type { WorkspaceRegistry } from "../../workspace/Workspace.ts";
+import type { WorkspaceRegistry } from "../../workspace/types/Workspace.ts";
 import {
   isNotFoundError,
   normalizeWorkspaceRelativePath,

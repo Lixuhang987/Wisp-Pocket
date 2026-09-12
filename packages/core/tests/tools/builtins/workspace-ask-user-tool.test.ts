@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WorkspaceAskUserTool } from "../../../src/tools/builtins/WorkspaceAskUserTool.ts";
-import type { Workspace, WorkspaceRegistry } from "../../../src/workspace/Workspace.ts";
+import type { Workspace, WorkspaceRegistry } from "../../../src/workspace/types/Workspace.ts";
 
 class MemoryWorkspaceRegistry implements WorkspaceRegistry {
   constructor(private readonly workspaces: Workspace[]) {}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { FileWorkspaceRegistry } from "@handagent/core/workspace/FileWorkspaceRegistry.ts";
+import { FileWorkspaceRegistry } from "@handagent/core/adapters/filesystem/FileWorkspaceRegistry.ts";
 import { SettingsBackedToolRegistry } from "../../src/settings/SettingsBackedToolRegistry.ts";
 
 describe("SettingsBackedToolRegistry", () => {

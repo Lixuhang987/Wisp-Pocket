@@ -4,7 +4,7 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { z } from "zod";
 import { defineTool } from "../defineTool.ts";
-import type { AgentTool } from "../AgentTool.ts";
+import type { AgentTool } from "../types/AgentTool.ts";
 
 const DEFAULT_SEARCH_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_PAGE_TTL_MS = 10 * 60 * 1000;

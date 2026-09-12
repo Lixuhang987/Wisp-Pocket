@@ -12,7 +12,7 @@ type ThreadWorkspacePaneProps = {
   onSubmit(threadId: string, input: UserInput): void;
   onStop(threadId: string): void;
   onRemoveQueuedInput(threadId: string, index: number): void;
-  onAnswerPermission(requestId: string, decision: "allow" | "deny"): void;
+  onAnswerPermission(requestId: string, decision: "allow" | "deny", scope: "once" | "always"): void;
   onAnswerWorkspace(requestId: string, workspaceId: string | null): void;
 };
 

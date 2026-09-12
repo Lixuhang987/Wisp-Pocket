@@ -1,5 +1,5 @@
-import type { BlobRecord } from "@handagent/core/blob/BlobRecord.ts";
-import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
+import type { BlobRecord } from "@handagent/core/blob/types/BlobRecord.ts";
+import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
 
 export class MemoryBlobStore implements BlobStore {
   records: BlobRecord[] = [];

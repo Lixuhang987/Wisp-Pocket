@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentActivityEvent } from "@handagent/core/protocol/AgentActivity.ts";
+import type { AgentActivityEvent } from "@handagent/core/protocol/types/AgentActivity.ts";
 import { AgentActivityPublisher } from "../../src/activity/AgentActivityPublisher.ts";
 
 describe("AgentActivityPublisher", () => {

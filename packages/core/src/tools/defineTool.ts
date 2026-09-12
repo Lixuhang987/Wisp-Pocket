@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AgentTool, AgentToolCallContext, AgentToolInputSchema } from "./AgentTool.ts";
+import type { AgentTool, AgentToolCallContext, AgentToolInputSchema } from "./types/AgentTool.ts";
 
 export interface DefineToolOptions<TInput, TOutput, TDeps> {
   name: string;

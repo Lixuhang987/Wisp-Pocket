@@ -1,0 +1,153 @@
+import {
+  streamText,
+} from "ai";
+import { createOpenAI, type OpenAIProvider } from "@ai-sdk/openai";
+import type { LLMClient, LLMCompleteOptions, LLMCompletion, LLMStreamEvent } from "../../llm/LLMClient.ts";
+import { collectLLMStream } from "../../llm/LLMClient.ts";
+import type { AgentMessage } from "../../runtime/types/AgentMessage.ts";
+import type { RegisteredTool } from "../../tools/ToolRegistry.ts";
+import type { OpenAIApiType } from "../../config/ModelSettings.ts";
+import type { NetworkLogger } from "../../logging/types/NetworkLogger.ts";
+import { createLoggingFetch } from "../../logging/createLoggingFetch.ts";
+import { resolveOpenAIApiKey, resolveOpenAIBaseURL } from "./OpenAIConfig.ts";
+import {
+  createOpenAICompatibleFetch,
+  hasImageContent,
+  sanitizeToolName,
+  toVercelMessages,
+  toVercelTools,
+} from "./VercelAdapters.ts";
+import { toError } from "../../utils/errors.ts";
+
+type OpenAIProviderSettings = NonNullable<Parameters<typeof createOpenAI>[0]>;
+type VercelStreamRequest = Parameters<typeof streamText>[0];
+
+export type VercelClientOptions = OpenAIProviderSettings & {
+  model?: string;
+  api?: OpenAIApiType;
+  networkLogger?: NetworkLogger;
+};
+
+type VercelClientDependencies = {
+  createOpenAI?: typeof createOpenAI;
+  streamText?: typeof streamText;
+};
+
+export class VercelClient implements LLMClient {
+  private readonly model;
+  private readonly api;
+  private readonly streamText;
+
+  constructor(
+    options: VercelClientOptions = {},
+    dependencies: VercelClientDependencies = {},
+  ) {
+    const {
+      model = "gpt-5-mini",
+      api = "chat",
+      apiKey,
+      baseURL,
+      networkLogger,
+      fetch: fetchOverride,
+      ...providerSettings
+    } = options;
+    const createOpenAIProvider = dependencies.createOpenAI ?? createOpenAI;
+    const loggingFetch = networkLogger
+      ? createLoggingFetch({
+          logger: networkLogger,
+          baseFetch: fetchOverride as typeof fetch | undefined,
+        })
+      : fetchOverride;
+    const fetchImpl = createOpenAICompatibleFetch(loggingFetch as typeof fetch | undefined);
+    const provider = createOpenAIProvider({
+      ...providerSettings,
+      apiKey: resolveOpenAIApiKey({ apiKey }),
+      baseURL: resolveOpenAIBaseURL({ baseURL }),
+      fetch: fetchImpl,
+    });
+    this.api = api;
+    this.model = selectLanguageModel(provider, api, model);
+    this.streamText = dependencies.streamText ?? streamText;
+  }
+
+  async complete(
+    messages: AgentMessage[],
+    tools: RegisteredTool[],
+    options?: LLMCompleteOptions,
+  ): Promise<LLMCompletion> {
+    return collectLLMStream(this.stream(messages, tools, options));
+  }
+
+  async *stream(
+    messages: AgentMessage[],
+    tools: RegisteredTool[],
+    options?: LLMCompleteOptions,
+  ): AsyncIterable<LLMStreamEvent> {
+    if (this.api === "completion" && hasImageContent(messages)) {
+      throw new Error("OpenAI completion API does not support image content. Use chat or responses.");
+    }
+    const reverseToolNames = new Map(
+      tools.map((t) => [sanitizeToolName(t.name), t.name])
+    );
+    const request: VercelStreamRequest = {
+      model: this.model,
+      messages: await toVercelMessages(messages, options),
+      tools: toVercelTools(tools),
+      abortSignal: options?.signal,
+    };
+    const response = this.streamText(request);
+    let content = "";
+    const toolCalls: NonNullable<LLMCompletion["toolCalls"]> = [];
+
+    for await (const part of response.fullStream) {
+      switch (part.type) {
+        case "text-delta":
+          content += part.text;
+          yield {
+            type: "text_delta",
+            text: part.text,
+          };
+          break;
+        case "tool-call": {
+          const toolCall = {
+            id: part.toolCallId,
+            name: reverseToolNames.get(part.toolName) ?? part.toolName,
+            arguments: part.input as Record<string, unknown>,
+          };
+          toolCalls.push(toolCall);
+          yield {
+            type: "tool_call",
+            toolCall,
+          };
+          break;
+        }
+        case "error":
+          throw toError(part.error);
+      }
+    }
+
+    if (!content && toolCalls.length === 0) {
+      throw new Error("AI SDK stream finished without assistant content or tool calls.");
+    }
+
+    yield {
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content,
+      },
+      toolCalls,
+    };
+  }
+}
+
+function selectLanguageModel(provider: OpenAIProvider, api: OpenAIApiType, model: string) {
+  switch (api) {
+    case "chat":
+      return provider.chat(model);
+    case "completion":
+      return provider.completion(model);
+    case "responses":
+      return provider.responses(model);
+  }
+}

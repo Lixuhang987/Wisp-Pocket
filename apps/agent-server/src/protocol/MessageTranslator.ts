@@ -1,4 +1,4 @@
-import type { AgentMessage, UserAgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
+import type { AgentMessage, UserAgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import type { AgentRuntimeEvent } from "@handagent/core/runtime/AgentRuntime.ts";
 import type {
   ThreadNotification,
@@ -6,12 +6,12 @@ import type {
   ToolStartedNotification,
   ToolFinishedNotification,
   ThreadErrorNotification,
-} from "@handagent/core/protocol/ThreadNotification.ts";
-import type { ThreadAttachment, ImageAttachment } from "@handagent/core/protocol/ThreadProtocolShared.ts";
-import type { UserInput } from "@handagent/core/protocol/Op.ts";
-import type { ConversationMessage } from "@handagent/core/conversation/ConversationMessage.ts";
+} from "@handagent/core/protocol/types/ThreadNotification.ts";
+import type { ThreadAttachment, ImageAttachment } from "@handagent/core/protocol/types/ThreadProtocolShared.ts";
+import type { UserInput } from "@handagent/core/protocol/types/Op.ts";
+import type { ConversationMessage } from "@handagent/core/conversation/types/ConversationMessage.ts";
 import type { ThreadAuditEvent } from "@handagent/thread-store/index.ts";
-import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
+import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
 import { parseStub, renderStub } from "@handagent/core/runtime/Stub.ts";
 import { extension, lookup } from "mime-types";
 

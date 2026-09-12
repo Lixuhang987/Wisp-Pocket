@@ -1,4 +1,4 @@
-import type { AgentMessage } from "./AgentMessage.ts";
+import type { AgentMessage } from "./types/AgentMessage.ts";
 import type { RegisteredTool } from "../tools/ToolRegistry.ts";
 import { META_TOOL_NAME } from "../tools/MetaToolUseTool.ts";
 

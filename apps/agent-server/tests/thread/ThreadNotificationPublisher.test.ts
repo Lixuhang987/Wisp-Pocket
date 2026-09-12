@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
-import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest.ts";
+import type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
 
 describe("ThreadNotificationPublisher", () => {

@@ -1,4 +1,4 @@
-import type { WorkspaceRegistry } from "../workspace/Workspace.ts";
+import type { WorkspaceRegistry } from "../workspace/types/Workspace.ts";
 import type { ToolSettings } from "../config/ToolSettings.ts";
 import { ToolRegistry } from "./ToolRegistry.ts";
 import {

@@ -2,8 +2,8 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ModelSettings } from "../../../src/config/ModelSettings";
 import type { LLMCompletion } from "../../../src/llm/LLMClient";
-import type { NetworkLogEntry } from "../../../src/logging/NetworkLogger";
-import type { AgentMessage } from "../../../src/runtime/AgentMessage";
+import type { NetworkLogEntry } from "../../../src/logging/types/NetworkLogger";
+import type { AgentMessage } from "../../../src/runtime/types/AgentMessage";
 import type { RegisteredTool } from "../../../src/tools/ToolRegistry";
 
 export type LLMIntegrationTurn = {

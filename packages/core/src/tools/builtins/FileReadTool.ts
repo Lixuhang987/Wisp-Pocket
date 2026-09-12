@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { defineTool } from "../defineTool.ts";
-import type { WorkspaceRegistry } from "../../workspace/Workspace.ts";
+import type { WorkspaceRegistry } from "../../workspace/types/Workspace.ts";
 import {
   normalizeWorkspaceRelativePath,
   resolveReadPathWithinWorkspace,

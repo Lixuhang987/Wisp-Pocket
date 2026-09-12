@@ -4,35 +4,31 @@ import { extname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import { contentType } from "mime-types";
-import type { DynamicToolProviderMessage } from "@handagent/core/protocol/DynamicTool.ts";
-import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
-import type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
-import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
-import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type { AgentActivityEvent } from "@handagent/core/protocol/AgentActivity.ts";
-import type { AgentEvent } from "@handagent/core/protocol/AgentEvent.ts";
-import type { Op } from "@handagent/core/protocol/Op.ts";
+import type { DynamicToolProviderMessage } from "@handagent/core/protocol/types/DynamicTool.ts";
+import type { ThreadCommand } from "@handagent/core/protocol/types/ThreadCommand.ts";
+import type { ClientResponse } from "@handagent/core/protocol/types/ClientResponse.ts";
+import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest.ts";
+import type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
+import type { AgentActivityEvent } from "@handagent/core/protocol/types/AgentActivity.ts";
+import type { AgentEvent } from "@handagent/core/protocol/types/AgentEvent.ts";
+import type { Op } from "@handagent/core/protocol/types/Op.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import type { MCPServerConfig, StdioMCPServerConfig, StreamableHttpMCPServerConfig } from "@handagent/core/mcp/MCPConfig.ts";
 import { parseMCPConfig } from "@handagent/core/mcp/MCPConfig.ts";
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
 import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
 import { ThreadPersistence } from "../thread/ThreadPersistence.ts";
-import {
-  AgentManager,
-  createSharedAgentStatus,
-  type Agent,
-} from "../agent/AgentManager.ts";
+import { ThreadRegistry } from "@handagent/core/thread/ThreadRegistry.ts";
+import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
+import * as projection from "../protocol/MessageTranslator.ts";
+import { settleWithin } from "@handagent/core/thread/utils/settleWithin.ts";
 import { AgentActivityPublisher } from "../activity/AgentActivityPublisher.ts";
 import { ThreadCommandRouter } from "../thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../thread/ThreadNotificationPublisher.ts";
-import { ThreadRuntimeOrchestrator } from "../thread/ThreadRuntimeOrchestrator.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { WebSocketDynamicToolBridge } from "../bridges/WebSocketDynamicToolBridge.ts";
-import type { FilePermissionPolicy } from "@handagent/core/permission/FilePermissionPolicy.ts";
-import { AgentEventQueue } from "../agent/AgentEventQueue.ts";
-import { AgentRequestBroker } from "../agent/AgentRequestBroker.ts";
+import type { FilePermissionPolicy } from "@handagent/core/adapters/filesystem/FilePermissionPolicy.ts";
 
 type ThreadSocket = {
   send(data: string): void;
@@ -47,17 +43,14 @@ export function attachThreadSocketHandlers(
   {
     commandRouter,
     eventPublisher,
-    permissionPolicy,
     acceptServerRequests = false,
   }: {
     commandRouter: ThreadCommandRouter;
     eventPublisher: ThreadNotificationPublisher;
-    permissionPolicy?: FilePermissionPolicy;
     acceptServerRequests?: boolean;
   },
 ): void {
   const connectionId = `connection-${++nextConnectionId}`;
-  const boundThreads = new Set<string>();
   const sendPublished = (outgoing: ThreadNotification | ServerRequest) => {
     socket.send(JSON.stringify(outgoing));
   };
@@ -79,10 +72,6 @@ export function attachThreadSocketHandlers(
         eventPublisher.subscribe(connectionId, message.threadId);
       }
 
-      if ("threadId" in message && typeof message.threadId === "string") {
-        boundThreads.add(message.threadId);
-      }
-
       await commandRouter.receive(message, connectionId);
       return;
     }
@@ -90,11 +79,7 @@ export function attachThreadSocketHandlers(
 
   socket.on("close", () => {
     eventPublisher.detachConnection(connectionId);
-    for (const threadId of boundThreads) {
-      void Promise.resolve(commandRouter.interruptThread(threadId)).catch(() => {});
-      clearThreadPermissionRules(permissionPolicy, threadId);
-    }
-    boundThreads.clear();
+
   });
 }
 
@@ -304,7 +289,7 @@ const ClientResponseSchema = z.discriminatedUnion("type", [
     timestamp: z.string(),
     payload: z.object({
       decision: z.enum(["allow", "deny"]),
-      scope: z.enum(["once", "thread", "always"]).optional(),
+      scope: z.enum(["once", "always"]).optional(),
       reason: z.string().optional(),
     }),
   }),
@@ -366,7 +351,6 @@ export async function startServer({
   eventPublisher,
   activityPublisher,
   dynamicToolBridge,
-  permissionPolicy,
   staticFilesDir,
   port = 4317,
 }: {
@@ -374,7 +358,6 @@ export async function startServer({
   eventPublisher: ThreadNotificationPublisher;
   activityPublisher?: AgentActivityPublisher;
   dynamicToolBridge?: WebSocketDynamicToolBridge;
-  permissionPolicy?: FilePermissionPolicy;
   staticFilesDir?: string;
   port?: number;
 }) {
@@ -391,8 +374,7 @@ export async function startServer({
     attachThreadSocketHandlers(socket, {
       commandRouter,
       eventPublisher,
-      permissionPolicy,
-      acceptServerRequests: request.url?.includes("acceptServerRequests=1") ?? false,
+        acceptServerRequests: request.url?.includes("acceptServerRequests=1") ?? false,
     });
   });
 
@@ -448,6 +430,14 @@ export async function startServer({
     server.listen(port, "127.0.0.1");
   });
 
+  const closeHTTP = server.close.bind(server);
+  server.close = ((callback?: (error?: Error) => void) => {
+    for (const wsServer of [threadWebSocketServer, dynamicToolWebSocketServer, activityWebSocketServer]) {
+      for (const client of wsServer.clients) client.terminate();
+      wsServer.close();
+    }
+    return closeHTTP(callback);
+  }) as typeof server.close;
   return server;
 }
 
@@ -458,7 +448,6 @@ export async function startDefaultServer(port = 4317) {
     { FilePermissionPolicy },
     { SettingsBackedLLMClient },
     { SettingsBackedToolRegistry },
-    { ThreadScopedToolRegistry },
     { MCPServerRegistry },
     { StdioMCPClient },
     { StreamableHttpMCPClient },
@@ -469,18 +458,17 @@ export async function startDefaultServer(port = 4317) {
     { createDefaultWebTools },
   ] = await Promise.all([
     import("@handagent/core/runtime/AgentRuntime.ts"),
-    import("@handagent/core/workspace/FileWorkspaceRegistry.ts"),
-    import("@handagent/core/permission/FilePermissionPolicy.ts"),
+    import("@handagent/core/adapters/filesystem/FileWorkspaceRegistry.ts"),
+    import("@handagent/core/adapters/filesystem/FilePermissionPolicy.ts"),
     import("../settings/SettingsBackedLLMClient.ts"),
     import("../settings/SettingsBackedToolRegistry.ts"),
-    import("../actions/ThreadScopedToolRegistry.ts"),
     import("../actions/MCPServerRegistry.ts"),
-    import("@handagent/core/mcp/StdioMCPClient.ts"),
-    import("@handagent/core/mcp/StreamableHttpMCPClient.ts"),
-    import("@handagent/core/logging/FileNetworkLogger.ts"),
-    import("@handagent/core/blob/FilesystemBlobStore.ts"),
+    import("@handagent/core/adapters/mcp/StdioMCPClient.ts"),
+    import("@handagent/core/adapters/mcp/StreamableHttpMCPClient.ts"),
+    import("@handagent/core/adapters/filesystem/FileNetworkLogger.ts"),
+    import("@handagent/core/adapters/filesystem/FilesystemBlobStore.ts"),
     import("@handagent/core/runtime/TurnSummarizer.ts"),
-    import("@handagent/core/llm/MockLLMClient.ts"),
+    import("@handagent/core/adapters/providers/MockLLMClient.ts"),
     import("@handagent/core/tools/web/WebTools.ts"),
   ]);
 
@@ -498,10 +486,10 @@ export async function startDefaultServer(port = 4317) {
   await workspaceRegistry.getDefault();
 
   const dynamicToolBridge = new WebSocketDynamicToolBridge();
-  const requestBroker = new AgentRequestBroker();
+  let threads: ThreadRegistry;
   const toolRegistry = new SettingsBackedToolRegistry({
     workspaceRegistry,
-    workspaceAskResolver: requestBroker.askWorkspace,
+    workspaceAskResolver: (request) => threads.get(request.threadId ?? "")?.requests.askWorkspace(request) ?? Promise.resolve({ cancelled: true }),
   });
   await toolRegistry.refresh();
   const llmMode = resolveLLMMode();
@@ -519,23 +507,9 @@ export async function startDefaultServer(port = 4317) {
     },
   });
   const globalMcpServerIds = [...mcpServers.keys()];
-  const threadScopedTools = new ThreadScopedToolRegistry(
-    {
-      builtinRegistry: toolRegistry.registry,
-      globalMcpServerIds,
-      listMcpTools: (serverId: string) => mcpRegistry.listTools(serverId),
-      dynamicToolBridge,
-      exposeBuiltinToolsBeforeActivation: llmMode === "mock",
-      defaultTools: createDefaultWebTools(),
-    },
-    {
-      log: (message: string) => console.warn(message),
-    },
-  );
-
   const permissionPolicy = new FilePermissionPolicy({
     filePath: paths.permissionsPath,
-    askResolver: requestBroker.askPermission,
+    askResolver: (request) => threads.get(request.threadId ?? "")?.requests.askPermission(request) ?? Promise.resolve({ decision: "deny" }),
   });
 
   const llmClient = llmMode === "mock"
@@ -549,166 +523,47 @@ export async function startDefaultServer(port = 4317) {
     });
   console.log(`[agent-server] llm mode: ${llmMode}`);
 
-  const runtimeByThread = new Map<string, InstanceType<typeof AgentRuntime>>();
-  const runtimeForThread = (threadId: string) => {
-    let runtime = runtimeByThread.get(threadId);
-    if (!runtime) {
-      runtime = new AgentRuntime(llmClient, threadScopedTools.registryForThread(threadId), {
-        permissionPolicy,
-        blobStore,
-        turnSummarizer: summarizer,
-        onMetaToolActivate: async (activeThreadId) => {
-          await threadScopedTools.activate(activeThreadId);
-        },
-        isThreadActivated: (activeThreadId) => threadScopedTools.isActivated(activeThreadId),
-      });
-      runtimeByThread.set(threadId, runtime);
-    }
-    return runtime;
-  };
   const persistence = new ThreadPersistence(store, undefined, blobStore);
-  const orchestrator = new ThreadRuntimeOrchestrator(
-    runtimeForThread,
-    persistence,
-    undefined,
-    async (threadId) => {
-      await toolRegistry.refresh();
-      const thread = await persistence.getThread(threadId);
-      threadScopedTools.setDynamicTools(threadId, thread?.metadata.dynamicTools ?? []);
-
-      if (!threadScopedTools.isActivated(threadId)) {
-        const history = await persistence.getMessages(threadId);
-        if (historyShowsToolsActivated(history)) {
-          await threadScopedTools.activate(threadId);
-        }
-      }
-
-      await threadScopedTools.refreshForThread(threadId);
-    },
-  );
   const activityPublisher = new AgentActivityPublisher();
-  const eventPublisher = new ThreadNotificationPublisher((event) => {
-    activityPublisher.observe(event);
-  });
-  const agentManager = new AgentManager();
-  const createAgent = (threadId: string): Agent => {
-    const agentStatus = createSharedAgentStatus();
-    const eventQueue = new AgentEventQueue<AgentEvent>();
-    const pumpDone = pumpAgentEvents(eventQueue, eventPublisher, agentStatus);
-    const publishRuntimeEvent = (event: ThreadNotification) => {
-      eventQueue.push(wrapThreadNotificationEvent(event));
-    };
-    requestBroker.bindThread(threadId, (event) => eventQueue.push(event));
-
-    return {
-      tx_sub: {
-        async send(op: Op) {
-          if (op.type === "client_response") {
-            requestBroker.handleOp(op);
-            return;
-          }
-
-          if (op.type === "interrupt") {
-            requestBroker.cancelPendingForThread(threadId);
-            await orchestrator.interruptAndWait(threadId, publishRuntimeEvent);
-            return;
-          }
-
-          await orchestrator.submitInput(
-            {
-              threadId,
-              messageId: op.opId,
-              timestamp: op.timestamp,
-              payload: op.payload,
-            },
-            publishRuntimeEvent,
-          );
-        },
-      },
-      rx_event: eventQueue,
-      agent_status: agentStatus,
-      session: { threadId },
-      async close() {
-        requestBroker.cancelPendingForThread(threadId);
-        await orchestrator.interruptAndWait(threadId, publishRuntimeEvent);
-        requestBroker.unbindThread(threadId);
-        eventQueue.close();
-        await pumpDone;
-      },
-    };
-  };
-  const commandRouter = new ThreadCommandRouter(
-    agentManager,
-    persistence,
-    eventPublisher,
-    undefined,
-    (threadId) => {
-      threadScopedTools.forgetThread(threadId);
-      runtimeByThread.delete(threadId);
+  const eventPublisher = new ThreadNotificationPublisher((event) => activityPublisher.observe(event));
+  threads = new ThreadRegistry({
+    storage: persistence,
+    projection: {
+      runtimeMessages: projection.agentMessagesToRuntimeMessages,
+      conversation: projection.agentMessagesToConversation,
+      notification: projection.toThreadNotification,
+      audit: projection.toAuditEvent,
+      summarizeInput: projection.summarizeUserInput,
     },
-    {},
-    workspaceRegistry,
-    createAgent,
-    (threadId, dynamicTools) => {
-      threadScopedTools.setDynamicTools(threadId, dynamicTools);
-    },
-  );
-  return startServer({
-    commandRouter,
-    eventPublisher,
-    activityPublisher,
-    dynamicToolBridge,
-    permissionPolicy,
-    staticFilesDir: resolveThreadWindowWebDistDir(),
-    port,
+    publish: (event) => eventPublisher.publish(event),
+    createTools: (dynamicTools) => new ThreadTools({
+      builtinRegistry: toolRegistry.registry,
+      refreshBuiltins: () => toolRegistry.refresh(),
+      globalMcpServerIds,
+      listMcpTools: (id) => mcpRegistry.listTools(id),
+      dynamicToolBridge,
+      exposeBuiltinToolsBeforeActivation: llmMode === "mock",
+      defaultTools: createDefaultWebTools(),
+    }, dynamicTools, { log: (message) => console.warn(message) }),
+    createRuntime: (id, tools) => new AgentRuntime(llmClient, tools.registry, {
+      permissionPolicy, blobStore, turnSummarizer: summarizer,
+      onMetaToolActivate: () => tools.activate(),
+      isThreadActivated: () => tools.isActivated(),
+    }),
   });
-}
-
-async function pumpAgentEvents(
-  events: AsyncIterable<AgentEvent>,
-  publisher: ThreadNotificationPublisher,
-  agentStatus: ReturnType<typeof createSharedAgentStatus>,
-): Promise<void> {
-  for await (const event of events) {
-    switch (event.type) {
-      case "thread.notification":
-        observeAgentStatus(agentStatus, event.payload);
-        publisher.publish(event.payload);
-        break;
-      case "server.request":
-        publisher.publish(event.payload);
-        break;
-    }
-  }
-}
-
-function wrapThreadNotificationEvent(event: ThreadNotification): AgentEvent {
-  return {
-    type: "thread.notification",
-    eventId: `agent-event-${event.notificationId}`,
-    ...("threadId" in event ? { threadId: event.threadId } : {}),
-    timestamp: event.timestamp,
-    payload: event,
-  };
-}
-
-function observeAgentStatus(
-  agentStatus: ReturnType<typeof createSharedAgentStatus>,
-  event: ThreadNotification,
-): void {
-  if (event.type === "turn.started") {
-    agentStatus.set("running");
-    return;
-  }
-
-  if (event.type === "turn.completed") {
-    agentStatus.set(event.payload.status === "completed" ? "idle" : event.payload.status);
-    return;
-  }
-
-  if (event.type === "thread.status.changed") {
-    agentStatus.set(event.payload.value);
-  }
+  const commandRouter = new ThreadCommandRouter(threads, eventPublisher, workspaceRegistry);
+  const server = await startServer({ commandRouter, eventPublisher, activityPublisher, dynamicToolBridge,
+    staticFilesDir: resolveThreadWindowWebDistDir(), port });
+  let shutdown: Promise<void> | undefined;
+  const close = () => shutdown ??= (async () => {
+    const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
+    await threads.close();
+    await settleWithin(mcpRegistry.closeAll(), 3000);
+    dynamicToolBridge.close();
+    store.close();
+    await settleWithin(stopped, 1000);
+  })();
+  return Object.assign(server, { shutdown: close });
 }
 
 interface ServerPaths {
@@ -865,15 +720,11 @@ function resolveThreadWindowRequestPath(pathname: string): string | null {
 }
 
 
-function clearThreadPermissionRules(
-  permissionPolicy: FilePermissionPolicy | undefined,
-  threadId: string,
-): void {
-  permissionPolicy?.clearThreadRules(threadId);
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const server = await startDefaultServer();
+  const shutdown = () => { void server.shutdown().finally(() => process.exit(0)); };
   process.stdin.resume();
-  process.stdin.on("end", () => process.exit(0));
-  await startDefaultServer();
+  process.stdin.on("end", shutdown);
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
 }

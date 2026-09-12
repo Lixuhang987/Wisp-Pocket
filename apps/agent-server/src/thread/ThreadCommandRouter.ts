@@ -6,93 +6,72 @@ import type {
   ThreadDeleteCommand,
   OpSubmitCommand,
   WorkspaceListCommand,
-} from "@handagent/core/protocol/ThreadCommand.ts";
+} from "@handagent/core/protocol/types/ThreadCommand.ts";
 import type {
   ClientResponse,
   PermissionAnsweredResponse,
   WorkspaceAnsweredResponse,
-} from "@handagent/core/protocol/ClientResponse.ts";
-import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+} from "@handagent/core/protocol/types/ClientResponse.ts";
+import type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
 import type { ThreadSummary } from "@handagent/thread-store/index.ts";
-import type { WorkspaceRegistry } from "@handagent/core/workspace/Workspace.ts";
-import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
-import type { Agent, AgentManager } from "../agent/AgentManager.ts";
-import { threadIdFromRequestId } from "../agent/AgentRequestBroker.ts";
+import type { WorkspaceRegistry } from "@handagent/core/workspace/types/Workspace.ts";
+import type { DynamicToolSpec } from "@handagent/core/protocol/types/DynamicTool.ts";
+import { ThreadRegistry } from "@handagent/core/thread/ThreadRegistry.ts";
 import { ThreadNotificationPublisher } from "./ThreadNotificationPublisher.ts";
-import type { ThreadPersistence } from "./ThreadPersistence.ts";
-
-type AgentFactory = (threadId: string) => Agent;
-
-type ResponseHandlers = {
-  onPermissionResponse?: (
-    response: PermissionAnsweredResponse,
-    connectionId: string,
-  ) => void;
-  onWorkspaceResponse?: (
-    response: WorkspaceAnsweredResponse,
-    connectionId: string,
-  ) => void;
-};
 
 export class ThreadCommandRouter {
   constructor(
-    private readonly agentManager: AgentManager,
-    private readonly persistence: ThreadPersistence,
+    private readonly threads: ThreadRegistry,
     private readonly publisher: ThreadNotificationPublisher,
-    private readonly now: () => string = () => new Date().toISOString(),
-    private readonly onThreadDeleted?: (threadId: string) => void,
-    private readonly responseHandlers: ResponseHandlers = {},
     private readonly workspaceRegistry?: WorkspaceRegistry,
-    private readonly createAgent?: AgentFactory,
-    private readonly onThreadDynamicTools?: (
-      threadId: string,
-      dynamicTools: DynamicToolSpec[],
-    ) => void,
+    private readonly now: () => string = () => new Date().toISOString(),
   ) {}
 
   async receive(command: ThreadCommand, connectionId: string): Promise<void> {
+    try {
     switch (command.type) {
       case "thread.start":
-        return this.handleCreateThread(command, connectionId);
+        return await this.handleCreateThread(command, connectionId);
       case "thread.resume":
-        return this.handleResumeThread(command, connectionId);
+        return await this.handleResumeThread(command, connectionId);
       case "op.submit":
-        return this.handleOpSubmit(command, connectionId);
+        return await this.handleOpSubmit(command, connectionId);
       case "thread.list":
-        return this.handleListThreads(command, connectionId);
+        return await this.handleListThreads(command, connectionId);
       case "thread.delete":
-        return this.handleDeleteThread(command, connectionId);
+        return await this.handleDeleteThread(command, connectionId);
       case "workspace.list":
-        return this.handleListWorkspaces(command, connectionId);
+        return await this.handleListWorkspaces(command, connectionId);
+    }
+      } catch (error) {
+      this.publisher.publishToConnection(connectionId, {
+        type: "thread.error", notificationId: this.makeNotificationId(), commandId: command.commandId,
+        ...("threadId" in command ? { threadId: command.threadId } : {}), timestamp: this.now(),
+        payload: { message: error instanceof Error ? error.message : String(error) },
+      });
     }
   }
 
   async handleResponse(response: ClientResponse, connectionId: string): Promise<void> {
-    void connectionId;
-    const threadId = threadIdFromRequestId(response.requestId);
-    await this.agentManager.submit(threadId, {
-      type: "client_response",
-      opId: response.requestId,
-      timestamp: response.timestamp,
-      payload: { response },
-    });
+    const separator = response.requestId.lastIndexOf(":");
+    const threadId = response.requestId.slice(0, separator);
+    if (!this.publisher.canAnswer(connectionId, threadId)) return;
+    this.threads.get(threadId)?.requests.answer(response);
   }
 
   async interruptThread(threadId: string): Promise<void> {
-    await this.agentManager.interrupt(threadId);
+    await this.threads.get(threadId)?.interrupt();
   }
 
   private async handleCreateThread(
     command: ThreadStartCommand,
     connectionId: string,
   ): Promise<void> {
-    const thread = await this.persistence.createThread({
+    const thread = await this.threads.create({
       workspaceId: command.payload.workspaceId,
       dynamicTools: command.payload.dynamicTools,
     });
-    const threadId = thread.metadata.id;
-    this.onThreadDynamicTools?.(threadId, command.payload.dynamicTools ?? []);
-    this.ensureAgent(threadId);
+    const threadId = thread.id;
     this.publisher.subscribe(connectionId, threadId);
     this.publisher.publish({
       type: "thread.started",
@@ -100,7 +79,7 @@ export class ThreadCommandRouter {
       notificationId: this.makeNotificationId(),
       commandId: command.commandId,
       timestamp: this.now(),
-      payload: { preview: thread.metadata.preview ?? null },
+      payload: { preview: null },
     });
   }
 
@@ -109,39 +88,14 @@ export class ThreadCommandRouter {
     connectionId: string,
   ): Promise<void> {
     this.publisher.subscribe(connectionId, command.threadId);
-    const thread = await this.persistence.getThread(command.threadId);
-    if (!thread) {
-      this.publisher.publishToConnection(connectionId, {
-        type: "thread.error",
-        threadId: command.threadId,
-        notificationId: this.makeNotificationId(),
-        commandId: command.commandId,
-        timestamp: this.now(),
-        payload: {
-          code: "not_found",
-          message: `Thread not found: ${command.threadId}`,
-        },
-      });
-      return;
-    }
-
-    this.ensureAgent(command.threadId);
-    const isRunning = this.agentManager.isRunning(command.threadId);
-    const recoveredStatus = !isRunning
-      ? await this.persistence.recoverIncompleteTurnForSnapshot(command.threadId, this.now())
-      : null;
-    const messages = await this.persistence.getConversationMessages(command.threadId);
-
+    const thread = await this.threads.load(command.threadId);
     this.publisher.publishToConnection(connectionId, {
       type: "thread.snapshot",
       threadId: command.threadId,
       notificationId: this.makeNotificationId(),
       commandId: command.commandId,
       timestamp: this.now(),
-      payload: {
-        messages,
-        status: isRunning ? "running" : (recoveredStatus ?? "idle"),
-      },
+      payload: thread.snapshot(),
     });
   }
 
@@ -149,35 +103,15 @@ export class ThreadCommandRouter {
     command: OpSubmitCommand,
     connectionId?: string,
   ): Promise<void> {
-    if (!(await this.persistence.getThread(command.threadId))) {
-      const errorEvent: ThreadNotification = {
-        type: "thread.error",
-        threadId: command.threadId,
-        notificationId: this.makeNotificationId(),
-        timestamp: this.now(),
-        payload: {
-          code: "thread_not_found",
-          message: `Thread not found: ${command.threadId}`,
-        },
-      };
-      if (connectionId) {
-        this.publisher.publishToConnection(connectionId, errorEvent);
-      } else {
-        this.publisher.publish(errorEvent);
-      }
-      return;
-    }
-
-    const op = command.payload.op;
-    this.ensureAgent(command.threadId);
-    await this.agentManager.submit(command.threadId, op);
+    const thread = this.threads.get(command.threadId) ?? await this.threads.load(command.threadId);
+    await thread.submit(command.payload.op);
   }
 
   private async handleListThreads(
     command: ThreadListCommand,
     connectionId: string,
   ): Promise<void> {
-    const threads = await this.persistence.listThreads();
+    const threads = await this.threads.list();
     this.publisher.publishToConnection(connectionId, {
       type: "thread.listed",
       notificationId: this.makeNotificationId(),
@@ -194,34 +128,10 @@ export class ThreadCommandRouter {
     connectionId: string,
   ): Promise<void> {
     const targetThreadId = command.payload.targetThreadId;
-    const existing = await this.persistence.getThread(targetThreadId);
-    if (!existing) {
-      this.publisher.publishToConnection(connectionId, {
-        type: "thread.deleted",
-        notificationId: this.makeNotificationId(),
-        commandId: command.commandId,
-        timestamp: this.now(),
-        payload: {
-          targetThreadId,
-          status: "not_found",
-        },
-      });
-      return;
-    }
-
-    await this.agentManager.delete(targetThreadId);
-
-    await this.persistence.deleteThread(targetThreadId);
-    this.onThreadDeleted?.(targetThreadId);
+    const deleted = await this.threads.delete(targetThreadId);
     this.publisher.publishToConnection(connectionId, {
-      type: "thread.deleted",
-      notificationId: this.makeNotificationId(),
-      commandId: command.commandId,
-      timestamp: this.now(),
-      payload: {
-        targetThreadId,
-        status: "deleted",
-      },
+      type: "thread.deleted", notificationId: this.makeNotificationId(), commandId: command.commandId,
+      timestamp: this.now(), payload: { targetThreadId, status: deleted ? "deleted" : "not_found" },
     });
   }
 
@@ -263,13 +173,6 @@ export class ThreadCommandRouter {
     return `notification-${crypto.randomUUID()}`;
   }
 
-  private ensureAgent(threadId: string): void {
-    if (this.agentManager.has(threadId) || !this.createAgent) {
-      return;
-    }
-
-    this.agentManager.register(threadId, this.createAgent(threadId));
-  }
 }
 
 function toThreadListEntry(summary: ThreadSummary) {

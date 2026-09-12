@@ -1,4 +1,4 @@
-import type { AgentTool } from "../tools/AgentTool.ts";
+import type { AgentTool } from "../tools/types/AgentTool.ts";
 import type { MCPCallToolResult, MCPToolDescription } from "./MCPClient.ts";
 
 export class MCPToolAdapter

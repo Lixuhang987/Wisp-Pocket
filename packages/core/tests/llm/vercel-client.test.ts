@@ -2,18 +2,18 @@ import { describe, expect, it, vi } from "vitest";
 import { asSchema } from "ai";
 import {
   resolveOpenAIApiKey,
-} from "../../src/llm/OpenAIConfig";
+} from "../../src/adapters/providers/OpenAIConfig";
 import {
   createOpenAICompatibleFetch,
   filterEmptySSEDataEvents,
   sanitizeToolName,
   toVercelMessages,
   toVercelTools,
-} from "../../src/llm/VercelAdapters";
-import { VercelClient } from "../../src/llm/VercelClient";
-import type { AgentMessage } from "../../src/runtime/AgentMessage";
-import type { BlobRecord } from "../../src/blob/BlobRecord";
-import type { BlobStore } from "../../src/blob/BlobStore";
+} from "../../src/adapters/providers/VercelAdapters";
+import { VercelClient } from "../../src/adapters/providers/VercelClient";
+import type { AgentMessage } from "../../src/runtime/types/AgentMessage";
+import type { BlobRecord } from "../../src/blob/types/BlobRecord";
+import type { BlobStore } from "../../src/blob/types/BlobStore";
 
 class MemoryBlobStore implements BlobStore {
   records = new Map<string, BlobRecord>();

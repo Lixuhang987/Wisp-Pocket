@@ -1,4 +1,4 @@
-import type { UserInput } from "@handagent/core/protocol/Op.ts";
+import type { UserInput } from "@handagent/core/protocol/types/Op.ts";
 import { z } from "zod";
 
 export type InitialPromptPayload = {

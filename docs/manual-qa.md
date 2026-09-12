@@ -81,3 +81,11 @@
   6. 用最小 policy 调用 `automation.run`，失败时确认 run 记录、repair request、fallback patch 和 `automation.history` 都可追踪。
   7. 调用 `automation.repair_apply`，确认 policy version 增加、repair request 变为 `applied`，重复 apply 会失败。
   8. 修改官方 manifest 的非 enabled 字段后重启，确认 installer 修复 manifest 且保留用户 enabled 选择。
+
+## Issue #2 后端 Thread 所有权重构
+
+- [ ] 启动 agent-server，创建两个 Thread；分别连续提交两轮输入，确认历史和流式通知不串线。
+- [ ] 执行期间关闭全部 Thread UI 连接，确认 Turn 继续运行；重新连接后用 `thread.resume` 读取结果。
+- [ ] 在权限请求中分别选择“本次允许”和“永久允许”，确认永久规则在另一 Thread、不同参数和重启后仍按完整工具名称命中。
+- [ ] 在执行中删除 Thread，确认后端报告删除成功且晚到模型 / Tool 结果不会重新创建历史。
+- [ ] 人工注入数据库写入失败，确认 Thread 暂停后续输入，恢复后只基于已保存历史继续。

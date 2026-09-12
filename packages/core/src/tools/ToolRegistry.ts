@@ -1,4 +1,4 @@
-import type { AgentTool } from "./AgentTool.ts";
+import type { AgentTool } from "./types/AgentTool.ts";
 
 export type RegisteredTool = Pick<AgentTool, "name" | "description" | "inputSchema">;
 

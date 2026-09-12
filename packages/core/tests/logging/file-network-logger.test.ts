@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FileNetworkLogger } from "../../src/logging/FileNetworkLogger";
+import { FileNetworkLogger } from "../../src/adapters/filesystem/FileNetworkLogger";
 
 describe("FileNetworkLogger", () => {
   let baseDir: string;

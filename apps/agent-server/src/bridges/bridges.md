@@ -4,7 +4,7 @@
 
 `bridges/` 只保留 agent-server 与 dynamic tool provider socket 之间的桥接。这里不执行 LLM、tool、thread request-response 或 UI 业务逻辑。
 
-权限审批与 workspace 选择已经迁移到 `agent/AgentRequestBroker.ts`：turn 内部产生的待回执请求先进入 Agent `rx_event`，再由 app-server 发布为 `/api/thread` 的 `ServerRequest`；React 回传的 `ClientResponse` 会被 app-server 包装成 `client_response` Op 投回 Agent `tx_sub`。
+权限审批与 workspace 选择已经迁移到 `agent/core Thread requests.ts`：turn 内部产生的待回执请求先进入 Agent `rx_event`，再由 app-server 发布为 `/api/thread` 的 `ServerRequest`；React 回传的 `ClientResponse` 会被 app-server 包装成 `client_response` Op 投回 Agent `tx_sub`。
 
 ## 文件
 
@@ -36,7 +36,7 @@ attach(clientId: string, send: Send): ProviderToken {
 ## 编辑约束
 
 - 新增桥时必须定义 token/fencing 策略，避免旧 socket 响应影响新 socket。
-- `/api/thread` 的 permission/workspace request-response 不再放进本目录；应先判断是否属于 `AgentRequestBroker` 的 Agent `rx_event` / `tx_sub` 通道。
+- `/api/thread` 的 permission/workspace request-response 不再放进本目录；应先判断是否属于 `core Thread requests` 的 Agent `rx_event` / `tx_sub` 通道。
 - socket close 清理由对应 server handler 调用；dynamic tool bridge 只清理自己的 pending 状态。
 
 ## 下一步阅读

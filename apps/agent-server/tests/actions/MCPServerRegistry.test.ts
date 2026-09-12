@@ -79,3 +79,17 @@ function makeClient(serverId: string): MCPClient {
     async close() {},
   };
 }
+
+it("shares concurrent initialization and closes a client that finishes during shutdown", async () => {
+  const gate = Promise.withResolvers<void>();
+  const client = makeClient("shared");
+  let closed = 0; let created = 0;
+  client.initialize = async () => { await gate.promise; return client.serverInfo()!; };
+  client.close = async () => { closed += 1; };
+  const registry = new MCPServerRegistry({ createClient: () => { created += 1; return client; } });
+  const requests = Promise.allSettled([registry.getClient("shared"), registry.getClient("shared")]);
+  const stopping = registry.closeAll();
+  gate.resolve(); await stopping;
+  expect((await requests).every((result) => result.status === "rejected")).toBe(true);
+  expect(created).toBe(1); expect(closed).toBe(1);
+});

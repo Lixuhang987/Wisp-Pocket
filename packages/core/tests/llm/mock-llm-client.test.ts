@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MockLLMClient, mockLLMScenarios, type MockLLMScenario } from "../../src/llm/MockLLMClient";
+import { MockLLMClient, mockLLMScenarios, type MockLLMScenario } from "../../src/adapters/providers/MockLLMClient";
 import { AgentRuntime } from "../../src/runtime/AgentRuntime";
-import type { AgentTool } from "../../src/tools/AgentTool";
+import type { AgentTool } from "../../src/tools/types/AgentTool";
 import { ToolRegistry } from "../../src/tools/ToolRegistry";
 
 class FakeFileWriteTool implements AgentTool {

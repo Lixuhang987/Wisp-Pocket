@@ -5,22 +5,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WebSocket } from "ws";
 import { describe, expect, it, vi } from "vitest";
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import type { AgentRuntimeEvent } from "@handagent/core/runtime/AgentRuntime.ts";
-import type { ThreadCommand } from "@handagent/core/protocol/ThreadCommand.ts";
-import type { ClientResponse } from "@handagent/core/protocol/ClientResponse.ts";
-import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
-import type { AgentActivityEvent } from "@handagent/core/protocol/AgentActivity.ts";
-import type { FilePermissionPolicy } from "@handagent/core/permission/FilePermissionPolicy.ts";
+import type { ThreadCommand } from "@handagent/core/protocol/types/ThreadCommand.ts";
+import type { ClientResponse } from "@handagent/core/protocol/types/ClientResponse.ts";
+import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest.ts";
+import type { AgentActivityEvent } from "@handagent/core/protocol/types/AgentActivity.ts";
+import type { FilePermissionPolicy } from "@handagent/core/adapters/filesystem/FilePermissionPolicy.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { AgentActivityPublisher } from "../../src/activity/AgentActivityPublisher.ts";
-import {
-  AgentManager,
-  createSharedAgentStatus,
-} from "../../src/agent/AgentManager.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
-import { ThreadRuntimeOrchestrator } from "../../src/thread/ThreadRuntimeOrchestrator.ts";
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
 import {
@@ -66,7 +61,7 @@ function permissionResponse(
     type: "permission.answered",
     requestId,
     timestamp: new Date().toISOString(),
-    payload: { decision, scope: "thread" },
+    payload: { decision, scope: "once" },
   };
 }
 
@@ -129,27 +124,13 @@ async function waitForClose(socket: WebSocket, timeoutMs = 250): Promise<boolean
 }
 
 describe("attachThreadSocketHandlers", () => {
-  it("tracks every thread command on a socket and clears owned runs on close", async () => {
+  it("only detaches subscriptions when a UI socket closes", async () => {
     const socket = new FakeSocket();
     const { commandRouter, eventPublisher } = makeHandlerDependencies();
-    const permissionPolicy = {
-      clearThreadRules: vi.fn(),
-    } as unknown as FilePermissionPolicy;
-
-    attachThreadSocketHandlers(socket as never, {
-      commandRouter,
-      eventPublisher,
-      permissionPolicy,
-    });
-
+    attachThreadSocketHandlers(socket as never, { commandRouter, eventPublisher });
     await emitMessage(socket, opSubmit("Thread-A", "first"));
-    await emitMessage(socket, opSubmit("Thread-B", "second"));
     socket.emit("close");
-
-    expect(commandRouter.interruptThread).toHaveBeenCalledWith("Thread-A");
-    expect(commandRouter.interruptThread).toHaveBeenCalledWith("Thread-B");
-    expect(permissionPolicy.clearThreadRules).toHaveBeenCalledWith("Thread-A");
-    expect(permissionPolicy.clearThreadRules).toHaveBeenCalledWith("Thread-B");
+    expect(commandRouter.interruptThread).not.toHaveBeenCalled();
   });
 
   it("routes client responses to the command router instead of bridge handlers", async () => {
@@ -208,97 +189,6 @@ describe("attachThreadSocketHandlers", () => {
     expect(lastSent<ServerRequest>(swiftSocket)).toBeNull();
   });
 
-  it("interrupts the active run owned by a socket when that socket closes", async () => {
-    const socket = new FakeSocket();
-    const persistence = new ThreadPersistence(
-      testStore(),
-      () => "2026-05-20T00:00:00.000Z",
-    );
-    let runtimeSignal: AbortSignal | undefined;
-    let finishRun: ((result: { messages: AgentMessage[] }) => void) | undefined;
-    const runStarted = Promise.withResolvers<void>();
-    const orchestrator = new ThreadRuntimeOrchestrator(
-      {
-        runWithMessages(messages, _onEvent: (event: AgentRuntimeEvent) => void, runOptions) {
-          runtimeSignal = runOptions?.signal;
-          runOptions?.signal.addEventListener("abort", () => {
-            finishRun?.({
-              messages: [
-                ...messages,
-                {
-                  role: "assistant" as const,
-                  content: "late assistant after close",
-                },
-              ],
-            });
-          });
-          runStarted.resolve();
-          return new Promise((resolve) => {
-            finishRun = resolve;
-          });
-        },
-      },
-      persistence,
-      () => "2026-05-20T00:00:00.000Z",
-    );
-    const eventPublisher = new ThreadNotificationPublisher();
-    const manager = new AgentManager();
-    manager.register("Thread-A", {
-      tx_sub: {
-        async send(op) {
-          if (op.type === "interrupt") {
-            await orchestrator.interruptAndWait("Thread-A", (event) => {
-              eventPublisher.publish(event);
-            });
-            return;
-          }
-
-          await orchestrator.submitInput(
-            {
-              threadId: "Thread-A",
-              messageId: op.opId,
-              timestamp: op.timestamp,
-              payload: op.payload,
-            },
-            (event) => {
-              eventPublisher.publish(event);
-            },
-          );
-        },
-      },
-      rx_event: (async function* emptyRuntimeEventStream() {})(),
-      agent_status: createSharedAgentStatus(),
-      session: { threadId: "Thread-A" },
-      async close() {
-        await orchestrator.interruptAndWait("Thread-A", (event) => {
-          eventPublisher.publish(event);
-        });
-      },
-    });
-    const commandRouter = new ThreadCommandRouter(
-      manager,
-      persistence,
-      eventPublisher,
-      () => "2026-05-20T00:00:00.000Z",
-    );
-    await persistence.ensureThread("Thread-A");
-    attachThreadSocketHandlers(socket as never, {
-      commandRouter,
-      eventPublisher,
-    });
-
-    await emitMessage(socket, opSubmit("Thread-A", "close me"));
-    await runStarted.promise;
-
-    socket.emit("close");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(runtimeSignal?.aborted).toBe(true);
-    expect(orchestrator.isThreadRunning("Thread-A")).toBe(false);
-    expect(stripUserInputItems(await persistence.getMessages("Thread-A"))).toEqual([
-      { role: "user", content: "close me" },
-    ]);
-  });
 
   it("ignores non-object and malformed thread socket frames", async () => {
     const socket = new FakeSocket();

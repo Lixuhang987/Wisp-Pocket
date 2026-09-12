@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { StreamableHttpMCPClient } from "../../src/mcp/StreamableHttpMCPClient.ts";
+import { StreamableHttpMCPClient } from "../../src/adapters/mcp/StreamableHttpMCPClient.ts";
 
 describe("StreamableHttpMCPClient", () => {
   const servers: Array<{ close: () => void }> = [];

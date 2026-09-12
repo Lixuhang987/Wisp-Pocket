@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { AgentActivityEvent } from "../../src/protocol/AgentActivity.ts";
-import type { ClientResponse } from "../../src/protocol/ClientResponse.ts";
-import type { DynamicToolProviderMessage } from "../../src/protocol/DynamicTool.ts";
-import type { Op } from "../../src/protocol/Op.ts";
-import type { ServerRequest } from "../../src/protocol/ServerRequest.ts";
-import type { ThreadCommand } from "../../src/protocol/ThreadCommand.ts";
-import type { ThreadNotification } from "../../src/protocol/ThreadNotification.ts";
+import type { AgentActivityEvent } from "../../src/protocol/types/AgentActivity.ts";
+import type { ClientResponse } from "../../src/protocol/types/ClientResponse.ts";
+import type { DynamicToolProviderMessage } from "../../src/protocol/types/DynamicTool.ts";
+import type { Op } from "../../src/protocol/types/Op.ts";
+import type { ServerRequest } from "../../src/protocol/types/ServerRequest.ts";
+import type { ThreadCommand } from "../../src/protocol/types/ThreadCommand.ts";
+import type { ThreadNotification } from "../../src/protocol/types/ThreadNotification.ts";
 
 describe("thread protocol boundaries", () => {
   it("supports user_input with text, image, skill, and text_selection items", () => {
@@ -54,7 +54,7 @@ describe("thread protocol boundaries", () => {
           type: "permission.answered",
           requestId: "thread-1:req-1",
           timestamp: "2026-06-10T00:00:02.000Z",
-          payload: { decision: "allow", scope: "thread" },
+          payload: { decision: "allow", scope: "once" },
         },
       },
     };

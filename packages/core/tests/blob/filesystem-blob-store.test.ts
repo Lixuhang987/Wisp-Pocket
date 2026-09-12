@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { FilesystemBlobStore } from "../../src/blob/FilesystemBlobStore";
+import { FilesystemBlobStore } from "../../src/adapters/filesystem/FilesystemBlobStore";
 
 const tempRoots: string[] = [];
 

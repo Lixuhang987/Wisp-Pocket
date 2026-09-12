@@ -5,10 +5,10 @@
 ## 直接文件
 
 - `ThreadCommandRouter.ts`：生命周期、查询和 Op 路由。
-- `ThreadRuntimeOrchestrator.ts`：active Turn、generation 与中断。
+- `@handagent/core/thread/Thread.ts`：active Turn、输入队列、中断、持久化与关闭。
 - `ThreadPersistence.ts`：thread-store 适配、snapshot 与残缺 Turn 修复。
 - `ThreadNotificationPublisher.ts`：连接订阅和定向发布。
-- `ThreadInputQueue.ts`：输入队列与等待者。
+- Thread 内部队列负责输入排队；运行中 Thread 保留在 `ThreadRegistry`。
 
 ## 命令边界
 
@@ -19,7 +19,7 @@
 
 ## 状态与持久化
 
-- 所有 `/api/thread` 连接默认收到新建 Thread，并自动订阅其普通通知；ServerRequest 还要求连接是交互式 owner。
+- 所有 `/api/thread` 连接只持有订阅；连接断开解除订阅但不停止 Thread。ServerRequest 只发给交互式订阅者。
 - runtime 回调写入前检查 active generation；被中断旧 Turn 的晚到结果不得污染当前状态。
 - user input 同时保存扁平模型内容和结构化 Input Item，确保 live notification 与 snapshot 一致。
 - rollout 只追加 generated message、Turn 审计和已发布 notification，不覆盖运行期间已有输入。

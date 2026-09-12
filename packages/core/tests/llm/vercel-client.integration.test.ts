@@ -5,9 +5,9 @@ import {
   type ModelSettings,
   type OpenAIApiType,
 } from "../../src/config/ModelSettings";
-import { VercelClient } from "../../src/llm/VercelClient";
-import type { NetworkLogEntry, NetworkLogger } from "../../src/logging/NetworkLogger";
-import type { AgentMessage } from "../../src/runtime/AgentMessage";
+import { VercelClient } from "../../src/adapters/providers/VercelClient";
+import type { NetworkLogEntry, NetworkLogger } from "../../src/logging/types/NetworkLogger";
+import type { AgentMessage } from "../../src/runtime/types/AgentMessage";
 import type { RegisteredTool } from "../../src/tools/ToolRegistry";
 import {
   type LLMIntegrationTurn,

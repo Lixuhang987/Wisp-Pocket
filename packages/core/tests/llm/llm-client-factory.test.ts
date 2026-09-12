@@ -4,8 +4,8 @@ import {
   createLLMClient,
   unsupportedCapabilityMessage,
   type LLMClientFactoryDependencies,
-} from "../../src/llm/LLMClientFactory";
-import type { AgentMessage } from "../../src/runtime/AgentMessage";
+} from "../../src/adapters/providers/LLMClientFactory";
+import type { AgentMessage } from "../../src/runtime/types/AgentMessage";
 
 describe("LLMClientFactory", () => {
   it("creates an OpenAI-compatible client by default with explicit capabilities", () => {

@@ -3,7 +3,7 @@ import type {
   DynamicToolCallRequestPayload,
   DynamicToolCallResponsePayload,
   DynamicToolProviderMessage,
-} from "@handagent/core/protocol/DynamicTool.ts";
+} from "@handagent/core/protocol/types/DynamicTool.ts";
 
 type ProviderToken = number;
 
@@ -120,6 +120,11 @@ export class WebSocketDynamicToolBridge implements DynamicToolBridge {
       pending.reject(new DynamicToolProviderOfflineError(`${pending.clientId} (${reason})`));
       this.pending.delete(pendingKey);
     }
+  }
+
+  close(): void {
+    for (const provider of this.providers.values()) this.failPendingForToken(provider.token, "backend closed");
+    this.providers.clear();
   }
 
   private pendingKey(token: ProviderToken, callId: string): string {

@@ -2,7 +2,7 @@ import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { StdioMCPClient } from "../../src/mcp/StdioMCPClient.ts";
+import { StdioMCPClient } from "../../src/adapters/mcp/StdioMCPClient.ts";
 import { MCPToolAdapter } from "../../src/mcp/MCPToolAdapter.ts";
 
 const SERVER_SCRIPT = `#!/usr/bin/env node

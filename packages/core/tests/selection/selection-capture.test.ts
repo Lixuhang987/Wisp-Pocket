@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { AgentThread } from "../../src/runtime/AgentThread";
 import {
   normalizeSelectedText,
   selectionResultFromText,
@@ -47,38 +46,4 @@ describe("selection capture", () => {
     });
   });
 
-  it("builds the initial thread input with user-selected text", async () => {
-    const thread = await AgentThread.open({
-      prompt: "总结重点",
-      selection: {
-        kind: "selected",
-        text: "这是用户主动选中的一段文字",
-      },
-    });
-
-    expect(thread.selectedText).toBe("这是用户主动选中的一段文字");
-    expect(thread.buildInitialUserMessage()).toContain("这是用户主动选中的一段文字");
-    expect(thread.buildInitialUserMessage()).toContain("总结重点");
-  });
-
-  it("keeps prompt-only threads when no selection is available", async () => {
-    const thread = await AgentThread.open({
-      prompt: "直接执行",
-      selection: {
-        kind: "empty",
-      },
-    });
-
-    expect(thread.selectedText).toBeNull();
-    expect(thread.buildInitialUserMessage()).toBe("直接执行");
-  });
-
-  it("keeps prompt-only threads when selection is omitted", async () => {
-    const thread = await AgentThread.open({
-      prompt: "只执行提示词",
-    });
-
-    expect(thread.selectedText).toBeNull();
-    expect(thread.buildInitialUserMessage()).toBe("只执行提示词");
-  });
 });

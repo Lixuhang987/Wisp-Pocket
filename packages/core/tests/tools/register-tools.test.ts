@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentTool } from "../../src/tools/AgentTool.ts";
+import type { AgentTool } from "../../src/tools/types/AgentTool.ts";
 import {
   registerTools,
   type RegisterToolsOptions,

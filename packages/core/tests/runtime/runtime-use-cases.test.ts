@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentRuntime } from "../../src/runtime/AgentRuntime";
-import { AgentRunner } from "../../src/runtime/AgentRunner.ts";
 import { ToolRegistry } from "../../src/tools/ToolRegistry";
-import type { AgentTool } from "../../src/tools/AgentTool";
-import type { AgentMessage } from "../../src/runtime/AgentMessage";
+import type { AgentTool } from "../../src/tools/types/AgentTool";
+import type { AgentMessage } from "../../src/runtime/types/AgentMessage";
 import type { LLMClient, LLMStreamEvent } from "../../src/llm/LLMClient";
-import type { BlobRecord } from "../../src/blob/BlobRecord";
-import type { BlobStore } from "../../src/blob/BlobStore";
+import type { BlobRecord } from "../../src/blob/types/BlobRecord";
+import type { BlobStore } from "../../src/blob/types/BlobStore";
 import { TurnSummarizer, type TurnSummarizerLike } from "../../src/runtime/TurnSummarizer";
 import { parseStub, renderStub, type StubRecord } from "../../src/runtime/Stub";
 import { MetaToolUseTool, META_TOOL_NAME, META_TOOL_ALREADY_ACTIVE_RESULT } from "../../src/tools/MetaToolUseTool";
@@ -1009,59 +1008,6 @@ describe("AgentRuntime", () => {
   });
 });
 
-describe("AgentRunner runtime input flow", () => {
-  it("records user input, emits turn notifications, and stops on interrupt", async () => {
-    const events: string[] = [];
-    const runner = new AgentRunner({
-      config: {
-        model: "test-model",
-        provider: "test-provider",
-        workspaceId: null,
-        maxTimes: 1,
-      },
-      session: {},
-      thread: {
-        threadId: "thread-1",
-        async getMessages() {
-          return [];
-        },
-        async recordUserInput(op) {
-          events.push(`record:${op.type}`);
-          return { messageId: op.opId };
-        },
-        async emit(event) {
-          events.push(`emit:${event.type}`);
-        },
-        async waitForPendingSummaries() {
-          events.push("wait");
-        },
-      },
-      rx_sub: (async function* () {
-        yield {
-          type: "user_input" as const,
-          opId: "op-1",
-          timestamp: "2026-06-10T00:00:00.000Z",
-          payload: {
-            items: [{ type: "text" as const, id: "item-1", text: "hello" }],
-          },
-        };
-        yield {
-          type: "interrupt" as const,
-          opId: "op-2",
-          timestamp: "2026-06-10T00:00:01.000Z",
-          payload: { reason: "user" as const },
-        };
-      })(),
-    });
-
-    await runner.run();
-
-    expect(events).toContain("record:user_input");
-    expect(events).toContain("emit:user.message.recorded");
-    expect(events).toContain("emit:turn.completed");
-    expect(events).toContain("emit:thread.status.changed");
-  });
-});
 
 describe("Turn summaries and stubbed tool content", () => {
   it("renders parseable stubs for image, persisted, and summarized turn content", () => {

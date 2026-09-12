@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FilePermissionPolicy } from "../../src/permission/FilePermissionPolicy.ts";
+import { FilePermissionPolicy } from "../../src/adapters/filesystem/FilePermissionPolicy.ts";
 import { AgentRuntime, type AgentRuntimeEvent } from "../../src/runtime/AgentRuntime";
 import { ToolRegistry } from "../../src/tools/ToolRegistry";
-import type { AgentTool } from "../../src/tools/AgentTool";
-import type { AgentMessage } from "../../src/runtime/AgentMessage";
+import type { AgentTool } from "../../src/tools/types/AgentTool";
+import type { AgentMessage } from "../../src/runtime/types/AgentMessage";
 import type {
   PermissionPolicy,
   PermissionResolution,
@@ -44,22 +44,8 @@ describe("FilePermissionPolicy", () => {
     expect(decision).toBe("ask");
   });
 
-  it("thread-scope rule survives within instance but not across instances", async () => {
-    const policy = new FilePermissionPolicy({ filePath });
-    const req = {
-      toolName: "file.write",
-      arguments: { workspaceId: "default", relativePath: "x.md" },
-      toolCallId: "tc-1",
-    };
-    await policy.remember(req, { decision: "allow", remember: "thread" });
 
-    expect(await policy.check(req)).toBe("allow");
-
-    const fresh = new FilePermissionPolicy({ filePath });
-    expect(await fresh.check(req)).toBe("ask");
-  });
-
-  it("always-scope rule persists across instances and matches stable arg hash", async () => {
+  it("always-scope rule persists across instances and matches the full tool name regardless of arguments", async () => {
     const policy = new FilePermissionPolicy({ filePath });
     const req = {
       toolName: "file.write",
@@ -73,13 +59,11 @@ describe("FilePermissionPolicy", () => {
     expect(
       await fresh.check({
         ...req,
-        arguments: { relativePath: "x.md", workspaceId: "default" },
+        arguments: { relativePath: "different.md", workspaceId: "default" },
       }),
     ).toBe("allow");
-    expect(fresh.listPersistedRules()[0].arguments).toEqual({
-      workspaceId: "default",
-      relativePath: "x.md",
-    });
+    expect(fresh.listPersistedRules()[0].toolName).toBe("file.write");
+    expect(await fresh.check({ ...req, threadId: "other", arguments: {} })).toBe("allow");
   });
 
   it("does not reuse file tool allow rules for separate tool names with the same arguments", async () => {
@@ -127,7 +111,7 @@ describe("FilePermissionPolicy", () => {
     const rules = policy.listPersistedRules();
     expect(rules).toHaveLength(1);
 
-    await policy.revoke(rules[0].argHash);
+    await policy.revoke(rules[0].toolName);
     expect(policy.listPersistedRules()).toHaveLength(0);
   });
 
@@ -144,54 +128,7 @@ describe("FilePermissionPolicy", () => {
     expect(resolution).toEqual({ decision: "deny", reason: "user clicked deny" });
   });
 
-  it("thread-scope rules are isolated by threadId", async () => {
-    const policy = new FilePermissionPolicy({ filePath });
-    const baseArgs = { workspaceId: "default", relativePath: "secret.md" };
 
-    const reqA = {
-      toolName: "file.write",
-      arguments: baseArgs,
-      threadId: "thread-A",
-      toolCallId: "tc-a",
-    };
-    const reqB = {
-      toolName: "file.write",
-      arguments: baseArgs,
-      threadId: "thread-B",
-      toolCallId: "tc-b",
-    };
-
-    await policy.remember(reqA, { decision: "allow", remember: "thread" });
-
-    expect(await policy.check(reqA)).toBe("allow");
-    expect(await policy.check(reqB)).toBe("ask");
-  });
-
-  it("clearThreadRules removes only rules for the given threadId", async () => {
-    const policy = new FilePermissionPolicy({ filePath });
-    const baseArgs = { workspaceId: "default", relativePath: "x.md" };
-
-    const reqA = {
-      toolName: "file.write",
-      arguments: baseArgs,
-      threadId: "thread-A",
-      toolCallId: "tc-a",
-    };
-    const reqB = {
-      toolName: "file.write",
-      arguments: baseArgs,
-      threadId: "thread-B",
-      toolCallId: "tc-b",
-    };
-
-    await policy.remember(reqA, { decision: "allow", remember: "thread" });
-    await policy.remember(reqB, { decision: "deny", remember: "thread" });
-
-    policy.clearThreadRules("thread-A");
-
-    expect(await policy.check(reqA)).toBe("ask");
-    expect(await policy.check(reqB)).toBe("deny");
-  });
 
   it("reloads external file changes before check", async () => {
     const policy = new FilePermissionPolicy({ filePath });
@@ -214,27 +151,26 @@ describe("FilePermissionPolicy", () => {
     const secondReq = requestFor("second.md");
     await writer.remember(secondReq, { decision: "deny", remember: "always" });
 
-    expect(policy.listPersistedRules().map((r) => r.argHash)).toContain(
-      writer.listPersistedRules()[0].argHash,
+    expect(policy.listPersistedRules().map((r) => r.toolName)).toContain(
+      writer.listPersistedRules()[0].toolName,
     );
 
     const raw = JSON.parse(await readFile(filePath, "utf8"));
     raw.rules.push({
-      toolName: "file.write",
-      argHash: "externally-added",
+      toolName: "externally-added",
       decision: "deny",
       createdAt: "2026-05-18T00:00:00.000Z",
     });
     await writeFile(filePath, JSON.stringify(raw, null, 2), "utf8");
 
-    await policy.revoke(firstRule.argHash);
+    await policy.revoke(firstRule.toolName);
 
     const rules = JSON.parse(await readFile(filePath, "utf8")).rules;
-    expect(rules.map((r: { argHash: string }) => r.argHash)).toContain(
+    expect(rules.map((r: { toolName: string }) => r.toolName)).toContain(
       "externally-added",
     );
-    expect(rules.map((r: { argHash: string }) => r.argHash)).not.toContain(
-      firstRule.argHash,
+    expect(rules.map((r: { toolName: string }) => r.toolName)).not.toContain(
+      firstRule.toolName,
     );
   });
 });
@@ -308,7 +244,7 @@ describe("PermissionPolicy runtime integration", () => {
     const tool = new EchoTool();
     const policy: PermissionPolicy = {
       async check() { return "ask"; },
-      async resolveAsk() { return { decision: "allow", remember: "thread" }; },
+      async resolveAsk() { return { decision: "allow", remember: "once" }; },
       async remember() {},
     };
     const events: AgentRuntimeEvent[] = [];
@@ -324,7 +260,7 @@ describe("PermissionPolicy runtime integration", () => {
     expect(tool.call).toHaveBeenCalledTimes(1);
     expect(events.find((e) => e.type === "permission_decision")).toMatchObject({
       decision: "allow",
-      scope: "thread",
+      scope: "once",
     });
     expect(events.find((e) => e.type === "tool_result")).toMatchObject({
       status: "success",

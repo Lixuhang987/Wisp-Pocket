@@ -1,5 +1,5 @@
-import type { ServerRequest } from "@handagent/core/protocol/ServerRequest.ts";
-import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
+import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest.ts";
+import type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
 
 export type PublishedThreadMessage = ThreadNotification | ServerRequest;
 type SendEvent = (event: PublishedThreadMessage) => void;
@@ -38,6 +38,11 @@ export class ThreadNotificationPublisher {
     }
   }
 
+  canAnswer(connectionId: string, threadId: string): boolean {
+    const state = this.connections.get(connectionId);
+    return !!state?.acceptServerRequests && state.subscriptions.has(threadId);
+  }
+
   unsubscribe(connectionId: string, threadId: string): void {
     this.connections.get(connectionId)?.subscriptions.delete(threadId);
   }
@@ -54,14 +59,14 @@ export class ThreadNotificationPublisher {
           continue;
         }
         if (state.subscriptions.has(event.threadId)) {
-          state.send(event);
+          try { state.send(event); } catch { /* Disconnected transport cannot fail a Thread. */ }
         }
       }
       return;
     }
 
     for (const state of this.connections.values()) {
-      state.send(event);
+      try { state.send(event); } catch { /* Disconnected transport cannot fail a Thread. */ }
     }
   }
 

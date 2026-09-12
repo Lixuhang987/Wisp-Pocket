@@ -37,7 +37,7 @@ struct PermissionRulesView: View {
                         viewModel.revoke(ruleId: rule.id)
                     }
                 }
-                Text(rule.argumentsSummary)
+                Text("永久生效 · 所有参数 · 所有 Thread")
                     .font(theme.typography.captionFont.monospaced())
                     .foregroundStyle(theme.colors.textSecondary)
                     .textSelection(.enabled)

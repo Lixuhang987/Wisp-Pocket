@@ -4,8 +4,8 @@ export type {
   WorkspaceRegistration,
   WorkspaceUpdate,
   WorkspaceRegistry,
-} from "./Workspace.ts";
+} from "./types/Workspace.ts";
 export {
   FileWorkspaceRegistry,
   type FileWorkspaceRegistryOptions,
-} from "./FileWorkspaceRegistry.ts";
+} from "../adapters/filesystem/FileWorkspaceRegistry.ts";

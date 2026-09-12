@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import type {
   AppendItemsInput,
   CreateThreadParams,
@@ -18,7 +18,7 @@ import type {
   ThreadStoreResult,
   ThreadSummary,
   ResumeThreadParams,
-} from "./types.ts";
+} from "./types/ThreadStore.ts";
 
 type ThreadStoreOptions = {
   dbPath: string;
@@ -164,7 +164,6 @@ export class ThreadStore {
           this.insertThreadRow(threadId, live);
           this.insertItem(threadId, 0, "session_meta", live.meta, live.createdAt);
           live.nextSequence = Math.max(live.nextSequence, 1);
-          live.persisted = true;
         }
         for (const pending of live.pending) {
           this.insertItem(
@@ -175,7 +174,6 @@ export class ThreadStore {
             pending.createdAt,
           );
         }
-        live.pending = [];
         live.updatedAt = this.now();
         this.updateThreadRow(threadId, {
           preview: live.preview,
@@ -184,6 +182,8 @@ export class ThreadStore {
           closedAt: null,
         });
       });
+      live.persisted = true;
+      live.pending = [];
       return ok(undefined);
     });
   }
@@ -306,8 +306,7 @@ export class ThreadStore {
         });
         const live = this.liveThreads.get(threadId);
         if (live) {
-          live.pending = [];
-          live.nextSequence = sequence;
+            live.nextSequence = sequence;
           live.updatedAt = updatedAt;
         }
       });

@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import type { WorkspaceRegistry } from "@handagent/core/workspace/Workspace.ts";
+import type { WorkspaceRegistry } from "@handagent/core/workspace/types/Workspace.ts";
 import type { WorkspaceAskResolver } from "@handagent/core/tools/builtins/WorkspaceAskUserTool.ts";
 import {
   loadToolSettings,

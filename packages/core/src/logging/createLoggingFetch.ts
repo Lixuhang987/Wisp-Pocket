@@ -1,4 +1,4 @@
-import type { NetworkLogEntry, NetworkLogger } from "./NetworkLogger.ts";
+import type { NetworkLogEntry, NetworkLogger } from "./types/NetworkLogger.ts";
 
 type FetchInput = Parameters<typeof fetch>[0];
 type FetchInit = Parameters<typeof fetch>[1];

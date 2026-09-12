@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { MemoryBlobStore } from "../support/MemoryBlobStore.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
@@ -17,7 +17,7 @@ describe("ThreadPersistence", () => {
     await persistence.renameThread(Thread.metadata.id, "新预览");
     const updated = await persistence.getThread(Thread.metadata.id);
     expect(updated?.metadata.preview).toBe("新预览");
-    expect(await persistence.listThreads()).toEqual([]);
+    expect(await persistence.listThreads()).toHaveLength(1);
 
     await persistence.persistUserMessage(Thread.metadata.id, "hello");
 
@@ -44,7 +44,7 @@ describe("ThreadPersistence", () => {
       () => "2026-05-17T00:00:00.000Z",
     );
 
-    await persistence.ensureThread("Thread-attach");
+    await createFixture(persistence, "Thread-attach");
     await persistence.persistUserMessage("Thread-attach", "解释这段代码", [
       { kind: "text_selection", id: "a", text: "let x = 1" },
     ]);
@@ -66,7 +66,7 @@ describe("ThreadPersistence", () => {
       () => "2026-05-17T00:00:00.000Z",
     );
 
-    await persistence.ensureThread("Thread-title");
+    await createFixture(persistence, "Thread-title");
     await persistence.persistUserMessage("Thread-title", "第一句");
     await persistence.autoTitle("Thread-title", "第一句");
     await persistence.persistUserMessage("Thread-title", "第二句");
@@ -88,7 +88,7 @@ describe("ThreadPersistence", () => {
       blobStore,
     );
 
-    await persistence.ensureThread("Thread-image");
+    await createFixture(persistence, "Thread-image");
     await persistence.persistUserMessage("Thread-image", "看看这张图", [
       {
         kind: "image",
@@ -132,7 +132,7 @@ describe("ThreadPersistence", () => {
       },
     ];
 
-    await persistence.ensureThread("Thread-conversation");
+    await createFixture(persistence, "Thread-conversation");
     await persistence.persistRunResult("Thread-conversation", finalMessages, []);
 
     expect(await persistence.getConversationMessages("Thread-conversation")).toEqual([
@@ -175,7 +175,7 @@ describe("ThreadPersistence", () => {
       { role: "assistant", content: "reading file" },
     ];
 
-    await persistence.ensureThread("Thread-audit");
+    await createFixture(persistence, "Thread-audit");
     await persistence.persistRunResult("Thread-audit", messages, [
       {
         type: "tool_call",
@@ -205,7 +205,7 @@ describe("ThreadPersistence", () => {
       store,
       () => "2026-06-07T00:00:00.000Z",
     );
-    await persistence.ensureThread("thread-delta");
+    await createFixture(persistence, "thread-delta");
     await persistence.persistUserMessage("thread-delta", "first");
     const baseMessagesSnapshot = [
       ...await persistence.getMessages("thread-delta"),
@@ -253,7 +253,7 @@ describe("ThreadPersistence", () => {
       testStore(() => "2026-06-07T00:00:00.000Z"),
       () => "2026-06-07T00:00:00.000Z",
     );
-    await persistence.ensureThread("thread-delta-events");
+    await createFixture(persistence, "thread-delta-events");
     await persistence.persistUserMessage("thread-delta-events", "first");
     const runtimeMessages = [
       ...await persistence.getMessages("thread-delta-events"),
@@ -295,7 +295,7 @@ describe("ThreadPersistence", () => {
       () => "2026-05-17T00:00:00.000Z",
     );
 
-    await persistence.ensureThread("Thread-error");
+    await createFixture(persistence, "Thread-error");
     await persistence.persistError("Thread-error", "Missing apiKey");
 
     const Thread = await persistence.getThread("Thread-error");
@@ -312,4 +312,11 @@ describe("ThreadPersistence", () => {
 
 function testStore(now: () => string): ThreadStore {
   return new ThreadStore({ dbPath: ":memory:", now });
+}
+
+async function createFixture(persistence: ThreadPersistence, id: string) {
+  const store = (persistence as unknown as { store: ThreadStore }).store;
+  await store.createThread({ threadId: id });
+  await store.persistThread(id);
+  await persistence.ensureThread(id);
 }

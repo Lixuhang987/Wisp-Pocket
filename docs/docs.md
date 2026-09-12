@@ -4,6 +4,9 @@
 
 ## 直接子节点
 
+- [issue-2-plan.md](./issue-2-plan.md)：后端所有权重构的当前实施计划。
+- [backend-state-ownership.md](./backend-state-ownership.md)：后端状态唯一所有权 DAG。
+
 - [TODO.md](/Users/mu9/proj/handAgent/docs/TODO.md)：尚未实现的产品 / 架构待办；实现并验证后移出。
 - [bugs.md](/Users/mu9/proj/handAgent/docs/bugs.md)：当前仍未修复、需要排查的缺陷。
 - [manual-qa.md](/Users/mu9/proj/handAgent/docs/manual-qa.md)：已实现但需要人工回归或实机验收的项目。

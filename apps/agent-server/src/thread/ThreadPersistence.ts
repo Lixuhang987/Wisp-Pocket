@@ -1,9 +1,9 @@
-import type { AgentMessage } from "@handagent/core/runtime/AgentMessage.ts";
-import type { BlobStore } from "@handagent/core/blob/BlobStore.ts";
-import { FilesystemBlobStore } from "@handagent/core/blob/FilesystemBlobStore.ts";
-import type { UserInput } from "@handagent/core/protocol/Op.ts";
-import type { ThreadNotification } from "@handagent/core/protocol/ThreadNotification.ts";
-import type { DynamicToolSpec } from "@handagent/core/protocol/DynamicTool.ts";
+import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
+import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
+import { FilesystemBlobStore } from "@handagent/core/adapters/filesystem/FilesystemBlobStore.ts";
+import type { UserInput } from "@handagent/core/protocol/types/Op.ts";
+import type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNotification.ts";
+import type { DynamicToolSpec } from "@handagent/core/protocol/types/DynamicTool.ts";
 import {
   CurrentThread,
   ThreadStore,
@@ -47,6 +47,7 @@ export class ThreadPersistence {
       threadSource: "user",
       originator: "user",
     });
+    unwrap(await current.persist());
     this.currentThreads.set(id, current);
     return await this.requireThread(id);
   }
@@ -86,7 +87,7 @@ export class ThreadPersistence {
     ]);
   }
 
-  async persistUserInput(threadId: string, userInput: UserInput): Promise<void> {
+  async persistUserInput(threadId: string, userInput: UserInput): Promise<AgentMessage> {
     const userMessage: AgentMessage = {
       role: "user",
       content: await composeUserInputContent(userInput, this.blobStore),
@@ -95,6 +96,7 @@ export class ThreadPersistence {
     await this.appendAndPersist(threadId, [
       { kind: "response_item", payload: userMessage },
     ]);
+    return userMessage;
   }
 
   async autoTitle(threadId: string, text: string): Promise<void> {
@@ -125,6 +127,7 @@ export class ThreadPersistence {
     }
 
     const lastError = [...thread.events]
+      .filter((event): event is Extract<ThreadAuditEvent, { type: "error" }> => event.type === "error")
       .reverse()
       .find(
         (event) =>
@@ -265,14 +268,12 @@ export class ThreadPersistence {
       return resumed;
     }
 
-    const created = await this.createCurrentThread({
-      threadId,
-      timestamp: this.now(),
-      threadSource: "user",
-      originator: "user",
-    });
-    this.currentThreads.set(threadId, created);
-    return created;
+    throw new Error(`Thread not found: ${threadId}`);
+  }
+
+  async resetThread(threadId: string): Promise<void> {
+    this.currentThreads.delete(threadId);
+    unwrap(await this.store.discardThread(threadId));
   }
 
   private async createCurrentThread(params: CreateThreadParams): Promise<CurrentThread> {

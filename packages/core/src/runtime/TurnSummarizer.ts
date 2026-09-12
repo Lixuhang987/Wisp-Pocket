@@ -1,8 +1,8 @@
-import type { BlobRecord } from "../blob/BlobRecord.ts";
-import type { BlobStore } from "../blob/BlobStore.ts";
+import type { BlobRecord } from "../blob/types/BlobRecord.ts";
+import type { BlobStore } from "../blob/types/BlobStore.ts";
 import type { LLMClientLike } from "../llm/LLMClient.ts";
 import { completeLLM } from "../llm/LLMClient.ts";
-import type { AgentMessage, ToolAgentMessage } from "./AgentMessage.ts";
+import type { AgentMessage, ToolAgentMessage } from "./types/AgentMessage.ts";
 import { renderStub } from "./Stub.ts";
 
 export interface TurnSummarizerLike {

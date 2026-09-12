@@ -3,7 +3,7 @@ import type { PermissionRequestState, WorkspaceRequestState } from '../store/thr
 interface RequestPanelsProps {
   permissionRequests: PermissionRequestState[];
   workspaceRequests: WorkspaceRequestState[];
-  onAnswerPermission: (requestId: string, decision: 'allow' | 'deny') => void;
+  onAnswerPermission: (requestId: string, decision: 'allow' | 'deny', scope: 'once' | 'always') => void;
   onAnswerWorkspace: (requestId: string, workspaceId: string | null) => void;
 }
 
@@ -33,19 +33,28 @@ export function RequestPanels({
           <div className="flex flex-wrap gap-xs">
             <button
               type="button"
-              onClick={() => onAnswerPermission(request.id, 'allow')}
+              onClick={() => onAnswerPermission(request.id, 'allow', 'once')}
               className="h-9 rounded-md bg-app-accent px-sm text-sm font-medium text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
             >
-              允许
+              本次允许
             </button>
             <button
               type="button"
-              onClick={() => onAnswerPermission(request.id, 'deny')}
+              onClick={() => onAnswerPermission(request.id, 'deny', 'once')}
               className="h-9 rounded-md border border-app-hairline bg-app-surface px-sm text-sm font-medium text-app-text-primary transition-colors duration-200 hover:bg-app-canvas focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
             >
-              拒绝
+              本次拒绝
+            </button>
+            <button type="button" onClick={() => onAnswerPermission(request.id, 'allow', 'always')}
+              className="h-9 rounded-md border border-app-hairline px-sm text-sm text-app-text-primary focus:ring-4 focus:ring-app-accent-ring">
+              永久允许
+            </button>
+            <button type="button" onClick={() => onAnswerPermission(request.id, 'deny', 'always')}
+              className="h-9 rounded-md border border-app-hairline px-sm text-sm text-app-text-primary focus:ring-4 focus:ring-app-accent-ring">
+              永久拒绝
             </button>
           </div>
+          <p className="mt-xs text-xs text-app-text-muted">永久决定适用于此工具的所有参数和所有 Thread。</p>
         </section>
       ))}
       {workspaceRequests.map((request) => (

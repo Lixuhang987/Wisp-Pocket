@@ -1,6 +1,6 @@
 # conversation
 
-UI / 持久化用的消息模型，**不是** LLM 面向的消息。LLM 视角是 `runtime/AgentMessage`；UI 视角是 `ConversationMessage`。两者的翻译由 agent-server 的 `MessageTranslator.agentMessagesToConversation` 维护，流式事件管道后续由 `ThreadRuntimeOrchestrator` 触发。
+UI / 持久化用的消息模型，**不是** LLM 面向的消息。LLM 视角是 `runtime/AgentMessage`；UI 视角是 `ConversationMessage`。两者的翻译由 agent-server 的 `MessageTranslator.agentMessagesToConversation` 维护，流式事件管道后续由 `core Thread` 触发。
 
 ## 文件
 

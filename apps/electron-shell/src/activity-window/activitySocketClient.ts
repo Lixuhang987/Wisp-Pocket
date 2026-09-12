@@ -2,7 +2,7 @@ import type {
   AgentActivityEvent,
   AgentActivityStatus,
   AgentActivityWaitingRequest,
-} from "@handagent/core/protocol/AgentActivity.ts";
+} from "@handagent/core/protocol/types/AgentActivity.ts";
 
 type WebSocketLike = {
   onmessage: ((event: { data: string }) => void) | null;

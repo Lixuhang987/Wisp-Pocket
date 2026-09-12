@@ -4,7 +4,7 @@ import type {
   ThreadId,
   ThreadStoreResult,
   ResumeThreadParams,
-} from "./types.ts";
+} from "./types/ThreadStore.ts";
 import { ThreadStore } from "./ThreadStore.ts";
 
 export class CurrentThread {

@@ -12,7 +12,6 @@ export type MCPCallToolResult = {
 
 export type MCPTextContent = { type: "text"; text: string };
 export type MCPImageContent = { type: "image"; data: string; mimeType: string };
-export type MCPResourceContent = { type: "resource"; resource: { uri: string; text?: string; blob?: string; mimeType?: string } };
 
 export type MCPContent =
   | MCPTextContent

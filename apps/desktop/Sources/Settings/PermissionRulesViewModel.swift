@@ -5,7 +5,6 @@ struct PermissionRuleEntry: Identifiable, Equatable {
     let toolName: String
     let decision: String
     let createdAtText: String
-    let argumentsSummary: String
 }
 
 @Observable
@@ -27,7 +26,7 @@ final class PermissionRulesViewModel {
 
     func revoke(ruleId: String) {
         var list = rawRules()
-        list.removeAll { ($0["argHash"] as? String) == ruleId }
+        list.removeAll { ($0["toolName"] as? String) == ruleId }
         save(list)
         reload()
     }
@@ -35,6 +34,7 @@ final class PermissionRulesViewModel {
     private func rawRules() -> [[String: Any]] {
         guard let data = try? Data(contentsOf: filePath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["version"] as? Int == 2,
               let list = json["rules"] as? [[String: Any]] else {
             return []
         }
@@ -42,7 +42,7 @@ final class PermissionRulesViewModel {
     }
 
     private func save(_ list: [[String: Any]]) {
-        let json: [String: Any] = ["version": 1, "rules": list]
+        let json: [String: Any] = ["version": 2, "rules": list]
         guard let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) else {
             return
         }
@@ -55,46 +55,16 @@ final class PermissionRulesViewModel {
 
     private static func entry(from raw: [String: Any]) -> PermissionRuleEntry? {
         guard let toolName = raw["toolName"] as? String,
-              let argHash = raw["argHash"] as? String,
               let decision = raw["decision"] as? String else {
             return nil
         }
 
         return PermissionRuleEntry(
-            id: argHash,
+            id: toolName,
             toolName: toolName,
             decision: decision,
-            createdAtText: formatCreatedAt(raw["createdAt"] as? String),
-            argumentsSummary: summarizeArguments(raw["arguments"])
+            createdAtText: formatCreatedAt(raw["createdAt"] as? String)
         )
-    }
-
-    private static func summarizeArguments(_ value: Any?) -> String {
-        guard let arguments = value as? [String: Any], !arguments.isEmpty else {
-            return "参数摘要不可用：\(value == nil ? "旧规则未保存参数" : "空参数")"
-        }
-        return arguments.keys.sorted().map { key in
-            "\(key): \(formatValue(arguments[key]))"
-        }.joined(separator: "\n")
-    }
-
-    private static func formatValue(_ value: Any?) -> String {
-        switch value {
-        case let bool as Bool:
-            return bool ? "true" : "false"
-        case let string as String:
-            return string
-        case let number as NSNumber:
-            return number.stringValue
-        case let array as [Any]:
-            return array.map { formatValue($0) }.joined(separator: ", ")
-        case let object as [String: Any]:
-            return object.keys.sorted()
-                .map { "\($0): \(formatValue(object[$0]))" }
-                .joined(separator: ", ")
-        default:
-            return String(describing: value ?? "")
-        }
     }
 
     private static func formatCreatedAt(_ value: String?) -> String {

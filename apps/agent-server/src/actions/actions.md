@@ -9,13 +9,13 @@
 | 文件 | 职责 |
 |------|------|
 | `MCPServerRegistry.ts` | 按 `serverId` 缓存 MCP client 和适配后的 tools；代理 prompts/resources 能力 |
-| `ThreadScopedToolRegistry.ts` | 为每个 thread 维护独立 `ToolRegistry`；处理默认公开工具、`use_tools` 懒加载、全局 MCP、dynamic tools、mock LLM 特例和删除清理 |
+| `packages/core/src/thread/ThreadTools.ts` | 为每个 thread 维护独立 `ToolRegistry`；处理默认公开工具、`use_tools` 懒加载、全局 MCP、dynamic tools、mock LLM 特例和删除清理 |
 
 ## 工具组合流
 
 ```mermaid
 flowchart TD
-  A["settings builtin registry"] --> D["ThreadScopedToolRegistry"]
+  A["settings builtin registry"] --> D["ThreadTools"]
   B["~/.spotAgent/mcp.json 全局 server ids"] --> D
   W["default web tools"] --> D
   D --> E{"thread activated?"}
@@ -41,12 +41,12 @@ flowchart TD
 
 ## Dynamic tools
 
-`ThreadScopedToolRegistry` 在 thread 激活后把 `metadata.dynamicTools` 转换为 `DynamicToolAdapter`。adapter 的模型可见名称为 `namespace.name`，例如 `host_macos.screen_capture`；调用时 agent-server 通过 `WebSocketDynamicToolBridge` 按 `clientId` 转发给 provider。
+core `ThreadTools` 在 thread 激活后把 `metadata.dynamicTools` 转换为 `DynamicToolAdapter`。adapter 的模型可见名称为 `namespace.name`，例如 `host_macos.screen_capture`；调用时 agent-server 通过 `WebSocketDynamicToolBridge` 按 `clientId` 转发给 provider。
 
 ## 编辑约束
 
 - 新增 MCP server transport 时，先扩展 core `MCPClient` / config，再在 `server/createMCPClientFromConfig()` 接入。
-- `ThreadScopedToolRegistry` 不直接读取磁盘配置；全局 server id 由上游传入。
+- core `ThreadTools` 不直接读取磁盘配置；全局 server id 由上游传入。
 - 缺失或失败的 MCP server 应记录 skip 日志并保留 builtin tools，不阻断整轮 prompt。
 
 ## 下一步阅读
