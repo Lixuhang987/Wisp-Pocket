@@ -5,7 +5,7 @@
 ## 直接子节点
 
 - [server/server.md](/Users/mu9/proj/handAgent/apps/agent-server/src/server/server.md)：进程入口、HTTP/WebSocket 分派与组合根。
-- [thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)：Thread 命令、运行编排、持久化和通知分发。
+- [thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)：Thread 命令接入、持久化适配和通知分发。
 - [agent/agent.md](/Users/mu9/proj/handAgent/apps/agent-server/src/agent/agent.md)：历史 Agent 目录说明；生产 Thread owner 位于 core `thread/`。
 - [protocol/protocol.md](/Users/mu9/proj/handAgent/apps/agent-server/src/protocol/protocol.md)：runtime、UI 与持久化表达之间的翻译。
 - [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md)：Thread-scoped Tool registry 与 MCP 激活。
@@ -21,12 +21,12 @@ flowchart LR
   S --> A[actions]
   S --> B[bridges]
   S --> V[activity]
-  T --> G[agent]
+  T --> C[core ThreadRegistry / Thread]
   T --> P[protocol]
   A --> B
 ```
 
 - `server` 是唯一组合根；子模块不读取进程环境并自行创建全局依赖。
-- `thread` 是唯一直接使用 thread-store 的业务目录；`protocol` 只翻译类型。
+- `server` 创建 thread-store 并通过 `thread` 的持久化适配注入 core；`protocol` 提供转换函数，不拥有运行状态。
 - `activity` 旁路观察 Thread 消息，不反向改变 Thread 行为。
 - 跨进程 DTO 只从 core protocol 导入，不在本包复制定义。

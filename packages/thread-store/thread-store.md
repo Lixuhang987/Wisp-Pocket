@@ -4,10 +4,7 @@
 
 ## 直接子节点
 
-- `src/types/ThreadStore.ts`：rollout、元数据、审计和结果类型。
-- `src/ThreadStore.ts`：SQLite schema、Thread 生命周期与派生视图。
-- `src/CurrentThread.ts`：当前 open Thread 的顺序写入语义。
-- `src/index.ts`：包导出。
+- `src/`：rollout 类型、SQLite schema、派生视图、顺序写入句柄与包导出。
 - `tests/`：真实临时 SQLite 用例。
 
 ## 持久化边界
@@ -17,3 +14,4 @@
 - 第一次 persist 才创建数据库 Thread；resume 从最大 sequence 之后继续追加。
 - 同一 Thread 的写入在包内串行化。调用方使用派生 API，不直接查询 SQLite 表。
 - 跨进程 DTO 与 runtime message 来自 core；本包只定义持久化表达。
+- [agent-server 持久化适配](../../apps/agent-server/src/thread/thread.md) 承担输入转换、运行增量与残缺 Turn 恢复，并实现 core 的 `ThreadStorage` 端口；底层 ThreadStore 不可直接替代这些语义。

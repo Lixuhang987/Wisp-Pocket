@@ -77,9 +77,11 @@ final class AppCoordinatorTests: XCTestCase {
         )
 
         coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
+        // 提交先隐藏 PromptPanel，应用 Settings 派生的宿主策略。
+        XCTAssertEqual(appliedPolicies, [.accessory])
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
 
-        XCTAssertEqual(appliedPolicies, [])
+        XCTAssertEqual(appliedPolicies, [.accessory])
     }
 
     @MainActor
@@ -94,10 +96,12 @@ final class AppCoordinatorTests: XCTestCase {
         )
 
         coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
+        XCTAssertEqual(appliedPolicies, [.accessory])
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
+        XCTAssertEqual(appliedPolicies, [.accessory])
         coordinator.send(.threadWindowClosed)
 
-        XCTAssertEqual(appliedPolicies, [])
+        XCTAssertEqual(appliedPolicies, [.accessory])
     }
 
     @MainActor

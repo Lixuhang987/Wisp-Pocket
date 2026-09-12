@@ -34,7 +34,7 @@ flowchart TD
 ## 跨层合约
 
 - 初始上下文只来自用户主动提交的 Input Item。屏幕、剪贴板、文件和 App 状态必须由 Tool 按需读取。
-- `/api/thread` 承载 `ThreadCommand`、`ThreadNotification`、`ServerRequest` 与 `ClientResponse`。React 是持续连接和交互式请求 owner；Swift 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`。
+- `/api/thread` 承载 `ThreadCommand`、`ThreadNotification`、`ServerRequest` 与 `ClientResponse`。React 承接持续通知与交互式请求的 UI；Swift 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`。
 - `/api/activity` 只发送 Agent Activity，不承载 Thread 消息或历史。
 - `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 统一暴露原生与 enabled Plugin 的能力。
 - Electron UI Shell 是 agent-server 的唯一 supervisor，也是 ThreadWindow 与 StatusBubble 的唯一宿主；关闭 UI 窗口不停止 agent-server。
@@ -43,7 +43,7 @@ flowchart TD
 ## 状态源
 
 - Swift Host 持久化模型设置、主题偏好、AgentTrigger 与 Plugin enablement；React 只消费解析后的主题。
-- React ThreadWindow 持有完整 UI Thread 状态；Swift 与 Electron main 不 mirror 消息或历史。
+- React ThreadWindow 持有后端事实的展示投影、前端输入交接与界面偏好；正式历史、Turn 和待答请求的生命周期由后端拥有。Swift 与 Electron main 不 mirror 消息或历史。
 - core ThreadRegistry / Thread 持有运行中的 Thread、历史、Turn、请求和工具状态；agent-server 仅持有订阅、连接和请求路由。
 - Thread 历史主文件是 `~/.spotAgent/threads.sqlite`；其他本地配置和数据路径由 owning 模块文档说明。
 

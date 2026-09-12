@@ -8,17 +8,18 @@
 - `components/`：历史侧栏、消息、Composer 和请求面板。
 - `native/`：读取 preload 注入的配置、主题与 fallback initial prompt。
 - `protocol/`：core 协议的 Web encode 与类型守卫。
-- `store/`：Thread 状态、消息 item 与显式 action。
-- `thread/`：`/api/thread` socket client。
+- [store/store.md](./store/store.md)：事实投影、输入交接、偏好与公共 store 组装。
+- [thread/thread.md](./thread/thread.md)：输入编排与 `/api/thread` 传输缓冲。
+- `history/`：用户打开历史 Thread 的加载与选择顺序。
 - `utils/`：分组、布局和纯函数工具。
 
 ## 状态所有权
 
-- store 持有 `threadsById`、历史、请求、Workspace 列表、连接状态和窗口错误。
+- store 组装后端事实的展示投影、前端输入交接和界面偏好；正式历史、Turn 与待答请求的生命周期仍属于后端。
 - 当前右侧展示的 `activeThreadId` 属于 `App` 本地状态，不进入 store，也不通知 server。
-- socket client 只负责收发、队列和协议回调，不直接写组件状态。
+- socket client 只负责收发、传输缓冲和协议回调；输入控制器统一首轮关联与 Composer 派发，状态修改经 store 公共 action。
 - permission/workspace request 按 Thread 保存；回答、Turn 终态或 Thread error 都必须清理失效请求。
-- Composer 按 Thread 保存结构化 Input Item。运行中输入进入 per-Thread 队列，一次只派发一条。
+- 草稿由 ThreadWorkspacePane 按 Thread 保存在内存，切换保留、提交清空、页面重建丢失；运行中提交进入 store 的等待队列，一次只派发一条。
 
 ## UI 约束
 
@@ -29,7 +30,7 @@
 
 ## 协议约束
 
-- 收到 notification 先按 ID 去重；streaming delta 必须追加到稳定 item identity。
-- `thread.started` 只创建缓存；是否切换当前 Thread 由触发该动作的 UI 流决定。
+- 只有 assistant delta 按现有 notification ID 去重，并追加到稳定 item identity；不保证所有通知可重放。
+- store 处理 `thread.started` 时更新缓存与输入关联；App 仍在原有通知回调中切换选中项，后台创建导致切换的既有问题见 [bugs](../../../docs/bugs.md)。
 - 打开历史先确保本地 state，再发送 resume 等待 snapshot。
 - 组件通过 props、store action 或根 callback 发起行为，不直接操作 WebSocket。

@@ -4,14 +4,9 @@
 
 ## 验收前提
 
-- 已完成依赖安装。
-- 已通过 `bash ./scripts/test.sh`。
-- 已通过 `bash ./scripts/swiftw test`。
-- 已通过 `bash ./scripts/swiftw build`。
+先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
 
-## 待验收项
-
-### Wisp Pocket 品牌与桌宠命名
+## Wisp Pocket 品牌与桌宠命名
 
 - **状态**：已实现，待打包与实机确认。
 - **自动化验证**：`bash ./scripts/test.sh`、`bash ./scripts/package-app.test.sh`、`bash ./scripts/swiftw build`。
@@ -21,7 +16,7 @@
   3. 确认桌宠相关文案使用“桌宠”或“月见八千代”，不把桌宠称为“Wisp”。
   4. 确认 Swift target、npm package、环境变量和协议事件等内部构建标识仍可正常工作。
 
-### 文档卫生回归
+## 文档卫生回归
 
 - **范围**：`AGENTS.md`、`CONTEXT-MAP.md`、三个 `CONTEXT.md`、`handAgent.md`、`README.md`、`DESIGN.md`、各级目录指南与 `docs/*.md`。
 - **验收步骤**：
@@ -33,7 +28,7 @@
   6. 打开 `bugs.md`，确认只保留未修复缺陷；已实现待验收项在本文。
   7. 从 `AGENTS.md` 的 `Agent skills` 区块进入 `docs/agents/`，确认 GitHub Issues、默认 triage 标签和 multi-context 消费规则仍一致。
 
-### ThreadWindow Radix UI 弹出层迁移
+## ThreadWindow Radix UI 弹出层迁移
 
 - **状态**：已实现，待实机 QA。
 - **自动化验证**：`pnpm --filter handagent-thread-window-web exec vitest run tests/composerInputItems.test.ts`、`pnpm --filter handagent-thread-window-web test`、`pnpm --filter handagent-thread-window-web build`、`bash ./scripts/test.sh`。
@@ -44,7 +39,7 @@
   4. 缩小窗口高度，确认 popover 自动避让或保持在视口内可滚动。
   5. 点击历史 thread 删除按钮，确认 Radix AlertDialog 居中、`Escape` / 取消不删除、确认后删除。
 
-### AgentTrigger 设置二级菜单与默认 Package
+## AgentTrigger 设置二级菜单与默认 Package
 
 - **状态**：已实现，待实机 QA。
 - **自动化验证**：`bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
@@ -56,7 +51,7 @@
   5. 删除某条 Instance，确认列表立即移除且 runtime reload。
   6. 删除内置 package 目录后重启，确认启动期恢复内置 manifest，且不覆盖用户已有实例。
 
-### 默认 Websearch 与 Responses SSE 回归
+## 默认 Websearch 与 Responses SSE 回归
 
 - **状态**：已实现，待真实 provider 实机 QA；上次阻塞在本地 provider 返回 401 invalidated oauth token。
 - **自动化验证**：`pnpm exec vitest run packages/core/tests/tools/websearch-use-cases.test.ts packages/core/tests/permission/security-use-cases.test.ts packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`。
@@ -68,7 +63,7 @@
   5. 去掉 `TAVILY_API_KEY` 后重启，确认 `web_search` 返回明确缺 key 错误且 App 不崩溃。
   6. 请求抓取 localhost、127.0.0.1 或私网地址，确认 `fetch_page` 拒绝。
 
-### Context History 与自进化 Automation 官方 Plugin
+## Context History 与自进化 Automation 官方 Plugin
 
 - **状态**：已实现，待实机 QA。
 - **自动化验证**：`bash ./scripts/swiftw test --filter PluginDynamicToolsTests`、`bash ./scripts/swiftw test --filter ContextHistoryPluginCoreTests`、`bash ./scripts/swiftw test --filter AutomationRuntimeTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
@@ -82,10 +77,21 @@
   7. 调用 `automation.repair_apply`，确认 policy version 增加、repair request 变为 `applied`，重复 apply 会失败。
   8. 修改官方 manifest 的非 enabled 字段后重启，确认 installer 修复 manifest 且保留用户 enabled 选择。
 
+## Issue #3 前后端状态所有权收敛
+
+- **状态**：前端职责拆分与后端保留核查已完成，尚未进行桌面实机回归；自动化与提交前检查结果见 [规格入口](./issue-3-design.md)。构建、store 测试与静态组件渲染不计作以下验收。
+- [ ] **草稿隔离与提交**：在 Thread A、B 分别编辑含文本和 Input Item 的草稿，来回切换确认各自保留；分别提交后只清空本 Thread 的草稿，运行中提交仍进入等待队列。
+- [ ] **页面重建与偏好**：调整 Workspace 分组展开，编辑草稿并展开消息或工具详情后重载 Web 页面；草稿与组件临时展开恢复初始状态，Workspace 分组展开保留，搜索词清空。
+- [ ] **派发与等待**：空闲时提交一条，运行时继续提交多条并移除中间等待项；配合可控后端延迟 `turn.started`，确认每 Thread 只交接一条，收到开始并结束后按剩余顺序继续，A、B 互不影响。
+- [ ] **首轮关联与占位**：经 preload initial-prompt fallback 连续创建两个 Thread，交错返回创建通知；核对各自先加载再提交首轮，snapshot 保留待确认占位，正式输入记录替换原占位且内容不串线。
+- [ ] **历史与流式展示**：显式打开历史 Thread，核对文本、图片、Append Prompt 和文本选区内容；连续回复更新同一消息，重复 assistant delta 不重复显示。后台创建导致选中项切换仍按 [既有缺陷](./bugs.md) 单独复现，不记为本轮已修复。
+- [ ] **请求面板**：在不同 Thread 触发 Permission / Workspace 请求，回答后确认只清理对应面板；分别检查完成、中断、失败和 Thread error 后的请求清理及另一 Thread 的面板保留。
+- [ ] **连接与缓冲**：延迟 socket open，核对已缓冲命令和 ClientResponse 的发送顺序；意外断连后显示 disconnected 并禁用 Composer，保持无自动重连、订阅恢复或待答请求补发的现状。
+- [ ] **宿主窗口回执**：关闭 Settings 后从 PromptPanel 提交，确认隐藏面板时 Swift Host 回落到 accessory；ThreadWindow 打开回执和关闭均不再次改变 Swift Host 的 Dock / Cmd+Tab 可见性。本轮只校正相关测试的观察阶段。
+
 ## Issue #2 后端 Thread 所有权重构
 
 - **自动化状态**：实现与自动化回归已提交；以下项目保留为真实 agent-server / UI 环境的人工验收。
-
 - [ ] 启动 agent-server，创建两个 Thread；分别连续提交两轮输入，确认历史和流式通知不串线。
 - [ ] 执行期间关闭全部 Thread UI 连接，确认 Turn 继续运行；重新连接后用 `thread.resume` 读取结果。
 - [ ] 在权限请求中分别选择“本次允许”和“永久允许”，确认永久规则在另一 Thread、不同参数和重启后仍按完整工具名称命中。

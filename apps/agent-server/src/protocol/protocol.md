@@ -12,7 +12,7 @@
 - assistant 与 Tool item ID 必须包含 Turn 身份；notification ID 还要在 active Turn 内唯一，避免流式片段被误去重。
 - 图片先写 BlobStore，Thread 中保存可恢复 STUB；进入 LLM 前才展开为多模态内容。
 - user message 同时保留扁平内容和结构化 Input Item，保证 live 与 snapshot round-trip。
-- Permission/Workspace 的 ServerRequest 由 request broker 产生；workspace list 与 Dynamic Tool frame 不经过本目录。
+- Permission / Workspace 的 ServerRequest 由 core Thread 的待答请求产生；workspace list 与 Dynamic Tool frame 不经过本目录。
 
 ## 修改约束
 

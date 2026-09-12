@@ -1,6 +1,6 @@
 # 后端按状态归属与生命周期划分边界
 
-各项目标原则已逐项接受，并汇总为 [实施规格 #2](https://github.com/Lixuhang987/Wisp-Pocket/issues/2)；尚未修改实现。
+各项原则已在 [实施规格 #2](https://github.com/Lixuhang987/Wisp-Pocket/issues/2) 中落地。当前所有权见 [后端状态归属](../backend-state-ownership.md)；本文保留决策理由与明确排除的能力，Issue #3 沿用这些边界。
 
 重构覆盖整个后端，包括 Thread 执行、协议接入、持久化、Tool / Provider、交互请求和服务生命周期。默认保持现有用户行为；发现矛盾时单独决策，不借结构调整改变产品规则。
 
@@ -44,7 +44,7 @@ Thread 不再拥有临时授权记忆；权限范围与工具级匹配见 [权�
 | thread-store | 数据库、写入顺序和持久化句柄 | 不控制 Turn；已加载 Thread 的历史写入从 Thread 发起 |
 | 通知与 Activity | 对外消息和展示投影 | 不从通知反推运行事实，也不反向控制 Thread |
 
-## 现有结构的处理方向
+## 结构调整原则
 
 - 合并 Agent owner 外壳与 Orchestrator 的实际 Thread 状态；移除外部 `runtimeByThread` 等分别管理同一 Thread 生命周期的路径。
 - 保留协议路由的解析与翻译职责，将创建、恢复、排队、中断、删除等业务规则移入 core 的唯一生命周期入口或 Thread。
