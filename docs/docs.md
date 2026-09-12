@@ -5,7 +5,7 @@
 ## 直接子节点
 
 - [issue-2-plan.md](./issue-2-plan.md)：后端所有权重构的当前实施计划。
-- [issue-3-design.md](./issue-3-design.md)：前后端状态所有权与中间层评估的已确认约束及验收原则。
+- [issue-3-design.md](./issue-3-design.md)：前后端状态所有权实施规格入口、基线与验证状态。
 - [backend-state-ownership.md](./backend-state-ownership.md)：后端状态唯一所有权 DAG。
 
 - [TODO.md](/Users/mu9/proj/handAgent/docs/TODO.md)：尚未实现的产品 / 架构待办；实现并验证后移出。

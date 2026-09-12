@@ -39,8 +39,7 @@
 
 ### 前后端状态所有权收敛（Issue #3）
 
-- [设计评估](./issue-3-design.md) 的六项约束已确认，包含范围、前端状态边界、后端精简停止条件与行为验收原则；未开始实现。
-- [ ] 按已确认约束修订 GitHub 实施规格，纠正既有能力与适配层职责的事实描述。
+- [实施规格 #3](https://github.com/Lixuhang987/Wisp-Pocket/issues/3) 已按六项确认约束发布，标记 `ready-for-agent`；未开始实现。基线与验证状态见 [规格入口](./issue-3-design.md)。
 - [ ] 实现前读取目标目录文档链至根架构，从主 checkout 用规定脚本创建并初始化 worktree，确认 CodeGraph 路径并运行分层基线。
 - [ ] 完成实现与验证，更新 owning 模块文档；由独立、无上下文继承的子 agent 审核规格、代码与文档，更新 manual-qa 后提交。
 
