@@ -87,69 +87,6 @@ describe("ElectronShellRuntime", () => {
     });
   });
 
-  it("does nothing when an idle activity click has no thread id", () => {
-    const harness = createHarness({ focusResult: false });
-
-    harness.runtime.handleActivityWindowFocusRequest(null);
-
-    expect(harness.prewarmer.focus).not.toHaveBeenCalled();
-    expect(harness.events).toEqual([]);
-  });
-
-  it("focuses the thread window when an activity click has a visible thread", () => {
-    const harness = createHarness();
-
-    harness.runtime.handleActivityWindowFocusRequest("thread-1");
-
-    expect(harness.prewarmer.focus).toHaveBeenCalledTimes(1);
-    expect(harness.events).toEqual([]);
-  });
-
-  it("does not request the Swift prompt panel when activity click cannot focus a thread window", () => {
-    const harness = createHarness({ focusResult: false });
-
-    harness.runtime.handleActivityWindowFocusRequest("thread-1");
-
-    expect(harness.prewarmer.focus).toHaveBeenCalledTimes(1);
-    expect(harness.events).toEqual([]);
-  });
-
-  it("does not request the Swift prompt panel from native activity focus", () => {
-    const harness = createHarness({ focusResult: false });
-
-    harness.runtime.handleActivityWindowNativeFocus();
-
-    expect(harness.prewarmer.focus).toHaveBeenCalledTimes(1);
-    expect(harness.events).toEqual([]);
-  });
-
-  it("focuses a visible thread window from native activity focus", () => {
-    const harness = createHarness();
-
-    harness.runtime.handleActivityWindowNativeFocus();
-
-    expect(harness.prewarmer.focus).toHaveBeenCalledTimes(1);
-    expect(harness.events).toEqual([]);
-  });
-
-  it("does not request the Swift prompt panel from native activity mouse down", () => {
-    const harness = createHarness({ focusResult: false });
-
-    harness.runtime.handleActivityWindowNativeMouseDown();
-
-    expect(harness.prewarmer.focus).toHaveBeenCalledTimes(1);
-    expect(harness.events).toEqual([]);
-  });
-
-  it("focuses a visible thread window from native activity mouse down", () => {
-    const harness = createHarness();
-
-    harness.runtime.handleActivityWindowNativeMouseDown();
-
-    expect(harness.prewarmer.focus).toHaveBeenCalledTimes(1);
-    expect(harness.events).toEqual([]);
-  });
-
   it("opens and acks focus when no visible thread window exists", async () => {
     const harness = createHarness({ focusResult: false });
 
@@ -225,22 +162,6 @@ describe("ElectronShellRuntime", () => {
     expect(harness.prewarmer.prepare).toHaveBeenCalledTimes(1);
   });
 
-  it("releases activity window native focus when a visible thread window closes", () => {
-    const harness = createHarness();
-
-    harness.runtime.handleThreadWindowClosed({ wasPrepared: true, wasVisible: true });
-
-    expect(harness.activityWindow.releaseNativeFocusForNextClick).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not release activity window native focus for hidden prewarm closes", () => {
-    const harness = createHarness();
-
-    harness.runtime.handleThreadWindowClosed({ wasPrepared: true, wasVisible: false });
-
-    expect(harness.activityWindow.releaseNativeFocusForNextClick).not.toHaveBeenCalled();
-  });
-
   it("does not stop the supervisor when the visible thread window closes", () => {
     const harness = createHarness();
     harness.runtime.handleAgentServerHealth({ available: true });
@@ -287,7 +208,6 @@ function createHarness(options: { focusResult?: boolean; prepareError?: Error } 
   };
   const activityWindow = {
     show: vi.fn(async () => {}),
-    releaseNativeFocusForNextClick: vi.fn(),
     updateTheme: vi.fn(async () => {}),
   };
   const stopSupervisor = vi.fn();

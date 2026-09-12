@@ -166,6 +166,7 @@ export function isThreadNotification(value: unknown): value is ThreadNotificatio
         && isOptionalString(value.commandId)
         && Array.isArray(value.payload.messages)
         && value.payload.messages.every(isConversationMessage)
+        && (value.payload.pendingRequests === undefined || (Array.isArray(value.payload.pendingRequests) && value.payload.pendingRequests.every(isServerRequest)))
         && isRunStatus(value.payload.status);
     case "user.message.recorded":
       return hasNotificationBase(value)
@@ -173,6 +174,7 @@ export function isThreadNotification(value: unknown): value is ThreadNotificatio
         && isRecord(value.payload)
         && typeof value.payload.messageId === "string"
         && typeof value.payload.text === "string"
+        && isOptionalBoolean(value.payload.pending)
         && isOptionalInputItems(value.payload.items);
     case "turn.started":
       return hasNotificationBase(value)
@@ -185,7 +187,9 @@ export function isThreadNotification(value: unknown): value is ThreadNotificatio
         && typeof value.turnId === "string"
         && typeof value.itemId === "string"
         && isRecord(value.payload)
-        && typeof value.payload.text === "string";
+        && typeof value.payload.text === "string"
+        && isOptionalReplies(value.payload.suggestedReplies)
+        && isOptionalBoolean(value.payload.awaitingReply);
     case "tool.started":
       return hasNotificationBase(value)
         && hasThreadId(value)
@@ -231,6 +235,8 @@ export function isThreadNotification(value: unknown): value is ThreadNotificatio
         && isOptionalString(value.commandId)
         && Array.isArray(value.payload.workspaces)
         && value.payload.workspaces.every(isWorkspaceListEntry);
+    case "request.resolved":
+      return hasNotificationBase(value) && hasThreadId(value) && isRecord(value.payload) && typeof value.payload.requestId === "string";
     case "thread.error":
       return hasNotificationBase(value)
         && isRecord(value.payload)
@@ -302,6 +308,9 @@ function isConversationMessage(value: unknown): boolean {
     && isConversationMessageRole(value.role)
     && typeof value.text === "string"
     && isOptionalInputItems(value.inputItems)
+    && isOptionalBoolean(value.pending)
+    && isOptionalReplies(value.suggestedReplies)
+    && isOptionalBoolean(value.awaitingReply)
     && isConversationMessageStatus(value.status)
     && typeof value.createdAt === "string"
     && typeof value.updatedAt === "string"
@@ -344,7 +353,9 @@ function isInputItem(value: unknown): value is InputItem {
       return typeof value.text === "string";
     case "image":
       return (value.mimeType === "image/png" || value.mimeType === "image/jpeg" || value.mimeType === "image/webp")
-        && typeof value.base64 === "string";
+        && isBinaryInputSource(value);
+    case "pdf":
+      return value.mimeType === "application/pdf" && typeof value.name === "string" && isBinaryInputSource(value);
     case "skill":
       return typeof value.actionId === "string"
         && typeof value.title === "string"
@@ -352,6 +363,16 @@ function isInputItem(value: unknown): value is InputItem {
     default:
       return false;
   }
+}
+
+function isBinaryInputSource(value: Record<string, unknown>): boolean {
+  return (typeof value.base64 === "string" && value.blobId === undefined)
+    || (typeof value.blobId === "string" && /^blob-[A-Za-z0-9-]+$/.test(value.blobId) && value.base64 === undefined);
+}
+
+function isOptionalBoolean(value: unknown): boolean { return value === undefined || typeof value === "boolean"; }
+function isOptionalReplies(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.length <= 4 && value.every((item) => typeof item === "string"));
 }
 
 function isWorkspaceListEntry(value: unknown): boolean {

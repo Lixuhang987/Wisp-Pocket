@@ -10,7 +10,7 @@ type MainWorldScript = {
 };
 
 type ActivityWindowGlobals = {
-  handAgentActivityWindowConfig?: { activityWebSocketURL?: string };
+  handAgentActivityWindowConfig?: { threadWebSocketURL?: string };
   handAgentTheme?: HostTheme;
   handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
 };
@@ -25,10 +25,10 @@ describe("activityWindowPreload", () => {
     vi.resetModules();
     delete nodeRequire.cache[preloadPath];
     delete (globalThis as { window?: ActivityWindowGlobals }).window;
-    process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-theme="));
+    process.argv = process.argv.filter((arg) => !arg.startsWith("--handagent-theme=") && !arg.startsWith("--handagent-pet-thread-websocket-url="));
   });
 
-  it("installs activity window config in the renderer main world", async () => {
+  it("installs the pet Thread endpoint in the renderer main world", async () => {
     const contextBridge = {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
@@ -45,10 +45,23 @@ describe("activityWindowPreload", () => {
 
     script.func(...script.args);
 
-    expect(mainWorld.handAgentActivityWindowConfig?.activityWebSocketURL).toBe(
-      "ws://127.0.0.1:4317/api/activity",
+    expect(mainWorld.handAgentActivityWindowConfig?.threadWebSocketURL).toBe(
+      "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1",
     );
     expect(mainWorld.handAgentTheme).toEqual({ preference: "system", resolved: "light" });
+  });
+
+  it("accepts a loopback Thread endpoint for isolated native QA", () => {
+    process.argv.push(`--handagent-pet-thread-websocket-url=${encodeURIComponent("ws://127.0.0.1:5321/api/thread")}`);
+    const contextBridge = { executeInMainWorld: vi.fn(), exposeInMainWorld: vi.fn() };
+    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => nodeRequire(preloadPath));
+    const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
+    const mainWorld: ActivityWindowGlobals = {};
+    (globalThis as { window?: ActivityWindowGlobals }).window = mainWorld;
+    script.func(...script.args);
+    expect(mainWorld.handAgentActivityWindowConfig?.threadWebSocketURL).toBe(
+      "ws://127.0.0.1:5321/api/thread?acceptServerRequests=1",
+    );
   });
 
   it("reads the initial host theme from additional arguments", async () => {
@@ -120,25 +133,6 @@ describe("activityWindowPreload", () => {
     expect(handler).toHaveBeenCalledWith({ preference: "dark", resolved: "dark" });
   });
 
-  it("exposes a focusThread bridge that sends focus requests to main", async () => {
-    const contextBridge = {
-      executeInMainWorld: vi.fn(),
-      exposeInMainWorld: vi.fn(),
-    };
-    const ipcRenderer = createIpcRendererMock();
-    withElectronMock({ contextBridge, ipcRenderer }, () => {
-      nodeRequire(preloadPath);
-    });
-
-    const [name, api] = contextBridge.exposeInMainWorld.mock.calls.find(([exposedName]) => exposedName === "handAgentActivityWindow") ?? [];
-    expect(name).toBe("handAgentActivityWindow");
-
-    (api as { focusThread(threadId: string | null): void }).focusThread("thread-1");
-    (api as { focusThread(threadId: string | null): void }).focusThread(null);
-
-    expect(ipcRenderer.send).toHaveBeenCalledWith("activity-window:focus-thread", "thread-1");
-    expect(ipcRenderer.send).toHaveBeenCalledWith("activity-window:focus-thread", null);
-  });
 });
 
 function createIpcRendererMock() {

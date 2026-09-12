@@ -12,8 +12,8 @@
 
 | 路径 | 消费方 | 内容 |
 | --- | --- | --- |
-| `/api/thread` | React、Swift 窄口径 client | ThreadCommand、ThreadNotification、ServerRequest、ClientResponse |
-| `/api/activity` | StatusBubble | Agent Activity |
+| `/api/thread` | ThreadWindow、桌宠、Swift 窄口径 client | ThreadCommand、ThreadNotification、ServerRequest、ClientResponse |
+| `/api/activity` | 轻量状态订阅者 | Agent Activity |
 | `/api/dynamic-tools` | Swift Host / Provider | Dynamic Tool 注册与调用 |
 
 三条通道语义隔离；不要用 Dynamic Tool 通道承载 UI 请求，也不要在 Activity 中复制 Thread 内容。
@@ -24,6 +24,7 @@
 - ThreadRegistry / Thread 是运行中及空闲 Thread 的唯一 owner；外部输入统一经 `op.submit`，UI 回执在 server 内包装为内部 Op。
 - core runtime event 先在本包翻译成协议通知和审计，再发布或落盘；UI 不直接看到 runtime event。
 - Dynamic Tool spec 可随 Thread 持久化，实际调用按 `clientId` 转发给在线 Provider。
+- 主动拖入先保存 Input Item 与 Blob 副本，再经读取 adapter 取得正文；建议等待与执行阶段由 core 区分，接口与恢复边界见 `src/`。
 
 ## 本地数据
 
@@ -35,6 +36,6 @@
 ## 验证
 
 ```bash
-pnpm --filter handagent-agent-server test
+pnpm exec vitest run apps/agent-server/tests
 bash ./scripts/test.sh
 ```

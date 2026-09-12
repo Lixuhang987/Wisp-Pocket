@@ -173,7 +173,7 @@ describe("AgentRuntime", () => {
     ]);
     expect(result.messages).toEqual([
       { role: "user", content: "执行一个流程，使用两个tool调用" },
-      { role: "assistant", content: "ok" },
+      { role: "assistant", id: "assistant-1", content: "ok" },
     ]);
   });
 
@@ -237,6 +237,7 @@ describe("AgentRuntime", () => {
 
     expect(result.messages.at(-1)).toEqual({
       role: "assistant",
+      id: expect.any(String),
       content: "done",
     });
     expect(result).not.toHaveProperty("bubbles");
@@ -351,6 +352,7 @@ describe("AgentRuntime", () => {
     expect(seenTurns[1].slice(-3)).toEqual([
       {
         role: "assistant",
+        id: "assistant-1",
         content: "我会读取workspace 和文件。",
         toolCalls,
       },
@@ -429,6 +431,7 @@ describe("AgentRuntime", () => {
     ]);
     expect(result.messages.at(-1)).toEqual({
       role: "assistant",
+      id: expect.any(String),
       content: "两个 tool 都已完成。",
     });
   });
@@ -610,6 +613,7 @@ describe("AgentRuntime", () => {
     ]);
     expect(result.messages.at(-1)).toEqual({
       role: "assistant",
+      id: expect.any(String),
       content: "这是真流式",
     });
     expect(result).not.toHaveProperty("bubbles");
@@ -706,6 +710,7 @@ describe("AgentRuntime", () => {
       ...initialMessages,
       {
         role: "assistant",
+        id: "assistant-1",
         content: "先调用工具",
         toolCalls: firstToolCalls,
       },
@@ -722,6 +727,7 @@ describe("AgentRuntime", () => {
     ]);
     expect(result.messages[2]).toEqual({
       role: "assistant",
+      id: "assistant-1",
       content: "先调用工具",
       toolCalls: firstToolCalls,
     });
@@ -789,6 +795,7 @@ describe("AgentRuntime", () => {
     ]);
     expect(result.messages.at(-1)).toEqual({
       role: "assistant",
+      id: expect.any(String),
       content: "工具已完成",
     });
     expect(result).not.toHaveProperty("bubbles");
@@ -915,6 +922,7 @@ describe("AgentRuntime", () => {
 
     expect(result.messages.at(-1)).toEqual({
       role: "assistant",
+      id: expect.any(String),
       content: "tools are ready",
     });
   });

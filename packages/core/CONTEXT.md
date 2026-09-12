@@ -17,7 +17,7 @@ _Avoid_: Response、Run（指代 Thread 内处理周期时）
 _Avoid_: Prompt（指代完整结构化提交时）
 
 **Input Item**:
-`UserInput` 中一个有类型的内容单元，例如文本、图片、Append Prompt 或文本选区。
+`UserInput` 中一个有类型的内容单元，例如文本、图片、PDF、Append Prompt 或文本选区。
 _Avoid_: Attachment（泛指所有 Input Item 时）
 
 **Op**:

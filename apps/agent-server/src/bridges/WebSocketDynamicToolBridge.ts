@@ -3,6 +3,7 @@ import type {
   DynamicToolCallRequestPayload,
   DynamicToolCallResponsePayload,
   DynamicToolProviderMessage,
+  DynamicToolSpec,
 } from "@handagent/core/protocol/types/DynamicTool.ts";
 
 type ProviderToken = number;
@@ -11,6 +12,7 @@ type Provider = {
   clientId: string;
   token: ProviderToken;
   send: Send;
+  tools: DynamicToolSpec[];
 };
 
 type Pending = {
@@ -42,15 +44,19 @@ export class WebSocketDynamicToolBridge implements DynamicToolBridge {
   private readonly pending = new Map<string, Pending>();
   private nextToken = 0;
 
-  attach(clientId: string, send: Send): ProviderToken {
+  attach(clientId: string, send: Send, tools: DynamicToolSpec[] = []): ProviderToken {
     const previous = this.providers.get(clientId);
     if (previous) {
       this.failPendingForToken(previous.token, "provider replaced");
     }
 
     const token = ++this.nextToken;
-    this.providers.set(clientId, { clientId, token, send });
+    this.providers.set(clientId, { clientId, token, send, tools: structuredClone(tools.filter((tool) => tool.clientId === clientId)) });
     return token;
+  }
+
+  availableTools(): DynamicToolSpec[] {
+    return structuredClone([...this.providers.values()].flatMap((provider) => provider.tools));
   }
 
   detach(token: ProviderToken, reason = "provider disconnected"): void {

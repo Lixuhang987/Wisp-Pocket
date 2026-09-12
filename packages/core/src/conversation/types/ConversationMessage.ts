@@ -9,6 +9,9 @@ export type ConversationMessage = {
   role: "user" | "assistant" | "tool" | "system";
   text: string;
   inputItems?: InputItem[];
+  pending?: boolean;
+  suggestedReplies?: string[];
+  awaitingReply?: boolean;
   status: ConversationMessageStatus;
   createdAt: string;
   updatedAt: string;

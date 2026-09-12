@@ -11,6 +11,7 @@ Wisp Pocket 是本地 AI agent 桌面工具，界面应安静、高效、适合�
 ## Token 边界
 
 - 运行时 token 源是 `design/tokens.json`，Swift / React 主题适配层都应从生成结果取值。
+- `generate-theme-tokens.mjs` 为 Web 同时生成 Tailwind 声明和普通 CSS 的 `--ha-*` 变量；桌宠直接导入生成样式，不能复制 token 值或手改生成文件。
 - 组件内不要内联 hex、rgba 或孤立字号；确需新增视觉常量时先判断它是否应该成为 token。
 - 暗色 surface 不是亮色 surface 的机械反转：canvas 是地表，输入框和 tool 面板更深，浮层更亮。
 - 语义状态色亮暗一致；不要为 dark mode 另造 success / warning / error / teal / amber 变体。
@@ -27,8 +28,15 @@ Wisp Pocket 是本地 AI agent 桌面工具，界面应安静、高效、适合�
 - 主按钮只用于最重要的提交 / 新建 / 允许动作；次要动作使用弱表面、边框或文字按钮。
 - 图标按钮用于工具栏、关闭、删除、更多操作等熟悉命令；需要说明时用 tooltip，不在界面堆长解释。
 - 普通列表项和卡片不加阴影；阴影只用于真正浮动的 PromptPanel、Composer 或弹窗。
-- User 消息使用右对齐气泡；Assistant 消息直接排在画布上；Tool 输出使用更紧凑的可折叠块。
+- ThreadWindow 的 User 消息使用右对齐气泡，Assistant 消息排在画布上，Tool 输出使用紧凑的可折叠块。
 - 详细说明默认收进 `?` 提示，页面上只保留短标题、必要状态和可操作控件。
+
+## 桌宠角色表面
+
+- 桌宠保留月见八千代图集的角色色彩；气泡与控件继续使用共享设计 token，主题由宿主解析后下发。
+- 角色在气泡下方。常态只展示最新 assistant 消息，展开后使用左桌宠、右用户的气泡，历史可滚动，回复框保持可用。
+- 拖入高亮表达最终松手动作，普通后台消息不解除主动隐藏；动画尊重 reduced motion。
+- 图集播放合约与透明窗口布局由[桌宠模块](./apps/electron-shell/src/activity-window/activity-window.md)维护。
 
 ## 禁止项
 

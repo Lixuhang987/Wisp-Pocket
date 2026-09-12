@@ -10,6 +10,8 @@ import type {
 import type { InputItem } from '../protocol/threadProtocol.ts';
 import { cn } from '../utils/cn.ts';
 import { TypingIndicator } from './TypingIndicator.tsx';
+import { getThreadWebSocketURL } from '../native/nativeConfig.ts';
+import { attachmentUrl } from '../thread/attachmentUrl.ts';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -19,13 +21,14 @@ interface ThreadItemBubbleProps {
   item: ThreadItem;
   onCopy: (text: string) => void;
   isRunning?: boolean;
+  onRespond?: (text: string) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
-export function ThreadItemBubble({ item, onCopy, isRunning = false }: ThreadItemBubbleProps) {
+export function ThreadItemBubble({ item, onCopy, isRunning = false, onRespond }: ThreadItemBubbleProps) {
   switch (item.type) {
     case "tool_call":
       return <ToolCallBubble item={item} onCopy={onCopy} />;
@@ -33,7 +36,7 @@ export function ThreadItemBubble({ item, onCopy, isRunning = false }: ThreadItem
       return <UserMessageBubble item={item} onCopy={onCopy} />;
     case "assistant_message":
       if (!item.text && !isRunning) return null;
-      return <AssistantMessageBubble item={item} onCopy={onCopy} isRunning={isRunning} />;
+      return <AssistantMessageBubble item={item} onCopy={onCopy} isRunning={isRunning} onRespond={onRespond} />;
     case "error":
       return <ErrorBubble item={item} />;
   }
@@ -195,6 +198,11 @@ function UserMessageBubble({ item, onCopy }: { item: UserMessageItem; onCopy: (t
                   {sections.text}
                 </p>
               ) : null}
+              {sections.pdfs.map((pdf) => (
+                <div key={pdf.id} className="rounded-lg border border-app-hairline bg-app-surface-muted px-sm py-xs text-sm">
+                  PDF · {pdf.name}
+                </div>
+              ))}
             </div>
           ) : (
             <p className="m-0 whitespace-pre-wrap break-words text-[15px] leading-[1.6] text-app-text-primary">
@@ -203,7 +211,7 @@ function UserMessageBubble({ item, onCopy }: { item: UserMessageItem; onCopy: (t
           )}
           {item.pending && (
             <small className="mt-xs block text-xs text-app-text-secondary">
-              处理中...
+              待处理
             </small>
           )}
         </div>
@@ -243,7 +251,7 @@ function UserMessageBubble({ item, onCopy }: { item: UserMessageItem; onCopy: (t
 // AssistantMessageBubble
 // ---------------------------------------------------------------------------
 
-function AssistantMessageBubble({ item, onCopy, isRunning }: { item: AssistantMessageItem; onCopy: (text: string) => void; isRunning: boolean }) {
+function AssistantMessageBubble({ item, onCopy, isRunning, onRespond }: { item: AssistantMessageItem; onCopy: (text: string) => void; isRunning: boolean; onRespond?: (text: string) => void }) {
   const handleCopy = () => {
     navigator.clipboard.writeText(item.text);
     onCopy(item.text);
@@ -257,6 +265,16 @@ function AssistantMessageBubble({ item, onCopy, isRunning }: { item: AssistantMe
             {item.text}
           </p>
           {isRunning && <TypingIndicator />}
+          {item.awaitingReply && onRespond && !!item.suggestedReplies?.length && (
+            <div className="mt-sm flex flex-wrap gap-xs">
+              {item.suggestedReplies.map((reply) => (
+                <button key={reply} type="button" onClick={() => onRespond(reply)}
+                  className="rounded-lg border border-app-hairline bg-app-surface px-sm py-xs text-sm text-app-accent transition-colors hover:bg-app-surface-soft focus:outline-none focus:ring-4 focus:ring-app-accent-ring">
+                  {reply}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-xs flex h-8 items-center gap-xs px-xs">
@@ -310,6 +328,7 @@ function ErrorBubble({ item }: { item: ErrorItem }) {
 
 function splitUserMessageSections(items: InputItem[]): {
   images: Array<{ id: string; previewUrl: string }>;
+  pdfs: Array<{ id: string; name: string }>;
   chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }>;
   text: string | null;
 } | null {
@@ -318,12 +337,16 @@ function splitUserMessageSections(items: InputItem[]): {
   }
 
   const images: Array<{ id: string; previewUrl: string }> = [];
+  const pdfs: Array<{ id: string; name: string }> = [];
   const chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }> = [];
   const textParts: string[] = [];
 
   for (const item of items) {
     if (item.type === "image") {
-      images.push({ id: item.id, previewUrl: `data:${item.mimeType};base64,${item.base64}` });
+      const url = typeof window === "undefined" ? "ws://127.0.0.1:4317/api/thread" : getThreadWebSocketURL();
+      images.push({ id: item.id, previewUrl: attachmentUrl(item, url) });
+    } else if (item.type === "pdf") {
+      pdfs.push({ id: item.id, name: item.name });
     } else if (item.type === "skill") {
       chips.push({ id: item.id, type: "skill", label: item.title });
     } else if (item.type === "text_selection") {
@@ -335,6 +358,7 @@ function splitUserMessageSections(items: InputItem[]): {
 
   return {
     images,
+    pdfs,
     chips,
     text: textParts.length > 0 ? textParts.join("\n\n") : null,
   };

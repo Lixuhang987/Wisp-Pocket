@@ -99,6 +99,10 @@ function buildCss(tokens) {
 ${cssThemeVariables(tokens)}
 }
 
+:root {
+${cssNativeRendererVariables(tokens)}
+}
+
 :root[data-theme="light"] {
 ${cssColorVariables(tokens.color.light)}
 }
@@ -152,6 +156,12 @@ function cssThemeVariables(tokens) {
   const shadowLines = Object.entries(tokens.shadow)
     .map(([key, value]) => `  --shadow-${kebab(key)}: ${value};`);
   return [...colorLines, ...spacingLines, ...radiusLines, ...fontLines, ...shadowLines].join("\n");
+}
+
+function cssNativeRendererVariables(tokens) {
+  const groups = { spacing: tokens.spacing, radius: tokens.radius, shadow: tokens.shadow, typography: tokens.typography };
+  return Object.entries(groups).flatMap(([group, values]) => Object.entries(values)
+    .map(([key, value]) => `  --ha-${group}-${kebab(key)}: ${value};`)).join("\n");
 }
 
 function cssColorVariables(colors) {

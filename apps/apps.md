@@ -5,8 +5,8 @@
 ## 直接子节点
 
 - [desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md)：Swift Host，拥有 macOS 生命周期、PromptPanel、Settings 和宿主能力。
-- [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md)：Electron UI Shell 与 agent-server supervisor。
-- [thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：React ThreadWindow。
+- [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md)：Electron UI Shell、桌宠与 agent-server supervisor。
+- [thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：React ThreadWindow 与两界面共用的 Thread 客户端。
 - [agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：Conversation Runtime 的本地服务组合根。
 - [builtin-plugins/builtin-plugins.md](/Users/mu9/proj/handAgent/apps/builtin-plugins/builtin-plugins.md)：官方 Host Automation Plugin。
 - [chrome-bookmarks-extension/chrome-bookmarks-extension.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-extension/chrome-bookmarks-extension.md)：Chrome 书签事件采集端。
@@ -16,5 +16,5 @@
 
 - apps 可以组合 packages；packages 不反向依赖 apps。
 - Swift Host 拥有系统集成和瞬时原生 UI；Electron UI Shell 拥有常驻 UI 和后台服务生命周期。
-- React ThreadWindow 直接消费 `/api/thread`；Electron main 与 Swift 不保存其消息状态。
+- React ThreadWindow 与桌宠直接消费 `/api/thread`，各持 UI 投影；Electron main 与 Swift 不保存消息状态。
 - agent-server 负责适配协议、持久化和 provider，不把 Node 或 WebSocket 细节下沉到 core。

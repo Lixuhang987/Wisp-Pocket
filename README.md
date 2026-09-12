@@ -16,6 +16,12 @@ Wisp Pocket 是一个 macOS 桌面 AI Agent 运行时。全局热键唤起 Promp
 
 ThreadWindow 展示完整对话流，包括 assistant 回复、工具调用过程与权限审批。支持历史侧栏和后台 thread 管理。
 
+### 桌宠轻量对话
+
+月见八千代桌宠可接收文本、链接、图片和 PDF：拖到角色上新建 Thread，拖到气泡或展开历史上追加当前 Thread。内容保存后自动读取并提出建议，点击建议或自由回复后继续；图片与 PDF 保存本地副本。桌宠和 ThreadWindow 共用历史。
+
+启动只显示角色；悬停气泡可查看历史并回复。桌宠位置可拖动并保存，气泡可主动隐藏。macOS 跨应用拖放、焦点和透明窗口行为仍需按手工清单验收。
+
 ### Append Prompt 与 MCP 扩展
 
 通过本地 manifest 定义 Append Prompt，通过 MCP 协议接入外部工具。PromptPanel 中选中的 Append Prompt 会作为 chip 附加到输入。

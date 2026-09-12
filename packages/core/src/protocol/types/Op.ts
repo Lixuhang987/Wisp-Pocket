@@ -5,6 +5,8 @@ export type Op = RuntimeOp | ClientResponseOp;
 
 export type UserInput = {
   items: InputItem[];
+  /** Dragged material is authorized for inspection, never for executing its instructions. */
+  mode?: "inspect";
 };
 
 export type UserInputOp = {
@@ -35,6 +37,7 @@ export type ClientResponseOp = {
 export type InputItem =
   | TextInputItem
   | ImageInputItem
+  | PDFInputItem
   | SkillInputItem
   | TextSelectionInputItem;
 
@@ -44,12 +47,23 @@ export type TextInputItem = {
   text: string;
 };
 
+export type BinaryInputSource =
+  | { base64: string; blobId?: never }
+  | { blobId: string; base64?: never };
+
 export type ImageInputItem = {
   type: "image";
   id: string;
   mimeType: "image/png" | "image/jpeg" | "image/webp";
-  base64: string;
-};
+  name?: string;
+} & BinaryInputSource;
+
+export type PDFInputItem = {
+  type: "pdf";
+  id: string;
+  mimeType: "application/pdf";
+  name: string;
+} & BinaryInputSource;
 
 export type SkillInputItem = {
   type: "skill";

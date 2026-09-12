@@ -1,4 +1,5 @@
 import type { ConversationMessage } from "../../conversation/types/ConversationMessage.ts";
+import type { ServerRequest } from "./ServerRequest.ts";
 
 export type RunStatus = "idle" | "running" | "failed" | "interrupted";
 
@@ -38,4 +39,5 @@ export type WorkspaceAskCandidate = {
 export type ThreadSnapshotPayload = {
   messages: ConversationMessage[];
   status: RunStatus;
+  pendingRequests?: ServerRequest[];
 };

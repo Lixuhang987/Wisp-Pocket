@@ -16,14 +16,19 @@ export type AgentUserContent = string | Array<AgentTextContentPart | AgentImageC
 
 export type UserAgentMessage = {
   role: "user";
+  id?: string;
   content: AgentUserContent;
   inputItems?: InputItem[];
+  inputMode?: "inspect";
 };
 
 export type AssistantAgentMessage = {
   role: "assistant";
+  id?: string;
   content: string;
   toolCalls?: ToolCallEnvelope[];
+  suggestedReplies?: string[];
+  awaitingReply?: boolean;
 };
 
 export type ToolAgentMessage = {

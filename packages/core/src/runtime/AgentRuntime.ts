@@ -21,6 +21,7 @@ import {
 } from "../tools/MetaToolUseTool.ts";
 
 import type { AgentRunResult, AssistantMessageStartEvent, AssistantMessageDeltaEvent, AssistantMessageEndEvent, ToolCallEvent, ToolResultEvent, PermissionDecisionEvent, RuntimeErrorEvent, AgentRuntimeEvent, AgentRuntimeRunOptions, AgentRuntimeEventSink, ToolExecutionResult } from "./types/AgentRuntime.ts";
+import { USER_QUESTION_TOOL_NAME, userQuestionTool, userQuestionSchema, INSPECT_INPUT_PROMPT, FOLLOW_UP_PROMPT } from "./UserQuestion.ts";
 export type { AgentRunResult, AssistantMessageStartEvent, AssistantMessageDeltaEvent, AssistantMessageEndEvent, ToolCallEvent, ToolResultEvent, PermissionDecisionEvent, RuntimeErrorEvent, AgentRuntimeEvent, AgentRuntimeRunOptions } from "./types/AgentRuntime.ts";
 
 export class AgentRuntime {
@@ -97,6 +98,25 @@ export class AgentRuntime {
       }
 
       for (const toolCall of toolCalls) {
+        if (runOptions.interactionMode && toolCall.name === USER_QUESTION_TOOL_NAME) {
+          const question = userQuestionSchema.safeParse(toolCall.arguments);
+          if (!question.success) {
+            nextMessages.push({ role: "tool", toolCallId: toolCall.id, name: toolCall.name, content: "询问需要 message 和 suggestedReplies，请修正参数。" });
+            continue;
+          }
+          // Resolve the tool-call envelope, then present one ordinary assistant message.
+          // Finishing this Turn makes any later plain user input an immediate answer.
+          for (const pending of toolCalls.slice(toolCalls.indexOf(toolCall))) {
+            nextMessages.push({ role: "tool", toolCallId: pending.id, name: pending.name, content: "等待用户下一条消息，尚未执行任何建议。" });
+          }
+          const id = `question-${toolCall.id}`;
+          const message = { role: "assistant" as const, id, content: question.data.message,
+            suggestedReplies: question.data.suggestedReplies, awaitingReply: true };
+          nextMessages.push(message);
+          onEvent({ type: "assistant_message_delta", messageId: id,
+            payload: { text: message.content, suggestedReplies: message.suggestedReplies, awaitingReply: true } });
+          return { messages: nextMessages };
+        }
         await this.handleToolCall({
           toolCall,
           messages: nextMessages,
@@ -117,6 +137,12 @@ export class AgentRuntime {
   }): Promise<void> {
     const { toolCall, messages, onEvent, runOptions } = input;
     throwIfAborted(runOptions.signal);
+
+    if (runOptions.interactionMode === "inspect") {
+      messages.push({ role: "tool", toolCallId: toolCall.id, name: toolCall.name,
+        content: "当前仅获准读取拖入资料并提出建议。请使用 user.ask，等待用户明确回复后再执行。" });
+      return;
+    }
 
     const tool = this.toolRegistry.get(toolCall.name);
     if (!tool) {
@@ -313,11 +339,14 @@ export class AgentRuntime {
     const messageId = `assistant-${assistantCount}`;
     let content = "";
     const toolCalls: ToolCallEnvelope[] = [];
-    const tools = this.toolRegistry.list();
+    const tools = runOptions.interactionMode === "inspect" ? [userQuestionTool]
+      : [...this.toolRegistry.list(), ...(runOptions.interactionMode ? [userQuestionTool] : [])];
     const llmMessages = await buildSystemPromptMessages({
       sections: this.systemPromptSections,
       context: { tools },
-      messages,
+      messages: runOptions.interactionMode
+        ? [{ role: "system", content: runOptions.interactionMode === "inspect" ? INSPECT_INPUT_PROMPT : FOLLOW_UP_PROMPT }, ...messages]
+        : messages,
     });
 
     throwIfAborted(runOptions.signal);
@@ -378,7 +407,7 @@ export class AgentRuntime {
     });
 
     return {
-      message: { role: "assistant", content },
+      message: { role: "assistant", id: messageId, content },
       toolCalls,
     };
   }

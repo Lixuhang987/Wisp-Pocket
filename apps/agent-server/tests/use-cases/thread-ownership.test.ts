@@ -184,7 +184,7 @@ it("queues inputs during execution, preserves their order and isolates other Thr
     await a.submit(input("second")); await a.submit(input("third"));
     await b.submit(input("other")); await wait(() => expect(b.status).toBe("idle"));
     gate.resolve(); await wait(() => expect(a.status).toBe("idle"));
-    expect(a.snapshot().messages.map((message) => message.text)).toEqual(["first", "reply:first", "second", "third", "reply:third"]);
+    expect(a.snapshot().messages.map((message) => message.text)).toEqual(["first", "second", "third", "reply:first", "reply:second", "reply:third"]);
     expect(b.snapshot().messages.map((message) => message.text)).toEqual(["other", "reply:other"]);
   } finally { gate.resolve(); await h.close(); }
 });

@@ -8,7 +8,7 @@ import type {
   ThreadErrorNotification,
 } from "@handagent/core/protocol/types/ThreadNotification.ts";
 import type { ThreadAttachment, ImageAttachment } from "@handagent/core/protocol/types/ThreadProtocolShared.ts";
-import type { UserInput } from "@handagent/core/protocol/types/Op.ts";
+import type { InputItem, UserInput } from "@handagent/core/protocol/types/Op.ts";
 import type { ConversationMessage } from "@handagent/core/conversation/types/ConversationMessage.ts";
 import type { ThreadAuditEvent } from "@handagent/thread-store/index.ts";
 import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
@@ -42,7 +42,7 @@ export function toThreadNotification(
         turnId,
         itemId: `${threadId}-${turnId}-${event.messageId}`,
         timestamp,
-        payload: { text: event.payload.text },
+        payload: { ...event.payload },
       };
     case "tool_call":
       return {
@@ -159,8 +159,10 @@ export function toAuditEvent(event: AgentRuntimeEvent, timestamp: string): Threa
 }
 
 export function agentMessagesToConversation(messages: AgentMessage[]): ConversationMessage[] {
+  const latestUser = messages.findLastIndex((message) => message.role === "user");
+  const latestAssistant = messages.findLastIndex((message) => message.role === "assistant" && !!message.content.trim());
   return messages.map((msg, idx) => {
-    const id = `msg-${idx}`;
+    const id = ("id" in msg ? msg.id : undefined) ?? `msg-${idx}`;
     const now = new Date(0).toISOString();
     if (msg.role === "tool") {
       return {
@@ -176,8 +178,12 @@ export function agentMessagesToConversation(messages: AgentMessage[]): Conversat
     return {
       id,
       role: msg.role,
-      text: typeof msg.content === "string" ? msg.content : "",
+      text: msg.role === "user" && msg.inputItems
+        ? summarizeUserInput({ items: msg.inputItems })
+        : typeof msg.content === "string" ? msg.content : "",
       ...(msg.role === "user" && msg.inputItems ? { inputItems: msg.inputItems } : {}),
+      ...(msg.role === "assistant" && msg.suggestedReplies ? { suggestedReplies: msg.suggestedReplies } : {}),
+      ...(msg.role === "assistant" && msg.awaitingReply && idx === latestAssistant && idx > latestUser ? { awaitingReply: true } : {}),
       status: "completed",
       createdAt: now,
       updatedAt: now,
@@ -245,12 +251,14 @@ export async function composeUserInputContent(
       case "text_selection":
         if (item.text.length > 0) parts.push(`[选区]\n${item.text}`);
         break;
-      case "image": {
-        const record = await blobStore.put({
-          kind: "image",
-          bytes: Buffer.from(item.base64, "base64"),
-          extension: imageExtension(item.mimeType),
-        });
+      case "image":
+      case "pdf": {
+        const record = item.blobId
+          ? await blobStore.get(item.blobId)
+          : await blobStore.put({ kind: item.type, bytes: Buffer.from(item.base64!, "base64"),
+            extension: item.type === "pdf" ? "pdf" : imageExtension(item.mimeType) });
+        if (!record) throw new Error(`附件副本不存在：${item.name ?? item.id}`);
+        if (item.type === "pdf") parts.push(`PDF：${item.name}`);
         parts.push(renderStub({
           id: record.id,
           kind: record.kind,
@@ -264,6 +272,28 @@ export async function composeUserInputContent(
   return parts.join("\n\n");
 }
 
+/** The history and every renderer refer to the saved copy, never the original file. */
+export async function storeUserInput(input: UserInput, blobStore: BlobStore): Promise<UserInput> {
+  const items: InputItem[] = [];
+  for (const item of input.items) {
+    if (item.type !== "image" && item.type !== "pdf") { items.push({ ...item }); continue; }
+    if (item.blobId) {
+      if (!/^blob-[a-zA-Z0-9-]+$/.test(item.blobId)) throw new Error("无效的附件引用");
+      const record = await blobStore.get(item.blobId);
+      if (!record || record.kind !== item.type) throw new Error(`附件副本不存在：${item.name ?? item.id}`);
+      items.push({ ...item });
+      continue;
+    }
+    const record = await blobStore.put({
+      kind: item.type, bytes: Buffer.from(item.base64!, "base64"),
+      extension: item.type === "pdf" ? "pdf" : imageExtension(item.mimeType),
+    });
+    const { base64: _bytes, ...metadata } = item;
+    items.push({ ...metadata, blobId: record.id } as InputItem);
+  }
+  return { items, ...(input.mode ? { mode: input.mode } : {}) };
+}
+
 export function summarizeUserInput(userInput: UserInput): string {
   const parts = userInput.items.map((item) => {
     switch (item.type) {
@@ -274,7 +304,9 @@ export function summarizeUserInput(userInput: UserInput): string {
       case "text_selection":
         return `[选区]\n${item.text}`;
       case "image":
-        return "图片附件";
+        return item.name ?? "图片附件";
+      case "pdf":
+        return `PDF：${item.name}`;
     }
   }).filter((part) => part.trim().length > 0);
   return parts.join("\n\n");

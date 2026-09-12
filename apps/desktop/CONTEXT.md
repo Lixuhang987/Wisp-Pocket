@@ -20,22 +20,19 @@ _Avoid_: Prompt Window、ThreadWindow
 展示 Thread 历史、运行状态、请求和后续输入的常驻工作界面。
 _Avoid_: Chat Window、Conversation Window、PromptPanel
 
-**StatusBubble**:
-显示 Agent Activity 并聚焦已有 ThreadWindow 的轻量状态界面。
-_Avoid_: ActivityWindow（指代用户可见界面时）
+**桌宠**:
+Wisp Pocket 的常驻轻量交互界面，以月见八千代形象接收主动拖入、展示 Thread 并承接回复。
+_Avoid_: Wisp（指代桌宠时）、StatusBubble、ActivityWindow（指代用户可见界面时）
 
 ## 产品命名
 
 **Wisp Pocket**:
 本产品的名称。它包含 PromptPanel、ThreadWindow、常驻桌面交互和宿主自动化能力。
 
-**桌宠**:
-Wisp Pocket 的常驻轻量交互界面，当前使用月见八千代形象；它不是产品名称，也不称为“Wisp”。
-
 ## Input
 
 **Attachment**:
-用户在提交前主动选择并确认的上下文内容，例如文本选区或图片；它不是环境的默认快照。
+用户主动选择并交付的上下文内容，例如文本选区、图片或 PDF；它不是环境的默认快照。
 _Avoid_: Ambient Context、Tool Result
 
 **Append Prompt**:

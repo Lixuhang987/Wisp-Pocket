@@ -16,9 +16,11 @@ import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import type { MCPServerConfig, StdioMCPServerConfig, StreamableHttpMCPServerConfig } from "@handagent/core/mcp/MCPConfig.ts";
 import { parseMCPConfig } from "@handagent/core/mcp/MCPConfig.ts";
 import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
+import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
 import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
 import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
 import { ThreadPersistence } from "../thread/ThreadPersistence.ts";
+import { DroppedInputReader } from "../thread/DroppedInputReader.ts";
 import { ThreadRegistry } from "@handagent/core/thread/ThreadRegistry.ts";
 import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
 import * as projection from "../protocol/MessageTranslator.ts";
@@ -103,7 +105,7 @@ export function attachDynamicToolSocketHandlers(
     }
 
     if (message.type === "provider_hello" && bridge) {
-      providerToken = bridge.attach(message.clientId, sendDynamicToolMessage);
+      providerToken = bridge.attach(message.clientId, sendDynamicToolMessage, message.tools);
     } else if (message.type === "tool_call_response") {
       bridge?.handleResponse(message.payload, providerToken);
     }
@@ -158,7 +160,12 @@ function parseSocketMessage(raw: { toString(): string }): unknown {
   }
 }
 
-const InputItemSchema = z.discriminatedUnion("type", [
+const BinaryInputSourceSchema = z.union([
+  z.object({ base64: z.string().max(40 * 1024 * 1024).regex(/^[A-Za-z0-9+/]*={0,2}$/), blobId: z.never().optional() }),
+  z.object({ blobId: z.string().regex(/^blob-[A-Za-z0-9-]+$/), base64: z.never().optional() }),
+]);
+
+const InputItemSchema = z.union([
   z.object({
     type: z.literal("text"),
     id: z.string(),
@@ -173,8 +180,11 @@ const InputItemSchema = z.discriminatedUnion("type", [
     type: z.literal("image"),
     id: z.string(),
     mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
-    base64: z.string(),
-  }),
+    name: z.string().optional(),
+  }).and(BinaryInputSourceSchema),
+  z.object({
+    type: z.literal("pdf"), id: z.string(), mimeType: z.literal("application/pdf"), name: z.string(),
+  }).and(BinaryInputSourceSchema),
   z.object({
     type: z.literal("skill"),
     id: z.string(),
@@ -190,6 +200,7 @@ const UserInputOpSchema = z.object({
   timestamp: z.string(),
   payload: z.object({
     items: z.array(InputItemSchema).min(1),
+    mode: z.literal("inspect").optional(),
   }),
 });
 
@@ -352,6 +363,7 @@ export async function startServer({
   activityPublisher,
   dynamicToolBridge,
   staticFilesDir,
+  blobStore,
   port = 4317,
 }: {
   commandRouter: ThreadCommandRouter;
@@ -359,6 +371,7 @@ export async function startServer({
   activityPublisher?: AgentActivityPublisher;
   dynamicToolBridge?: WebSocketDynamicToolBridge;
   staticFilesDir?: string;
+  blobStore?: BlobStore;
   port?: number;
 }) {
   const { createServer } = await import("node:http");
@@ -367,7 +380,7 @@ export async function startServer({
   const dynamicToolWebSocketServer = new WebSocketServer({ noServer: true });
   const activityWebSocketServer = new WebSocketServer({ noServer: true });
   const server = createServer((request, response) => {
-    void handleHTTPRequest(request, response, { staticFilesDir });
+    void handleHTTPRequest(request, response, { staticFilesDir, blobStore });
   });
 
   threadWebSocketServer.on("connection", (socket, request) => {
@@ -524,6 +537,7 @@ export async function startDefaultServer(port = 4317) {
   console.log(`[agent-server] llm mode: ${llmMode}`);
 
   const persistence = new ThreadPersistence(store, undefined, blobStore);
+  const inputReader = new DroppedInputReader({ blobStore });
   const activityPublisher = new AgentActivityPublisher();
   const eventPublisher = new ThreadNotificationPublisher((event) => activityPublisher.observe(event));
   threads = new ThreadRegistry({
@@ -536,6 +550,7 @@ export async function startDefaultServer(port = 4317) {
       summarizeInput: projection.summarizeUserInput,
     },
     publish: (event) => eventPublisher.publish(event),
+    prepareInput: (input, signal) => inputReader.read(input, signal),
     createTools: (dynamicTools) => new ThreadTools({
       builtinRegistry: toolRegistry.registry,
       refreshBuiltins: () => toolRegistry.refresh(),
@@ -551,9 +566,9 @@ export async function startDefaultServer(port = 4317) {
       isThreadActivated: () => tools.isActivated(),
     }),
   });
-  const commandRouter = new ThreadCommandRouter(threads, eventPublisher, workspaceRegistry);
+  const commandRouter = new ThreadCommandRouter(threads, eventPublisher, workspaceRegistry, undefined, () => dynamicToolBridge.availableTools());
   const server = await startServer({ commandRouter, eventPublisher, activityPublisher, dynamicToolBridge,
-    staticFilesDir: resolveThreadWindowWebDistDir(), port });
+    staticFilesDir: resolveThreadWindowWebDistDir(), blobStore, port });
   let shutdown: Promise<void> | undefined;
   const close = () => shutdown ??= (async () => {
     const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
@@ -653,8 +668,24 @@ async function handleHTTPRequest(
   },
   options: {
     staticFilesDir?: string;
+    blobStore?: BlobStore;
   },
 ): Promise<void> {
+  const blobId = /^\/api\/blobs\/(blob-[A-Za-z0-9-]+)$/.exec(request.url ?? "")?.[1];
+  if (blobId && options.blobStore && request.method === "GET") {
+    try {
+      const record = await options.blobStore.get(blobId);
+      if (!record || (record.kind !== "image" && record.kind !== "pdf")) {
+        response.statusCode = 404; response.end("Attachment not found"); return;
+      }
+      const bytes = await options.blobStore.readContent(blobId);
+      response.setHeader("Content-Type", contentType(extname(record.path)) || "application/octet-stream");
+      response.setHeader("X-Content-Type-Options", "nosniff");
+      response.setHeader("Cache-Control", "private, max-age=3600");
+      response.end(bytes);
+    } catch { response.statusCode = 404; response.end("Attachment not found"); }
+    return;
+  }
   await handleStaticRequest(request.url ?? "/", response, options.staticFilesDir);
 }
 

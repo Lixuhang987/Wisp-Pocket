@@ -10,7 +10,7 @@
 
 | 审计项 | 保留原因 |
 |------|------|
-| `reconnecting-websocket` 替换 ActivityWindow 手写连接逻辑 | 当前产品明确约束 ThreadWindow 不做断线恢复；ActivityWindow 的重连策略涉及状态展示和 heartbeat，需要独立确认。 |
+| `reconnecting-websocket` 替换桌宠手写重连逻辑 | ThreadWindow 当前不做断线恢复；桌宠负责重连并恢复选中的 Thread，替换依赖须保留两端各自的连接与显隐语义。 |
 | `sirv` / `serve-static` 替换手写静态资源服务 | 会改变 cache headers、range、ETag、fallback 与错误语义；本轮只收敛 MIME 推断，静态服务整体替换需单独验证。 |
 | `ws` path 选项替换手写 upgrade path routing | 当前一个 HTTP server 同时承载三条 WebSocket 和静态资源；改成多 `WebSocketServer` path 配置会触及启动 / 测试结构，收益低于风险。 |
 | `lucide-react` 替换 inline SVG 图标 | 属于视觉资产和 bundle 迁移，需要按组件逐项替换并做视觉回归。 |

@@ -1,11 +1,10 @@
-import { current, produce } from "immer";
+import { produce } from "immer";
 import { create } from "zustand";
 import type { PersistStorage, StorageValue } from "zustand/middleware";
 import { persist } from "zustand/middleware";
 import type {
   InitialPromptPayload,
   InputItem,
-  RuntimeOp,
   RunStatus,
   ServerRequest,
   ThreadListEntry,
@@ -43,10 +42,6 @@ function getLocalStorage(): Storage | undefined {
 
 export type ConnectionState = "disconnected" | "connecting" | "connected";
 
-export type QueuedComposerInput = {
-  op: RuntimeOp;
-};
-
 export type PermissionRequestState = {
   id: string;
   toolName: string;
@@ -66,8 +61,6 @@ export type ThreadState = {
   status: RunStatus;
   messages: ThreadItem[];
   pendingInitialPrompt: InitialPromptPayload | null;
-  queuedComposerInputs: QueuedComposerInput[];
-  queuedInputDispatchPending: boolean;
   permissionRequests: PermissionRequestState[];
   workspaceRequests: WorkspaceRequestState[];
   errorMessage: string | null;
@@ -91,10 +84,6 @@ export type ThreadWindowState = {
   setWorkspaces(workspaces: Array<{ id: string; name: string; rootPath: string }>): void;
   toggleWorkspaceExpanded(workspaceId: string): void;
   setSearchQuery(query: string): void;
-  queueComposerInput(threadId: string, op: RuntimeOp): void;
-  removeQueuedComposerInput(threadId: string, index: number): void;
-  markComposerInputDispatchPending(threadId: string): void;
-  takeNextQueuedInputForDispatch(threadId: string): QueuedComposerInput | null;
   handleNotification(notification: ThreadNotification): void;
   handleRequest(request: ServerRequest): void;
 };
@@ -106,15 +95,14 @@ function emptyThreadState(threadId: string, title: string | null = null): Thread
     status: "idle",
     messages: [],
     pendingInitialPrompt: null,
-    queuedComposerInputs: [],
-    queuedInputDispatchPending: false,
     permissionRequests: [],
     workspaceRequests: [],
     errorMessage: null,
   };
 }
 
-export const createThreadWindowStore = create<ThreadWindowState>()(persist((set) => ({
+export function makeThreadWindowStore() {
+return create<ThreadWindowState>()(persist((set) => ({
   connectionState: "disconnected",
   windowErrorMessage: null,
   history: [],
@@ -151,51 +139,6 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
     set({ searchQuery: query });
   },
 
-  queueComposerInput(threadId, op) {
-    set(produce<ThreadWindowState>((draft) => {
-      const thread = draft.threadsById[threadId] ??= emptyThreadState(threadId);
-      thread.queuedComposerInputs.push({ op });
-    }));
-  },
-
-  removeQueuedComposerInput(threadId, index) {
-    set(produce<ThreadWindowState>((draft) => {
-      const thread = draft.threadsById[threadId];
-      if (!thread || index < 0 || index >= thread.queuedComposerInputs.length) {
-        return;
-      }
-      thread.queuedComposerInputs.splice(index, 1);
-    }));
-  },
-
-  markComposerInputDispatchPending(threadId) {
-    set(produce<ThreadWindowState>((draft) => {
-      const thread = draft.threadsById[threadId] ??= emptyThreadState(threadId);
-      thread.queuedInputDispatchPending = true;
-    }));
-  },
-
-  takeNextQueuedInputForDispatch(threadId) {
-    let nextInput: QueuedComposerInput | null = null;
-    set(produce<ThreadWindowState>((draft) => {
-      const thread = draft.threadsById[threadId];
-      if (
-        !thread
-        || thread.status === "running"
-        || thread.queuedInputDispatchPending
-        || thread.queuedComposerInputs.length === 0
-      ) {
-        return;
-      }
-      const queuedInput = thread.queuedComposerInputs.shift() ?? null;
-      if (queuedInput) {
-        nextInput = { op: cloneOp(current(queuedInput.op)) };
-        thread.queuedInputDispatchPending = true;
-      }
-    }));
-    return nextInput;
-  },
-
   enqueueInitialPrompt(prompt) {
     set(produce<ThreadWindowState>((draft) => {
       draft.pendingInitialPrompts[prompt.clientRequestId] = prompt;
@@ -226,9 +169,11 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
 
   handleNotification(notification) {
     set(produce<ThreadWindowState>((draft) => {
+      if (draft.processedNotificationIds[notification.notificationId]) return;
       switch (notification.type) {
         case "thread.started": {
           draft.processedNotificationIds[notification.notificationId] = true;
+          draft.windowErrorMessage = null;
           const prompt = notification.commandId
             ? draft.pendingInitialPrompts[notification.commandId]
             : undefined;
@@ -242,7 +187,7 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           draft.threadsById[notification.threadId].pendingInitialPrompt = prompt ?? null;
           upsertHistoryEntry(draft, notification.threadId, {
             preview: notification.payload.preview,
-            createdAt: notification.timestamp,
+            createdAt: notification.payload.createdAt ?? notification.timestamp,
             updatedAt: notification.timestamp,
           });
           break;
@@ -269,12 +214,15 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
                   id: message.id,
                   text: message.text,
                   inputItems: message.inputItems ? message.inputItems.map(cloneInputItem) : [],
+                  ...(message.pending ? { pending: true } : {}),
                 };
               case "assistant":
                 return {
                   type: "assistant_message",
                   id: message.id,
                   text: message.text,
+                  suggestedReplies: message.suggestedReplies,
+                  awaitingReply: message.awaitingReply,
                 };
               default:
                 return {
@@ -284,6 +232,9 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
                 };
             }
           });
+          thread.permissionRequests = [];
+          thread.workspaceRequests = [];
+          for (const request of notification.payload.pendingRequests ?? []) addRequest(thread, request);
           if (
             thread.pendingInitialPrompt
             && !thread.messages.some((item) => item.type === "user_message" && item.pending)
@@ -303,14 +254,18 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
         case "user.message.recorded": {
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
-          thread.messages = thread.messages.filter((item) => !(item.type === "user_message" && item.pending));
+          thread.messages = thread.messages.filter((item) => !(item.type === "user_message" && item.pending && item.id.startsWith("pending-")));
+          for (const item of thread.messages) if (item.type === "assistant_message") item.awaitingReply = false;
           const userItem: UserMessageItem = {
             type: "user_message",
             id: notification.payload.messageId,
             text: notification.payload.text,
             inputItems: notification.payload.items ? notification.payload.items.map(cloneInputItem) : [],
+            ...(notification.payload.pending ? { pending: true } : {}),
           };
-          thread.messages.push(userItem);
+          const existing = thread.messages.findIndex((item) => item.id === userItem.id);
+          if (existing >= 0) thread.messages[existing] = userItem;
+          else thread.messages.push(userItem);
           upsertHistoryEntry(draft, notification.threadId, {
             preview: notification.payload.text,
             updatedAt: notification.timestamp,
@@ -323,7 +278,10 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           draft.processedNotificationIds[notification.notificationId] = true;
           const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
           thread.status = "running";
-          thread.queuedInputDispatchPending = false;
+          thread.errorMessage = null;
+          for (const message of thread.messages) if (message.type === "assistant_message") message.awaitingReply = false;
+          const input = thread.messages.find((item) => item.type === "user_message" && item.id === notification.turnId);
+          if (input?.type === "user_message") input.pending = false;
           break;
         }
 
@@ -336,11 +294,15 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           const existing = thread.messages.find((item): item is AssistantMessageItem => item.type === "assistant_message" && item.id === notification.itemId);
           if (existing) {
             existing.text += notification.payload.text;
+            if (notification.payload.suggestedReplies) existing.suggestedReplies = notification.payload.suggestedReplies;
+            if (notification.payload.awaitingReply !== undefined) existing.awaitingReply = notification.payload.awaitingReply;
           } else {
             thread.messages.push({
               type: "assistant_message",
               id: notification.itemId,
               text: notification.payload.text,
+              suggestedReplies: notification.payload.suggestedReplies,
+              awaitingReply: notification.payload.awaitingReply,
             });
           }
           break;
@@ -408,6 +370,16 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
           break;
         }
 
+        case "request.resolved": {
+          draft.processedNotificationIds[notification.notificationId] = true;
+          const thread = draft.threadsById[notification.threadId];
+          if (thread) {
+            thread.permissionRequests = thread.permissionRequests.filter((request) => request.id !== notification.payload.requestId);
+            thread.workspaceRequests = thread.workspaceRequests.filter((request) => request.id !== notification.payload.requestId);
+          }
+          break;
+        }
+
         case "thread.listed":
           draft.processedNotificationIds[notification.notificationId] = true;
           draft.history = notification.payload.threads;
@@ -436,7 +408,6 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
             const thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId);
             thread.errorMessage = notification.payload.message;
             thread.status = "failed";
-            thread.queuedInputDispatchPending = false;
             clearThreadRequests(thread);
           } else {
             draft.windowErrorMessage = notification.payload.message;
@@ -450,20 +421,7 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
   handleRequest(request) {
     set(produce<ThreadWindowState>((draft) => {
       const thread = draft.threadsById[request.threadId] ??= emptyThreadState(request.threadId);
-      if (request.type === "permission.requested") {
-        thread.permissionRequests.push({
-          id: request.requestId,
-          toolName: request.payload.toolName,
-          toolCallId: request.payload.toolCallId,
-          argumentsJSON: JSON.stringify(request.payload.arguments),
-        });
-      } else {
-        thread.workspaceRequests.push({
-          id: request.requestId,
-          prompt: request.payload.prompt,
-          candidates: request.payload.candidates,
-        });
-      }
+      addRequest(thread, request);
     }));
   },
 }), {
@@ -482,6 +440,20 @@ export const createThreadWindowStore = create<ThreadWindowState>()(persist((set)
     };
   },
 }));
+}
+
+export const createThreadWindowStore = makeThreadWindowStore();
+
+function addRequest(thread: ThreadState, request: ServerRequest): void {
+  if (request.type === "permission.requested") {
+    if (!thread.permissionRequests.some((item) => item.id === request.requestId)) thread.permissionRequests.push({
+      id: request.requestId, toolName: request.payload.toolName, toolCallId: request.payload.toolCallId,
+      argumentsJSON: JSON.stringify(request.payload.arguments),
+    });
+  } else if (!thread.workspaceRequests.some((item) => item.id === request.requestId)) thread.workspaceRequests.push({
+    id: request.requestId, prompt: request.payload.prompt, candidates: request.payload.candidates,
+  });
+}
 
 function createExpandedWorkspaceIdsStorage(): PersistStorage<PersistedThreadWindowState> {
   return {
@@ -522,10 +494,6 @@ function createExpandedWorkspaceIdsStorage(): PersistStorage<PersistedThreadWind
   };
 }
 
-function cloneOp(op: RuntimeOp): RuntimeOp {
-  return structuredClone(op);
-}
-
 function cloneInputItem(item: InputItem): InputItem {
   return structuredClone(item);
 }
@@ -548,6 +516,8 @@ function summarizeInputItems(items: InputItem[]): string {
         return item.title || item.prompt;
       case "image":
         return "图片附件";
+      case "pdf":
+        return `PDF：${item.name}`;
     }
   }).filter((value) => value.length > 0).join("\n\n");
 }

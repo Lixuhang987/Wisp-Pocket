@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { ElectronShellRuntime, errorMessage } from "./electronShellRuntime.js";
-import { handleActivityWindowFocusThreadIpc } from "./activityWindowIpc.js";
+import { registerPetWindowIpc } from "./petWindowIpc.js";
 import {
   parseCommand,
   type ElectronToSwiftEvent,
@@ -13,6 +13,7 @@ import { createAgentServerSupervisor } from "./serverSupervisor/agentServerSuper
 import { JsonLineBridge } from "./swiftBridge/jsonLineBridge.js";
 import { CommandSocketServer } from "./swiftBridge/commandSocketServer.js";
 import { ActivityWindowController } from "./windows/activityWindowController.js";
+import { PetPositionStore } from "./windows/petPositionStore.js";
 import { ThreadWindowPrewarmer } from "./windows/threadWindowPrewarmer.js";
 import { configureMacOSDockApp } from "./macosDockApp.js";
 import { readAvailableSkillsFromActionsDirectory } from "./availableSkills.js";
@@ -74,10 +75,27 @@ const prewarmer = new ThreadWindowPrewarmer({
 const activityWindow = new ActivityWindowController({
   activityWindowHTMLPath,
   preloadPath: activityPreloadPath,
+  threadWebSocketURL: process.env.HANDAGENT_PET_THREAD_WEBSOCKET_URL,
   initialTheme,
+  positionStore: new PetPositionStore(
+    process.env.HANDAGENT_PET_POSITION_PATH ?? join(homedir(), ".spotAgent/pet-position.json"),
+    (error) => process.stderr.write(`[electron-shell] pet position: ${errorMessage(error)}\n`),
+  ),
   createWindow: (options) => new BrowserWindow(options),
   screenProvider: {
     getPrimaryWorkArea: () => screen.getPrimaryDisplay().workArea,
+    getWorkAreaForPoint: (point) => screen.getDisplayNearestPoint(point).workArea,
+    getCursorScreenPoint: () => screen.getCursorScreenPoint(),
+    subscribeWorkAreaChanges: (listener) => {
+      screen.on("display-added", listener);
+      screen.on("display-removed", listener);
+      screen.on("display-metrics-changed", listener);
+      return () => {
+        screen.off("display-added", listener);
+        screen.off("display-removed", listener);
+        screen.off("display-metrics-changed", listener);
+      };
+    },
   },
   onRendererCrashed: (reason) => {
     send({
@@ -86,12 +104,6 @@ const activityWindow = new ActivityWindowController({
       window: "activity",
       reason,
     });
-  },
-  onNativeFocus: () => {
-    runtime.handleActivityWindowNativeFocus();
-  },
-  onNativeMouseDown: () => {
-    runtime.handleActivityWindowNativeMouseDown();
   },
 });
 
@@ -148,12 +160,7 @@ const runtime = new ElectronShellRuntime({
   quit: () => app.quit(),
 });
 
-ipcMain.on("activity-window:focus-thread", (event, threadId: unknown) => {
-  handleActivityWindowFocusThreadIpc(event, threadId, {
-    activityWebContents: () => activityWindow.currentWebContents(),
-    runtime,
-  });
-});
+registerPetWindowIpc(ipcMain, activityWindow);
 
 async function handleCommandLine(line: string): Promise<void> {
   let command: SwiftToElectronCommand;

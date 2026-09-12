@@ -522,12 +522,18 @@ export class ThreadStore {
         };
 
     const messages = this.messagesForThread(threadId);
+    const started = new Set(this.rolloutItemsForThread(threadId).flatMap((item) =>
+      item.kind === "event_msg" && item.payload.type === "turn.started" ? [item.payload.turnId] : []));
+    const pendingInputs = messages.flatMap((message) => message.role === "user" && message.id && message.inputItems && !started.has(message.id)
+      ? [{ opId: message.id, payload: { items: message.inputItems, ...(message.inputMode ? { mode: message.inputMode } : {}) } }]
+      : []);
     metadata.messageCount = messages.length;
     return {
       version: 1,
       metadata,
       messages,
       events: this.auditEventsForThread(threadId),
+      ...(pendingInputs.length ? { pendingInputs } : {}),
     };
   }
 

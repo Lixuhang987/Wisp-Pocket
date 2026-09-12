@@ -18,6 +18,8 @@ export type AssistantMessageItem = {
   type: "assistant_message";
   id: string;
   text: string;
+  suggestedReplies?: string[];
+  awaitingReply?: boolean;
 };
 
 export type ToolCallItem = {

@@ -17,8 +17,6 @@ function threadState(threadId: string): ThreadState {
     status: "idle",
     messages: [],
     pendingInitialPrompt: null,
-    queuedComposerInputs: [],
-    queuedInputDispatchPending: false,
     permissionRequests: [],
     workspaceRequests: [],
     errorMessage: null,
@@ -101,27 +99,21 @@ describe("ThreadWindow scroll containers", () => {
     expect(html).toContain("overflow-y-auto overflow-x-hidden");
   });
 
-  it("renders queued composer input above the input bar", () => {
-    const html = render(
-      React.createElement(Composer, {
-        disabled: false,
-        stopDisabled: false,
-        inputItems: [{ type: "text", id: "text-1", text: "" }],
-        onInputItemsChange: vi.fn(),
-        queuedInputs: [
-          { op: { type: "user_input", opId: "queued-1", timestamp: "2026-06-11T00:00:00.000Z", payload: { items: [{ type: "text", id: "queued-text-1", text: "排队的后续问题 1" }] } } },
-          { op: { type: "user_input", opId: "queued-2", timestamp: "2026-06-11T00:00:01.000Z", payload: { items: [{ type: "text", id: "queued-text-2", text: "排队的后续问题 2" }] } } },
-        ],
-        onSubmit: vi.fn(),
-        onStop: vi.fn(),
-        onRemoveQueuedInput: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain('data-queued-composer-panel="true"');
-    expect(html).toContain("排队的后续问题 1");
-    expect(html).toContain("排队的后续问题 2");
-    expect(html).toContain('aria-label="移除排队输入 1"');
+  it("renders received pending input in the conversation while the composer remains usable", () => {
+    const html = render(React.createElement(MessageList, {
+      items: [{ type: "user_message", id: "queued", text: "排队的后续问题", inputItems: [], pending: true }],
+      errorMessage: null,
+      isRunning: true,
+    }));
+    expect(html).toContain("排队的后续问题");
+    expect(html).toContain("待处理");
+    const composer = render(React.createElement(Composer, {
+      disabled: false, stopDisabled: false,
+      inputItems: [{ type: "text", id: "text", text: "新的补充" }],
+      onInputItemsChange: vi.fn(), onSubmit: vi.fn(), onStop: vi.fn(),
+    }));
+    expect(composer).not.toContain('textarea disabled');
+    expect(composer).toContain("新的补充");
   });
 
   it("renders the fixed workspace pane from a thread id without a tab strip", () => {
@@ -140,7 +132,6 @@ describe("ThreadWindow scroll containers", () => {
         threadId: "thread-1",
         onSubmit: vi.fn(),
         onStop: vi.fn(),
-        onRemoveQueuedInput: vi.fn(),
         onAnswerPermission: vi.fn(),
         onAnswerWorkspace: vi.fn(),
       }),

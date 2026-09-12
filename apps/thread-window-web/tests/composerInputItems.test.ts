@@ -6,7 +6,6 @@ import {
   SLASH_MENU_COLLISION_PADDING,
   SLASH_MENU_CONTENT_STYLE,
   getSlashMenuState,
-  inputItemsPreview,
   isComposerInputSubmittable,
   normalizeComposerItems,
   selectSlashSkill,
@@ -14,7 +13,7 @@ import {
   removeInputItem,
   toUserInput,
 } from "../src/components/Composer.tsx";
-import type { InputItem, RuntimeOp } from "../src/protocol/threadProtocol.ts";
+import type { InputItem } from "../src/protocol/threadProtocol.ts";
 
 const skill: InputItem = {
   type: "skill",
@@ -84,34 +83,13 @@ describe("Composer input items", () => {
     });
   });
 
-  it("previews queued skill input by title instead of flattening to prompt text", () => {
-    expect(inputItemsPreview({
-      op: {
-        type: "user_input",
-        opId: "op-1",
-        timestamp: "2026-06-12T00:00:00.000Z",
-        payload: {
-          items: [
-            skill,
-            { type: "text", id: "text-1", text: "with edge cases" },
-          ],
-        },
-      },
-    })).toBe("Review with edge cases");
-  });
-
-  it("previews queued interrupt ops without requiring UserInput payload items", () => {
-    const interruptOp: RuntimeOp = {
-      type: "interrupt",
-      opId: "op-stop",
-      timestamp: "2026-06-12T00:00:01.000Z",
-      payload: {
-        reason: "user",
-      },
-    };
-
-    expect(inputItemsPreview(interruptOp)).toBe("停止当前运行");
-    expect(inputItemsPreview({ op: interruptOp })).toBe("停止当前运行");
+  it("submits persisted image and PDF attachments without requiring inline bytes", () => {
+    const items: InputItem[] = [
+      { type: "image", id: "image", mimeType: "image/png", blobId: "blob-image" },
+      { type: "pdf", id: "pdf", name: "资料.pdf", mimeType: "application/pdf", blobId: "blob-pdf" },
+    ];
+    expect(isComposerInputSubmittable(items)).toBe(true);
+    expect(toUserInput(items).items.slice(0, 2)).toEqual(items);
   });
 
   it("filters slash skills and selects the first match", () => {

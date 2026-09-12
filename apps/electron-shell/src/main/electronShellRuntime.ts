@@ -24,7 +24,6 @@ type ThreadWindowHost = {
 
 type ActivityWindowHost = {
   show(): Promise<void>;
-  releaseNativeFocusForNextClick(): void;
   updateTheme(theme: HostTheme): Promise<void>;
 };
 
@@ -58,10 +57,6 @@ export class ElectronShellRuntime {
   }
 
   handleThreadWindowClosed(event: ThreadWindowClosedEvent): void {
-    if (event.wasVisible) {
-      this.options.activityWindow.releaseNativeFocusForNextClick();
-    }
-
     this.options.send({
       channel: "electron_shell",
       type: "thread_window.closed",
@@ -72,20 +67,6 @@ export class ElectronShellRuntime {
     if (event.wasPrepared && this.hasAgentServerHealth) {
       void this.prewarmThreadWindowAfterServerReady();
     }
-  }
-
-  handleActivityWindowFocusRequest(threadId: string | null): void {
-    if (threadId) {
-      this.options.prewarmer.focus();
-    }
-  }
-
-  handleActivityWindowNativeFocus(): void {
-    this.options.prewarmer.focus();
-  }
-
-  handleActivityWindowNativeMouseDown(): void {
-    this.options.prewarmer.focus();
   }
 
   async handleCommand(command: SwiftToElectronCommand): Promise<void> {

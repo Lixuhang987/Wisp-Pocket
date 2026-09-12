@@ -1,35 +1,40 @@
 # activity-window
 
-`activity-window/` 是 Electron ActivityWindow 的 React renderer。它只负责 StatusBubble UI 展示和点击请求，不参与 ThreadWindow 的完整 thread 协议。
+本目录是[桌宠](../../../desktop/CONTEXT.md)的 React renderer，复用 ThreadWindow 的协议、store factory、socket 和附件 URL。后端 Thread 是历史、输入队列与请求的唯一真源。
 
-## 文件
+## 直接子节点
 
-| 文件 | 职责 |
-|------|------|
-| `App.tsx` | 创建 `ActivitySocketClient`，把 activity state 映射成按钮 UI，点击时请求 main 聚焦 thread |
-| `activitySocketClient.ts` | `/api/activity` WebSocket client，解析 `AgentActivityEvent`、忽略非法消息、断线后有限重连 |
-| `activityState.ts` | 将 `activity.snapshot` / `activity.changed` 规约成 renderer state 和展示文案 |
-| `main.tsx` | React root 挂载入口 |
-| `index.html` | Vite ActivityWindow HTML entry |
-| `styles.css` | 透明窗口里的 272x76 StatusBubble 样式，包含 light/dark 成对 surface、边框、文字和 reduced-motion 规则 |
+- `App.tsx`：两处拖入区域、气泡显隐、悬停/焦点、回复及窗口桥接。
+- `PetConversation.tsx`：左右历史、持久附件、建议与 Permission/Workspace 面板。
+- `petThreadController.ts`：Thread 连接、创建时间选择、隐藏状态和提交入口。
+- `readDroppedItems.ts`：同步捕获浏览器拖入数据，异步读取用户交付文件。
+- `PetSprite.tsx`：图集播放及 reduced-motion 行为。
+- [assets/assets.md](./assets/assets.md)：角色图集来源与播放合约。
+- `styles.css`：共享主题 token、四行折叠和受限滚动布局。
+- `main.tsx`、`index.html`：renderer 入口。
 
-## 数据边界
+## Thread 与输入边界
 
-- WebSocket URL 来自 preload 注入的 `window.handAgentActivityWindowConfig.activityWebSocketURL`，默认 fallback 是 `ws://127.0.0.1:4317/api/activity`。
-- host theme 来自 preload 注入的 `window.handAgentTheme` 和 `window.handAgentSubscribeThemeChange`；renderer 只把 resolved theme 写入 `documentElement.dataset.theme`，不持久化主题偏好。
-- 本目录只接受 `AgentActivityEvent`，不解析 `ThreadNotification`、`ServerRequest`、`ThreadCommand` 或 `ClientResponse`。
-- `reduceActivityEvent()` 直接用最新 event 覆盖当前 state；activity snapshot 与 changed 使用同一套字段。
-- `ActivitySocketClient` 会忽略 malformed JSON、错误 channel、非法 status/waitingRequest；不要把 parser 放宽到完整 thread 消息。
-- 断线重连默认 1 秒间隔，最多 20 次；手动 `close()` 必须取消 timer 并关闭 socket。
+- endpoint 由 [preload](../preload/preload.md) 注入，使用 `/api/thread?acceptServerRequests=1`；完整历史不经过 Activity 通道。
+- 当前展示只按 `createdAt` 选择最新 Thread。旧 Thread 的消息和结果不抢占当前展示，仍可从 ThreadWindow 历史找回。
+- 启动先列出历史并恢复选中 Thread，但保持只显示角色；后续新建 Thread 接管展示。桌宠重连会重新列出、resume 当前选择；ThreadWindow 的连接语义见[其模块文档](../../../thread-window-web/thread-window-web.md)。
+- 当前 Thread 被删除时选择剩余历史中最新创建的一项；列表为空则清空选择。重连后的列表也要确认旧 ID 仍存在，不能继续 resume 离线期间已被删除的 Thread。
+- 最终 drop 在角色上新建 Thread，在气泡或展开历史上追加。drop 时先捕获目标 Thread 与 DataTransfer，再异步读文件；dragenter/dragover 只高亮和提示，不提交。
+- 拖入支持文本、链接、PNG/JPEG/WebP、PDF，提交 `UserInput.mode: "inspect"`。原始 bytes 由服务端保存为 Blob，成功通知与历史使用同一持久引用。
+- 文件读取失败或服务端拒绝保存必须显示具体错误；Thread 级与连接级 `thread.error` 都能呈现，但仍遵守主动隐藏。已保存后的内容读取失败由 Thread 消息说明，不能混为未提交。
+- 建议按钮和自由回复发送同一种普通 UserInput；执行中也立即提交，由 Thread 保存并排队。接收确认展示“待处理”，`turn.started` 解除对应输入的标记。
+- Permission/Workspace 使用原 ClientResponse；两界面竞争回执由 core 仲裁，收到 `request.resolved` 后同步清理。建议等待不使用这些请求的计时器。
 
-## 交互边界
+## 展示与原生边界
 
-- 点击气泡只调用 `window.handAgentActivityWindow.focusThread(activeThreadId ?? null)`；renderer 不直接调用 Electron API。
-- `focusThread` 最终由 main 校验 sender 后处理。没有 active thread 或无法聚焦时，main 不请求 Swift 打开 PromptPanel。packaged macOS 下如果点击只触发 ActivityWindow native focus 或 `before-mouse-event` 而未送达 renderer IPC，main 侧 native 兜底也只尝试聚焦 visible ThreadWindow。
-- ActivityWindow 通过 `showInactive()` 非激活展示，但窗口必须保持 `focusable: true` 与 `acceptFirstMouse: true`，确保 macOS CGEvent 点击能进入 renderer；UI 仍不能依赖键盘焦点常驻，可访问性文案应放在按钮文本中。
+- 角色在下、气泡在上。常态取最新非空 assistant 消息并限制约四行；工具调用不进入桌宠历史。
+- 悬停展开有高度限制的历史；回复区或其控件保持焦点时继续展开，鼠标离开且失焦才折叠。滚动查看旧消息时，新消息不会强制跳回底部。
+- 主动隐藏只改 UI。后台更新不会解除隐藏；点击角色或再次拖入恢复。启动无首次纯文字输入框，首次文字仍由 PromptPanel 承接。
+- renderer 只上报布局和 DOM 命中矩形，并发出移动意图；[原生窗口](../main/windows/windows.md)负责系统光标、位置文件、屏幕限制和透明区域穿透。
+- 角色点击只恢复气泡；首次文字与完整历史继续通过现有 PromptPanel/ThreadWindow 入口访问。输入、滚动或 drop 不转换为窗口聚焦请求。
+- 主题消费 Swift 解析的 resolved 值，不持久化主题偏好；气泡和控件遵守 [DESIGN.md](../../../../DESIGN.md) 的共享 token 约束。
+- `styles.css` 直接导入 ThreadWindow 的生成主题，使用普通 CSS 的 `--ha-*` 变量；图集尺寸来自播放合约，不依赖 Tailwind 处理桌宠样式。
 
-## 修改约束
+## 验证入口
 
-- 不在本目录实现 tool、permission、workspace 回执；这些仍属于 React ThreadWindow 的 `/api/thread` UI。
-- 不引入 Node/Electron import；renderer 能力只能来自 preload 暴露的 `window.handAgentActivityWindow*`。
-- 改 activity 字段或状态枚举时，先更新 `packages/core/src/protocol/AgentActivity.ts`，再更新 parser、state reducer 和 `tests/activity-window/*`。
+[renderer 测试](../../tests/activity-window/activity-window.md)覆盖轻量交互；[agent-server 用例](../../../agent-server/tests/tests.md)覆盖真实 Thread、SQLite 与 Blob；原生窗口合约见 Electron `pet-window` 用例。跨应用拖入、焦点、位置与透明命中必须另做[实机验收](../../../../docs/manual-qa.md)。

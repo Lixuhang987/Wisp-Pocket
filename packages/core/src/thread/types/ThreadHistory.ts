@@ -1,5 +1,6 @@
 import type { AgentMessage } from "../../runtime/types/AgentMessage.ts";
 import type { DynamicToolSpec } from "../../protocol/types/DynamicTool.ts";
+import type { UserInput } from "../../protocol/types/Op.ts";
 
 export type ThreadMetadata = {
   id: string;
@@ -21,6 +22,7 @@ export type PersistedThread = {
   metadata: ThreadMetadata;
   messages: AgentMessage[];
   events: ThreadAuditEvent[];
+  pendingInputs?: Array<{ opId: string; payload: UserInput }>;
 };
 
 export type ThreadAuditEventType =
@@ -66,4 +68,3 @@ export type ThreadAuditEvent =
   | ToolResultAuditEvent
   | PermissionRequestAuditEvent
   | ErrorAuditEvent;
-

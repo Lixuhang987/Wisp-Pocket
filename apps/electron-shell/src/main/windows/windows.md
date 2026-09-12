@@ -1,13 +1,14 @@
 # windows
 
-`windows/` 封装 Electron main process 中的窗口生命周期。它不持有 thread 消息状态，也不订阅 `/api/activity`；renderer 自己连接对应 WebSocket。
+`windows/` 封装 Electron main process 中的窗口生命周期与桌宠位置；Thread 消息和连接由 renderer 持有。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
 | `threadWindowPrewarmer.ts` | 全局唯一 ThreadWindow `BrowserWindow` 的 hidden prewarm、initial prompt 注入、show/focus、close 状态、host theme 下发与只读 `availableSkills` 注入 |
-| `activityWindowController.ts` | React StatusBubble ActivityWindow 的创建、定位、非激活展示、host theme 下发和 renderer crash 回调 |
+| `activityWindowController.ts` | 桌宠 ActivityWindow 的非激活展示、布局、拖动、透明命中、host theme 下发和 renderer crash 回调 |
+| `petPositionStore.ts` | 角色右下角屏幕坐标的原子保存与恢复；文件路径由 main 注入 |
 
 ## ThreadWindow 前提
 
@@ -20,18 +21,19 @@
 - `closed` 事件要回传 `wasPrepared` 和 `wasVisible`，让 runtime 区分 hidden prewarm 失败和用户可见窗口关闭。
 - controller 保存当前 host theme；进程启动时的初值来自 Electron main 解析后的 `HANDAGENT_INITIAL_THEME`，新建窗口时通过 preload `additionalArguments` 传入该 theme。窗口已创建但尚未 prepared 时收到 `theme.changed`，必须在 prepared 后补发一次当前 theme，避免 renderer 初始参数停留在旧主题。
 
-## ActivityWindow 前提
+## 桌宠 ActivityWindow 前提
 
-- ActivityWindow 是 frameless、transparent、alwaysOnTop、skipTaskbar、focusable true、acceptFirstMouse true、resizable false 的小窗；`showInactive()` 负责初始非激活展示，`focusable` 不能设为 false，否则 macOS packaged CGEvent 点击可能只激活 Electron 而不触发 StatusBubble renderer IPC。
-- `show()` 每次都会按 primary work area 重新计算右下角 bounds，再用 `showInactive()` 显示，避免抢焦点。
-- ActivityWindow 只 load `dist/activity-window/index.html`；状态数据由 renderer 通过 `/api/activity` 获取。
-- ActivityWindow controller 保存当前 host theme；进程启动时的初值来自 Electron main 解析后的 `HANDAGENT_INITIAL_THEME`，新建窗口时通过 preload `additionalArguments` 传入该 theme，窗口已加载后通过 `handagent:theme-changed` IPC 推送后续 theme。窗口已创建但尚未 loaded 时收到 `theme.changed`，必须在 loaded 后补发一次当前 theme，避免 StatusBubble 停留在旧主题。
-- ActivityWindow 的 native `focus` 和 `before-mouse-event` 左键 `mouseDown` 要作为 renderer click IPC 的兜底上报给 runtime：如果 visible ThreadWindow 可聚焦则聚焦 ThreadWindow，否则不做 PromptPanel 回退。`before-mouse-event` 兜底要阻止对应 page mouse event，避免 renderer click IPC 再次发送同一点击意图。
-- visible ThreadWindow 关闭后，runtime 会让 ActivityWindow 预先创建并显示一个新的 `showInactive()` 窗口，再销毁旧 `BrowserWindow`，用新的 native window identity 释放旧窗口的 native focus / AXMain 状态，同时避免 StatusBubble 先消失再出现；这不会直接触发 PromptPanel。
-- renderer crash 只上报 `renderer.crashed window: "activity"`；不回退到 Swift StatusBubble，也不代表 agent-server 不可用。
+- 窗口透明、无边框、置顶；`showInactive()` 负责启动展示。保留 `focusable: true`、`acceptFirstMouse: true`，让回复框通过正常点击获得焦点。
+- 初次位置在主屏工作区右下角；之后保存角色右下角的 DIP 坐标。`pet`、`compact`、`expanded` 改变窗口外框时保留同一锚点；恢复位置、屏幕变动和拖动均将完整窗口限制在目标工作区内。
+- 位置存储只保存窗口坐标，消息、当前 Thread 和回复草稿仍归 renderer。已有桌宠窗口被重复显示或 ThreadWindow 关闭时，继续使用同一 renderer。
+- renderer 通过 [preload](../../preload/preload.md) 上报当前角色和聊天区域的 DOM 矩形；main 用系统光标轮询决定 `setIgnoreMouseEvents(..., { forward: true })`。外部应用拖入时也能恢复命中，不能只依赖 renderer 的 mousemove。
+- `beginMove`、`move`、`endMove` 只使用 main 读取的系统光标。拖动期间保留鼠标事件，让 renderer 的 pointer capture 跨窗口边界继续工作；结束后保存位置并恢复局部命中。
+- 鼠标和焦点直接进入桌宠 renderer，保留输入、滚动和原生 drop；窗口控制器不把这些事件转换为 ThreadWindow 聚焦请求。
+- 窗口只 load `dist/activity-window/index.html`；preload 注入 Thread endpoint 和 host theme。加载期间收到的新 theme 在 loaded 后补发，后续通过 `handagent:theme-changed` 推送。
+- renderer crash 仍上报 `renderer.crashed window: "activity"`；它不代表 agent-server 不可用。
 
 ## 修改约束
 
-- 不在窗口控制器里解析 `ThreadCommand`、`ThreadNotification` 或 `AgentActivityEvent`。
+- 不在窗口控制器里解析 Thread 协议或持有消息状态。
 - 改 BrowserWindow security 选项时，必须同时检查 `src/preload/preload.md` 中的暴露边界。
 - 改窗口 close/prewarm 语义时，同步更新 `tests/use-cases/thread-window-commands.test.ts` 和 `tests/use-cases/desktop-startup.test.ts`。

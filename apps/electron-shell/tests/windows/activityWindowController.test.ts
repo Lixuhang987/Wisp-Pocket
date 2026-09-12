@@ -1,400 +1,121 @@
 import { EventEmitter } from "node:events";
-import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { BrowserWindowConstructorOptions, Rectangle } from "electron";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActivityWindowController } from "../../src/main/windows/activityWindowController.js";
+import { PetPositionStore } from "../../src/main/windows/petPositionStore.js";
 
-describe("ActivityWindowController", () => {
-  it("creates a frameless transparent activity window and shows it inactive", async () => {
-    const window = new FakeBrowserWindow();
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: (options) => {
-        expect(options).toMatchObject({
-          width: 272,
-          height: 76,
-          show: false,
-          frame: false,
-          transparent: true,
-          alwaysOnTop: true,
-          skipTaskbar: true,
-          focusable: true,
-          acceptFirstMouse: true,
-          resizable: false,
-          webPreferences: {
-            preload: "/dist/preload/activityWindowPreload.cjs",
-            contextIsolation: true,
-            nodeIntegration: false,
-          },
-        });
-        return window;
-      },
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-    });
+const cleanup: Array<() => void> = [];
+afterEach(() => { for (const dispose of cleanup.splice(0)) dispose(); });
 
-    await controller.show();
-
-    expect(window.bounds).toEqual({ x: 1144, y: 800, width: 272, height: 76 });
-    expect(window.loadedFile).toBe("/dist/activity-window/index.html");
-    expect(window.showInactiveCount).toBe(1);
-  });
-
-  it("reuses a live activity window", async () => {
-    const window = new FakeBrowserWindow();
-    const createWindow = vi.fn(() => window);
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 20, y: 10, width: 1440, height: 900 }),
-      },
-    });
-
-    await controller.show();
-    await controller.show();
-
-    expect(createWindow).toHaveBeenCalledTimes(1);
-    expect(window.loadFileCount).toBe(1);
-    expect(window.showInactiveCount).toBe(2);
-    expect(window.bounds).toEqual({ x: 1164, y: 810, width: 272, height: 76 });
-  });
-
-  it("passes the initial theme to the first created activity window", async () => {
-    const window = new FakeBrowserWindow();
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
+describe("ActivityWindowController lifecycle boundaries", () => {
+  it("passes the initial host theme and configured Thread endpoint to preload", async () => {
+    const { controller, window } = createHarness({
       initialTheme: { preference: "system", resolved: "dark" },
-      createWindow: (options) => {
-        expect(options.webPreferences?.additionalArguments).toContain(
-          `--handagent-theme=${encodeURIComponent(JSON.stringify({ preference: "system", resolved: "dark" }))}`,
-        );
-        return window;
-      },
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 20, y: 10, width: 1440, height: 900 }),
-      },
+      threadWebSocketURL: "ws://127.0.0.1:5321/api/thread",
     });
-
     await controller.show();
+
+    expect(window.options.webPreferences?.additionalArguments).toContain(
+      `--handagent-theme=${encodeURIComponent(JSON.stringify({ preference: "system", resolved: "dark" }))}`,
+    );
+    expect(window.options.webPreferences?.additionalArguments).toContain(
+      `--handagent-pet-thread-websocket-url=${encodeURIComponent("ws://127.0.0.1:5321/api/thread")}`,
+    );
+    expect(window.loadedFile).toBe("/dist/activity-window/index.html");
   });
 
-  it("broadcasts an in-flight theme change after the existing activity window loads", async () => {
-    const window = new FakeBrowserWindow();
+  it("broadcasts an in-flight theme change after loading, then sends later changes live", async () => {
     const loaded = createDeferred<void>();
-    window.loadFile = (filePath: string): Promise<void> => {
-      window.loadedFile = filePath;
-      window.loadFileCount += 1;
-      return loaded.promise;
-    };
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => window,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-    });
-
+    const { controller, window } = createHarness({ loadFilePromise: loaded.promise });
     const shown = controller.show();
     await controller.updateTheme({ preference: "dark", resolved: "dark" });
     expect(window.webContents.send).not.toHaveBeenCalled();
-
     loaded.resolve();
     await shown;
+    await controller.updateTheme({ preference: "light", resolved: "light" });
 
-    expect(window.webContents.send).toHaveBeenCalledWith(
-      "handagent:theme-changed",
-      { preference: "dark", resolved: "dark" },
-    );
+    expect(window.webContents.send).toHaveBeenNthCalledWith(1, "handagent:theme-changed", { preference: "dark", resolved: "dark" });
+    expect(window.webContents.send).toHaveBeenNthCalledWith(2, "handagent:theme-changed", { preference: "light", resolved: "light" });
   });
 
-  it("resets the live window after close", async () => {
-    const firstWindow = new FakeBrowserWindow();
-    const secondWindow = new FakeBrowserWindow();
-    const windows = [firstWindow, secondWindow];
-    const createWindow = vi.fn(() => {
-      const window = windows.shift();
-      if (!window) {
-        throw new Error("unexpected createWindow");
-      }
-      return window;
-    });
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-    });
+  it("shares loading across show requests and reports a window closed during loading", async () => {
+    const loaded = createDeferred<void>();
+    const { controller, window } = createHarness({ loadFilePromise: loaded.promise });
+    const first = controller.show();
+    const second = controller.show();
+    const settled = Promise.allSettled([first, second]);
+    window.destroy();
+    loaded.resolve();
 
-    await controller.show();
-    firstWindow.emit("closed");
-    await controller.show();
-
-    expect(createWindow).toHaveBeenCalledTimes(2);
+    expect(window.loadFileCount).toBe(1);
+    expect(await settled).toEqual([
+      { status: "rejected", reason: expect.objectContaining({ message: "pet window closed before it was shown" }) },
+      { status: "rejected", reason: expect.objectContaining({ message: "pet window closed before it was shown" }) },
+    ]);
   });
 
-  it("emits renderer crashed callback for non-clean render exits", async () => {
-    const window = new FakeBrowserWindow();
+  it("reports a renderer crash through the existing shell callback", async () => {
     const onRendererCrashed = vi.fn();
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => window,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-      onRendererCrashed,
-    });
-
+    const { controller, window } = createHarness({ onRendererCrashed });
     await controller.show();
     window.webContents.emit("render-process-gone", {}, { reason: "clean-exit" });
     window.webContents.emit("render-process-gone", {}, { reason: "crashed" });
-
-    expect(onRendererCrashed).toHaveBeenCalledTimes(1);
-    expect(onRendererCrashed).toHaveBeenCalledWith("crashed");
-  });
-
-  it("emits native focus as an activity click fallback", async () => {
-    const window = new FakeBrowserWindow();
-    const onNativeFocus = vi.fn();
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => window,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-      onNativeFocus,
-    });
-
-    await controller.show();
-    expect(onNativeFocus).not.toHaveBeenCalled();
-
-    window.emit("focus");
-
-    expect(onNativeFocus).toHaveBeenCalledTimes(1);
-  });
-
-  it("emits native left mouse down as a focused activity click fallback", async () => {
-    const window = new FakeBrowserWindow();
-    const onNativeMouseDown = vi.fn();
-    const preventDefault = vi.fn();
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => window,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-      onNativeMouseDown,
-    });
-
-    await controller.show();
-    expect(onNativeMouseDown).not.toHaveBeenCalled();
-
-    window.webContents.emit(
-      "before-mouse-event",
-      { preventDefault },
-      { type: "mouseDown", button: "left", x: 128, y: 32 },
-    );
-
-    expect(onNativeMouseDown).toHaveBeenCalledTimes(1);
-    expect(preventDefault).toHaveBeenCalledTimes(1);
-  });
-
-  it("treats native mouse down without button as an activity click fallback", async () => {
-    const window = new FakeBrowserWindow();
-    const onNativeMouseDown = vi.fn();
-    const preventDefault = vi.fn();
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => window,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-      onNativeMouseDown,
-    });
-
-    await controller.show();
-    expect(onNativeMouseDown).not.toHaveBeenCalled();
-
-    window.webContents.emit(
-      "before-mouse-event",
-      { preventDefault },
-      { type: "mouseDown", x: 128, y: 32 },
-    );
-
-    expect(onNativeMouseDown).toHaveBeenCalledTimes(1);
-    expect(preventDefault).toHaveBeenCalledTimes(1);
-  });
-
-  it("ignores non-click native mouse events", async () => {
-    const window = new FakeBrowserWindow();
-    const onNativeMouseDown = vi.fn();
-    const preventDefault = vi.fn();
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => window,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-      onNativeMouseDown,
-    });
-
-    await controller.show();
-    window.webContents.emit(
-      "before-mouse-event",
-      { preventDefault },
-      { type: "mouseMove", button: "left", x: 128, y: 32 },
-    );
-    window.webContents.emit(
-      "before-mouse-event",
-      { preventDefault },
-      { type: "mouseDown", button: "right", x: 128, y: 32 },
-    );
-
-    expect(onNativeMouseDown).not.toHaveBeenCalled();
-    expect(preventDefault).not.toHaveBeenCalled();
-  });
-
-  it("releases stale native window state for the next activity click without a visible gap", async () => {
-    const firstWindow = new FakeBrowserWindow();
-    const deferredLoad = createDeferred<void>();
-    const secondWindow = new FakeBrowserWindow({ loadFilePromise: deferredLoad.promise });
-    const windows = [firstWindow, secondWindow];
-    const createWindow = vi.fn(() => {
-      const window = windows.shift();
-      if (!window) {
-        throw new Error("unexpected createWindow");
-      }
-      return window;
-    });
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow,
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-    });
-
-    await controller.show();
-    controller.releaseNativeFocusForNextClick();
-
-    expect(createWindow).toHaveBeenCalledTimes(2);
-    expect(firstWindow.destroyCount).toBe(0);
-    expect(secondWindow.showInactiveCount).toBe(0);
-
-    deferredLoad.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(firstWindow.destroyCount).toBe(1);
-    expect(firstWindow.showInactiveCount).toBe(1);
-    expect(secondWindow.loadedFile).toBe("/dist/activity-window/index.html");
-    expect(secondWindow.showInactiveCount).toBe(1);
-    expect(secondWindow.bounds).toEqual({ x: 1144, y: 800, width: 272, height: 76 });
-  });
-
-  it("replays the latest theme to the replacement activity window after it loads", async () => {
-    const firstWindow = new FakeBrowserWindow();
-    const deferredLoad = createDeferred<void>();
-    const secondWindow = new FakeBrowserWindow({ loadFilePromise: deferredLoad.promise });
-    const windows = [firstWindow, secondWindow];
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => {
-        const window = windows.shift();
-        if (!window) {
-          throw new Error("unexpected createWindow");
-        }
-        return window;
-      },
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-    });
-
-    await controller.show();
-    controller.releaseNativeFocusForNextClick();
-    await controller.updateTheme({ preference: "dark", resolved: "dark" });
-
-    expect(secondWindow.webContents.send).not.toHaveBeenCalled();
-
-    deferredLoad.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(secondWindow.webContents.send).toHaveBeenCalledWith(
-      "handagent:theme-changed",
-      { preference: "dark", resolved: "dark" },
-    );
-  });
-
-  it("ignores native focus release before the activity window exists", () => {
-    const controller = new ActivityWindowController({
-      activityWindowHTMLPath: "/dist/activity-window/index.html",
-      preloadPath: "/dist/preload/activityWindowPreload.cjs",
-      createWindow: () => {
-        throw new Error("window should not be created");
-      },
-      screenProvider: {
-        getPrimaryWorkArea: () => ({ x: 0, y: 0, width: 1440, height: 900 }),
-      },
-    });
-
-    controller.releaseNativeFocusForNextClick();
+    expect(onRendererCrashed).toHaveBeenCalledExactlyOnceWith("crashed");
   });
 });
 
-class FakeBrowserWindow extends EventEmitter {
-  webContents = Object.assign(new EventEmitter(), {
-    send: vi.fn(),
+function createHarness(options: {
+  initialTheme?: { preference: "light" | "dark" | "system"; resolved: "light" | "dark" };
+  threadWebSocketURL?: string;
+  loadFilePromise?: Promise<void>;
+  onRendererCrashed?: (reason: string) => void;
+} = {}) {
+  const directory = mkdtempSync(join(tmpdir(), "handagent-pet-controller-"));
+  const window = new FakeBrowserWindow(options.loadFilePromise);
+  const workArea = { x: 0, y: 0, width: 1440, height: 900 };
+  const controller = new ActivityWindowController({
+    activityWindowHTMLPath: "/dist/activity-window/index.html",
+    preloadPath: "/dist/preload/activityWindowPreload.cjs",
+    positionStore: new PetPositionStore(join(directory, "pet-position.json")),
+    initialTheme: options.initialTheme,
+    threadWebSocketURL: options.threadWebSocketURL,
+    onRendererCrashed: options.onRendererCrashed,
+    createWindow: (windowOptions) => { window.options = windowOptions; return window; },
+    screenProvider: {
+      getPrimaryWorkArea: () => workArea,
+      getWorkAreaForPoint: () => workArea,
+      getCursorScreenPoint: () => ({ x: 0, y: 0 }),
+      subscribeWorkAreaChanges: () => () => {},
+    },
   });
-  bounds: { x: number; y: number; width: number; height: number } | null = null;
+  cleanup.push(() => { window.destroy(); rmSync(directory, { recursive: true, force: true }); });
+  return { window, controller };
+}
+
+class FakeBrowserWindow extends EventEmitter {
+  webContents = Object.assign(new EventEmitter(), { send: vi.fn() });
+  options: BrowserWindowConstructorOptions = {};
+  bounds: Rectangle = { x: 0, y: 0, width: 1, height: 1 };
   loadedFile: string | null = null;
   loadFileCount = 0;
-  showInactiveCount = 0;
-  destroyCount = 0;
-  private readonly loadFilePromise: Promise<void> | null;
-
-  constructor(options: { loadFilePromise?: Promise<void> } = {}) {
-    super();
-    this.loadFilePromise = options.loadFilePromise ?? null;
-  }
-
-  setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
-    this.bounds = bounds;
-  }
-
+  constructor(private readonly loadFilePromise: Promise<void> = Promise.resolve()) { super(); }
+  setBounds(bounds: Rectangle): void { this.bounds = bounds; }
+  getBounds(): Rectangle { return this.bounds; }
+  setIgnoreMouseEvents(): void {}
   loadFile(filePath: string): Promise<void> {
     this.loadedFile = filePath;
     this.loadFileCount += 1;
-    return this.loadFilePromise ?? Promise.resolve();
+    return this.loadFilePromise;
   }
-
-  showInactive(): void {
-    this.showInactiveCount += 1;
-  }
-
-  destroy(): void {
-    this.destroyCount += 1;
-    this.emit("closed");
-  }
+  showInactive(): void {}
+  destroy(): void { this.emit("closed"); }
 }
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>((innerResolve) => {
-    resolve = innerResolve;
-  });
+  const promise = new Promise<T>((innerResolve) => { resolve = innerResolve; });
   return { promise, resolve };
 }

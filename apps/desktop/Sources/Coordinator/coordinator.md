@@ -31,7 +31,7 @@
 - 上一条是明确的防回归红线，不是实现细节建议：这个 bug 已多次出现。今后只要修改 `showThreadWindow` 快捷键、`openHistory`、PromptPanel hide/focus restore、ThreadWindow open/focus ack 任一环节，就必须同时保留自动化顺序断言，并重跑 manual QA 里的“首次 PromptPanel -> ThreadWindow 历史入口 handoff”。
 - Settings 打开时会创建模型、外观、builtin tool、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel。Coordinator 只负责注入，不直接读写 `~/.spotAgent/actions` 或 `~/.spotAgent/mcp.json`。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
-- `AppCoordinator` 在 app-server available 后调用 `ActivityWindowCommanding.showActivityWindow()`；show 失败不回退到 Swift StatusBubble。Electron StatusBubble 点击不再回调 Coordinator 打开 PromptPanel，Coordinator 也不解析 `/api/activity` 状态。
+- `AppCoordinator` 在 app-server available 后通过 `ActivityWindowCommanding.showActivityWindow()` 显示桌宠。桌宠交互与 Thread 投影由 Electron renderer 处理，首次文字输入仍走 PromptPanel；Coordinator 不解析 Activity 状态。
 - `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving` 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。
 
 ## 当前 Action 列表
@@ -50,7 +50,7 @@ openHistory / threadWindowClosed
 - 持有 `AgentServerHealth`（来自 AppServices 层）。
 - 通过 `AgentServerHealth.onAvailabilityChange` 驱动 [PromptPanel](/Users/mu9/proj/handAgent/apps/desktop/Sources/PromptPanel/prompt-panel.md) 的提交启停状态。
 - 通过 `AppServerManaging.onHostTerminationRequest` 把 Electron clean exit 转成 Swift 宿主退出。
-- 通过 `ActivityWindowCommanding` 显示 Electron ActivityWindow；该 command client 只承载 ActivityWindow show 命令回执，不承载 activity 数据。
+- 通过 `ActivityWindowCommanding` 显示桌宠原生窗口；该 command client 只承载 show 命令回执，不承载 Thread 或 Activity 数据。
 - 通过 `AppearanceChangeObserving` 接收 macOS 外观变化，并交给 `AppearanceThemeService` 生成宿主主题 payload。
 - `AppActivationPolicyCoordinator` 实例由 Coordinator 创建；SettingsWindow 由 `SettingsLifecycle` 推送激活策略。Electron ThreadWindow open/close ack 只更新 Electron command lifecycle，不再改变 Swift 宿主 activation policy。
 - Coordinator 不再保留 TCA `Store` 或 Swift 侧 thread 状态；Electron ThreadWindow 的消息、历史和运行态都由 React / agent-server 持有。

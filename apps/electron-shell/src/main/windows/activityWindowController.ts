@@ -1,44 +1,63 @@
-import type { BrowserWindowConstructorOptions, Rectangle } from "electron";
+import type { BrowserWindowConstructorOptions, Point, Rectangle } from "electron";
 import type { HostTheme } from "../protocol/electronShellProtocol.js";
+import { PetPositionStore, type PetPosition } from "./petPositionStore.js";
+
+export type PetLayout = "pet" | "compact" | "expanded";
 
 export type BrowserWindowLike = {
   webContents: {
     on(event: "render-process-gone", listener: (event: unknown, details: { reason: string }) => void): unknown;
-    on(event: "before-mouse-event", listener: (event: { preventDefault(): void }, mouse: { type: string; button?: string }) => void): unknown;
     send(channel: "handagent:theme-changed", theme: HostTheme): void;
   };
-  on(event: "closed" | "focus", listener: () => void): unknown;
+  on(event: "closed", listener: () => void): unknown;
   loadFile(filePath: string): Promise<unknown> | unknown;
   setBounds(bounds: Rectangle): void;
+  getBounds(): Rectangle;
+  setIgnoreMouseEvents(ignore: boolean, options: { forward: boolean }): void;
   showInactive(): void;
-  destroy(): void;
 };
 
 type ScreenProvider = {
   getPrimaryWorkArea(): Rectangle;
+  getWorkAreaForPoint(point: Point): Rectangle;
+  getCursorScreenPoint(): Point;
+  subscribeWorkAreaChanges(listener: () => void): () => void;
 };
 
 type Options = {
   activityWindowHTMLPath: string;
   preloadPath: string;
+  threadWebSocketURL?: string;
   initialTheme?: HostTheme;
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
   screenProvider: ScreenProvider;
+  positionStore: PetPositionStore;
   onRendererCrashed?: (reason: string) => void;
-  onNativeFocus?: () => void;
-  onNativeMouseDown?: () => void;
 };
 
-const ACTIVITY_WINDOW_WIDTH = 272;
-const ACTIVITY_WINDOW_HEIGHT = 76;
-const ACTIVITY_WINDOW_MARGIN = 24;
+const PET_WIDTH = 192;
+const PET_HEIGHT = 208;
+const WINDOW_MARGIN = 24;
+const layoutSizes: Record<PetLayout, { width: number; height: number }> = {
+  pet: { width: PET_WIDTH, height: PET_HEIGHT },
+  compact: { width: 368, height: 370 },
+  expanded: { width: 368, height: 640 },
+};
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 
 export class ActivityWindowController {
   private window: BrowserWindowLike | null = null;
+  private bounds: Rectangle | null = null;
+  private position: PetPosition | null = null;
+  private layout: PetLayout = "pet";
+  private interactiveRegions: Rectangle[] = [];
+  private mouseIgnored: boolean | null = null;
+  private moveOrigin: { cursor: Point; position: PetPosition } | null = null;
+  private cursorTimer: ReturnType<typeof setInterval> | null = null;
+  private unsubscribeScreen: (() => void) | null = null;
   private hasLoaded = false;
+  private loadPromise: Promise<void> | null = null;
   private theme: HostTheme;
-  private replacementPromise: Promise<void> | null = null;
   private pendingThemeBroadcast = false;
 
   constructor(private readonly options: Options) {
@@ -46,32 +65,61 @@ export class ActivityWindowController {
   }
 
   async show(): Promise<void> {
-    if (this.replacementPromise) {
-      await this.replacementPromise;
-    }
-
     const window = this.ensureWindow();
-    await this.loadAndShow(window);
+    if (!this.hasLoaded) {
+      this.loadPromise ??= this.load(window).finally(() => {
+        if (this.window === window) this.loadPromise = null;
+      });
+      await this.loadPromise;
+    }
+    if (this.window !== window) throw new Error("pet window closed before it was shown");
+    this.startWatchingScreen();
+    this.updateMouseHit();
+    window.showInactive();
   }
 
   currentWebContents(): BrowserWindowLike["webContents"] | null {
     return this.window?.webContents ?? null;
   }
 
-  releaseNativeFocusForNextClick(): void {
-    const currentWindow = this.window;
-    if (!currentWindow || this.replacementPromise) {
-      return;
-    }
+  setLayout(layout: PetLayout): void {
+    if (!this.window || !this.position || this.layout === layout) return;
+    this.layout = layout;
+    const oldPosition = this.position;
+    this.place(this.position, this.workAreaForPosition(this.position));
+    if (!samePosition(oldPosition, this.position)) this.savePosition();
+  }
 
-    this.replacementPromise = this.replaceWindowWithoutVisibleGap(currentWindow)
-      .catch(() => {
-        // The close path is best-effort: a later explicit activity_window.show command
-        // still reports load failures through its command ack.
-      })
-      .finally(() => {
-        this.replacementPromise = null;
-      });
+  setInteractiveRegions(regions: Rectangle[]): void {
+    if (!this.bounds) return;
+    this.interactiveRegions = clipRegions(regions, this.bounds);
+    this.updateMouseHit();
+  }
+
+  beginMove(): void {
+    if (!this.window || !this.position || !this.hasLoaded || this.moveOrigin) return;
+    this.moveOrigin = {
+      cursor: this.options.screenProvider.getCursorScreenPoint(),
+      position: this.position,
+    };
+    this.updateMouseHit();
+  }
+
+  move(): void {
+    if (!this.moveOrigin || !this.window) return;
+    const cursor = this.options.screenProvider.getCursorScreenPoint();
+    this.place({
+      right: this.moveOrigin.position.right + cursor.x - this.moveOrigin.cursor.x,
+      bottom: this.moveOrigin.position.bottom + cursor.y - this.moveOrigin.cursor.y,
+    }, this.options.screenProvider.getWorkAreaForPoint(cursor));
+  }
+
+  endMove(): void {
+    if (!this.moveOrigin) return;
+    this.move();
+    this.moveOrigin = null;
+    this.savePosition();
+    this.updateMouseHit();
   }
 
   async updateTheme(theme: HostTheme): Promise<void> {
@@ -83,44 +131,25 @@ export class ActivityWindowController {
     }
   }
 
-  private async replaceWindowWithoutVisibleGap(currentWindow: BrowserWindowLike): Promise<void> {
-    const replacementWindow = this.createWindow();
-    replacementWindow.setBounds(this.boundsForPrimaryWorkArea());
-    const loadResult = replacementWindow.loadFile(this.options.activityWindowHTMLPath);
-    if (isPromiseLike(loadResult)) {
-      await loadResult;
-    }
-    replacementWindow.webContents.send("handagent:theme-changed", this.theme);
-    replacementWindow.showInactive();
-
-    if (this.window !== currentWindow) {
-      replacementWindow.destroy();
-      return;
-    }
-
-    this.window = replacementWindow;
-    this.hasLoaded = true;
-    this.pendingThemeBroadcast = false;
-    currentWindow.destroy();
-  }
-
   private ensureWindow(): BrowserWindowLike {
-    if (this.window) {
-      return this.window;
+    if (this.window) return this.window;
+    const primaryArea = this.options.screenProvider.getPrimaryWorkArea();
+    this.position ??= this.options.positionStore.load() ?? {
+      right: primaryArea.x + primaryArea.width - WINDOW_MARGIN,
+      bottom: primaryArea.y + primaryArea.height - WINDOW_MARGIN,
+    };
+    const additionalArguments = [`--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`];
+    if (this.options.threadWebSocketURL) {
+      additionalArguments.push(`--handagent-pet-thread-websocket-url=${encodeURIComponent(this.options.threadWebSocketURL)}`);
     }
-
-    const window = this.createWindow();
-    this.window = window;
-    return window;
-  }
-
-  private createWindow(): BrowserWindowLike {
+    const bounds = boundsFor(this.position, this.layout, this.workAreaForPosition(this.position));
     const window = this.options.createWindow({
-      width: ACTIVITY_WINDOW_WIDTH,
-      height: ACTIVITY_WINDOW_HEIGHT,
+      ...bounds,
       show: false,
       frame: false,
       transparent: true,
+      backgroundColor: "#00000000",
+      hasShadow: false,
       alwaysOnTop: true,
       skipTaskbar: true,
       focusable: true,
@@ -130,78 +159,128 @@ export class ActivityWindowController {
         preload: this.options.preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
-        additionalArguments: [`--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`],
+        additionalArguments,
       },
     });
-
+    this.window = window;
+    this.place(this.position, this.workAreaForPosition(this.position));
+    this.savePosition();
     window.on("closed", () => {
-      if (this.window === window) {
-        this.window = null;
-        this.hasLoaded = false;
-        this.pendingThemeBroadcast = false;
-      }
-    });
-    window.on("focus", () => {
-      if (this.window === window) {
-        this.options.onNativeFocus?.();
-      }
+      if (this.window !== window) return;
+      if (this.moveOrigin) this.savePosition();
+      if (this.cursorTimer) clearInterval(this.cursorTimer);
+      this.unsubscribeScreen?.();
+      this.cursorTimer = null;
+      this.unsubscribeScreen = null;
+      this.window = null;
+      this.bounds = null;
+      this.layout = "pet";
+      this.interactiveRegions = [];
+      this.moveOrigin = null;
+      this.mouseIgnored = null;
+      this.hasLoaded = false;
+      this.loadPromise = null;
+      this.pendingThemeBroadcast = false;
     });
     window.webContents.on("render-process-gone", (_event, details) => {
-      if (details.reason === "clean-exit") {
-        return;
-      }
+      if (this.window !== window || details.reason === "clean-exit") return;
+      this.moveOrigin = null;
+      this.interactiveRegions = [];
+      this.updateMouseHit();
       this.options.onRendererCrashed?.(details.reason);
     });
-    window.webContents.on("before-mouse-event", (event, mouse) => {
-      if (
-        mouse.type !== "mouseDown" ||
-        (mouse.button !== undefined && mouse.button !== "left")
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      this.options.onNativeMouseDown?.();
-    });
-
     return window;
   }
 
-  private async loadAndShow(window: BrowserWindowLike): Promise<void> {
-    window.setBounds(this.boundsForPrimaryWorkArea());
-
-    if (!this.hasLoaded) {
-      const loadResult = window.loadFile(this.options.activityWindowHTMLPath);
-      if (isPromiseLike(loadResult)) {
-        await loadResult;
-      }
-      if (this.window !== window) {
-        throw new Error("activity window closed before it was shown");
-      }
-      this.hasLoaded = true;
-      if (this.pendingThemeBroadcast) {
-        this.pendingThemeBroadcast = false;
-        window.webContents.send("handagent:theme-changed", this.theme);
-      }
+  private async load(window: BrowserWindowLike): Promise<void> {
+    await window.loadFile(this.options.activityWindowHTMLPath);
+    if (this.window !== window) throw new Error("pet window closed before it was shown");
+    this.hasLoaded = true;
+    if (this.pendingThemeBroadcast) {
+      this.pendingThemeBroadcast = false;
+      window.webContents.send("handagent:theme-changed", this.theme);
     }
-
-    window.showInactive();
   }
 
-  private boundsForPrimaryWorkArea(): Rectangle {
-    const workArea = this.options.screenProvider.getPrimaryWorkArea();
-    return {
-      x: workArea.x + workArea.width - ACTIVITY_WINDOW_WIDTH - ACTIVITY_WINDOW_MARGIN,
-      y: workArea.y + workArea.height - ACTIVITY_WINDOW_HEIGHT - ACTIVITY_WINDOW_MARGIN,
-      width: ACTIVITY_WINDOW_WIDTH,
-      height: ACTIVITY_WINDOW_HEIGHT,
-    };
+  private startWatchingScreen(): void {
+    if (!this.cursorTimer) {
+      // 系统光标轮询也覆盖跨应用拖入；不能等被穿透窗口收到 mousemove 才恢复命中。
+      this.cursorTimer = setInterval(() => this.updateMouseHit(), 16);
+      this.cursorTimer.unref();
+    }
+    this.unsubscribeScreen ??= this.options.screenProvider.subscribeWorkAreaChanges(() => {
+      if (!this.position) return;
+      this.place(this.position, this.workAreaForPosition(this.position));
+      this.savePosition();
+    });
+  }
+
+  private workAreaForPosition(position: PetPosition): Rectangle {
+    return this.options.screenProvider.getWorkAreaForPoint({
+      x: position.right - PET_WIDTH / 2,
+      y: position.bottom - PET_HEIGHT / 2,
+    });
+  }
+
+  private place(position: PetPosition, workArea: Rectangle): void {
+    if (!this.window) return;
+    const previousBounds = this.bounds;
+    this.window.setBounds(boundsFor(position, this.layout, workArea));
+    this.bounds = this.window.getBounds();
+    this.position = { right: this.bounds.x + this.bounds.width, bottom: this.bounds.y + this.bounds.height };
+    if (previousBounds) {
+      // renderer 的 ResizeObserver 回报新矩形前，已知命中区域随右下锚点一起移动。
+      this.interactiveRegions = clipRegions(this.interactiveRegions.map((region) => ({
+        ...region,
+        x: region.x + this.bounds!.width - previousBounds.width,
+        y: region.y + this.bounds!.height - previousBounds.height,
+      })), this.bounds);
+    }
+    this.updateMouseHit();
+  }
+
+  private updateMouseHit(): void {
+    if (!this.window || !this.bounds) return;
+    const cursor = this.options.screenProvider.getCursorScreenPoint();
+    const localX = cursor.x - this.bounds.x;
+    const localY = cursor.y - this.bounds.y;
+    const interactive = this.moveOrigin !== null || this.interactiveRegions.some((region) => (
+      localX >= region.x && localX < region.x + region.width
+      && localY >= region.y && localY < region.y + region.height
+    ));
+    if (this.mouseIgnored === !interactive) return;
+    this.mouseIgnored = !interactive;
+    this.window.setIgnoreMouseEvents(!interactive, { forward: true });
+  }
+
+  private savePosition(): void {
+    if (this.position) this.options.positionStore.save(this.position);
   }
 }
 
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return typeof value === "object"
-    && value !== null
-    && "then" in value
-    && typeof value.then === "function";
+function boundsFor(position: PetPosition, layout: PetLayout, workArea: Rectangle): Rectangle {
+  const width = Math.min(layoutSizes[layout].width, workArea.width);
+  const height = Math.min(layoutSizes[layout].height, workArea.height);
+  return {
+    x: Math.round(Math.min(Math.max(position.right - width, workArea.x), workArea.x + workArea.width - width)),
+    y: Math.round(Math.min(Math.max(position.bottom - height, workArea.y), workArea.y + workArea.height - height)),
+    width,
+    height,
+  };
+}
+
+function clipRegions(regions: Rectangle[], bounds: Rectangle): Rectangle[] {
+  return regions.map((region) => {
+    const x = Math.max(0, region.x);
+    const y = Math.max(0, region.y);
+    return {
+      x, y,
+      width: Math.min(bounds.width, region.x + region.width) - x,
+      height: Math.min(bounds.height, region.y + region.height) - y,
+    };
+  }).filter((region) => region.width > 0 && region.height > 0);
+}
+
+function samePosition(left: PetPosition, right: PetPosition): boolean {
+  return left.right === right.right && left.bottom === right.bottom;
 }

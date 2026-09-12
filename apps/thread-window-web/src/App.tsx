@@ -28,20 +28,10 @@ function id(prefix: string) {
 }
 
 export function App() {
-  const state = createThreadWindowStore();
-  const threads = Object.values(state.threadsById);
   const clientRef = useRef<ThreadSocketClient | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [deleteTargetThreadId, setDeleteTargetThreadId] = useState<string | null>(null);
   const sidebarLayout = useSidebarLayout();
-  const queuedDispatchKey = threads
-    .map((thread) => [
-      thread.threadId,
-      thread.status,
-      thread.queuedComposerInputs.length,
-      thread.queuedInputDispatchPending ? "pending" : "ready",
-    ].join(":"))
-    .join("|");
 
   useEffect(() => {
     applyThemeToDocument(getInitialTheme());
@@ -78,18 +68,6 @@ export function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (state.connectionState !== "connected") {
-      return;
-    }
-    const store = createThreadWindowStore.getState();
-    for (const thread of Object.values(store.threadsById)) {
-      const nextInput = store.takeNextQueuedInputForDispatch(thread.threadId);
-      if (nextInput) {
-        clientRef.current?.submitOp(thread.threadId, nextInput.op);
-      }
-    }
-  }, [state.connectionState, queuedDispatchKey]);
 
   const handleNewThread = () => {
     const commandId = id('start');
@@ -135,32 +113,15 @@ export function App() {
           threadId={activeThreadId}
           onSubmit={(threadId, userInput) => {
             const latestThread = createThreadWindowStore.getState().threadsById[threadId];
-            if (!latestThread) {
+            if (!latestThread || createThreadWindowStore.getState().connectionState !== "connected") {
               return;
             }
-            const shouldQueue =
-              latestThread.status === "running"
-              || latestThread.queuedInputDispatchPending
-              || latestThread.queuedComposerInputs.length > 0;
-            if (shouldQueue) {
-              createThreadWindowStore.getState().queueComposerInput(threadId, {
-                type: "user_input",
-                opId: id("op"),
-                timestamp: now(),
-                payload: cloneUserInput(userInput),
-              });
-              return;
-            }
-            createThreadWindowStore.getState().markComposerInputDispatchPending(threadId);
             clientRef.current?.submitOp(threadId, {
               type: "user_input",
               opId: id("op"),
               timestamp: now(),
               payload: cloneUserInput(userInput),
             });
-          }}
-          onRemoveQueuedInput={(threadId, index) => {
-            createThreadWindowStore.getState().removeQueuedComposerInput(threadId, index);
           }}
           onStop={(threadId) => {
             const latestThread = createThreadWindowStore.getState().threadsById[threadId];
@@ -181,7 +142,6 @@ export function App() {
               decision,
               scope,
             }));
-            createThreadWindowStore.getState().resolvePermissionRequest(requestId);
           }}
           onAnswerWorkspace={(requestId, workspaceId) => {
             clientRef.current?.sendRaw(encodeWorkspaceAnswer({
@@ -189,7 +149,6 @@ export function App() {
               timestamp: now(),
               ...(workspaceId ? { workspaceId } : { cancelled: true }),
             }));
-            createThreadWindowStore.getState().resolveWorkspaceRequest(requestId);
           }}
         />
         <AlertDialog.Root
