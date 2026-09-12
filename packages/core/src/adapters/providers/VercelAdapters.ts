@@ -1,6 +1,16 @@
-import { jsonSchema, tool, type JSONValue, type ModelMessage, type ToolSet } from "ai";
+import {
+  jsonSchema,
+  tool,
+  type ImagePart,
+  type JSONValue,
+  type ModelMessage,
+  type TextPart,
+  type ToolResultPart,
+  type ToolSet,
+} from "ai";
 import { createParser, type EventSourceMessage } from "eventsource-parser";
 import type { BlobStore } from "../../blob/types/BlobStore.ts";
+import type { DynamicToolCallResponsePayload } from "../../protocol/types/DynamicTool.ts";
 import type { AgentImageContentPart, AgentMessage } from "../../runtime/types/AgentMessage.ts";
 import type { RegisteredTool } from "../../tools/ToolRegistry.ts";
 
@@ -152,13 +162,15 @@ function formatSSEMessage(event: EventSourceMessage): string {
 
 export type VercelMessageAdapterOptions = {
   blobStore?: BlobStore;
+  // Chat 只支持 user 图片；Responses / Anthropic 支持工具结果中的图片。
+  toolResultImages?: "native" | "user";
 };
 
 export async function toVercelMessages(
   messages: AgentMessage[],
   options: VercelMessageAdapterOptions = {},
 ): Promise<ModelMessage[]> {
-  return Promise.all(messages.map(async (message) => {
+  const converted: ModelMessage[] = await Promise.all(messages.map(async (message) => {
     switch (message.role) {
       case "user":
         return {
@@ -222,15 +234,23 @@ export async function toVercelMessages(
         };
     }
   }));
+  return options.toolResultImages === "user" ? moveToolImagesToUserMessages(converted) : converted;
 }
 
 export function hasImageContent(messages: AgentMessage[]): boolean {
-  return messages.some(
-    (message) =>
-      message.role === "user" &&
-      Array.isArray(message.content) &&
-      message.content.some((part) => part.type === "image"),
-  );
+  return messages.some((message) => {
+    if (message.role === "user") {
+      return Array.isArray(message.content) && message.content.some((part) => part.type === "image");
+    }
+    if (message.role === "tool") {
+      try {
+        return isDynamicToolImageResponse(JSON.parse(message.content));
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
 }
 
 export function toVercelTools(tools: RegisteredTool[]): ToolSet {
@@ -256,18 +276,107 @@ export function toVercelTools(tools: RegisteredTool[]): ToolSet {
   ) as ToolSet;
 }
 
-function toToolResultOutput(content: string) {
+function toToolResultOutput(content: string): ToolResultPart["output"] {
+  let value: JSONValue;
   try {
-    return {
-      type: "json" as const,
-      value: JSON.parse(content) as JSONValue,
-    };
+    value = JSON.parse(content) as JSONValue;
   } catch {
     return {
       type: "text" as const,
       value: content,
     };
   }
+  if (!isDynamicToolImageResponse(value)) {
+    return { type: "json" as const, value };
+  }
+
+  const { contentItems, ...metadata } = value;
+  return {
+    type: "content" as const,
+    value: [
+      { type: "text" as const, text: JSON.stringify(metadata) },
+      ...contentItems.flatMap<TextPart | ReturnType<typeof toVercelToolImagePart>>((item, index) => item.type === "inputText"
+        ? [{ type: "text", text: item.text }]
+        : [
+          // 包络与 Chat 归属文本会改变 SDK 数组下标，显式保留原 imageContentIndex 的指向。
+          { type: "text", text: `图像 contentItems[${index}]：` },
+          toVercelToolImagePart(item.imageUrl),
+        ]),
+    ],
+  };
+}
+
+function isDynamicToolImageResponse(value: unknown): value is DynamicToolCallResponsePayload {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const payload = value as Record<string, unknown>;
+  return typeof payload.callId === "string" && typeof payload.success === "boolean" &&
+    Array.isArray(payload.contentItems) &&
+    payload.contentItems.every((item) => typeof item === "object" && item !== null && (
+      (item.type === "inputText" && typeof item.text === "string") ||
+      (item.type === "inputImage" && typeof item.imageUrl === "string")
+    )) && payload.contentItems.some((item) => item.type === "inputImage");
+}
+
+function toVercelToolImagePart(imageUrl: string) {
+  const dataURL = /^data:(image\/[\w.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(imageUrl);
+  if (dataURL) {
+    return { type: "image-data" as const, mediaType: dataURL[1], data: dataURL[2] };
+  }
+  const url = new URL(imageUrl);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Dynamic Tool image must be a base64 image data URL or an HTTP(S) URL.");
+  }
+  return { type: "image-url" as const, url: imageUrl };
+}
+
+function moveToolImagesToUserMessages(messages: ModelMessage[]): ModelMessage[] {
+  const result: ModelMessage[] = [];
+  let pendingImages: Array<TextPart | ImagePart> = [];
+  const flushImages = () => {
+    if (pendingImages.length === 0) return;
+    result.push({ role: "user", content: pendingImages });
+    pendingImages = [];
+  };
+
+  for (const message of messages) {
+    if (message.role !== "tool") {
+      flushImages();
+      result.push(message);
+      continue;
+    }
+    result.push({
+      ...message,
+      content: message.content.map((part) => {
+        if (part.type !== "tool-result" || part.output.type !== "content" ||
+          !part.output.value.some((item) => item.type === "image-data" || item.type === "image-url")) {
+          return part;
+        }
+        const text: string[] = [];
+        pendingImages.push({ type: "text", text: `工具 ${part.toolName}（toolCallId: ${part.toolCallId}）返回的图片及原始说明：` });
+        for (const item of part.output.value) {
+          switch (item.type) {
+            case "text":
+              text.push(item.text);
+              pendingImages.push(item);
+              break;
+            case "image-data":
+              pendingImages.push({ type: "image", image: Buffer.from(item.data, "base64"), mediaType: item.mediaType });
+              break;
+            case "image-url":
+              pendingImages.push({ type: "image", image: new URL(item.url) });
+              break;
+            default:
+              throw new Error(`Unsupported Dynamic Tool image content: ${item.type}`);
+          }
+        }
+        text.push(`图片随本组工具结果后的消息提供（toolCallId: ${part.toolCallId}）。`);
+        return { ...part, output: { type: "text" as const, value: text.join("\n") } };
+      }),
+    });
+  }
+  // 必须等一组 tool results 全部发完，再追加图片，保持 Chat 的 tool_call 配对顺序。
+  flushImages();
+  return result;
 }
 
 async function toVercelImagePart(

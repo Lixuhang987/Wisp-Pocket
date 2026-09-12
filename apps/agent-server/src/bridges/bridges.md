@@ -16,10 +16,14 @@ Permission 与 Workspace 的待答请求由 core Thread 拥有，经 `/api/threa
 
 新的 `/api/dynamic-tools` socket 发送 `provider_hello` 后会按 `clientId` 替换旧 provider 绑定，并让旧 token 下的 pending request 以 offline 失败。pending key 使用 provider token + provider-facing `callId`，因此不同 provider 同时返回相同 `callId` 不会互相唤醒；旧 socket 晚到的 response 因 token 不匹配会被忽略。`WebSocketDynamicToolBridge` 不挂载在 `/api/thread`，也不与 ThreadWindow UI 共享 WebSocket；它只转发 dynamic tool 请求，不实现 macOS 能力。
 
+同一 socket、相同 `clientId` 的再次 hello 由 [server handler](../server/server.md) 视为声明刷新，不重复调用 `attach`。业务工具开关变化因此不会让仍在执行的调用误报 offline；真正的连接替换仍遵守上述 token fencing。
+
 ## 失败语义
 
 - provider 不可用：`bridge.call` reject，由 `DynamicToolAdapter` / runtime 变成 tool 失败。
-- dynamic tool request 超时：`bridge.call` reject 超时错误，由 runtime 变成 tool 失败。
+- `bridge.call` 默认等待 Provider 响应或真实连接失效；只有调用方显式传入 `timeoutMs` 时建立 deadline 并在到期时 reject。正常长时间 Automation 不能因传输层默认 15 秒限制被误报失败。
+- 发送函数同步抛错时，在拒绝调用前清理该 pending 与 timer；相同 callId 后续可重新发送。不能留下既已失败、又占用在途关联的请求。
+- Thread 中断停止旧 Turn 投影，但不发送 Provider cancel；宿主 Automation 取消由禁用功能或退出应用触发。两端生命周期边界见 [core Thread](../../../../packages/core/src/thread/thread.md) 与 [Swift 平台桥](../../../desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
 
 ## 编辑约束
 

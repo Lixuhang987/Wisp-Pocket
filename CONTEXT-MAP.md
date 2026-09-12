@@ -6,12 +6,12 @@ Wisp Pocket 由三个领域上下文组成。术语只在一个上下文中定�
 
 - [Conversation Runtime](./packages/core/CONTEXT.md)：定义 Thread、Turn、输入、协议消息族、Tool、Workspace 与 Permission。
 - [Desktop Experience](./apps/desktop/CONTEXT.md)：定义用户入口、常驻交互界面、附件、Append Prompt 与 AgentTrigger。
-- [Host Automation](./apps/builtin-plugins/CONTEXT.md)：定义 Plugin、宿主原子能力、Context History 与可修复 Automation。
+- [Host Automation](./apps/host-automation/CONTEXT.md)：定义宿主能力、Context History、Automation 及其证据与修复数据。
 
 ## Relationships
 
 - **Desktop Experience → Conversation Runtime**：提交 `UserInput`，展示 Thread 状态，并承接需要用户决定的请求。
-- **Desktop Experience → Host Automation**：安装、启停 Plugin，并把其能力注册为 Dynamic Tool。
+- **Desktop Experience → Host Automation**：直接组合两个内置业务模块，保存启用选择，提供共享 macOS 能力，并注册 Dynamic Tool。
 - **Host Automation → Conversation Runtime**：通过 Dynamic Tool 提供宿主读取和操作能力，不直接拥有 Thread。
 
 ## Adapters

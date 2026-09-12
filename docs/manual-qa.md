@@ -63,19 +63,19 @@
   5. 去掉 `TAVILY_API_KEY` 后重启，确认 `web_search` 返回明确缺 key 错误且 App 不崩溃。
   6. 请求抓取 localhost、127.0.0.1 或私网地址，确认 `fetch_page` 拒绝。
 
-## Context History 与自进化 Automation 官方 Plugin
+## 内置 Context History 与 Automation（Issue #4）
 
-- **状态**：已实现，待实机 QA。
-- **自动化验证**：`bash ./scripts/swiftw test --filter PluginDynamicToolsTests`、`bash ./scripts/swiftw test --filter ContextHistoryPluginCoreTests`、`bash ./scripts/swiftw test --filter AutomationRuntimeTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
-- **验收步骤**：
-  1. 启动桌面 App，确认官方 Plugin Manifest 写入 `~/.spotAgent/plugins/`；Atomic Capability Plugin 默认 enabled，Context History 与 Automation 默认 disabled。
-  2. 启用 Context History 后重启，确认 Dynamic Tool 列表包含 activity index、sample details、thumbnails、original screenshot，并且 index 不返回完整 AX 树或原图。
-  3. 切换前台 app/window 并等待采样 tick，确认 activity sample、周期 sample 和 60 秒截图记录按预期出现。
-  4. 启用 Automation runtime 后重启，确认 record、policy、run、history、repair tools 暴露。
-  5. 录制 click / setValue / typeText / hotkey / waitFor / assertion，确认每个 event 含 before/after app-window、AX、screenshot evidence。
-  6. 用最小 policy 调用 `automation.run`，失败时确认 run 记录、repair request、fallback patch 和 `automation.history` 都可追踪。
-  7. 调用 `automation.repair_apply`，确认 policy version 增加、repair request 变为 `applied`，重复 apply 会失败。
-  8. 修改官方 manifest 的非 enabled 字段后重启，确认 installer 修复 manifest 且保留用户 enabled 选择。
+- **状态**：内置实现与 Provider 用例已接入；以下全部待实机，自动化通过不能代替验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，逐项操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
+- **实机阻塞（2026-09-13）**：旧 `/tmp/issue1-live/app/Wisp Pocket.app`（PID 34930）仍在运行，其 node（PID 34956）监听 `127.0.0.1:4317`；已请求允许暂时退出，尚未收到答复。本任务的 app / fixture 均未启动，九项均未执行，没有本规格的 QA 通过记录。
+- [ ] **CH1 默认与持久化**：确认两个开关默认关闭，启用后立即声明对应工具，重启遵守保存选择，声明刷新保留在途调用。
+- [ ] **CH2 变化与周期采样**：实际切换 app/window 并持续停留，核对变化样本、30 秒周期样本、60 秒截图及目标关联。
+- [ ] **CH3 查询与证据可读**：经真实工具读取索引、批量 AX 详情、缩略图和原图，核对内容、时间和标识；损坏/缺失证据与权限失败可定位。
+- [ ] **CH4 窗口关闭**：关闭 Settings 与 ThreadWindow 后持续采集，经重新打开后的真实工具读到关闭期间记录。
+- [ ] **CH5 停机与重启**：禁用后和完全退出后均无新写入；重启遵守配置并能读取旧活动、AX 与图片。
+- [ ] **AU1 录制与保存**：实际受控操作跨工具调用保留会话，停止保存 Trace；验证显式事件与真实用户事件、证据时间/引用及监听清理。
+- [ ] **AU2 持久流程重跑**：保存 Trace/Policy 后重启，按 policyId 在真实窗口执行步骤、条件与断言，经 history 核对结果与证据。
+- [ ] **AU3 失败与显式修复**：失败保留进度、原因和证据；修复数据应用不改写失败 Run，只有真实重跑才产生新成功记录。
+- [ ] **HOST1 宿主能力与清理**：验证保留的宿主读取/操作、可消费图片和明确参数失败；核对产物/进程，恢复配置并清理本次测试资源。
 
 ## Issue #3 前后端状态所有权收敛
 

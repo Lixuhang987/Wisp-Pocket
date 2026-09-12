@@ -6,6 +6,11 @@ import { join } from "node:path";
 import { threadHarness, input } from "../support/threadHarness.ts";
 import { attachThreadSocketHandlers } from "../../src/server/server.ts";
 import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
+import type { DynamicToolCallRequestPayload } from "@handagent/core/protocol/types/DynamicTool.ts";
+import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
+import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
+import { AgentRuntime } from "@handagent/core/runtime/AgentRuntime.ts";
+import { WebSocketDynamicToolBridge } from "../../src/bridges/WebSocketDynamicToolBridge.ts";
 const echo = { complete: async (messages: AgentMessage[]) => ({ message: { role: "assistant" as const, content: `reply:${messages.at(-1)?.content}` } }) };
 const wait = (check: () => void) => vi.waitFor(check, { timeout: 1500, interval: 5 });
 
@@ -97,6 +102,43 @@ describe("Thread ownership through public lifecycle", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect((await h.persistence.getMessages(thread.id))).toHaveLength(1);
     } finally { gate.resolve(); await h.close(); }
+  });
+
+  it("interrupts a Thread while its Dynamic Tool is pending and ignores the provider's late result", async () => {
+    const bridge = new WebSocketDynamicToolBridge();
+    const entered = Promise.withResolvers<DynamicToolCallRequestPayload>();
+    const token = bridge.attach("swift-host", (message) => entered.resolve(message.payload));
+    let completion = 0;
+    const client = { complete: async () => ({
+      message: { role: "assistant" as const, content: "" },
+      toolCalls: [{ id: `call-${++completion}`, name: completion === 1 ? "use_tools" : "automation.run", arguments: completion === 1 ? {} : { policyId: "waiting-policy" } }],
+    }) };
+    const h = threadHarness(client, {
+      createTools: (dynamicTools) => new ThreadTools({
+        builtinRegistry: new ToolRegistry(), globalMcpServerIds: [], listMcpTools: async () => [], dynamicToolBridge: bridge,
+      }, dynamicTools),
+      createRuntime: (_id, tools) => new AgentRuntime(client, tools.registry, {
+        onMetaToolActivate: () => tools.activate(), isThreadActivated: () => tools.isActivated(),
+      }),
+    });
+    try {
+      const thread = await h.threads.create({ dynamicTools: [{
+        clientId: "swift-host", namespace: "automation", name: "run", description: "Run saved policy", inputSchema: { type: "object" },
+      }] });
+      await thread.submit(input("run then interrupt"));
+      const request = await entered.promise;
+      await thread.interrupt();
+      expect(thread.status).toBe("interrupted");
+      const saved = await h.persistence.getMessages(thread.id);
+      bridge.handleResponse({
+        callId: request.callId, success: true,
+        contentItems: [{ type: "inputText", text: "late provider completion" }],
+      }, token);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(await h.persistence.getMessages(thread.id)).toEqual(saved);
+      expect(thread.status).toBe("interrupted");
+      expect(completion).toBe(2);
+    } finally { bridge.close(); await h.close(); }
   });
 
   it("deletes an executing Thread, rejects new input and never recreates history from late results", async () => {

@@ -34,6 +34,8 @@ public struct AutomationStep: Codable, Equatable {
     public var bundleId: String?
     public var condition: AutomationCondition?
     public var timeoutMs: Int?
+    public var position: [String: Double]?
+    public var button: String?
 
     public init(
         kind: AutomationStepKind,
@@ -41,7 +43,9 @@ public struct AutomationStep: Codable, Equatable {
         value: String? = nil,
         bundleId: String? = nil,
         condition: AutomationCondition? = nil,
-        timeoutMs: Int? = nil
+        timeoutMs: Int? = nil,
+        position: [String: Double]? = nil,
+        button: String? = nil
     ) {
         self.kind = kind
         self.selector = selector
@@ -49,6 +53,8 @@ public struct AutomationStep: Codable, Equatable {
         self.bundleId = bundleId
         self.condition = condition
         self.timeoutMs = timeoutMs
+        self.position = position
+        self.button = button
     }
 }
 
@@ -140,30 +146,20 @@ public enum AutomationJSONValue: Codable, Equatable {
     case null
 
     public init(any value: Any?) {
-        guard let value else {
+        switch value {
+        case nil, is NSNull:
             self = .null
-            return
-        }
-        if let value = value as? String {
+        case let value as String:
             self = .string(value)
-        } else if let value = value as? Bool {
-            self = .bool(value)
-        } else if let value = value as? Int {
-            self = .number(Double(value))
-        } else if let value = value as? Double {
-            self = .number(value)
-        } else if let value = value as? NSNumber {
-            if CFGetTypeID(value) == CFBooleanGetTypeID() {
-                self = .bool(value.boolValue)
-            } else {
-                self = .number(value.doubleValue)
-            }
-        } else if let value = value as? [String: Any] {
+        case let value as NSNumber:
+            self = CFGetTypeID(value) == CFBooleanGetTypeID()
+                ? .bool(value.boolValue) : .number(value.doubleValue)
+        case let value as [String: Any]:
             self = .object(value.mapValues { AutomationJSONValue(any: $0) })
-        } else if let value = value as? [Any] {
+        case let value as [Any]:
             self = .array(value.map { AutomationJSONValue(any: $0) })
-        } else {
-            self = .string(String(describing: value))
+        default:
+            self = .string(String(describing: value!))
         }
     }
 
@@ -217,12 +213,10 @@ public struct AutomationRunRecord: Codable, Equatable {
     public var steps: [AutomationStepRecord]
     public var evidence: [String: AutomationJSONValue]?
     public var failureReason: String?
+    public var failedStepIndex: Int?
+    public var failureStage: String?
     public var patchId: String?
     public var repairEvidence: [String: String]?
-}
-
-public protocol AutomationCapabilityCalling {
-    func call(namespace: String, tool: String, arguments: [String: Any]) async throws -> [String: Any]
 }
 
 public struct AutomationRepairRequest {
@@ -237,26 +231,14 @@ public struct AutomationRepairRequest {
     public var screenshot: [String: Any]
 }
 
-public struct AutomationRepairResult {
-    public var branch: AutomationBranch
-    public var evidence: [String: String]
-
-    public init(branch: AutomationBranch, evidence: [String: String]) {
-        self.branch = branch
-        self.evidence = evidence
-    }
-}
-
-public protocol AutomationRepairing {
-    func repair(request: AutomationRepairRequest) async throws -> AutomationRepairResult
-}
-
+@MainActor
 public protocol AutomationLiveEventRecording {
     func start(recordingId: String) throws
     func stop(recordingId: String) throws -> [[String: Any]]
 }
 
-public final class AutomationRepairRequestStore: @unchecked Sendable {
+@MainActor
+public final class AutomationRepairRequestStore {
     private let store: AutomationStore
 
     public init(store: AutomationStore) {
@@ -307,161 +289,155 @@ public final class AutomationRepairRequestStore: @unchecked Sendable {
     }
 }
 
-public final class AutomationRecordingService: @unchecked Sendable {
-    private let capabilityClient: AutomationCapabilityCalling
-    private let liveRecorder: AutomationLiveEventRecording?
+@MainActor
+public final class AutomationRecordingService {
+    private let host: any HostAutomationCapabilities
+    private let liveRecorder: (any AutomationLiveEventRecording)?
     private var sessions: [String: [String: Any]] = [:]
 
-    public init(capabilityClient: AutomationCapabilityCalling, liveRecorder: AutomationLiveEventRecording? = nil) {
-        self.capabilityClient = capabilityClient
+    public init(host: any HostAutomationCapabilities, liveRecorder: (any AutomationLiveEventRecording)? = nil) {
+        self.host = host
         self.liveRecorder = liveRecorder
     }
 
-    public func start(arguments: Any?) async -> [String: Any] {
+    public func start(arguments: Any?) async throws -> [String: Any] {
         let object = dictionaryArgument(arguments)
         let recordingId = stringArgument(arguments, "recordingId", fallback: UUID().uuidString)
-        let evidence = await captureEvidence()
+        try validateAutomationID(recordingId)
+        guard sessions[recordingId] == nil else {
+            throw AutomationRuntimeError.invalidArgument("recordingId is already active")
+        }
+        let evidence = await captureAutomationEvidence(host: host)
+        try Task.checkCancellation()
         let targetBundleId = stringValue(object["targetBundleId"])
             ?? ((evidence["appWindow"] as? [String: Any])?["app"] as? [String: Any])?["bundleId"] as? String
         var session: [String: Any] = [
-            "recordingId": recordingId,
-            "startedAt": iso8601(Date()),
-            "initialEvidence": evidence,
-            "lastEvidence": evidence,
-            "events": [],
+            "recordingId": recordingId, "startedAt": iso8601(Date()),
+            "initialEvidence": evidence, "lastEvidence": evidence, "events": [],
         ]
-        if let targetBundleId {
-            session["targetBundleId"] = targetBundleId
-        }
+        if let targetBundleId { session["targetBundleId"] = targetBundleId }
         if boolValue(object["captureUserEvents"]) {
-            do {
-                try liveRecorder?.start(recordingId: recordingId)
-                session["liveRecording"] = liveRecorder == nil ? "unavailable" : "running"
-            } catch {
-                session["liveRecording"] = "unavailable"
-                session["liveRecordingError"] = error.localizedDescription
+            guard let liveRecorder else {
+                throw AutomationRuntimeError.invalidArgument("live user event recording is unavailable")
             }
+            try liveRecorder.start(recordingId: recordingId)
+            session["liveRecording"] = "running"
         }
         sessions[recordingId] = session
-        var response: [String: Any] = [
-            "recordingId": recordingId,
-            "status": "recording",
-            "initialEvidence": evidence,
-        ]
-        if let targetBundleId {
-            response["targetBundleId"] = targetBundleId
-        }
-        if let liveRecording = session["liveRecording"] {
-            response["liveRecording"] = liveRecording
-        }
-        if let liveRecordingError = session["liveRecordingError"] {
-            response["liveRecordingError"] = liveRecordingError
-        }
+        var response = session
+        response["status"] = "recording"
+        response.removeValue(forKey: "lastEvidence")
+        response.removeValue(forKey: "events")
         return response
     }
 
     public func recordEvent(arguments: Any?) async throws -> [String: Any] {
         let object = dictionaryArgument(arguments)
         let recordingId = stringArgument(arguments, "recordingId")
-        guard var session = sessions[recordingId] else {
-            throw AutomationRuntimeError.recordingNotFound
-        }
+        guard var session = sessions[recordingId] else { throw AutomationRuntimeError.recordingNotFound }
         let event = dictionaryArgument(object["event"]).merging(metadataArguments(from: object)) { current, _ in current }
+        guard !event.isEmpty else { throw AutomationRuntimeError.invalidArgument("event is required") }
+        try validateAutomationBranch(automationBranch(from: ["events": [event]]))
         let (recorded, after) = await recordedEvent(from: event, previousEvidence: session["lastEvidence"] as? [String: Any] ?? [:])
+        try Task.checkCancellation()
         var events = session["events"] as? [[String: Any]] ?? []
         events.append(recorded)
         session["events"] = events
         session["lastEvidence"] = after
         sessions[recordingId] = session
-        return [
-            "recordingId": recordingId,
-            "status": "recording",
-            "eventIndex": events.count - 1,
-            "event": recorded,
-        ]
+        return ["recordingId": recordingId, "status": "recording", "eventIndex": events.count - 1, "event": recorded]
     }
 
     public func stop(arguments: Any?, store: AutomationStore) async throws -> [String: Any] {
         let object = dictionaryArgument(arguments)
         let recordingId = stringArgument(arguments, "recordingId")
         let traceId = stringArgument(arguments, "traceId", fallback: recordingId.isEmpty ? UUID().uuidString : recordingId)
-        guard !recordingId.isEmpty, var session = sessions.removeValue(forKey: recordingId) else {
+        try validateAutomationID(traceId)
+        let suppliedEvents = object["events"] as? [[String: Any]] ?? []
+        if object["events"] != nil, !(object["events"] is [[String: Any]]) {
+            throw AutomationRuntimeError.invalidArgument("events must be an array of event objects")
+        }
+        for event in suppliedEvents { try validateAutomationBranch(automationBranch(from: ["events": [event]])) }
+        if recordingId.isEmpty {
+            guard !suppliedEvents.isEmpty else {
+                throw AutomationRuntimeError.invalidArgument("recordingId or a nonempty events trace is required")
+            }
             try store.saveTrace(id: traceId, payload: object)
-            return ["traceId": traceId, "status": "saved"]
+            return ["traceId": traceId, "status": "saved", "eventCount": suppliedEvents.count]
         }
-        var liveEventCount = 0
+        guard var session = sessions[recordingId] else { throw AutomationRuntimeError.recordingNotFound }
+        var liveEvents: [[String: Any]] = []
         if session["liveRecording"] as? String == "running" {
-            do {
-                let liveEvents = try liveRecorder?.stop(recordingId: recordingId) ?? []
-                liveEventCount = liveEvents.count
-                if !liveEvents.isEmpty {
-                    var recordedEvents = session["events"] as? [[String: Any]] ?? []
-                    var previousEvidence = session["lastEvidence"] as? [String: Any] ?? [:]
-                    for event in liveEvents {
-                        let (recorded, after) = await recordedEvent(from: event, previousEvidence: previousEvidence)
-                        recordedEvents.append(recorded)
-                        previousEvidence = after
-                    }
-                    session["events"] = recordedEvents
-                    session["lastEvidence"] = previousEvidence
-                }
-            } catch {
-                session["liveRecordingError"] = error.localizedDescription
-            }
+            liveEvents = try liveRecorder?.stop(recordingId: recordingId) ?? []
+            session["liveRecording"] = "stopped"
+            sessions[recordingId] = session
         }
-        if let events = object["events"] as? [[String: Any]], !events.isEmpty {
-            var recordedEvents = session["events"] as? [[String: Any]] ?? []
-            var previousEvidence = session["lastEvidence"] as? [String: Any] ?? [:]
-            for event in events {
-                let (recorded, after) = await recordedEvent(from: event, previousEvidence: previousEvidence)
-                recordedEvents.append(recorded)
-                previousEvidence = after
-            }
-            session["events"] = recordedEvents
-            session["lastEvidence"] = previousEvidence
+        var events = session["events"] as? [[String: Any]] ?? []
+        var previousEvidence = session["lastEvidence"] as? [String: Any] ?? [:]
+        let stopEvidence = await captureAutomationEvidence(host: host)
+        try Task.checkCancellation()
+        // The event tap records actions and their times, not per-event screenshots.
+        // Take one stop snapshot and identify that timing on every live event.
+        for event in liveEvents {
+            var recorded = event
+            recorded["timestamp"] = event["timestamp"] ?? iso8601(Date())
+            recorded["evidenceRef"] = "finalEvidence"
+            recorded["evidenceCapturedAt"] = stopEvidence["capturedAt"]
+            recorded["evidenceTiming"] = "recording_stop"
+            events.append(recorded)
         }
+        if !liveEvents.isEmpty { previousEvidence = stopEvidence }
+        for event in suppliedEvents {
+            let (recorded, after) = await recordedEvent(from: event, previousEvidence: previousEvidence)
+            try Task.checkCancellation()
+            events.append(recorded)
+            previousEvidence = after
+        }
+        session["events"] = events
+        session["lastEvidence"] = previousEvidence
         session["traceId"] = traceId
         session["completedAt"] = iso8601(Date())
-        session["finalEvidence"] = await captureEvidence()
-        try store.saveTrace(id: traceId, payload: session)
+        session["finalEvidence"] = stopEvidence
+        try Task.checkCancellation()
+        sessions[recordingId] = session
+        var trace = session
+        trace.removeValue(forKey: "lastEvidence")
+        try store.saveTrace(id: traceId, payload: trace)
+        sessions.removeValue(forKey: recordingId)
         return [
-            "traceId": traceId,
-            "recordingId": recordingId,
-            "status": "saved",
-            "eventCount": (session["events"] as? [[String: Any]])?.count ?? 0,
-            "liveEventCount": liveEventCount,
+            "traceId": traceId, "recordingId": recordingId, "status": "saved",
+            "eventCount": events.count, "liveEventCount": liveEvents.count,
+            "finalEvidence": stopEvidence,
         ]
     }
 
-    private func captureEvidence() async -> [String: Any] {
-        async let appWindow = optionalCall(namespace: "app_window", tool: "frontmost", arguments: [:])
-        async let axSnapshot = optionalCall(namespace: "ax", tool: "snapshot", arguments: [:])
-        async let screenshot = optionalCall(namespace: "screenshot", tool: "capture", arguments: [:])
-        return [
-            "appWindow": await appWindow,
-            "axSnapshot": await axSnapshot,
-            "screenshot": await screenshot,
-        ]
+    public func stopAll() {
+        for (id, session) in sessions where session["liveRecording"] as? String == "running" {
+            _ = try? liveRecorder?.stop(recordingId: id)
+        }
+        sessions.removeAll()
     }
 
-    private func optionalCall(namespace: String, tool: String, arguments: [String: Any]) async -> [String: Any] {
-        (try? await capabilityClient.call(namespace: namespace, tool: tool, arguments: arguments)) ?? [:]
-    }
-
-    private func recordedEvent(
-        from event: [String: Any],
-        previousEvidence: [String: Any]
-    ) async -> (recorded: [String: Any], after: [String: Any]) {
-        let after = await captureEvidence()
+    private func recordedEvent(from event: [String: Any], previousEvidence: [String: Any]) async -> (
+        recorded: [String: Any], after: [String: Any]
+    ) {
+        let after = await captureAutomationEvidence(host: host)
         var recorded = event
-        recorded["timestamp"] = iso8601(Date())
+        // Live events already carry the event time. Evidence collected at stop is
+        // explicitly marked; it is not presented as a snapshot from that time.
+        recorded["timestamp"] = event["timestamp"] ?? iso8601(Date())
         recorded["before"] = previousEvidence
         recorded["after"] = after
+        if event["source"] as? String == "macos_event_tap" {
+            recorded["evidenceCapturedAt"] = iso8601(Date())
+            recorded["evidenceTiming"] = "recording_stop"
+        }
         return (recorded, after)
     }
 }
 
-public final class AutomationStore: @unchecked Sendable {
+@MainActor
+public final class AutomationStore {
     private let directoryURL: URL
     private let fileManager: FileManager
     private let encoder: JSONEncoder
@@ -476,31 +452,58 @@ public final class AutomationStore: @unchecked Sendable {
     }
 
     public func savePolicy(_ policy: AutomationPolicy) throws {
+        try validateAutomationPolicy(policy)
         try write(policy, to: policiesURL.appendingPathComponent("\(policy.id).json"))
     }
 
     public func loadPolicy(id: String) throws -> AutomationPolicy {
-        try read(AutomationPolicy.self, from: policiesURL.appendingPathComponent("\(id).json"))
+        try validateAutomationID(id)
+        let policy = try read(AutomationPolicy.self, from: policiesURL.appendingPathComponent("\(id).json"))
+        try validateAutomationPolicy(policy)
+        guard policy.id == id else { throw AutomationRuntimeError.invalidArgument("stored policy identifier does not match its file") }
+        return policy
     }
 
     public func saveRun(_ run: AutomationRunRecord) throws {
+        try validateAutomationID(run.id)
         try write(run, to: runsURL.appendingPathComponent("\(run.id).json"))
     }
 
+    public func loadRun(id: String) throws -> AutomationRunRecord {
+        try validateAutomationID(id)
+        return try read(AutomationRunRecord.self, from: runsURL.appendingPathComponent("\(id).json"))
+    }
+
     public func savePatch(_ patch: AutomationPolicyPatch) throws {
+        try validateAutomationID(patch.id)
         try write(patch, to: patchesURL.appendingPathComponent("\(patch.id).json"))
     }
 
     public func loadPatch(id: String) throws -> AutomationPolicyPatch {
-        try read(AutomationPolicyPatch.self, from: patchesURL.appendingPathComponent("\(id).json"))
+        try validateAutomationID(id)
+        return try read(AutomationPolicyPatch.self, from: patchesURL.appendingPathComponent("\(id).json"))
     }
 
     public func applyPatch(_ patch: AutomationPolicyPatch) throws -> AutomationPolicy {
         var policy = try loadPolicy(id: patch.policyId)
-        policy.branches.append(patch.branch)
-        policy.version += 1
-        try savePolicy(policy)
+        guard policy.version == patch.basePolicyVersion else { throw AutomationRuntimeError.stalePatch }
+        let (nextVersion, overflow) = policy.version.addingReportingOverflow(1)
+        guard !overflow else {
+            throw AutomationRuntimeError.invalidArgument("policy version cannot be incremented beyond the integer limit")
+        }
+        try validateAutomationBranch(patch.branch)
+        let sourceRun = try loadRun(id: patch.sourceRunId)
+        guard sourceRun.policyId == policy.id else {
+            throw AutomationRuntimeError.invalidArgument("patch source run belongs to a different policy")
+        }
+        if let index = policy.branches.firstIndex(where: { $0.id == sourceRun.branchId }) {
+            policy.branches[index] = patch.branch
+        } else {
+            policy.branches.insert(patch.branch, at: 0)
+        }
+        policy.version = nextVersion
         try savePatch(patch)
+        try savePolicy(policy)
         return policy
     }
 
@@ -513,6 +516,7 @@ public final class AutomationStore: @unchecked Sendable {
     }
 
     public func saveTrace(id: String, payload: [String: Any]) throws {
+        try validateAutomationID(id)
         let url = tracesURL.appendingPathComponent(id, isDirectory: true).appendingPathComponent("trace.json")
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
@@ -520,12 +524,17 @@ public final class AutomationStore: @unchecked Sendable {
     }
 
     public func loadTrace(id: String) throws -> [String: Any] {
+        try validateAutomationID(id)
         let url = tracesURL.appendingPathComponent(id, isDirectory: true).appendingPathComponent("trace.json")
         let data = try Data(contentsOf: url)
-        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], !object.isEmpty else {
+            throw AutomationRuntimeError.invalidArgument("stored data must be a nonempty JSON object")
+        }
+        return object
     }
 
     public func saveRepairRequest(id: String, payload: [String: Any]) throws {
+        try validateAutomationID(id)
         let url = repairRequestsURL.appendingPathComponent("\(id).json")
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
@@ -533,22 +542,24 @@ public final class AutomationStore: @unchecked Sendable {
     }
 
     public func loadRepairRequest(id: String) throws -> [String: Any] {
+        try validateAutomationID(id)
         let url = repairRequestsURL.appendingPathComponent("\(id).json")
         let data = try Data(contentsOf: url)
-        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], !object.isEmpty else {
+            throw AutomationRuntimeError.invalidArgument("stored data must be a nonempty JSON object")
+        }
+        return object
     }
 
     public func listRepairRequests() throws -> [[String: Any]] {
-        guard let urls = try? fileManager.contentsOfDirectory(at: repairRequestsURL, includingPropertiesForKeys: nil) else {
-            return []
-        }
-        return try urls
-            .filter { $0.pathExtension == "json" }
-            .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
-            .map { url in
-                let data = try Data(contentsOf: url)
-                return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        try jsonFiles(in: repairRequestsURL).map { url in
+            let request = try loadRepairRequest(id: url.deletingPathExtension().lastPathComponent)
+            guard request["id"] is String, request["status"] is String,
+                  request["policyId"] is String, request["runId"] is String else {
+                throw AutomationRuntimeError.invalidArgument("stored repair request is missing required fields")
             }
+            return request
+        }
     }
 
     private func write<T: Encodable>(_ value: T, to url: URL) throws {
@@ -561,11 +572,16 @@ public final class AutomationStore: @unchecked Sendable {
     }
 
     private func list<T: Decodable>(_ type: T.Type, in directory: URL) throws -> [T] {
-        guard let urls = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else {
+        try jsonFiles(in: directory).map { try read(type, from: $0) }
+    }
+
+    private func jsonFiles(in directory: URL) throws -> [URL] {
+        do {
+            return try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension == "json" }
+                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        } catch CocoaError.fileReadNoSuchFile {
             return []
-        }
-        return try urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }).map {
-            try read(type, from: $0)
         }
     }
 
@@ -576,159 +592,105 @@ public final class AutomationStore: @unchecked Sendable {
     private var repairRequestsURL: URL { directoryURL.appendingPathComponent("repair-requests", isDirectory: true) }
 }
 
-public final class AutomationRuntime: @unchecked Sendable {
+@MainActor
+public final class AutomationRuntime {
     private let store: AutomationStore
-    private let capabilityClient: AutomationCapabilityCalling
-    private let repairer: AutomationRepairing
+    private let host: any HostAutomationCapabilities
 
-    public init(store: AutomationStore, capabilityClient: AutomationCapabilityCalling, repairer: AutomationRepairing) {
+    public init(store: AutomationStore, host: any HostAutomationCapabilities) {
         self.store = store
-        self.capabilityClient = capabilityClient
-        self.repairer = repairer
+        self.host = host
     }
 
     public func run(policyId: String) async throws -> AutomationRunRecord {
-        var policy = try store.loadPolicy(id: policyId)
-        let runId = UUID().uuidString
-        let startedAt = iso8601(Date())
-        var records: [AutomationStepRecord] = []
-        guard !policy.branches.isEmpty else {
-            throw AutomationRuntimeError.emptyPolicy
-        }
+        let policy = try store.loadPolicy(id: policyId)
+        guard !policy.branches.isEmpty else { throw AutomationRuntimeError.emptyPolicy }
+        var run = AutomationRunRecord(
+            id: UUID().uuidString, policyId: policy.id, policyVersion: policy.version,
+            targetBundleId: policy.targetBundleId, branchId: nil, matchedConditions: [],
+            startedAt: iso8601(Date()), status: "running", steps: [], evidence: nil,
+            failureReason: nil, failedStepIndex: nil, failureStage: nil, patchId: nil, repairEvidence: nil
+        )
+        try store.saveRun(run)
         var branch: AutomationBranch?
-
+        var stage = "conditions"
         do {
+            try Task.checkCancellation()
             guard let matchedBranch = try await matchingBranch(in: policy) else {
                 throw AutomationRuntimeError.conditionFailed
             }
             branch = matchedBranch
+            run.branchId = matchedBranch.id
+            run.matchedConditions = matchedBranch.conditions
+            stage = "steps"
             for (index, step) in matchedBranch.steps.enumerated() {
+                try Task.checkCancellation()
                 try await execute(step: step)
-                records.append(AutomationStepRecord(stepIndex: index, kind: step.kind, status: "completed"))
+                try Task.checkCancellation()
+                run.steps.append(AutomationStepRecord(stepIndex: index, kind: step.kind, status: "completed"))
+                try store.saveRun(run)
             }
+            stage = "assertions"
             try await assert(matchedBranch.assertions)
-            let evidence = await collectEvidence()
-            let run = AutomationRunRecord(
-                id: runId,
-                policyId: policy.id,
-                policyVersion: policy.version,
-                targetBundleId: policy.targetBundleId,
-                branchId: matchedBranch.id,
-                matchedConditions: matchedBranch.conditions,
-                startedAt: startedAt,
-                status: "completed",
-                steps: records,
-                evidence: automationJSONDictionary(evidence),
-                failureReason: nil,
-                patchId: nil,
-                repairEvidence: nil
-            )
+            try Task.checkCancellation()
+            run.evidence = automationJSONDictionary(await captureAutomationEvidence(host: host))
+            try Task.checkCancellation()
+            run.status = "completed"
             try store.saveRun(run)
             return run
         } catch {
-            let (failedStep, failedStepIndex) = repairTargetStep(
-                branch: branch ?? policy.branches.first,
-                policy: policy,
-                completedStepCount: records.count
-            )
-            let failureEvidence = await collectEvidence()
-            let request = AutomationRepairRequest(
-                policy: policy,
-                runId: runId,
-                failedStep: failedStep,
-                failedStepIndex: failedStepIndex,
-                completedSteps: records,
-                failureReason: error.localizedDescription,
-                appWindow: failureEvidence["appWindow"] as? [String: Any] ?? [:],
-                axSnapshot: failureEvidence["axSnapshot"] as? [String: Any] ?? [:],
-                screenshot: failureEvidence["screenshot"] as? [String: Any] ?? [:]
-            )
-            let repair = try await repairer.repair(request: request)
-            let patch = AutomationPolicyPatch(
-                id: UUID().uuidString,
-                policyId: policy.id,
-                sourceRunId: runId,
-                basePolicyVersion: policy.version,
-                branch: repair.branch,
-                evidence: repair.evidence
-            )
-            policy.branches.append(repair.branch)
-            policy.version += 1
-            try store.savePolicy(policy)
-            try store.savePatch(patch)
-            let run = AutomationRunRecord(
-                id: runId,
-                policyId: policy.id,
-                policyVersion: patch.basePolicyVersion,
-                targetBundleId: policy.targetBundleId,
-                branchId: branch?.id,
-                matchedConditions: branch?.conditions ?? [],
-                startedAt: startedAt,
-                status: "repaired",
-                steps: records,
-                evidence: automationJSONDictionary(failureEvidence),
-                failureReason: error.localizedDescription,
-                patchId: patch.id,
-                repairEvidence: repair.evidence
-            )
+            let cancelled = error is CancellationError || Task.isCancelled
+            run.status = cancelled ? "cancelled" : "failed"
+            run.failureReason = cancelled ? "automation run cancelled" : error.localizedDescription
+            run.failedStepIndex = run.steps.count
+            run.failureStage = stage
+            let evidence = cancelled ? ["cancelled": true] : await captureAutomationEvidence(host: host)
+            run.evidence = automationJSONDictionary(evidence)
+            // Persist failure before creating repair data so a repair-store error
+            // cannot erase the execution record or imply a successful run.
             try store.saveRun(run)
+            if !cancelled {
+                let steps = branch?.steps ?? []
+                let failedStep = steps.indices.contains(run.steps.count)
+                    ? steps[run.steps.count] : AutomationStep(kind: .waitFor)
+                let request = AutomationRepairRequest(
+                    policy: policy, runId: run.id, failedStep: failedStep,
+                    failedStepIndex: run.steps.count, completedSteps: run.steps,
+                    failureReason: run.failureReason ?? "automation failed",
+                    appWindow: evidence["appWindow"] as? [String: Any] ?? [:],
+                    axSnapshot: evidence["axSnapshot"] as? [String: Any] ?? [:],
+                    screenshot: evidence["screenshot"] as? [String: Any] ?? [:]
+                )
+                do {
+                    run.repairEvidence = try AutomationRepairRequestStore(store: store).saveRepairRequest(request)
+                } catch {
+                    run.repairEvidence = ["error": error.localizedDescription]
+                }
+                try store.saveRun(run)
+            }
             return run
         }
-    }
-
-    private func repairTargetStep(
-        branch: AutomationBranch?,
-        policy: AutomationPolicy,
-        completedStepCount: Int
-    ) -> (step: AutomationStep, index: Int) {
-        let steps = branch?.steps ?? []
-        guard !steps.isEmpty else {
-            return (AutomationStep(kind: .activateApp, bundleId: policy.targetBundleId), 0)
-        }
-        let index = min(completedStepCount, steps.count - 1)
-        return (steps[index], index)
     }
 
     private func execute(step: AutomationStep) async throws {
         switch step.kind {
         case .activateApp:
-            _ = try await capabilityClient.call(
-                namespace: "app_window",
-                tool: "activate",
-                arguments: optionalStringArgument("bundleId", step.bundleId)
-            )
+            try await host.activateApp(bundleId: step.bundleId)
         case .click:
-            _ = try await capabilityClient.call(
-                namespace: "ax",
-                tool: "action",
-                arguments: ["action": "click", "selector": selectorDictionary(step.selector)]
-            )
+            var arguments: [String: Any] = ["action": "click", "selector": selectorDictionary(step.selector)]
+            if let position = step.position { arguments["position"] = position }
+            if let button = step.button { arguments["button"] = button }
+            try await host.performAction(arguments)
         case .setValue:
-            _ = try await capabilityClient.call(
-                namespace: "ax",
-                tool: "action",
-                arguments: [
-                    "action": "set_value",
-                    "selector": selectorDictionary(step.selector),
-                    "value": step.value ?? "",
-                ]
-            )
+            try await host.performAction([
+                "action": "set_value", "selector": selectorDictionary(step.selector), "value": step.value ?? "",
+            ])
         case .typeText:
-            _ = try await capabilityClient.call(
-                namespace: "ax",
-                tool: "action",
-                arguments: [
-                    "action": "type_text",
-                    "selector": selectorDictionary(step.selector),
-                    "text": step.value ?? "",
-                ]
-            )
+            try await host.performAction([
+                "action": "type_text", "selector": selectorDictionary(step.selector), "text": step.value ?? "",
+            ])
         case .hotkey:
-            _ = try await capabilityClient.call(
-                namespace: "ax",
-                tool: "action",
-                arguments: ["action": "hotkey", "keys": step.value ?? ""]
-            )
+            try await host.performAction(["action": "hotkey", "keys": step.value ?? ""])
         case .waitFor:
             try await waitFor(condition: step.condition, timeoutMs: step.timeoutMs ?? 2_000)
         }
@@ -736,30 +698,24 @@ public final class AutomationRuntime: @unchecked Sendable {
 
     private func matchingBranch(in policy: AutomationPolicy) async throws -> AutomationBranch? {
         for branch in policy.branches {
-            if try await matchesAll(branch.conditions) {
-                return branch
-            }
+            try Task.checkCancellation()
+            if try await matchesAll(branch.conditions) { return branch }
         }
         return nil
     }
 
     private func matchesAll(_ conditions: [AutomationCondition]) async throws -> Bool {
         guard !conditions.isEmpty else { return true }
-        let snapshot = try await capabilityClient.call(namespace: "ax", tool: "snapshot", arguments: [:])
-        let root = snapshotRoot(snapshot)
-        return conditions.allSatisfy { condition in
-            matches(selector: condition.selector, node: root)
-        }
+        let root = snapshotRoot(try await host.accessibilitySnapshot())
+        return conditions.allSatisfy { matches(selector: $0.selector, node: root) }
     }
 
     private func waitFor(condition: AutomationCondition?, timeoutMs: Int) async throws {
         guard let condition else { throw AutomationRuntimeError.conditionFailed }
         let deadline = Date().addingTimeInterval(TimeInterval(max(timeoutMs, 0)) / 1_000)
         repeat {
-            let snapshot = try await capabilityClient.call(namespace: "ax", tool: "snapshot", arguments: [:])
-            if matches(selector: condition.selector, node: snapshotRoot(snapshot)) {
-                return
-            }
+            try Task.checkCancellation()
+            if matches(selector: condition.selector, node: snapshotRoot(try await host.accessibilitySnapshot())) { return }
             try await Task.sleep(for: .milliseconds(100))
         } while Date() < deadline
         throw AutomationRuntimeError.conditionFailed
@@ -767,30 +723,30 @@ public final class AutomationRuntime: @unchecked Sendable {
 
     private func assert(_ assertions: [AutomationAssertion]) async throws {
         guard !assertions.isEmpty else { return }
-        let snapshot = try await capabilityClient.call(namespace: "ax", tool: "snapshot", arguments: [:])
-        let root = snapshotRoot(snapshot)
+        let root = snapshotRoot(try await host.accessibilitySnapshot())
         for assertion in assertions where !matches(selector: assertion.selector, node: root) {
             throw AutomationRuntimeError.assertionFailed
         }
     }
-
-    private func collectEvidence() async -> [String: Any] {
-        async let appWindow = optionalCall(namespace: "app_window", tool: "frontmost", arguments: [:])
-        async let axSnapshot = optionalCall(namespace: "ax", tool: "snapshot", arguments: [:])
-        async let screenshot = optionalCall(namespace: "screenshot", tool: "capture", arguments: [:])
-        return [
-            "appWindow": await appWindow,
-            "axSnapshot": await axSnapshot,
-            "screenshot": await screenshot,
-        ]
-    }
-
-    private func optionalCall(namespace: String, tool: String, arguments: [String: Any]) async -> [String: Any] {
-        (try? await capabilityClient.call(namespace: namespace, tool: tool, arguments: arguments)) ?? [:]
-    }
 }
 
-public final class AutomationToolRouter: @unchecked Sendable {
+@MainActor
+private func captureAutomationEvidence(host: any HostAutomationCapabilities) async -> [String: Any] {
+    var evidence: [String: Any] = ["capturedAt": iso8601(Date())]
+    guard !Task.isCancelled else { return ["error": "cancelled"] }
+    do { evidence["appWindow"] = try await host.frontmostAppWindow() }
+    catch { evidence["appWindow"] = ["error": error.localizedDescription] }
+    guard !Task.isCancelled else { return evidence }
+    do { evidence["axSnapshot"] = try await host.accessibilitySnapshot() }
+    catch { evidence["axSnapshot"] = ["error": error.localizedDescription] }
+    guard !Task.isCancelled else { return evidence }
+    do { evidence["screenshot"] = try await host.captureScreenshot() }
+    catch { evidence["screenshot"] = ["error": error.localizedDescription] }
+    return evidence
+}
+
+@MainActor
+public final class AutomationToolRouter {
     private let store: AutomationStore
     private let runtime: AutomationRuntime
     private let recorder: AutomationRecordingService?
@@ -801,7 +757,7 @@ public final class AutomationToolRouter: @unchecked Sendable {
         self.recorder = recorder
     }
 
-    public func handle(namespace: String, tool: String, arguments: Any?) async -> PluginToolResult {
+    public func handle(namespace: String, tool: String, arguments: Any?) async -> DynamicToolResult {
         guard namespace == "automation" else {
             return .text("unsupported namespace: \(namespace)", success: false)
         }
@@ -809,43 +765,41 @@ public final class AutomationToolRouter: @unchecked Sendable {
             switch tool {
             case "run":
                 let run = try await runtime.run(policyId: stringArgument(arguments, "policyId"))
-                return .json(["run": try encodeDictionary(run)])
+                return .jsonWithImages(["run": try encodeDictionary(run)], success: run.status == "completed")
             case "history":
-                return .json([
+                return .jsonWithImages([
                     "runs": try store.listRuns().map(encodeDictionary),
                     "patches": try store.listPatches().map(encodeDictionary),
                     "repairRequests": try AutomationRepairRequestStore(store: store).listRepairRequests(),
                 ])
             case "record_start":
                 if let recorder {
-                    return .json(await recorder.start(arguments: arguments))
+                    return .jsonWithImages(try await recorder.start(arguments: arguments))
                 }
-                return .json(["recordingId": UUID().uuidString, "status": "recording"])
+                return .text("recording service is not available", success: false)
             case "record_event":
                 guard let recorder else {
                     return .text("recording service is not available", success: false)
                 }
-                return .json(try await recorder.recordEvent(arguments: arguments))
+                return .jsonWithImages(try await recorder.recordEvent(arguments: arguments))
             case "record_stop":
                 if let recorder {
-                    return .json(try await recorder.stop(arguments: arguments, store: store))
+                    return .jsonWithImages(try await recorder.stop(arguments: arguments, store: store))
                 }
-                let traceId = stringArgument(arguments, "traceId", fallback: UUID().uuidString)
-                try store.saveTrace(id: traceId, payload: dictionaryArgument(arguments))
-                return .json(["traceId": traceId, "status": "saved"])
+                return .text("recording service is not available", success: false)
             case "policy_create":
                 let object = dictionaryArgument(arguments)
                 if object["policy"] != nil {
                     let policy = try decodeJSONObject(AutomationPolicy.self, from: object["policy"])
                     try store.savePolicy(policy)
-                    return .json(["policy": try encodeDictionary(policy)])
+                    return .jsonWithImages(["policy": try encodeDictionary(policy)])
                 }
                 let policyId = stringArgument(arguments, "policyId", fallback: UUID().uuidString)
                 let traceId = stringArgument(arguments, "traceId", fallback: "")
-                let trace = traceId.isEmpty ? [:] : (try? store.loadTrace(id: traceId)) ?? [:]
+                let trace = traceId.isEmpty ? [:] : try store.loadTrace(id: traceId)
                 let branch = object["branch"] != nil
                     ? try decodeJSONObject(AutomationBranch.self, from: object["branch"])
-                    : automationBranch(from: trace)
+                    : try automationBranch(from: trace)
                 let policy = AutomationPolicy(
                     id: policyId,
                     title: stringArgument(arguments, "title", fallback: "Recorded Automation"),
@@ -853,12 +807,12 @@ public final class AutomationToolRouter: @unchecked Sendable {
                     branches: [branch]
                 )
                 try store.savePolicy(policy)
-                return .json(["policy": try encodeDictionary(policy)])
+                return .jsonWithImages(["policy": try encodeDictionary(policy)])
             case "apply_patch":
                 let patchId = stringArgument(arguments, "patchId", fallback: "")
                 let patch = try store.loadPatch(id: patchId)
                 let policy = try store.applyPatch(patch)
-                return .json(["policy": try encodeDictionary(policy), "patch": try encodeDictionary(patch)])
+                return .jsonWithImages(["policy": try encodeDictionary(policy), "patch": try encodeDictionary(patch)])
             case "repair_apply":
                 let object = dictionaryArgument(arguments)
                 let repairRequestId = stringArgument(arguments, "repairRequestId", fallback: "")
@@ -870,6 +824,9 @@ public final class AutomationToolRouter: @unchecked Sendable {
                 let policyId = stringValue(repairRequest["policyId"]) ?? ""
                 let runId = stringValue(repairRequest["runId"]) ?? UUID().uuidString
                 let policy = try store.loadPolicy(id: policyId)
+                guard (repairRequest["policyVersion"] as? Int) == policy.version else {
+                    throw AutomationRuntimeError.stalePatch
+                }
                 let branch = try decodeJSONObject(AutomationBranch.self, from: object["branch"])
                 var evidence = stringDictionaryArgument(object["evidence"])
                 evidence["repair"] = "agent-computer-use-result"
@@ -885,7 +842,7 @@ public final class AutomationToolRouter: @unchecked Sendable {
                 )
                 let updatedPolicy = try store.applyPatch(patch)
                 let updatedRepairRequest = try repairStore.markApplied(id: repairRequestId, patchId: patch.id)
-                return .json([
+                return .jsonWithImages([
                     "policy": try encodeDictionary(updatedPolicy),
                     "patch": try encodeDictionary(patch),
                     "repairRequest": updatedRepairRequest,
@@ -904,6 +861,8 @@ public enum AutomationRuntimeError: LocalizedError {
     case conditionFailed
     case assertionFailed
     case recordingNotFound
+    case invalidArgument(String)
+    case stalePatch
 
     public var errorDescription: String? {
         switch self {
@@ -915,6 +874,10 @@ public enum AutomationRuntimeError: LocalizedError {
             return "automation assertion failed"
         case .recordingNotFound:
             return "automation recording session was not found"
+        case .invalidArgument(let message):
+            return "invalid_argument: " + message
+        case .stalePatch:
+            return "automation patch does not match the current policy version"
         }
     }
 }
@@ -925,11 +888,6 @@ private func selectorDictionary(_ selector: AXSelector?) -> [String: Any] {
     if let role = selector.role { result["role"] = role }
     if let title = selector.title { result["title"] = title }
     return result
-}
-
-private func optionalStringArgument(_ key: String, _ value: String?) -> [String: Any] {
-    guard let value else { return [:] }
-    return [key: value]
 }
 
 private func snapshotRoot(_ snapshot: [String: Any]) -> [String: Any] {
@@ -981,7 +939,7 @@ private func metadataArguments(from object: [String: Any]) -> [String: Any] {
     }
 }
 
-private func automationBranch(from trace: [String: Any]) -> AutomationBranch {
+private func automationBranch(from trace: [String: Any]) throws -> AutomationBranch {
     let events = (trace["events"] as? [[String: Any]]) ?? (trace["steps"] as? [[String: Any]]) ?? []
     var steps: [AutomationStep] = []
     var assertions: [AutomationAssertion] = []
@@ -999,7 +957,12 @@ private func automationBranch(from trace: [String: Any]) -> AutomationBranch {
                 bundleId: stringValue(event["bundleId"]) ?? stringValue(event["targetBundleId"])
             ))
         case "click", "press":
-            steps.append(AutomationStep(kind: .click, selector: axSelector(event["selector"])))
+            steps.append(AutomationStep(
+                kind: .click,
+                selector: axSelector(event["selector"]),
+                position: event["position"] as? [String: Double],
+                button: event["button"] as? String
+            ))
         case "setvalue", "set_value":
             steps.append(AutomationStep(
                 kind: .setValue,
@@ -1015,23 +978,64 @@ private func automationBranch(from trace: [String: Any]) -> AutomationBranch {
         case "hotkey":
             steps.append(AutomationStep(kind: .hotkey, value: hotkeyValue(event["keys"] ?? event["value"])))
         case "waitfor", "wait_for", "wait":
-            if let selector = axSelector(event["selector"]) {
-                steps.append(AutomationStep(
-                    kind: .waitFor,
-                    condition: AutomationCondition(selector: selector),
-                    timeoutMs: intValue(event["timeoutMs"]) ?? intValue(event["timeout"])
-                ))
+            guard let selector = axSelector(event["selector"]) else {
+                throw AutomationRuntimeError.invalidArgument("waitFor event requires selector")
             }
+            steps.append(AutomationStep(
+                kind: .waitFor,
+                condition: AutomationCondition(selector: selector),
+                timeoutMs: try recordedTimeout(event)
+            ))
         case "assert", "assertion":
-            if let selector = axSelector(event["selector"]) {
-                assertions.append(AutomationAssertion(selector: selector))
+            guard let selector = axSelector(event["selector"]) else {
+                throw AutomationRuntimeError.invalidArgument("assertion event requires selector")
             }
+            assertions.append(AutomationAssertion(selector: selector))
         default:
-            continue
+            throw AutomationRuntimeError.invalidArgument("unsupported recorded event: \(kind)")
         }
     }
 
     return AutomationBranch(id: "main", steps: steps, assertions: assertions)
+}
+
+private func validateAutomationID(_ id: String) throws {
+    guard !id.isEmpty, id.count <= 200, id != ".", id != "..",
+          id.range(of: #"^[A-Za-z0-9._:-]+$"#, options: .regularExpression) != nil else {
+        throw AutomationRuntimeError.invalidArgument("identifier must contain 1...200 ASCII letters, digits, dot, underscore, colon or hyphen")
+    }
+}
+
+private func validateAutomationPolicy(_ policy: AutomationPolicy) throws {
+    try validateAutomationID(policy.id)
+    guard policy.version > 0, !policy.branches.isEmpty else { throw AutomationRuntimeError.emptyPolicy }
+    guard Set(policy.branches.map(\.id)).count == policy.branches.count else {
+        throw AutomationRuntimeError.invalidArgument("policy branch identifiers must be unique")
+    }
+    for branch in policy.branches { try validateAutomationBranch(branch) }
+}
+
+private func validateAutomationBranch(_ branch: AutomationBranch) throws {
+    try validateAutomationID(branch.id)
+    guard !branch.steps.isEmpty || !branch.assertions.isEmpty else {
+        throw AutomationRuntimeError.invalidArgument("branch requires steps or assertions")
+    }
+    for selector in branch.conditions.map(\.selector) + branch.assertions.map(\.selector) {
+        guard selector.role?.isEmpty == false || selector.title?.isEmpty == false else {
+            throw AutomationRuntimeError.invalidArgument("condition and assertion selectors require role or title")
+        }
+    }
+    for step in branch.steps {
+        if let timeout = step.timeoutMs, !(0...300_000).contains(timeout) {
+            throw AutomationRuntimeError.invalidArgument("timeoutMs must be between 0 and 300000")
+        }
+        if step.kind == .waitFor {
+            guard let selector = step.condition?.selector,
+                  selector.role?.isEmpty == false || selector.title?.isEmpty == false else {
+                throw AutomationRuntimeError.invalidArgument("waitFor requires a condition with role or title")
+            }
+        }
+    }
 }
 
 private func axSelector(_ value: Any?) -> AXSelector? {
@@ -1048,11 +1052,17 @@ private func stringValue(_ value: Any?) -> String? {
     return String(describing: value)
 }
 
-private func intValue(_ value: Any?) -> Int? {
-    if let int = value as? Int { return int }
-    if let double = value as? Double { return Int(double) }
-    if let string = value as? String { return Int(string) }
-    return nil
+private func recordedTimeout(_ event: [String: Any]) throws -> Int? {
+    var timeout: Int?
+    for key in ["timeoutMs", "timeout"] {
+        guard let value = event[key] else { continue }
+        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+              let milliseconds = Int(exactly: number.doubleValue), (0...300_000).contains(milliseconds) else {
+            throw AutomationRuntimeError.invalidArgument("\(key) must be an integer between 0 and 300000")
+        }
+        if timeout == nil { timeout = milliseconds }
+    }
+    return timeout
 }
 
 private func boolValue(_ value: Any?) -> Bool {

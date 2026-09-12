@@ -18,7 +18,7 @@ type Pending = {
   token: ProviderToken;
   resolve: (value: DynamicToolCallResponsePayload) => void;
   reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
+  timeout?: ReturnType<typeof setTimeout>;
 };
 
 export type Send = (message: DynamicToolProviderMessage) => void;
@@ -64,7 +64,7 @@ export class WebSocketDynamicToolBridge implements DynamicToolBridge {
 
   call(
     payload: DynamicToolCallRequestPayload,
-    timeoutMs = 15_000,
+    timeoutMs?: number,
   ): Promise<DynamicToolCallResponsePayload> {
     const provider = this.providers.get(payload.clientId);
     if (!provider) {
@@ -78,7 +78,7 @@ export class WebSocketDynamicToolBridge implements DynamicToolBridge {
         return;
       }
 
-      const timeout = setTimeout(() => {
+      const timeout = timeoutMs === undefined ? undefined : setTimeout(() => {
         this.pending.delete(pendingKey);
         reject(new DynamicToolProviderTimeoutError(payload.clientId, timeoutMs));
       }, timeoutMs);
@@ -91,11 +91,17 @@ export class WebSocketDynamicToolBridge implements DynamicToolBridge {
         timeout,
       });
 
-      provider.send({
-        channel: "dynamic_tools",
-        type: "tool_call_request",
-        payload,
-      });
+      try {
+        provider.send({
+          channel: "dynamic_tools",
+          type: "tool_call_request",
+          payload,
+        });
+      } catch (error) {
+        clearTimeout(timeout);
+        this.pending.delete(pendingKey);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 

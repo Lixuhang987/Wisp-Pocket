@@ -1,52 +1,39 @@
 # Host Dynamic Tools
 
-`DynamicToolProviderService` 是桌面 App 进程内的 host / plugin dynamic tool 请求处理器。`DynamicToolProviderConnectionClient` 建立到 `ws://127.0.0.1:4317/api/dynamic-tools` 的独立 WebSocket，连接成功后发送 `channel: "dynamic_tools"` 的 `provider_hello`，并把收到的 `tool_call_request` 分派给 `DynamicToolProviderService`。`host_macos.*` 调用进入 `MacPlatformProvider`；plugin namespace 调用进入 `PluginDynamicToolManager`，由 Swift 管理 plugin 生命周期与进程调用，再把 `tool_call_response` 通过 `/api/dynamic-tools` 回到 agent-server。
+本目录把共享 macOS 能力与两个已知内置模块接入 Dynamic Tool。`DynamicToolProviderService` 处理请求并保留 `callId`；`host_macos` 进入 `MacPlatformProvider`，`context_history` / `automation` 进入 `BuiltinFeatures`，业务状态归 [Host Automation](../../../../host-automation/host-automation.md)。
 
-设计关键：
+## 直接文件
 
-- **独立连接，独立语义**：dynamic tool provider 只使用 `/api/dynamic-tools`，不与 React ThreadWindow 的 `/api/thread` 共享 WebSocket。
-- **provider 注入**：`MacPlatformProvider` 实现 macOS 原生能力；UI 层只关心 service 生命周期，不直接调用 provider。
-- **官方 plugin 安装**：`BuiltinPluginInstaller` 在生产 `AppServices.defaultRuntime` 创建 `PluginDynamicToolManager` 前，把官方 AX、screenshot、app/window、Context History 和 Automation runtime manifest 写入或修复到 `~/.spotAgent/plugins`；已有 manifest 的 `enabled` 用户选择会保留。
-- **plugin 生命周期归属**：`PluginDynamicToolManager` 扫描 `~/.spotAgent/plugins/<id>/plugin.json`。enabled 的 `alwaysOn` plugin 在 reload 后由 Swift 启动并保留，tool 调用走常驻进程 stdin/stdout RPC；`onDemand` / `toolsOnly` plugin 在对应 tool 被调用前由 Swift 确保启动并沿用一次性执行路径。agent-server 只看到 `clientId = swift-host` 的 dynamic tool spec，不读取 plugin binary，也不 spawn plugin 进程。
-- **plugin manifest**：manifest 版本为 `1`，字段包括 `id`、`title`、`description`、`lifecycle`、`kind`、`enabled`、`command`、`args`、`provides`、`requires`、`dataDirectoryName` 和 `tools`。旧 manifest 没有 `kind` / `enabled` 时按 `dynamicTool` / `true` 处理。plugin tool 的 `namespace/name` 只能使用 ASCII 字母、数字、`_`、`-`，且不能占用 `host_macos` namespace。
-- **官方 Context History / Automation**：AX、screenshot、app/window 原子 plugin 默认启用；`handagent-context-history` 与 `handagent-automation-runtime` 默认关闭。启用后才会暴露 `context_history.*` 或 `automation.*` dynamic tools。
-- **能力分级**：clipboard / app / window / screen 已落地（`NSPasteboard` / `NSWorkspace.runningApplications` / `CGWindowListCopyWindowInfo` / `ScreenCaptureKit SCScreenshotManager`）；`host_macos.ocr_read` 走 Vision 文本识别；`host_macos.accessibility_snapshot` / `host_macos.accessibility_action` 走 Accessibility API。`app.list` 是 provider 内部方法，对外暴露为 `host_macos.app_list`。
-- **权限边界**：`host_macos.screen_capture` 依赖「屏幕录制」权限，枚举内容失败时返回 `permission_denied` 并提示到系统设置授权。Accessibility 能力调用前用 `AXIsProcessTrustedWithOptions(false)` 检查，不主动弹系统权限框；未授权时返回 `permission_denied`，提示用户到「系统设置 → 隐私与安全性 → 辅助功能」允许 Wisp Pocket。
-- **上下文边界**：`host_macos.ocr_read` 只处理 tool 入参里的 `imageBase64`，不会默认读取屏幕、剪贴板或文件；需要先由用户主动提供图片或由 LLM 显式调用 `host_macos.screen_capture` 获得图片后再传入。
-- **Accessibility 快照限制**：快照返回 `role` / `label` / `title` / `value` / `description` / `frame` / `elementId` / `children`，默认限制深度与子节点数量，上限为 `maxDepth=6`、`maxChildren=50`，避免一次返回巨大无障碍树。
-- **Accessibility 动作限制**：`host_macos.accessibility_action` 支持 `press`、`click`、`set_value`。元素定位优先使用快照返回的 `elementId`，格式为 `pid:<pid>;path:<childIndex.childIndex>`；`click` 先尝试 AX press，不支持时再按元素 frame 中心点发送鼠标事件。
-- **重连归属**：断线与自动重连由 `/api/dynamic-tools` 的 `AppServerConnection` 负责；重连成功后 `DynamicToolProviderConnectionClient` 会立即发送 `provider_hello`。
+- `MacHostDynamicTools.swift`：原生工具声明、方法映射与 Provider 请求分派。
+- `BuiltinFeatureToolSpecs.swift`：两个业务模块的公开参数、结果与失败说明。
+- `BuiltinFeatures.swift`：显式持有配置、Context History 和 Automation，并同步启停与工具声明。
+- `MacPlatformProvider.swift`：应用/窗口、ScreenCaptureKit、Vision 与 Accessibility 的共享系统实现。
+- `MacAutomationLiveEventRecorder.swift`：按 Recording Session 共享并回收 macOS 事件监听。
 
-调用链：
+## 所有权与生命周期
 
-```mermaid
-sequenceDiagram
-  participant LLM
-  participant Server as agent-server
-  participant Client as DynamicToolProviderConnectionClient
-  participant Bridge as DynamicToolProviderService
-  participant Mac as MacPlatformProvider
+- 生产组合点 [AppServices](../app-services.md) 创建同一个 `MacPlatformProvider`，原生 Tool 与两个模块直接复用它。`HostAutomationCapabilities` 只表达固定系统边界，不做能力发现、安装或进程托管。
+- 两个模块默认关闭。启用选择由 [BuiltinFeatureSettingsStore](../AgentSettings/agent-settings.md) 持久化；写入成功才应用选择并发布新的工具声明。
+- Context History 采集与 Automation 操作由应用生命周期管理。关闭窗口继续；禁用或退出取消任务并清理监听，已保存历史与 Policy 保留。
+- Thread 中断只停止推理与旧 Turn 投影；现有 Dynamic Tool 协议没有远程 cancel，不会自动停止 Host 步骤。需要停止 Automation 宿主任务时禁用功能或退出应用，Thread 等待上限见 [core Thread](../../../../../packages/core/src/thread/thread.md)。
+- 原生 `host_macos` 工具始终声明；业务 namespace 只在对应模块启用时声明。禁用后的调用返回失败，不把旧 Thread 中仍保留的声明当作启用授权。
+- Automation event tap 只在请求 `captureUserEvents=true` 时创建，多个 Recording Session 共享监听源；最后一个会话停止或模块停机后释放。实时事件的证据时间合约见 [业务源码指南](../../../../host-automation/Sources/sources.md)。
 
-  LLM->>Server: tool_call host_macos.accessibility_snapshot
-  Server->>Client: DynamicToolProviderMessage tool_call_request {clientId, callId}
-  Client->>Bridge: handleIncoming(raw)
-  Bridge->>Mac: handle(method, args)
-  Mac-->>Bridge: result
-  Bridge-->>Client: DynamicToolProviderMessage tool_call_response {success, contentItems}
-  Client->>Server: /api/dynamic-tools send
-  Server-->>LLM: tool result
-```
+## 通道与内容合约
 
-文件：
+- [DynamicToolProviderConnectionClient](../AgentServer/agent-server.md) 使用独立 `/api/dynamic-tools` WebSocket，连接或工具选择变化时发送 `provider_hello`。同一 socket、同一 `clientId=swift-host` 的再次声明保留待完成调用，server 身份边界见 [server](../../../../agent-server/src/server/server.md)。
+- Swift 创建 Thread 时把当时的工具集合写入 `thread.start.payload.dynamicTools`；声明更新不自动修改已有 Thread 的 metadata。启用后以新建 Thread 验证新能力，禁用后即使旧声明仍在，模块也拒绝调用。
+- 结果沿用 `success` / `contentItems`；JSON 元数据放在 `inputText`，可显示图片放在 `inputImage`。截图查询保留图片与样本关联；权限不足、损坏数据和未知调用返回明确失败。
+- 动态工具通道不承载 `/api/thread` 消息，不自动向 UserInput 注入宿主状态。上下文与操作仍由 Agent 按需调用。
 
-- `MacHostDynamicTools.swift`：定义默认 `clientId = swift-host`、`namespace = host_macos`、tool specs、旧 provider method 映射和 `DynamicToolProviderService`。
-- `PluginDynamicTools.swift`：定义官方 plugin installer、plugin manifest 解析、lifecycle manager、plugin tool executor 和 `PluginDynamicToolManager`。
-- `MacPlatformProvider.swift`：实际能力实现；新增 macOS 能力时在此扩展。
-- [builtin-plugins](/Users/mu9/proj/handAgent/apps/builtin-plugins/builtin-plugins.md)：官方 Swift plugin 可执行 target 与可测试核心。
+## macOS 边界
 
-## 编辑此目录的约束
+- `MacPlatformProvider` 共享前台应用及其窗口、应用激活、截图/缩略图、AX 快照与动作；原生工具还保留剪贴板、应用/窗口列表与 OCR。
+- ScreenCaptureKit 负责显示器、窗口或区域截图；图片与实际尺寸必须一致。OCR 只识别传入图片，不自行读取屏幕或文件。
+- AX 快照有深度与子节点数量限制。动作支持 press、click、set_value、type_text、hotkey；定位可用 elementId、role/title selector、当前焦点或显式点击坐标，具体组合以工具 schema 和解析类型为准。
+- 屏幕录制、辅助功能与用户事件监听权限由系统决定；错误须携带阶段或可读原因。事件监听权限不足不能返回正在录制的空会话。
 
-- 新增平台能力时先扩 `MacPlatformProvider.handle(method:args:)` 的分派与解析，再同步 `MacHostDynamicTools.toolSpecs` 与 core dynamic tool 协议文档。
-- 新增 plugin manifest 字段或 lifecycle 时，同步更新 `PluginManifestStore`、`PluginDynamicToolsTests` 和 `docs/manual-qa.md`。
-- 不要把 dynamic tool provider RPC 混入 `/api/thread`；Swift 宿主只在 `/api/dynamic-tools` 处理 `channel: "dynamic_tools"` 的 provider 消息。
-- 需要真实系统权限的行为不放进自动化测试主路径，实机步骤维护到 `docs/manual-qa.md`。
+## 修改与验证
+
+- 修改能力时同步实现、公开 schema、结果内容和 Provider 用例；不要只验证内部函数或生成过标识。
+- 测试入口见 [PlatformBridge 测试](../../../TestsSwift/AppServices/PlatformBridge/platform-bridge.md)，真实权限、窗口关闭、退出、录制与执行验收从 [manual-qa](../../../../../docs/manual-qa.md) 进入。

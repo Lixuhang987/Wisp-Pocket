@@ -16,7 +16,7 @@ flowchart TD
   A -->|/api/activity| S
   S --> C[packages/core<br/>Conversation Runtime]
   S --> T[packages/thread-store<br/>Thread rollout]
-  D --> P[apps/builtin-plugins<br/>Host Automation]
+  D --> H[apps/host-automation<br/>Context History / Automation]
 ```
 
 ## 所有权
@@ -29,20 +29,21 @@ flowchart TD
 | `apps/agent-server` | WebSocket 路由、协议翻译、依赖组合与持久化适配 |
 | `packages/core` | Conversation Runtime、协议 DTO、LLM/Tool/Workspace/Permission 抽象 |
 | `packages/thread-store` | SQLite rollout 与 Thread 派生视图 |
-| `apps/builtin-plugins` | 宿主原子能力、Context History 与 Automation |
+| `apps/host-automation` | 应用进程内的 Context History、Automation 业务状态与持久化 |
 
 ## 跨层合约
 
 - 初始上下文只来自用户主动提交的 Input Item。屏幕、剪贴板、文件和 App 状态必须由 Tool 按需读取。
 - `/api/thread` 承载 `ThreadCommand`、`ThreadNotification`、`ServerRequest` 与 `ClientResponse`。React 承接持续通知与交互式请求的 UI；Swift 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`。
 - `/api/activity` 只发送 Agent Activity，不承载 Thread 消息或历史。
-- `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 统一暴露原生与 enabled Plugin 的能力。
+- `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 统一暴露原生能力与已启用的 Context History / Automation，直接向两个业务模块提供共享 macOS 实现。
 - Electron UI Shell 是 agent-server 的唯一 supervisor，也是 ThreadWindow 与 StatusBubble 的唯一宿主；关闭 UI 窗口不停止 agent-server。
 - `thread.snapshot` 是打开既有 Thread 的状态入口。React 当前不做断线重连、订阅恢复或自动 snapshot 拉取。
 
 ## 状态源
 
-- Swift Host 持久化模型设置、主题偏好、AgentTrigger 与 Plugin enablement；React 只消费解析后的主题。
+- Swift Host 持久化模型设置、主题偏好、AgentTrigger 与两个内置功能的启用选择；React 只消费解析后的主题。
+- Context History 的采集任务与 Automation 的录制、执行任务由 Swift Host 应用生命周期管理。关闭窗口继续运行，禁用对应功能或完全退出应用时清理；长期业务数据由各模块持久化。
 - React ThreadWindow 持有后端事实的展示投影、前端输入交接与界面偏好；正式历史、Turn 和待答请求的生命周期由后端拥有。Swift 与 Electron main 不 mirror 消息或历史。
 - core ThreadRegistry / Thread 持有运行中的 Thread、历史、Turn、请求和工具状态；agent-server 仅持有订阅、连接和请求路由。
 - Thread 历史主文件是 `~/.spotAgent/threads.sqlite`；其他本地配置和数据路径由 owning 模块文档说明。

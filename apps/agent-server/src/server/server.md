@@ -21,6 +21,7 @@
 - `ThreadPersistence` 和协议转换函数注入 core 已有端口；组合根不为每次输入重建运行历史或平行持有 Turn 状态。
 - `ThreadNotificationPublisher` 持有订阅关系，不持有 WebSocket；发送函数由本目录注入。
 - Provider 断线必须拒绝其 pending Dynamic Tool call，并从 registry 移除连接身份。
+- 同一 socket 以相同 `clientId` 再次发送 `provider_hello` 是声明刷新，保留既有 token 和 pending call；新 socket 或同一 socket 改变身份才执行替换/解绑。Swift 开关变化会触发此路径，双端合约见 [宿主连接](../../../desktop/Sources/AppServices/AgentServer/agent-server.md) 与 [bridge](../bridges/bridges.md)。
 
 ## 进程合约
 

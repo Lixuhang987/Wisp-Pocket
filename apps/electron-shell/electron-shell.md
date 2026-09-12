@@ -21,7 +21,7 @@
 
 - renderer 使用 `contextIsolation: true`、`nodeIntegration: false`；preload 只暴露受控配置与回调。
 - React ThreadWindow 直接连接 `/api/thread`，StatusBubble 直接连接 `/api/activity`。Electron main 不 mirror Thread 消息。
-- Swift Host 继续拥有 PromptPanel、Settings、AgentTrigger、焦点恢复和 Dynamic Tool Provider；本包不实现 macOS 能力或 Plugin 生命周期。
+- Swift Host 继续拥有 PromptPanel、Settings、AgentTrigger、焦点恢复和 Dynamic Tool Provider；本包不实现 macOS 能力或管理内置业务模块生命周期。
 - ThreadWindow 当前不做断线恢复；StatusBubble 的 activity client 可独立重连。不要统一两者语义。
 
 ## Supervisor 与构建

@@ -5,3 +5,4 @@
 ## 直接子节点
 
 - [screen.md](/Users/mu9/proj/handAgent/docs/human/screen.md)：用户截图 Attachment 与 ScreenCaptureKit Tool 的能力边界。
+- [builtin-features-qa.md](./builtin-features-qa.md)：Issue #4 内置 Context History / Automation 的实机动作、工具与证据核对步骤。

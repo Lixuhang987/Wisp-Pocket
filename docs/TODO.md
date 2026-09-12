@@ -5,9 +5,17 @@
 - **完成即迁移**：当本文中的待办项被代码实现并通过测试覆盖后，必须将该项**从本文移除**，并按主题分组追加到 manual-qa
 - **同步更新模块文档**：若条目跨多个模块，迁移时同步更新对应 `<dir>.md` 索引。
 
-最后核对日期：2026-09-01。
+最后核对日期：2026-09-13。
 
 ---
+
+## 内置 Context History 与 Automation（Issue #4）
+
+- 规格：[移除通用 Plugin 框架并完成实机验证](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)。
+- 基点：`codex/issue-3-state-ownership-main-20260913` / `72787e2`；[实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
+- 实现、审核发现的修复与独立文档复核已完成；最终三项检查、打包及签名验证均已通过，记录见实施计划。规格仍缺实机验收。
+- [ ] 等获准暂时退出占用 4317 的旧实例后，启动本次构建，逐项完成 [manual-qa](./manual-qa.md) 中九项验收；当前 app / fixture 尚未启动。
+- [ ] 依据后续实机证据归档通过项或记录真实阻塞/缺陷，同步相关文档并提交验收记录；不得把未执行项或 Issue #4 标为完成。
 
 ## Wisp Pocket 桌宠交互
 

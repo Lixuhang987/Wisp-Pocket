@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import HandAgentHostAutomation
 import KeyboardShortcuts
 
 @MainActor
@@ -53,6 +54,7 @@ struct AppServicesRuntime {
     let swiftThreadClient: (any SwiftThreadSubmitting)?
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
+    let builtinFeatures: BuiltinFeatures
 }
 
 @MainActor
@@ -63,6 +65,7 @@ final class AppServices {
     let threadWindowCommandClient: any ThreadWindowCommanding
     let activityWindowCommandClient: (any ActivityWindowCommanding)?
     let settingsStore: AgentSettingsStore
+    let builtinFeatures: BuiltinFeatures?
     let agentTriggerStore: AgentTriggerStore
     let agentTriggerRuntime: AgentTriggerRuntime
     let appearanceThemeService: AppearanceThemeService
@@ -84,6 +87,7 @@ final class AppServices {
         threadWindowCommandClient: (any ThreadWindowCommanding)? = nil,
         activityWindowCommandClient: (any ActivityWindowCommanding)? = nil,
         settingsStore: AgentSettingsStore = AgentSettingsStore(),
+        builtinFeatures: BuiltinFeatures? = nil,
         agentTriggerStore: AgentTriggerStore = AgentTriggerStore(),
         agentTriggerRuntime: AgentTriggerRuntime? = nil,
         appearanceThemeService: AppearanceThemeService? = nil,
@@ -120,6 +124,7 @@ final class AppServices {
         self.threadWindowCommandClient = threadWindowCommandClient ?? runtime?.threadWindowCommandClient ?? NopThreadWindowCommandClient()
         self.activityWindowCommandClient = activityWindowCommandClient ?? runtime?.activityWindowCommandClient
         self.settingsStore = settingsStore
+        self.builtinFeatures = builtinFeatures ?? runtime?.builtinFeatures
         self.agentTriggerStore = agentTriggerStore
         AppServices.prepareLaunchSupportFiles(
             agentTriggerStore: agentTriggerStore,
@@ -158,6 +163,7 @@ final class AppServices {
         activityWindowCommandClient: (any ActivityWindowCommanding)? = nil,
         settingsWindowPresenter: any SettingsWindowPresenting = NopSettingsWindowPresenter(),
         settingsStore: AgentSettingsStore = AgentSettingsStore(),
+        builtinFeatures: BuiltinFeatures? = nil,
         agentTriggerStore: AgentTriggerStore = AgentTriggerStore(),
         agentTriggerRuntime: AgentTriggerRuntime? = nil,
         appearanceThemeService: AppearanceThemeService? = nil,
@@ -172,6 +178,7 @@ final class AppServices {
             threadWindowCommandClient: threadWindowCommandClient,
             activityWindowCommandClient: activityWindowCommandClient,
             settingsStore: settingsStore,
+            builtinFeatures: builtinFeatures,
             agentTriggerStore: agentTriggerStore,
             agentTriggerRuntime: agentTriggerRuntime,
             appearanceThemeService: appearanceThemeService,
@@ -204,10 +211,22 @@ final class AppServices {
         dynamicToolServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
         threadServerURL: URL = URL(string: "ws://127.0.0.1:4317/api/thread")!
     ) -> AppServicesRuntime {
-        BuiltinPluginInstaller().ensureInstalled()
-        let pluginManager = PluginDynamicToolManager()
-        pluginManager.reload()
-        let providerService = DynamicToolProviderService(pluginManager: pluginManager)
+        let host = MacPlatformProvider()
+        let dataHome = environment["HANDAGENT_HOST_DATA_HOME"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? FileManager.default.homeDirectoryForCurrentUser
+        let builtinFeatures = BuiltinFeatures(
+            settingsStore: BuiltinFeatureSettingsStore(homeDirectoryURL: dataHome),
+            contextHistory: ContextHistoryModule(
+                store: ContextHistoryStore(directoryURL: dataHome.appendingPathComponent(".spotAgent/context-history")),
+                host: host
+            ),
+            automation: AutomationModule(
+                store: AutomationStore(directoryURL: dataHome.appendingPathComponent(".spotAgent/automation")),
+                host: host,
+                liveRecorder: MacAutomationLiveEventRecorder()
+            )
+        )
+        let providerService = DynamicToolProviderService(provider: host, builtinFeatures: builtinFeatures)
         let dynamicToolClient = DynamicToolProviderConnectionClient(
             connection: AppServerConnection(serverURL: dynamicToolServerURL),
             providerService: providerService
@@ -236,7 +255,8 @@ final class AppServices {
             appServer: appServer,
             swiftThreadClient: swiftThreadClient,
             threadWindowCommandClient: appServer,
-            activityWindowCommandClient: appServer
+            activityWindowCommandClient: appServer,
+            builtinFeatures: builtinFeatures
         )
     }
 

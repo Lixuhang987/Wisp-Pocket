@@ -1,4 +1,5 @@
 # AgentTrigger Thread Path Migration Spec
+> 历史迁移规格。文中的 Plugin / plugin manager 描述已由 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 的内置模块方案替代；它们不再是保留要求。通道与状态的当前约束以 [根架构](../../../handAgent.md) 为准。
 
 ## Background
 当前目标架构中，AgentTrigger 应当只是 Swift 桌面宿主里的自动输入来源：它监听外部事件，把命中的事件渲染为普通用户输入，再创建一个可回看的后台 thread。

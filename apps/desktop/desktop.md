@@ -7,7 +7,7 @@
 - [CONTEXT.md](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md)：Desktop Experience glossary。
 - `HandAgentApp.swift`：Wisp Pocket SwiftUI 入口与系统 termination 接入。
 - [Sources/sources.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/sources.md)：生产源码索引。
-- `TestsSwift/`：与 `Sources/` 对齐的 Swift 测试。
+- [TestsSwift/tests-swift.md](./TestsSwift/tests-swift.md)：与 `Sources/` 对齐的 Swift 测试。
 
 ## 架构红线
 
@@ -16,14 +16,15 @@
 - 模块协调统一进入 `AppCoordinator.send(.action)`；窗口生命周期由专用 lifecycle 对象持有。
 - 初始上下文只允许用户主动提交的 Input Item。屏幕、窗口、文件、剪贴板和 App 状态通过 Tool 读取。
 - Swift 的 `/api/thread` client 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`；持续通知和交互式请求由 React 处理。
-- Swift 通过 `/api/dynamic-tools` 暴露原生与 Plugin Dynamic Tool，不在宿主层编排 LLM/Tool 循环。
+- Swift 通过 `/api/dynamic-tools` 暴露原生能力与已启用的内置功能，不在宿主层编排 LLM/Tool 循环。
 
 ## 所有权
 
 - `AppServices` 是生产依赖组合点；测试使用 `AppServices.testing(...)` 隔离窗口、进程和系统策略。
 - Swift 启动 Electron UI Shell，但不直接启动 agent-server。可提交状态同时依赖 agent-server health 与 hidden ThreadWindow prepared。
 - `~/.spotAgent/settings.json` 的模型、Tool 和主题偏好由 Settings 写入；主题由 Swift 解析后同步给 Electron/React。
-- Append Prompt manifest 位于 `~/.spotAgent/actions`；Plugin manifest 位于 `~/.spotAgent/plugins`。二者是不同能力。
+- Append Prompt manifest 位于 `~/.spotAgent/actions`。Context History 与 Automation 使用独立的 `~/.spotAgent/builtin-features.json` 启用配置，由 [AppServices](./Sources/AppServices/app-services.md) 直接组合。
+- 两个内置功能默认关闭；启用后跟随 Swift Host 应用存续，关闭 Settings 或 ThreadWindow 不停止它们。完全退出时取消任务与监听，历史和 Policy 继续保存在业务目录。
 
 ## 验证
 

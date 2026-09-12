@@ -1,12 +1,13 @@
 # AgentSettings 模块
 
-LLM 模型配置、tool allowlist / denylist 与 Swift 宿主外观主题偏好的读写。
+LLM 模型配置、tool allowlist / denylist、外观主题与内置功能启用选择的持久化。两类配置使用独立 Store，模型设置供 agent-server 读取，内置功能只由 Swift Host 管理。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
 | `AgentSettingsStore.swift` | `@Observable` + `@MainActor`，从 `~/.spotAgent/settings.json` 读写外观主题、LLM 配置与 tool allowlist / denylist，500ms 轮询热加载 |
+| `BuiltinFeatureSettingsStore.swift` | 两个内置功能的默认关闭配置、原子写入与错误反馈 |
 | `AgentSettingsView.swift` | 模型设置的 SwiftUI 表单（provider / model / api / baseURL / apiKey），provider / api 使用 token 化 `SettingsSegmentedControl`，文本输入使用 `SettingsTextField` / `SettingsSecureField`，由 [Settings/SettingsView](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 嵌入 |
 
 ## 数据模型
@@ -38,6 +39,13 @@ LLM 模型配置、tool allowlist / denylist 与 Swift 宿主外观主题偏好�
 - 写入用 `JSONEncoder([.prettyPrinted, .sortedKeys])` + `Data.write(.atomic)`，避免半截文件。
 - 500ms 轮询比较 raw `Data` 字节，避免相同内容触发无意义刷新。
 - `updateAppearance(_:)` / `update(_:)` / `updateToolSettings(_:)` 是写入入口，写后立即 persist 并刷新 `lastLoadedData`；任一入口都必须保留另外两个顶层字段。
+
+## 内置功能配置
+
+- `BuiltinFeatureSettingsStore` 拥有 `~/.spotAgent/builtin-features.json`，字段为 `contextHistoryEnabled` 与 `automationEnabled`，初始值都为 `false`。正常入口是 [Settings 工具页](../../Settings/settings.md)。
+- 仅在文件成功原子写入后更新内存状态并通知 [BuiltinFeatures](../PlatformBridge/platform-bridge.md)；写入失败保留原有效选择并显示错误。文件缺失使用默认值，其他读取错误也必须可见。
+- 宿主启动时读取配置，工具页改变选择后立即生效；此 Store 不轮询外部文件，也不从旧 Plugin manifest 派生启用状态。
+- `HANDAGENT_HOST_DATA_HOME` 隔离配置与业务数据的开发用法见 [开发说明](../../../../../docs/dev.md)，业务目录归 [Host Automation](../../../../host-automation/host-automation.md) 所有。
 
 ## 编辑此目录的约束
 

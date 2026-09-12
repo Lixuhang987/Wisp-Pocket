@@ -1,14 +1,14 @@
 import Foundation
 import XCTest
-@testable import HandAgentPluginSupport
+@testable import HandAgentHostAutomation
 
+@MainActor
 final class AutomationRuntimeTests: XCTestCase {
     func testRuntimeExecutesPolicyWithAXActionsAndAssertions() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
-        let capabilityClient = RecordingAutomationCapabilityClient()
-        let repairer = RecordingAutomationRepairer()
-        let runtime = AutomationRuntime(store: store, capabilityClient: capabilityClient, repairer: repairer)
+        let host = RecordingAutomationHost()
+        let runtime = AutomationRuntime(store: store, host: host)
         let policy = AutomationPolicy(
             id: "policy-1",
             title: "Save Form",
@@ -46,17 +46,17 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertNotNil(run.evidence?["screenshot"])
         XCTAssertEqual(run.steps.map(\.kind), [.activateApp, .click, .setValue, .typeText, .hotkey, .waitFor])
         XCTAssertEqual(try store.listRuns().first?.evidence?["screenshot"], run.evidence?["screenshot"])
-        XCTAssertEqual(repairer.requests.count, 0)
-        XCTAssertEqual(capabilityClient.calls.prefix(7).map { "\($0.namespace).\($0.tool)" }, [
-            "app_window.activate",
-            "ax.action",
-            "ax.action",
-            "ax.action",
-            "ax.action",
-            "ax.snapshot",
-            "ax.snapshot",
+        XCTAssertTrue(try store.listRepairRequests().isEmpty)
+        XCTAssertEqual(host.calls.prefix(7).map(\.operation), [
+            "activateApp",
+            "performAction",
+            "performAction",
+            "performAction",
+            "performAction",
+            "accessibilitySnapshot",
+            "accessibilitySnapshot",
         ])
-        let typeTextArguments = capabilityClient.calls[3].arguments
+        let typeTextArguments = host.calls[3].arguments
         XCTAssertEqual(typeTextArguments["action"] as? String, "type_text")
         XCTAssertEqual(typeTextArguments["text"] as? String, "hello")
         let typeTextSelector = try XCTUnwrap(typeTextArguments["selector"] as? [String: Any])
@@ -66,11 +66,10 @@ final class AutomationRuntimeTests: XCTestCase {
     func testRuntimeUsesJSONSerializableArgumentsForOptionalStepValues() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
-        let capabilityClient = RecordingAutomationCapabilityClient()
+        let host = RecordingAutomationHost()
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: capabilityClient,
-            repairer: RecordingAutomationRepairer()
+            host: host
         )
         let policy = AutomationPolicy(
             id: "policy-json-args",
@@ -83,7 +82,7 @@ final class AutomationRuntimeTests: XCTestCase {
                         AutomationStep(kind: .activateApp),
                         AutomationStep(kind: .setValue, selector: AXSelector(role: "AXTextField")),
                         AutomationStep(kind: .typeText, selector: AXSelector(role: "AXTextField")),
-                        AutomationStep(kind: .hotkey),
+                        AutomationStep(kind: .hotkey, value: "command+s"),
                     ],
                     assertions: []
                 ),
@@ -94,7 +93,7 @@ final class AutomationRuntimeTests: XCTestCase {
         let run = try await runtime.run(policyId: "policy-json-args")
 
         XCTAssertEqual(run.status, "completed")
-        for call in capabilityClient.calls {
+        for call in host.calls {
             XCTAssertTrue(JSONSerialization.isValidJSONObject(["arguments": call.arguments]))
         }
     }
@@ -102,11 +101,10 @@ final class AutomationRuntimeTests: XCTestCase {
     func testRuntimeSelectsFirstBranchWhoseConditionsMatchCurrentAXSnapshot() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
-        let capabilityClient = RecordingAutomationCapabilityClient()
+        let host = RecordingAutomationHost()
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: capabilityClient,
-            repairer: RecordingAutomationRepairer()
+            host: host
         )
         let policy = AutomationPolicy(
             id: "policy-conditions",
@@ -139,20 +137,18 @@ final class AutomationRuntimeTests: XCTestCase {
         XCTAssertEqual(run.branchId, "saved-state")
         XCTAssertEqual(run.matchedConditions?.first?.selector.title, "Saved")
         XCTAssertEqual(run.steps.map(\.kind), [.click])
-        let actionCalls = capabilityClient.calls.filter { $0.namespace == "ax" && $0.tool == "action" }
+        let actionCalls = host.calls.filter { $0.operation == "performAction" }
         XCTAssertEqual(actionCalls.count, 1)
         let selector = try XCTUnwrap(actionCalls[0].arguments["selector"] as? [String: Any])
         XCTAssertEqual(selector["title"] as? String, "Correct")
     }
 
-    func testRuntimeRoutesUnmatchedBranchConditionsToRepair() async throws {
+    func testRuntimePersistsUnmatchedConditionsAsFailureAndPendingRepair() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
-        let repairer = RecordingAutomationRepairer()
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: RecordingAutomationCapabilityClient(),
-            repairer: repairer
+            host: RecordingAutomationHost()
         )
         let policy = AutomationPolicy(
             id: "policy-unmatched-conditions",
@@ -173,28 +169,27 @@ final class AutomationRuntimeTests: XCTestCase {
 
         let run = try await runtime.run(policyId: "policy-unmatched-conditions")
 
-        XCTAssertEqual(run.status, "repaired")
+        XCTAssertEqual(run.status, "failed")
         XCTAssertNil(run.branchId)
         XCTAssertEqual(run.matchedConditions, [])
+        XCTAssertEqual(run.failureStage, "conditions")
+        XCTAssertTrue(run.steps.isEmpty)
         XCTAssertNotNil(run.evidence?["appWindow"])
         XCTAssertNotNil(run.evidence?["axSnapshot"])
         XCTAssertNotNil(run.evidence?["screenshot"])
-        let request = try XCTUnwrap(repairer.requests.first)
-        XCTAssertEqual(request.failedStep.selector?.title, "Fallback")
-        XCTAssertEqual(request.failedStepIndex, 0)
-        XCTAssertEqual(request.completedSteps.count, 0)
-        XCTAssertEqual(request.failureReason, "automation condition failed")
-        XCTAssertNotNil(request.appWindow)
-        XCTAssertNotNil(request.axSnapshot)
-        XCTAssertNotNil(request.screenshot)
+        let request = try XCTUnwrap(store.listRepairRequests().first)
+        XCTAssertEqual(request["status"] as? String, "pending")
+        XCTAssertEqual(request["runId"] as? String, run.id)
+        XCTAssertEqual(request["failureReason"] as? String, "automation condition failed")
+        XCTAssertEqual(try store.loadPolicy(id: policy.id), policy)
+        XCTAssertTrue(try store.listPatches().isEmpty)
     }
 
-    func testRuntimeRepairsFailureAndAutomaticallyMergesPolicyPatch() async throws {
+    func testRuntimePersistsFailedStepAndRepairRequestWithoutChangingPolicy() async throws {
         let directory = makeDirectory()
         let store = AutomationStore(directoryURL: directory)
-        let capabilityClient = RecordingAutomationCapabilityClient(failAXAction: true)
-        let repairer = PersistingAutomationRepairer(store: store)
-        let runtime = AutomationRuntime(store: store, capabilityClient: capabilityClient, repairer: repairer)
+        let host = RecordingAutomationHost(failAXAction: true)
+        let runtime = AutomationRuntime(store: store, host: host)
         let policy = AutomationPolicy(
             id: "policy-2",
             title: "Submit Form",
@@ -213,21 +208,19 @@ final class AutomationRuntimeTests: XCTestCase {
 
         let run = try await runtime.run(policyId: "policy-2")
         let updatedPolicy = try store.loadPolicy(id: "policy-2")
-        let patch = try XCTUnwrap(run.patchId.flatMap { try? store.loadPatch(id: $0) })
-
-        XCTAssertEqual(run.status, "repaired")
+        XCTAssertEqual(run.status, "failed")
         XCTAssertEqual(run.branchId, "main")
+        XCTAssertEqual(run.failedStepIndex, 0)
+        XCTAssertEqual(run.failureStage, "steps")
         XCTAssertNotNil(run.startedAt)
+        XCTAssertNotNil(run.failureReason)
         XCTAssertNotNil(run.evidence?["appWindow"])
         XCTAssertNotNil(run.evidence?["axSnapshot"])
         XCTAssertNotNil(run.evidence?["screenshot"])
-        XCTAssertEqual(run.repairEvidence?["repair"], "agent-computer-use-request")
-        XCTAssertEqual(updatedPolicy.version, 2)
-        XCTAssertEqual(updatedPolicy.branches.count, 2)
-        XCTAssertEqual(patch.basePolicyVersion, 1)
-        XCTAssertEqual(patch.evidence["repair"], "agent-computer-use-request")
-        XCTAssertEqual(patch.evidence["route"], "agent_computer_use")
-        let repairRequestId = try XCTUnwrap(patch.evidence["repairRequestId"])
+        XCTAssertNil(run.patchId)
+        XCTAssertEqual(updatedPolicy, policy)
+        XCTAssertTrue(try store.listPatches().isEmpty)
+        let repairRequestId = try XCTUnwrap(run.repairEvidence?["repairRequestId"])
         let repairRequest = try store.loadRepairRequest(id: repairRequestId)
         XCTAssertEqual(repairRequest["policyId"] as? String, "policy-2")
         XCTAssertEqual(repairRequest["status"] as? String, "pending")
@@ -246,8 +239,7 @@ final class AutomationRuntimeTests: XCTestCase {
         let store = AutomationStore(directoryURL: directory)
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: RecordingAutomationCapabilityClient(failAXAction: true),
-            repairer: PersistingAutomationRepairer(store: store)
+            host: RecordingAutomationHost(failAXAction: true)
         )
         let router = AutomationToolRouter(store: store, runtime: runtime)
         let policy = AutomationPolicy(
@@ -272,7 +264,7 @@ final class AutomationRuntimeTests: XCTestCase {
             arguments: ["policyId": "policy-repair-queue"]
         ))
         let run = try XCTUnwrap(runResult["run"] as? [String: Any])
-        XCTAssertEqual(run["status"] as? String, "repaired")
+        XCTAssertEqual(run["status"] as? String, "failed")
 
         let history = decodeToolJSON(await router.handle(namespace: "automation", tool: "history", arguments: [:]))
         let historyRuns = try XCTUnwrap(history["runs"] as? [[String: Any]])
@@ -324,7 +316,7 @@ final class AutomationRuntimeTests: XCTestCase {
         let updatedPolicy = try XCTUnwrap(apply["policy"] as? [String: Any])
         let patch = try XCTUnwrap(apply["patch"] as? [String: Any])
         let updatedRepairRequest = try XCTUnwrap(apply["repairRequest"] as? [String: Any])
-        XCTAssertEqual(updatedPolicy["version"] as? Int, 3)
+        XCTAssertEqual(updatedPolicy["version"] as? Int, 2)
         XCTAssertEqual(patch["id"] as? String, "agent-repair-patch")
         let evidence = try XCTUnwrap(patch["evidence"] as? [String: Any])
         XCTAssertEqual(evidence["agentRunId"] as? String, "agent-run-1")
@@ -347,7 +339,8 @@ final class AutomationRuntimeTests: XCTestCase {
         )
         XCTAssertFalse(duplicateApply.success)
         XCTAssertEqual(duplicateApply.contentItems.first?["text"] as? String, "automation repair request is not pending")
-        XCTAssertEqual(try store.loadPolicy(id: "policy-repair-queue").version, 3)
+        XCTAssertEqual(try store.loadPolicy(id: "policy-repair-queue").version, 2)
+        XCTAssertEqual(try store.listRuns().first?.status, "failed")
     }
 
     func testAutomationToolRouterRecordsTraceCreatesPolicyAndListsHistory() async throws {
@@ -355,13 +348,12 @@ final class AutomationRuntimeTests: XCTestCase {
         let store = AutomationStore(directoryURL: directory)
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: RecordingAutomationCapabilityClient(),
-            repairer: RecordingAutomationRepairer()
+            host: RecordingAutomationHost()
         )
         let router = AutomationToolRouter(
             store: store,
             runtime: runtime,
-            recorder: AutomationRecordingService(capabilityClient: RecordingAutomationCapabilityClient())
+            recorder: AutomationRecordingService(host: RecordingAutomationHost())
         )
 
         let start = decodeToolJSON(await router.handle(
@@ -467,13 +459,12 @@ final class AutomationRuntimeTests: XCTestCase {
         let store = AutomationStore(directoryURL: directory)
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: RecordingAutomationCapabilityClient(),
-            repairer: RecordingAutomationRepairer()
+            host: RecordingAutomationHost()
         )
         let router = AutomationToolRouter(
             store: store,
             runtime: runtime,
-            recorder: AutomationRecordingService(capabilityClient: RecordingAutomationCapabilityClient())
+            recorder: AutomationRecordingService(host: RecordingAutomationHost())
         )
 
         let start = decodeToolJSON(await router.handle(
@@ -499,8 +490,7 @@ final class AutomationRuntimeTests: XCTestCase {
         let store = AutomationStore(directoryURL: directory)
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: RecordingAutomationCapabilityClient(),
-            repairer: RecordingAutomationRepairer()
+            host: RecordingAutomationHost()
         )
         let router = AutomationToolRouter(store: store, runtime: runtime)
 
@@ -588,6 +578,7 @@ final class AutomationRuntimeTests: XCTestCase {
             [
                 "kind": "click",
                 "source": "macos_event_tap",
+                "timestamp": "2026-09-13T06:00:01.123Z",
                 "position": ["x": 120.0, "y": 240.0],
             ],
             [
@@ -603,14 +594,13 @@ final class AutomationRuntimeTests: XCTestCase {
         ])
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: RecordingAutomationCapabilityClient(),
-            repairer: RecordingAutomationRepairer()
+            host: RecordingAutomationHost()
         )
         let router = AutomationToolRouter(
             store: store,
             runtime: runtime,
             recorder: AutomationRecordingService(
-                capabilityClient: RecordingAutomationCapabilityClient(),
+                host: RecordingAutomationHost(),
                 liveRecorder: liveRecorder
             )
         )
@@ -637,11 +627,53 @@ final class AutomationRuntimeTests: XCTestCase {
         let trace = try store.loadTrace(id: "live-trace")
         let events = try XCTUnwrap(trace["events"] as? [[String: Any]])
         XCTAssertEqual(events.map { $0["kind"] as? String }, ["click", "typeText", "hotkey"])
+        XCTAssertEqual(events.first?["timestamp"] as? String, "2026-09-13T06:00:01.123Z")
         for event in events {
             XCTAssertEqual(event["source"] as? String, "macos_event_tap")
-            XCTAssertNotNil(event["before"] as? [String: Any])
-            XCTAssertNotNil(event["after"] as? [String: Any])
+            XCTAssertEqual(event["evidenceTiming"] as? String, "recording_stop")
+            XCTAssertNotNil(event["evidenceCapturedAt"])
+            let reference = try XCTUnwrap(event["evidenceRef"] as? String)
+            XCTAssertEqual(reference, "finalEvidence")
+            let evidence = try XCTUnwrap(trace[reference] as? [String: Any])
+            XCTAssertNotNil(evidence["axSnapshot"])
+            XCTAssertNotNil(evidence["screenshot"])
         }
+    }
+
+    func testNonFiniteRecordedWaitIsAValidationFailureAtTheModuleBoundary() async throws {
+        let store = AutomationStore(directoryURL: makeDirectory())
+        let host = RecordingAutomationHost()
+        let router = AutomationToolRouter(
+            store: store, runtime: AutomationRuntime(store: store, host: host),
+            recorder: AutomationRecordingService(host: host)
+        )
+        for timeout in [Double.infinity, -Double.infinity, Double.nan] {
+            let result = await router.handle(namespace: "automation", tool: "record_stop", arguments: [
+                "events": [["kind": "waitFor", "selector": ["role": "AXButton"], "timeoutMs": timeout]],
+            ])
+            XCTAssertFalse(result.success)
+            XCTAssertTrue((result.contentItems.first?["text"] as? String)?.contains("timeoutMs must be an integer") == true)
+        }
+    }
+
+    func testMalformedTraceAndStoredPolicyFailInsteadOfCreatingSuccessfulNoOp() async throws {
+        let directory = makeDirectory()
+        let store = AutomationStore(directoryURL: directory)
+        let router = AutomationToolRouter(store: store, runtime: AutomationRuntime(store: store, host: RecordingAutomationHost()))
+        try store.saveTrace(id: "malformed-trace", payload: [
+            "targetBundleId": "com.example.app", "events": [["kind": "waitFor"]],
+        ])
+        let malformedTrace = await router.handle(namespace: "automation", tool: "policy_create", arguments: ["traceId": "malformed-trace"])
+        XCTAssertFalse(malformedTrace.success)
+        let policies = directory.appendingPathComponent("policies")
+        try FileManager.default.createDirectory(at: policies, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: [
+            "id": "damaged-policy", "version": 1, "title": "Damaged",
+            "branches": [["id": "main", "steps": [], "assertions": []]],
+        ]).write(to: policies.appendingPathComponent("damaged-policy.json"))
+        let malformedPolicy = await router.handle(namespace: "automation", tool: "run", arguments: ["policyId": "damaged-policy"])
+        XCTAssertFalse(malformedPolicy.success)
+        XCTAssertTrue(try store.listRuns().isEmpty)
     }
 
     func testZRecordEventFailsForUnknownRecordingSession() async throws {
@@ -649,13 +681,12 @@ final class AutomationRuntimeTests: XCTestCase {
         let store = AutomationStore(directoryURL: directory)
         let runtime = AutomationRuntime(
             store: store,
-            capabilityClient: RecordingAutomationCapabilityClient(),
-            repairer: RecordingAutomationRepairer()
+            host: RecordingAutomationHost()
         )
         let router = AutomationToolRouter(
             store: store,
             runtime: runtime,
-            recorder: AutomationRecordingService(capabilityClient: RecordingAutomationCapabilityClient())
+            recorder: AutomationRecordingService(host: RecordingAutomationHost())
         )
 
         let result = await router.handle(
@@ -669,11 +700,13 @@ final class AutomationRuntimeTests: XCTestCase {
     }
 
     private func makeDirectory() -> URL {
-        FileManager.default.temporaryDirectory
+        let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("automation-runtime-tests-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        return directory
     }
 
-    private func decodeToolJSON(_ result: PluginToolResult) -> [String: Any] {
+    private func decodeToolJSON(_ result: DynamicToolResult) -> [String: Any] {
         guard let text = result.contentItems.first?["text"] as? String,
               let data = text.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -684,89 +717,46 @@ final class AutomationRuntimeTests: XCTestCase {
     }
 }
 
-private final class RecordingAutomationCapabilityClient: AutomationCapabilityCalling {
+@MainActor
+private final class RecordingAutomationHost: HostAutomationCapabilities {
     struct Call {
-        let namespace: String
-        let tool: String
+        let operation: String
         let arguments: [String: Any]
     }
 
-    private let callsQueue = DispatchQueue(label: "RecordingAutomationCapabilityClient.calls")
-    private var recordedCalls: [Call] = []
+    private(set) var calls: [Call] = []
     let failAXAction: Bool
-
-    var calls: [Call] {
-        callsQueue.sync { recordedCalls }
-    }
 
     init(failAXAction: Bool = false) {
         self.failAXAction = failAXAction
     }
 
-    func call(namespace: String, tool: String, arguments: [String: Any]) async throws -> [String: Any] {
-        callsQueue.sync {
-            recordedCalls.append(Call(namespace: namespace, tool: tool, arguments: arguments))
-        }
-        if namespace == "ax", tool == "action", failAXAction {
-            throw NSError(domain: "RecordingAutomationCapabilityClient", code: 1)
-        }
-        if namespace == "ax", tool == "snapshot" {
-            return [
-                "root": [
-                    "role": "AXWindow",
-                    "children": [
-                        ["role": "AXStaticText", "title": "Saved"],
-                    ],
-                ],
-            ]
-        }
-        if namespace == "screenshot", tool == "capture" {
-            return ["imageBase64": "repair-shot"]
-        }
-        return ["ok": true]
+    func frontmostAppWindow() async throws -> [String: Any] {
+        calls.append(Call(operation: "frontmostAppWindow", arguments: [:]))
+        return ["app": ["pid": 42], "window": ["id": 7, "title": "Save Form"]]
+    }
+
+    func accessibilitySnapshot() async throws -> [String: Any] {
+        calls.append(Call(operation: "accessibilitySnapshot", arguments: [:]))
+        return ["root": ["role": "AXWindow", "children": [["role": "AXStaticText", "title": "Saved"]]]]
+    }
+
+    func captureScreenshot() async throws -> [String: Any] {
+        calls.append(Call(operation: "captureScreenshot", arguments: [:]))
+        return ["imageBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "mimeType": "image/png", "width": 1, "height": 1]
+    }
+
+    func activateApp(bundleId: String?) async throws {
+        calls.append(Call(operation: "activateApp", arguments: bundleId.map { ["bundleId": $0] } ?? [:]))
+    }
+
+    func performAction(_ arguments: [String: Any]) async throws {
+        calls.append(Call(operation: "performAction", arguments: arguments))
+        if failAXAction { throw NSError(domain: "RecordingAutomationHost", code: 1) }
     }
 }
 
-private final class RecordingAutomationRepairer: AutomationRepairing {
-    private(set) var requests: [AutomationRepairRequest] = []
-
-    func repair(request: AutomationRepairRequest) async throws -> AutomationRepairResult {
-        requests.append(request)
-        return AutomationRepairResult(
-            branch: AutomationBranch(
-                id: "\(request.policy.id):repair",
-                steps: [
-                    AutomationStep(kind: .click, selector: AXSelector(role: "AXButton", title: "Submit Now")),
-                ],
-                assertions: []
-            ),
-            evidence: ["repair": "fake-success"]
-        )
-    }
-}
-
-private final class PersistingAutomationRepairer: AutomationRepairing {
-    private let requestStore: AutomationRepairRequestStore
-
-    init(store: AutomationStore) {
-        self.requestStore = AutomationRepairRequestStore(store: store)
-    }
-
-    func repair(request: AutomationRepairRequest) async throws -> AutomationRepairResult {
-        let evidence = try requestStore.saveRepairRequest(request)
-        return AutomationRepairResult(
-            branch: AutomationBranch(
-                id: "\(request.policy.id):repair",
-                steps: [
-                    AutomationStep(kind: .click, selector: AXSelector(role: "AXButton", title: "Submit Now")),
-                ],
-                assertions: []
-            ),
-            evidence: evidence
-        )
-    }
-}
-
+@MainActor
 private final class RecordingAutomationLiveEventRecorder: AutomationLiveEventRecording {
     private let events: [[String: Any]]
     private(set) var startedRecordingIds: [String] = []

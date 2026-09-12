@@ -1,4 +1,5 @@
 # Self-Evolving Automation Spec
+> 历史方案，已被 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 替代。本文保留当时设计用于追溯；Automation 的独立 Plugin、插件间调用与自主修复承诺不再是当前约束，也不能作为功能通过实机验证的证据。当前所有权与行为从 [Host Automation](../../../apps/host-automation/host-automation.md) 进入。
 
 ## Background
 

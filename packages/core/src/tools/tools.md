@@ -55,14 +55,18 @@ flowchart LR
 
 ## Dynamic tools
 
-macOS host 能力、plugin 能力和未来外部 provider 能力通过 `DynamicToolSpec` 暴露，不进入 builtin 注册流程。`ThreadTools` 在 agent-server 侧把 thread metadata 中的 dynamic tools 适配为 `DynamicToolAdapter`；模型可见名称是 `namespace.name`，例如 `host_macos.screen_capture`。adapter 会用 `threadId / turnId / toolCallId` 生成 provider-facing 唯一 call id，避免多个 thread 并发复用同一个 LLM tool call id 时互相覆盖；返回给 runtime 的 tool message 仍使用原始 `toolCallId`。
+macOS 原生能力、Context History、Automation 与其他 Provider 能力通过 `DynamicToolSpec` 暴露，不进入 core builtin 注册流程。`ThreadTools` 在 agent-server 侧把 thread metadata 中的 dynamic tools 适配为 `DynamicToolAdapter`；模型可见名称是 `namespace.name`，例如 `host_macos.screen_capture`。adapter 会用 `threadId / turnId / toolCallId` 生成 provider-facing 唯一 call id，避免多个 thread 并发复用同一个 LLM tool call id 时互相覆盖；返回给 runtime 的 tool message 仍使用原始 `toolCallId`。
+
+Dynamic Tool 失败仍向 Runtime 抛出 `Error`，错误内容保留完整响应 envelope（含 `success:false`、文本与图片）并恢复原始 Tool call id。Runtime 因此保持错误状态，下一轮 [Provider 适配](../adapters/providers/providers.md) 仍能读取失败证据；不要把失败压成单条文本而丢失图片或关联。
+
+默认调用等待真实 Provider 结果或连接失效，显式超时由 bridge 边界处理。Thread 中断与宿主任务取消分别归各自 owner，见 [Thread](../thread/thread.md) 和 [server bridge](../../../../apps/agent-server/src/bridges/bridges.md)。
 
 ## 编辑此目录的约束
 
 - 新增 builtin tool 必须：实现 `AgentTool` → 在 `registerBuiltins.ts` 的 `candidates` 里挂上 → 同步更新 [README](/Users/mu9/proj/handAgent/README.md) 与本文件的 builtin tool 表。
 - 新增 MCP 字段时，同步更新对应模块文档，并补 MCP 配置解析测试。
 - tool name 一律点号风格（`category.action`），描述要包含调用场景与边界条件，方便 LLM 自决策。
-- 不要在 tool 内部直接 `import "node:fs"` 与平台无关的 IO；文件类 tool 必须经 `WorkspaceRegistry`，host/plugin 能力应走 dynamic tools。
+- 不要在 tool 内部直接 `import "node:fs"` 与平台无关的 IO；文件类 tool 必须经 `WorkspaceRegistry`，宿主能力应走 Dynamic Tool。
 - 工具结果优先返回**可序列化对象**（runtime 自动 JSON.stringify）；返回字符串只用于人类阅读场景。
 - 大段输出工具若需要 Blob/Stub 路径，应在 input schema 中加入必填 `cached: "turn" | "persist"`，并设置 `stubByDefault`；runtime 会负责落 Blob 与渲染 STUB，tool 不直接拼文本。
 - 入参 schema 单一源：写 `zod` schema 即可，`defineTool` 自动派生 JSON Schema、TS 类型，并在 `call(input)` 内执行运行时校验；builtin tool 的外层入参结构由 `defineTool` 统一校验。

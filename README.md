@@ -28,6 +28,10 @@ Agent 默认可调用 `web_search` 与 `fetch_page` 查询公共 Web。`web_sear
 
 支持 OpenAI Compatible / Anthropic 等多种 provider，在设置页即可切换模型、配置 API Key，保存后立即生效，无需重启。
 
+### 内置宿主功能
+
+Settings → 工具提供默认关闭的 Context History 与 Automation 开关，并保存启用选择。Context History 持续采样应用、窗口、AX 与截图，Agent 可按需分层读取；关闭窗口继续采集，禁用或退出应用后停止。Automation 提供录制、流程保存、按标识执行、历史与显式修复数据入口，已保存流程可在重启后复用。两者直接由 Swift Host 管理，不需要安装 Plugin；实机验收状态见 [manual-qa](docs/manual-qa.md)。
+
 ---
 
 ## 快速开始
@@ -54,6 +58,7 @@ bash ./scripts/swiftw run HandAgentDesktop
 | **ThreadWindow** (React) | 对话 UI、历史管理、权限审批 |
 | **Agent Server** (Node) | AgentRuntime 驱动、tool 注册、MCP 注入、thread 持久化 |
 | **Core** (TypeScript) | 跨平台 Agent 核心、工具编排、LLM adapter |
+| **Host Automation** (Swift) | 应用进程内的 Context History、Automation 与业务持久化 |
 
 ---
 
