@@ -17,6 +17,7 @@
 - [agents/agents.md](/Users/mu9/proj/handAgent/docs/agents/agents.md)：工程 skills 的 issue tracker、triage 标签与领域文档消费规则。
 - [adr/adr.md](/Users/mu9/proj/handAgent/docs/adr/adr.md)：跨模块架构决策及尚未实现的目标原则。
 - [human/human.md](/Users/mu9/proj/handAgent/docs/human/human.md)：面向人工操作和系统能力的补充说明。
+- [research/research.md](./research/research.md)：外部产品与交互研究；区分官方事实、观察和设计建议。
 - [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：历史 spec / plan 集合。
 - [superpowers/superpowers.md](/Users/mu9/proj/handAgent/docs/superpowers/superpowers.md)：历史视觉 / 输入资料资产。
 
