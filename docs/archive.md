@@ -42,3 +42,17 @@
 - **证据**：`/tmp/issue1-live-qa-20260913-1030/evidence/text-two-targets.json` 显示相关 Thread 只有 `thread-3714ddbb-e575-47e8-87b0-6a60602e1733`；序列 1 和 8 的两条 user response_item 均含完整中文、对应 text Input Item 和 `inputMode: inspect`。`textedit-windows.txt`、`native-text-drop-a.log`、`native-text-drop-b-final.log`、`windows-text-b-target.txt` 记录源窗口及最终区域；Computer Use 已观察原文选区和包含 A、B 的桌宠历史。
 - **结论**：本分项通过；角色新建、气泡追加和输入留存均有真实 UI 与 SQLite 证据。模型服务仍返回空流或 `unexpected EOF`，本结论不涵盖内容理解、建议或后续执行。
 - **清理状态**：两个 QA Thread 及 TextEdit 临时文稿继续保留供本轮后续测试，未改用户原有文稿、模型设置或默认桌宠位置。
+
+
+- [ ] 图片两区域拖入：从 Finder 或图片应用拖入样本，分别松手角色与气泡/历史，确认新建/追加分流及实际图片内容进入读取，历史显示图片。
+
+### 图片两区域拖入
+
+- **验证日期**：2026-09-13（Asia/Shanghai）。
+- **验证环境**：用户指定 `codex/issue-1-pet-main-20260913` worktree，源码 `0194a22` 加开始时已有的 8 个未提交文件；macOS 单屏 1440×932，默认 `dist/Wisp Pocket.app`；本轮 TypeScript/Web、Swift test/build 与打包均通过。使用真实 provider/model，临时将同一 provider 的 `llm.api` 从 `responses` 改为已验证可用的 `chat`，结束时恢复。
+- **验证过程**：从 Finder 将 `qa-image.png` 原生拖入角色，创建 `thread-dde5d3fb-ca39-43e4-a3b6-42ac787c3a31`；再将不同内容的 `qa-image-b.png` 原生拖入气泡，追加到同一 Thread。每次以最新 Finder 窗口原点与桌宠位置换算坐标，使用系统 `osascript`/CoreGraphics 发送拖放，Computer Use 观察拖放后的真实 UI。
+- **可见结果**：历史显示两张图片及文件名。真实模型从第一张图读出“社区花园种植工作坊、9 月 23 日 14:00、手套和笔记本”，从第二张图读出“社区图书馆图书交换、10 月 5 日 10:30、两本小说”，并给出相关建议；这些独有内容均未出现在文件名中。
+- **持久化证据**：SQLite 同一 Thread 的 sequence 1、10 分别保存 A/B 两条 `role:user`、`inputMode:inspect` 输入，各有不同 image Input Item 和 Blob 引用；sequence 7、16 保存对应 assistant 内容与建议。总 Thread 数为 86，图片 A 前为 85，追加 B 未再创建 Thread。
+- **证据位置**：`/tmp/issue1-live-qa-20260913-1030/evidence/image-two-targets.json`、`native-image-drop-b.json`、`image-b-after-drop.png`、`image-history-bottom.png`；第一张图片的原生拖放证据为 `native-image-drop-a-final.log`。
+- **结论**：通过，角色新建、气泡追加、图片历史展示及真实内容读取均有系统证据。
+- **清理状态**：应用和后端继续运行以验证后续分项；可丢弃图片及本轮测试 Thread 暂保留作证据；临时模型字段将在本轮结束时恢复。
