@@ -39,3 +39,15 @@
 - **期望结果**：`bridge.json` 指向当前 Swift bridge 正在监听的端口和 token；hello / folderTreeSnapshot 转发成功，Settings 表单可选择收藏夹并保存自动化。
 - **关键证据**：发现时 `bridge.json` 写入端口 `53317`，但 HandAgentDesktop 进程只监听旧端口 `53288`；旧端口携带当前 token 返回 `401`，新端口连接失败。
 - **根因边界**：问题在 Swift `AgentTriggerRuntime` / `ChromeBookmarksAgentTriggerProvider` / `ChromeBookmarksExtensionBridgeServer` 的 provider lifecycle 或 endpoint 写入；Settings UI 和 native host 只是读取磁盘 endpoint 后展示或转发。
+
+
+### P1：完全退出时 Electron 回执触发 EPIPE 并残留异常对话框
+
+- **严重级别**：P1，阻断正常完全退出与后续验收清理。
+- **发现日期**：2026-09-13。
+- **复现步骤**：使用本 worktree 的 `dist/Wisp Pocket.app`，正常启动并打开 Settings；通过 `osascript` 核对 Host 前台 PID 后发送 Command-Q；观察 Electron 与 Node 子进程。
+- **实际结果**：Swift Host 退出、服务端口关闭，但 Electron 弹出 `A JavaScript error occurred in the main process / Uncaught Exception: Error: write EPIPE` 并持续运行，Node 为僵尸；60 秒退出检查失败。
+- **期望结果**：宿主关闭输出管道后，已启动的 shutdown 清理仍完成，停止 agent-server 并退出 Electron，不弹出未处理异常或遗留进程。
+- **证据**：macOS 15.5 (24F74)，二进制 SHA-256 `b86c404631a0bb81b1a62ac0624e30770ac06c2a1b94eb9cb6a8b6c14cc95be7`。CUA 直接读取残余 Electron PID 43008 的警告对话框；堆栈为 `Writable.write → JsonLineBridge.send → main.send → ElectronShellRuntime.ack`。Host 43006 已退出，Node 43020 为 `Z / defunct`。`.cache/issue-4-qa/au2-old-electron.sample.txt` 显示此前 PID 40111 主线程停在 `NSAlert.runModal`；`shutdown-evidence.jsonl`、`shutdown-dialog-evidence.jsonl` 记录两轮 60 秒进程检查。
+- **初步调用链 / 根因边界**：原生 Command-Q → Swift shutdown 发送及退出 → Electron 收到 shutdown → ack 写 stdout → 宿主读取端已关闭，异步 stream error 无接收者 → Electron 默认异常对话框 → 清理被模态循环阻断。GUI 与系统证据已定位到输出流错误边界；接下来以真实断开管道构造可重复回归。
+- **基线与清理状态**：此前 Web、Swift test/build/package 均已通过，生产代码未变化；本轮 live QA 暂停。Host/采集/录制已停止，残余 Electron 错误框待确认后清理；AU3 的禁用取消已验证，退出取消的一轮先发生 AX snapshot 错误，不能计作取消通过。

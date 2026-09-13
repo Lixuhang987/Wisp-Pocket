@@ -95,3 +95,14 @@ Swift Host 通过固定的 `HostAutomationCapabilities` 共享 macOS 实现，`B
 - **可见窗口复验**：Settings 已可见且 Host 在后台时，`resumed-settings-visible-activate-host` 成功，随后激活 fixture、再切回 Host 也成功；最终 Host PID 51805 / 设置窗口 24546。CUA 观察到设置工具页两个开关 on、最近采样 17:42:09，以及 fixture 的 QA Input / Apply / Ready，记录在 `.cache/issue-4-qa/activation-ui-evidence.jsonl`。
 - **失败与未测边界**：不存在的 `local.handagent.issue4.missing` 返回 `not_found`，证据为 `activation-boundary-evidence.jsonl`。权限拒绝未通过撤销用户 TCC 来实测；取消仍待 AU3 禁用/退出的真实停机验证。无窗口 Host 自激活仍可能明确失败，未声称该场景已修复或通过。
 - **证据有效性与状态**：`resumed-activation-green` 的 Host 实际在前台，未满足用例前提，不计作产品失败；有效复验以上述 `green2` 为准。核心缺陷已从 bugs 移除，HOST1 原完整条目恢复到 manual-qa；HOST1 仍待完整验收，其余条目的最新状态以 manual-qa / archive 为准。
+
+
+## 实机发现：退出期间回执管道关闭
+
+触发：用户正常退出 Swift Host，Electron 处理既有 shutdown command 时向已经关闭的 stdout 读取端发送 ack。预期：停止 supervisor 并退出 Electron，不因回执传输失败进入异常模态框；连接正常时 NDJSON 内容保持原合约。
+
+复用链路：`ElectronBackedAppServer.stop → shutdown → ElectronShellRuntime.handleCommand → ack → JsonLineBridge.send → stdout`。不新增协议字段、托管进程或业务状态；输出流的终止必须作为传输边界处理，不能打断 shutdown 清理。
+
+用例级回归先在 Electron `tests/use-cases/` 构造真实 Node 子进程与可关闭的输出 socket，调用真实 command parser、runtime 和 bridge，仅替换 Electron 窗口/退出及 supervisor 系统边界；读取端正常时验证 ack，读取端关闭时验证进程正常结束且停止 supervisor，不产生未处理 EPIPE。再检查其他输出错误的定位边界，避免把未预期错误伪装成成功。
+
+TODO：建立并运行红用例 → 最小修复输出生命周期 → 用例及仓库 Web/Swift test/build/package 检查 → 独立文档审核 → 本地提交 → 原构建退出链路实机复验并继续 AU3/HOST1。用户已授权发现 bug 后按流程修复，沿用本 worktree 和既有分层基线。
