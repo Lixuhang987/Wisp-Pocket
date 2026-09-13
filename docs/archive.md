@@ -188,3 +188,22 @@
 - **清理与恢复证据**：移除旧/当前两个隔离业务 home、原始 Provider 响应、整屏图片、日志、token、fixture bundle 和临时脚本，共 1569 个文件 / 385514942 字节。保留脱敏汇总与两张已查看的 fixture 图片，保留最终构建；清理没有操作真实用户业务目录。随后使用原有 /tmp/issue1-live/launch.sh 恢复 /tmp/issue1-live/app/Wisp Pocket.app，核对 Host PID 7775、4317 listener PID 7780；原启动配置文件未修改。4317 此时属于恢复的旧实例。
 - **证据位置**：.cache/issue-4-qa/HOST1-{setvalue,keyboard,image,invalid,ui,clipboard,process,restored,stopped,cleanup}-verdict.json、HOST1-old-instance-restored.json、HOST1-window.png、FINAL-QA-SUMMARY.json；AU2-policy-fixture.png 为保留的先前脱敏图片。原始桌面证据已按本项清理，已提交归档的文本和哈希保留。
 - **结论**：通过。CH1–CH5、AU1–AU3、HOST1 九项已逐项验收归档；已说明的权限与无窗口激活边界不计作通过场景。全部代码检查、打包、签名和独立文档审核已完成，修改仅在本地分支提交。
+
+
+### AgentTrigger 新增表单错误关闭回归
+
+- **状态**：2026-09-14 已修复旧 P3，待主 checkout 重新打包实机验收；[实施与验证边界](./medium-powers/plans/2026-09-14-agenttrigger-form-errors.md)。
+- **自动化覆盖**：真实 SwiftUI 新增、无效保存、取消/收起、重新展开，覆盖 Chrome 空文件夹与 System Clock 空标题四条流程，并从新建 Store 读回既有记录。旧实现连续两次失败，修复后四项通过；测试窗口不显示，不把它计作实机通过。
+- **原失败证据**：主 checkout `2920af8` 产物的 Computer Use AX 与截图确认 Chrome 两条关闭路径残留红色错误，详见 `.cache/live-qa-20260914/trigger-form-repro.json`。当时已正常退出测试 App，4317 已释放。
+- **验收步骤**：
+  1. Chrome Bookmarks 详情页新增自动化，先选择文件夹，再空标题保存；确认 `标题不能为空`，点击取消，确认表单及红色错误一起消失。
+  2. 重新展开，不选文件夹保存；确认 `至少选择一个收藏夹文件夹`，点击收起，确认错误清除。再展开时标题与文件夹选择为空、提示词恢复 Package 默认值，不显示旧错误。
+  3. 在 System Clock 详情页用空标题重复取消与收起路径；保存失败时错误仍可见，关闭后清除，再展开时标题与时间点为空、时区恢复默认值。各次关闭后已有列表与 `instances.json` 不变。
+
+### AgentTrigger 表单关闭实机验证
+
+- **验证日期**：2026-09-14。
+- **验证环境**：主 checkout `main`、源码 `b2b8288`、macOS 15.5 arm64，正式模型模式的 `dist/Wisp Pocket.app`；Web/TypeScript、隔离 home 的 Swift test、Swift build、打包和签名验证全部通过。
+- **验证过程**：Computer Use 操作 Chrome Bookmarks 的已选文件夹/空标题保存后取消、未选文件夹保存后收起；再操作 System Clock 的空标题保存后取消与收起。失败时均显示正确原因，关闭后字段和红色错误一起消失，重新展开不带旧错误并恢复字段默认值。
+- **证据**：AX 与截图逐步确认表单/错误出现和移除；已有 System Clock Instance 始终保留，`instances.json` 前后 SHA256 均为 `ab49203cb1ed9dc49b8fa9fa5c55a8c109751d0d5c8d6862dac5358c7361b9e8`。产物、进程和检查记录见 `.cache/live-qa-20260914/trigger-form-fixed.json`；Host SHA256 为 `a13166b21bb03c1065fefbaefdfc90928123a50122d8c4de33eb1098a89dab0e`。
+- **清理与结论**：从 Settings 正常退出后 Host、Electron、agent-server 全部结束，4317 释放。本表单回归通过；Chrome 扩展连接与完整生命周期仍按各自条目验收。

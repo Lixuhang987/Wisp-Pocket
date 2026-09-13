@@ -35,5 +35,5 @@
 - [x] `bash ./scripts/test.sh` 与隔离 home 的 `bash ./scripts/swiftw test` 全量通过。
 - [x] `bash ./scripts/swiftw build` 通过。
 - [x] 更新 Settings、TestsSwift 文档与 manual QA，移出已修复 bug；独立无上下文子 agent 已核对计划、代码与所有修改目录的文档链，修正调用链表述和验收默认值。
-- [ ] 最终检查完成后提交。
-- [ ] 合回主分支、重新打包实测；通过后使用 QA 技能脚本归档，并继续完整清单。
+- [x] 最终检查及独立审核完成后以 `b2b8288` 提交并合入 `main`。
+- [x] 主 checkout 再次通过三项检查、正式模型模式打包与签名验证；Chrome 与 System Clock 的取消、收起、重新展开均实机通过，已有 `instances.json` 哈希不变。证据为 `.cache/live-qa-20260914/trigger-form-fixed.json`，通过项使用 QA 技能脚本归档；其他功能继续按总清单验收。
