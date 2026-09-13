@@ -30,20 +30,22 @@ struct WispPocketApp: App {
 @MainActor
 final class WispPocketApplicationDelegate: NSObject, NSApplicationDelegate {
     weak var coordinator: AppCoordinator?
+    var replyToTermination: @MainActor (NSApplication, Bool) -> Void = { app, shouldTerminate in
+        app.reply(toApplicationShouldTerminate: shouldTerminate)
+    }
     private var hasShutDown = false
+    private var shutdownTask: Task<Void, Never>?
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        shutdownCoordinatorIfNeeded()
-        return .terminateNow
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        shutdownCoordinatorIfNeeded()
-    }
-
-    private func shutdownCoordinatorIfNeeded() {
-        guard !hasShutDown else { return }
-        hasShutDown = true
-        coordinator?.shutdown()
+        guard !hasShutDown else { return .terminateNow }
+        if shutdownTask == nil {
+            shutdownTask = Task { @MainActor in
+                await coordinator?.shutdown()
+                hasShutDown = true
+                shutdownTask = nil
+                replyToTermination(sender, true)
+            }
+        }
+        return .terminateLater
     }
 }

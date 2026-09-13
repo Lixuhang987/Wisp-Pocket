@@ -16,7 +16,7 @@
 ## 职责
 
 1. Swift 通过 `DynamicToolProviderConnectionClient` 连接 `ws://127.0.0.1:4317/api/dynamic-tools`。
-2. 连接成功后发送 `channel: "dynamic_tools"` 的 `provider_hello`，注册默认 `swift-host` / `host_macos` 工具。
+2. 连接成功或内置功能启用选择变化时发送 `channel: "dynamic_tools"` 的 `provider_hello`，声明 `swift-host` 的原生工具与当前启用的业务工具。
 3. 收到 `tool_call_request` 后交给 `DynamicToolProviderService`，再通过同一 socket 回写 `tool_call_response`。
 4. PromptPanel 提交和 AgentTrigger 命中时，Swift 通过 `SwiftThreadClient` 连接 `ws://127.0.0.1:4317/api/thread`，发送带默认 dynamic tools 的 `thread.start`，收到 `thread.started.threadId` 后发送首轮 `op.submit(UserInput)`；PromptPanel 路径随后通知 Electron 打开或聚焦 ThreadWindow，AgentTrigger 路径只创建后台 thread。
 5. `AgentServerHealth` 只观察 `ElectronBackedAppServer` 暴露的 availability/fatal 状态，不直接启动或停止 Node 子进程。
@@ -29,9 +29,10 @@ Swift `/api/thread` client 只负责 PromptPanel 和 AgentTrigger 首轮直连�
 - 除 `AgentServerHealth.swift` 作为健康状态与原生 fatal alert 的桥接外，不要在此处新增 `SwiftUI` / `AppKit` 依赖。
 - 不要重新引入 Swift 侧 agent-server 子进程启动器或 `/api/activity` subscriber。
 - 修改 TS 源码后必须重启 desktop app 才能让 Electron 监督的 agent-server 重新加载。
+- 同一连接刷新工具声明时必须保留在途调用；只有真实断连或 Provider 身份替换才走 offline 清理。对应服务端规则见 [server](../../../../agent-server/src/server/server.md)。Swift 在创建时显式提交当时的工具集合；桌宠与 ThreadWindow 未指定集合时由服务端选取当前在线声明。hello 不重写既有 Thread metadata，旧连接的声明刷新也不能覆盖新连接。
 
 ## 与其他模块的关系
 
 - [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 在 `bootstrap()` 调 `start()`，在 `shutdown()` 调 `stop()`；订阅 `onAvailabilityChange`、`onFatalError` 与 `onHostTerminationRequest`。
 - [ElectronShell](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/ElectronShell/electron-shell.md) 通过 `ElectronBackedAppServer` 暴露 app-server health、ThreadWindow command client 和 ActivityWindow command client。
-- [PlatformBridge](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md) 走独立 `/api/dynamic-tools` WebSocket，通过 `channel: "dynamic_tools"` 处理 host / plugin dynamic tools。
+- [PlatformBridge](../PlatformBridge/platform-bridge.md) 走独立 `/api/dynamic-tools` WebSocket，通过 `channel: "dynamic_tools"` 处理原生、Context History 与 Automation 工具。

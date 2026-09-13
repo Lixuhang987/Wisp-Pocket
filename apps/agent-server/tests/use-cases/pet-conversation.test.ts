@@ -18,6 +18,7 @@ import { PetThreadController } from "../../../electron-shell/src/activity-window
 import { attachThreadSocketHandlers, attachDynamicToolSocketHandlers } from "../../src/server/server.ts";
 import { WebSocketDynamicToolBridge } from "../../src/bridges/WebSocketDynamicToolBridge.ts";
 import { ThreadSocketClient } from "../../../thread-window-web/src/thread/threadSocketClient.ts";
+import { ThreadInputController } from "../../../thread-window-web/src/thread/threadInputController.ts";
 import { makeThreadWindowStore } from "../../../thread-window-web/src/store/threadWindowStore.ts";
 import { encodePermissionAnswer } from "../../../thread-window-web/src/protocol/threadProtocol.ts";
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
@@ -202,6 +203,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
         payload: { callId: message.payload.callId, success: true, contentItems: [{ type: "inputText", text: "CLI completed" }] } })));
     };
     attachDynamicToolSocketHandlers(provider as never, { bridge });
+    provider.emit("message", Buffer.from(JSON.stringify({ channel: "dynamic_tools", type: "provider_hello", clientId: "qa-host", tools: [] })));
     provider.emit("message", Buffer.from(JSON.stringify({ channel: "dynamic_tools", type: "provider_hello", clientId: "qa-host", tools: [
       { clientId: "qa-host", namespace: "host", name: "cli", description: "执行用户已决定的整理", inputSchema: { type: "object", properties: {} } },
     ] })));
@@ -385,15 +387,29 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("收到你的回复"));
   });
 
-  it("执行中的追加输入立即持久化并排队，重启后仍在权威历史中", async () => {
+  it.each(["pet", "thread-window"])("%s 执行中追加输入立即持久化并排队，两界面一致且重启后仍在权威历史中", async (source) => {
     const gate = Promise.withResolvers<void>();
     const entered = Promise.withResolvers<void>();
     const h = await harness({ complete: async (messages) => { entered.resolve(); await gate.promise; return answer("当前工作完成"); } });
     h.pet.drop([textItem("先处理这一份")], "pet");
     await entered.promise;
     const id = current(h).id;
-    h.pet.respond("然后处理这一份");
+    const fullView = makeThreadWindowStore();
+    const fullSocket = new ThreadSocketClient({ url: "ws://local/api/thread", WebSocketImpl: h.LocalSocket,
+      onConnectionState: (value) => fullView.getState().setConnectionState(value),
+      onNotification: (value) => inputs.handleNotification(value),
+      onRequest: (value) => fullView.getState().handleRequest(value),
+    });
+    const inputs = new ThreadInputController({ getState: fullView.getState, client: fullSocket });
+    fullSocket.connect();
+    fullSocket.resumeThread(id);
+    await until(() => expect(fullView.getState().threadsById[id]?.status).toBe("running"));
+    if (source === "pet") h.pet.respond("然后处理这一份");
+    else inputs.submitComposerInput(id, { items: [textItem("然后处理这一份")] });
     await until(() => expect(h.pet.store.getState().threadsById[id].messages.some((m) => m.type === "user_message" && m.text === "然后处理这一份" && m.pending)).toBe(true));
+    const visibleMessages = (view: typeof fullView) => view.getState().threadsById[id].messages.map((message) =>
+      message.type === "user_message" ? { ...message, pending: message.pending === true } : message);
+    expect(visibleMessages(fullView)).toEqual(visibleMessages(h.pet.store));
     const saved = await h.persistence.getThread(id);
     expect(saved!.messages.some((m) => m.content === "然后处理这一份")).toBe(true);
     // A second SQLite reader proves acceptance is durable before the first execution completes.

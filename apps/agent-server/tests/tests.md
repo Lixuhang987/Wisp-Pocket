@@ -8,13 +8,13 @@
 
 | 子节点 | 职责 |
 |------|------|
-| `use-cases/` | Thread 生命周期/所有权、桌宠读取与持久化主路径；覆盖 socket、runtime、真实 SQLite/Blob 与跨界面请求 |
+| [use-cases/use-cases.md](./use-cases/use-cases.md) | Thread 生命周期/所有权、桌宠读取与持久化、跨界面请求及 Dynamic Tool 身份主路径 |
 | `activity/` | `AgentActivityPublisher` 的 snapshot、状态派生和 subscriber 广播边界 |
 | `thread/` | Thread 生命周期、持久化、请求、工具激活和所有权主路径 |
 | `protocol/` | `MessageTranslator` 的通知、审计、结构化附件与 STUB 翻译 |
 | `settings/` | `SettingsBackedLLMClient` 与 `SettingsBackedToolRegistry` 的 stamp 缓存和热加载 |
 | `actions/` | `MCPServerRegistry` |
-| `bridges/` | dynamic tool bridge 的 token fencing、超时和断线语义 |
+| [bridges/bridges.md](./bridges/bridges.md) | Dynamic Tool 的 token fencing、发送失败清理、显式超时和断线语义 |
 | `support/` | 测试辅助实现，目前包含内存 BlobStore |
 | `path-alias.test.ts` | 扫描测试目录内跨包 import，验证 `@handagent/core/*` path alias 能覆盖测试引用 |
 

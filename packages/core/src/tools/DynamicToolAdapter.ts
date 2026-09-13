@@ -45,13 +45,17 @@ export class DynamicToolAdapter implements AgentTool<unknown, DynamicToolCallRes
       tool: this.spec.name,
       arguments: input,
     });
-    if (!response.success) {
-      throw new Error(formatDynamicToolError(this.name, response));
-    }
-    return {
+    const result = {
       ...response,
       callId: context.toolCallId,
     };
+    if (!result.success) {
+      if (result.contentItems.length === 0) {
+        result.contentItems = [{ type: "inputText", text: `Dynamic tool failed: ${this.name}` }];
+      }
+      throw new Error(JSON.stringify(result));
+    }
+    return result;
   }
 }
 
@@ -63,15 +67,4 @@ function providerCallIdFor(input: {
   return input.turnId
     ? `${input.threadId}:${input.turnId}:${input.toolCallId}`
     : `${input.threadId}:${input.toolCallId}`;
-}
-
-function formatDynamicToolError(
-  toolName: string,
-  response: DynamicToolCallResponsePayload,
-): string {
-  const text = response.contentItems
-    .filter((item): item is { type: "inputText"; text: string } => item.type === "inputText")
-    .map((item) => item.text)
-    .join("\n");
-  return text || `Dynamic tool failed: ${toolName}`;
 }

@@ -9,12 +9,7 @@ let package = Package(
     ],
     products: [
         .executable(name: "HandAgentDesktop", targets: ["HandAgentDesktop"]),
-        .executable(name: "HandAgentChromeBookmarksNativeHost", targets: ["HandAgentChromeBookmarksNativeHost"]),
-        .executable(name: "HandAgentAtomicAppWindowPlugin", targets: ["HandAgentAtomicAppWindowPlugin"]),
-        .executable(name: "HandAgentAtomicScreenshotPlugin", targets: ["HandAgentAtomicScreenshotPlugin"]),
-        .executable(name: "HandAgentAtomicAXPlugin", targets: ["HandAgentAtomicAXPlugin"]),
-        .executable(name: "HandAgentContextHistoryPlugin", targets: ["HandAgentContextHistoryPlugin"]),
-        .executable(name: "HandAgentAutomationPlugin", targets: ["HandAgentAutomationPlugin"])
+        .executable(name: "HandAgentChromeBookmarksNativeHost", targets: ["HandAgentChromeBookmarksNativeHost"])
     ],
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.0.0"),
@@ -24,7 +19,8 @@ let package = Package(
         .executableTarget(
             name: "HandAgentDesktop",
             dependencies: [
-                .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts")
+                .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
+                "HandAgentHostAutomation"
             ],
             path: "apps/desktop",
             exclude: ["TestsSwift", "desktop.md"]
@@ -39,38 +35,18 @@ let package = Package(
             path: "apps/chrome-bookmarks-native-host/Sources/Host"
         ),
         .target(
-            name: "HandAgentPluginSupport",
-            path: "apps/builtin-plugins/Sources/Support"
-        ),
-        .executableTarget(
-            name: "HandAgentAtomicAppWindowPlugin",
-            dependencies: ["HandAgentPluginSupport"],
-            path: "apps/builtin-plugins/Sources/AtomicAppWindow"
-        ),
-        .executableTarget(
-            name: "HandAgentAtomicScreenshotPlugin",
-            dependencies: ["HandAgentPluginSupport"],
-            path: "apps/builtin-plugins/Sources/AtomicScreenshot"
-        ),
-        .executableTarget(
-            name: "HandAgentAtomicAXPlugin",
-            dependencies: ["HandAgentPluginSupport"],
-            path: "apps/builtin-plugins/Sources/AtomicAX"
-        ),
-        .executableTarget(
-            name: "HandAgentContextHistoryPlugin",
-            dependencies: ["HandAgentPluginSupport"],
-            path: "apps/builtin-plugins/Sources/ContextHistory"
-        ),
-        .executableTarget(
-            name: "HandAgentAutomationPlugin",
-            dependencies: ["HandAgentPluginSupport"],
-            path: "apps/builtin-plugins/Sources/Automation"
+            name: "HandAgentHostAutomation",
+            path: "apps/host-automation/Sources",
+            exclude: ["sources.md"]
         ),
         .testTarget(
             name: "HandAgentDesktopTests",
-            dependencies: ["HandAgentDesktop"],
-            path: "apps/desktop/TestsSwift"
+            dependencies: ["HandAgentDesktop", "HandAgentHostAutomation"],
+            path: "apps/desktop/TestsSwift",
+            exclude: [
+                "tests-swift.md", "AppServices/app-services.md",
+                "AppServices/AgentServer/agent-server.md", "AppServices/PlatformBridge/platform-bridge.md"
+            ]
         ),
         .testTarget(
             name: "ChromeBookmarksNativeHostCoreTests",
@@ -78,9 +54,10 @@ let package = Package(
             path: "apps/chrome-bookmarks-native-host/Tests"
         ),
         .testTarget(
-            name: "HandAgentPluginSupportTests",
-            dependencies: ["HandAgentPluginSupport"],
-            path: "apps/builtin-plugins/Tests"
+            name: "HandAgentHostAutomationTests",
+            dependencies: ["HandAgentHostAutomation"],
+            path: "apps/host-automation/Tests",
+            exclude: ["tests.md"]
         )
     ]
 )

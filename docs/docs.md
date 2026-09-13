@@ -4,8 +4,8 @@
 
 ## 直接子节点
 
-- [issue-2-plan.md](./issue-2-plan.md)：后端所有权重构的当前实施计划。
-- [issue-3-design.md](./issue-3-design.md)：前后端状态所有权实施规格入口、基线与验证状态。
+- [issue-2-plan.md](./issue-2-plan.md)：后端所有权重构的已完成实施记录。
+- [issue-3-design.md](./issue-3-design.md)：状态所有权规格入口、后端保留理由与最终验证状态。
 - [backend-state-ownership.md](./backend-state-ownership.md)：后端状态唯一所有权 DAG。
 
 - [TODO.md](/Users/mu9/proj/handAgent/docs/TODO.md)：尚未实现的产品 / 架构待办；实现并验证后移出。
@@ -16,7 +16,7 @@
 - [dependency-audit.md](/Users/mu9/proj/handAgent/docs/dependency-audit.md)：依赖收敛后仍保留的独立迁移项。
 - [llm-api-integration.md](/Users/mu9/proj/handAgent/docs/llm-api-integration.md)：真实 LLM API 集成测试说明。
 - [agents/agents.md](/Users/mu9/proj/handAgent/docs/agents/agents.md)：工程 skills 的 issue tracker、triage 标签与领域文档消费规则。
-- [adr/adr.md](/Users/mu9/proj/handAgent/docs/adr/adr.md)：跨模块架构决策及尚未实现的目标原则。
+- [adr/adr.md](/Users/mu9/proj/handAgent/docs/adr/adr.md)：跨模块架构决策、实现状态与排除范围。
 - [human/human.md](/Users/mu9/proj/handAgent/docs/human/human.md)：面向人工操作和系统能力的补充说明。
 - [research/research.md](./research/research.md)：外部产品与交互研究；区分官方事实、观察和设计建议。
 - [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：历史 spec / plan 集合。

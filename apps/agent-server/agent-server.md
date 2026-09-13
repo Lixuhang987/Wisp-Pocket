@@ -21,8 +21,8 @@
 ## 组合边界
 
 - `startDefaultServer` 创建设置、LLM、Workspace、Permission、Blob、MCP、Tool registry、ThreadStore、ThreadRegistry 和三条 socket 通道。
-- ThreadRegistry / Thread 是运行中及空闲 Thread 的唯一 owner；外部输入统一经 `op.submit`，UI 回执在 server 内包装为内部 Op。
-- core runtime event 先在本包翻译成协议通知和审计，再发布或落盘；UI 不直接看到 runtime event。
+- ThreadRegistry / Thread 是运行中及空闲 Thread 的唯一 owner；公开输入经 `op.submit`，UI 回执经连接资格检查后交给所属 Thread 的待答请求。
+- 本包注入协议翻译与持久化适配，由 core Thread 决定何时翻译、保存和发布运行结果；UI 不直接看到 runtime event。
 - Dynamic Tool spec 可随 Thread 持久化，实际调用按 `clientId` 转发给在线 Provider。
 - 主动拖入先保存 Input Item 与 Blob 副本，再经读取 adapter 取得正文；建议等待与执行阶段由 core 区分，接口与恢复边界见 `src/`。
 

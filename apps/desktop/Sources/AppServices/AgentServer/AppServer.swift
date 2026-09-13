@@ -23,6 +23,7 @@ final class DynamicToolProviderConnectionClient {
     ) {
         self.connection = connection
         self.providerService = providerService
+        providerService.onToolsChanged = { [weak self] in self?.sendHello() }
         connection.onStateChange = { [weak self] state in
             Task { @MainActor in
                 guard state == .connected, let self else { return }

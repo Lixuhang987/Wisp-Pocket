@@ -66,7 +66,8 @@ final class AppCoordinator {
         agentServerHealth.start()
     }
 
-    func shutdown() {
+    func shutdown() async {
+        await services.builtinFeatures?.stopAndWait()
         if let showThreadWindowMonitor {
             NSEvent.removeMonitor(showThreadWindowMonitor)
         }
@@ -109,7 +110,7 @@ final class AppCoordinator {
     }
 
     func makeToolSettingsViewModel() -> ToolSettingsViewModel {
-        ToolSettingsViewModel(store: services.settingsStore)
+        ToolSettingsViewModel(store: services.settingsStore, builtinFeatures: services.builtinFeatures)
     }
 
     func makeAgentTriggerSettingsViewModel() -> AgentTriggerSettingsViewModel {
@@ -160,6 +161,7 @@ final class AppCoordinator {
     }
 
     private func setupAgentServerHealth() {
+        services.builtinFeatures?.start()
         services.appServer.onHostTerminationRequest = { [weak self] in
             guard let self else { return }
             self.services.terminateApplication()

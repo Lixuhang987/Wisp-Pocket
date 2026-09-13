@@ -3,6 +3,7 @@ import { encodePermissionAnswer, encodeWorkspaceAnswer } from "../../../thread-w
 import { makeThreadWindowStore } from "../../../thread-window-web/src/store/threadWindowStore.ts";
 import type { AssistantMessageItem } from "../../../thread-window-web/src/store/threadItems.ts";
 import { ThreadSocketClient } from "../../../thread-window-web/src/thread/threadSocketClient.ts";
+import { ThreadInputController } from "../../../thread-window-web/src/thread/threadInputController.ts";
 
 export type PetDropTarget = "pet" | "conversation";
 export type PetSnapshot = {
@@ -16,6 +17,7 @@ export type PetSnapshot = {
 export class PetThreadController {
   readonly store = makeThreadWindowStore();
   private readonly socket: ThreadSocketClient;
+  private readonly inputs: ThreadInputController;
   private readonly listeners = new Set<() => void>();
   private currentThread: { id: string; createdAt: string } | null = null;
   private visibility: "startup" | "visible" | "hidden" = "startup";
@@ -33,12 +35,16 @@ export class PetThreadController {
           this.reconnectTimer = setTimeout(() => this.socket.connect(), 1000);
         }
       },
+      onNotification: (notification) => this.inputs.handleNotification(notification),
+      onRequest: (request) => this.store.getState().handleRequest(request),
+    });
+    this.inputs = new ThreadInputController({
+      getState: this.store.getState,
+      client: this.socket,
       onNotification: (notification) => {
-        this.store.getState().handleNotification(notification);
         this.selectThread(notification);
         this.changed();
       },
-      onRequest: (request) => this.store.getState().handleRequest(request),
     });
     this.store.subscribe(() => this.changed());
   }
@@ -56,7 +62,7 @@ export class PetThreadController {
     if (!items.length) return;
     this.visibility = "visible";
     if (target === "pet") {
-      this.socket.startInitialPrompt({ clientRequestId: crypto.randomUUID(), userInput: { items, mode: "inspect" } });
+      this.inputs.startInitialPrompt({ clientRequestId: crypto.randomUUID(), userInput: { items, mode: "inspect" } });
     } else {
       if (!threadId) throw new Error("当前没有可追加的对话，请把内容拖到角色上。");
       this.socket.submitOp(threadId, { type: "user_input", opId: crypto.randomUUID(), timestamp: new Date().toISOString(), payload: { items, mode: "inspect" } });

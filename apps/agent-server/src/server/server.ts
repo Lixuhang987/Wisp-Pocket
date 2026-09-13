@@ -94,6 +94,7 @@ export function attachDynamicToolSocketHandlers(
   },
 ): void {
   let providerToken: number | null = null;
+  let providerClientId: string | null = null;
   const sendDynamicToolMessage = (outgoing: DynamicToolProviderMessage) => {
     socket.send(JSON.stringify(outgoing));
   };
@@ -105,7 +106,15 @@ export function attachDynamicToolSocketHandlers(
     }
 
     if (message.type === "provider_hello" && bridge) {
+      if (providerToken !== null && providerClientId === message.clientId) {
+        bridge.updateTools(providerToken, message.tools);
+        return;
+      }
+      if (providerToken !== null) {
+        bridge.detach(providerToken);
+      }
       providerToken = bridge.attach(message.clientId, sendDynamicToolMessage, message.tools);
+      providerClientId = message.clientId;
     } else if (message.type === "tool_call_response") {
       bridge?.handleResponse(message.payload, providerToken);
     }

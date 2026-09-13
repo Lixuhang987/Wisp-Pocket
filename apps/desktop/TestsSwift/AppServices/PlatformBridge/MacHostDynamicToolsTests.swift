@@ -6,7 +6,7 @@ final class MacHostDynamicToolsTests: XCTestCase {
     func testDefaultToolSpecsUseHostNamespaceAndClientId() {
         let tools = MacHostDynamicTools.toolSpecs
 
-        XCTAssertEqual(tools.count, 8)
+        XCTAssertEqual(tools.count, 9)
         XCTAssertEqual(Set(tools.compactMap { $0["namespace"] as? String }), ["host_macos"])
         XCTAssertEqual(Set(tools.compactMap { $0["clientId"] as? String }), ["swift-host"])
         XCTAssertTrue(tools.contains { $0["name"] as? String == "screen_capture" })
@@ -22,11 +22,12 @@ final class MacHostDynamicToolsTests: XCTestCase {
         XCTAssertEqual(object["type"] as? String, "provider_hello")
         XCTAssertEqual(object["clientId"] as? String, "swift-host")
         let tools = object["tools"] as? [[String: Any]]
-        XCTAssertEqual(tools?.count, 8)
+        XCTAssertEqual(tools?.count, 9)
     }
 
     func testToolCallRequestDispatchesToMatchingPlatformMethod() async {
-        let provider = RecordingDynamicToolPlatformProvider(result: ["text": "hello"])
+        let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
+        let provider = RecordingDynamicToolPlatformProvider(result: ["imageBase64": png, "mimeType": "image/png", "width": 1, "height": 1])
         let service = DynamicToolProviderService(provider: provider)
         var sentObjects: [[String: Any]] = []
 
@@ -64,6 +65,12 @@ final class MacHostDynamicToolsTests: XCTestCase {
         let payload = response["payload"] as? [String: Any]
         XCTAssertEqual(payload?["callId"] as? String, "call-1")
         XCTAssertEqual(payload?["success"] as? Bool, true)
+        let items = payload?["contentItems"] as? [[String: Any]]
+        XCTAssertEqual(items?.last?["type"] as? String, "inputImage")
+        XCTAssertEqual(items?.last?["imageUrl"] as? String, "data:image/png;base64,\(png)")
+        let metadata = decodeObject(items?.first?["text"] as? String ?? "")
+        XCTAssertEqual(metadata["width"] as? Int, 1)
+        XCTAssertNil(metadata["imageBase64"])
     }
 
     func testPlatformErrorBecomesFailedDynamicToolResponse() async {
@@ -98,7 +105,7 @@ final class MacHostDynamicToolsTests: XCTestCase {
         let payload = sentObjects[0]["payload"] as? [String: Any]
         XCTAssertEqual(payload?["success"] as? Bool, false)
         let contentItems = payload?["contentItems"] as? [[String: Any]]
-        XCTAssertEqual(contentItems?.first?["text"] as? String, "ScreenCaptureKit failed")
+        XCTAssertEqual(contentItems?.first?["text"] as? String, "capture_failed: ScreenCaptureKit failed")
     }
 
     private func decodeObject(_ text: String) -> [String: Any] {

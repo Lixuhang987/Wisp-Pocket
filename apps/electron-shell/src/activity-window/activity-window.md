@@ -1,6 +1,6 @@
 # activity-window
 
-本目录是[桌宠](../../../desktop/CONTEXT.md)的 React renderer，复用 ThreadWindow 的协议、store factory、socket 和附件 URL。后端 Thread 是历史、输入队列与请求的唯一真源。
+本目录是[桌宠](../../../desktop/CONTEXT.md)的 React renderer，复用 ThreadWindow 的协议、store factory、输入控制器、socket 和附件 URL，各自创建独立 store 与控制器。后端 Thread 是历史、输入队列与请求的唯一真源。
 
 ## 直接子节点
 
@@ -18,6 +18,7 @@
 ## Thread 与输入边界
 
 - endpoint 由 [preload](../preload/preload.md) 注入，使用 `/api/thread?acceptServerRequests=1`；完整历史不经过 Activity 通道。
+- 首轮创建只登记在桌宠自己的 store，由输入控制器先更新 store/界面通知，再加载 Thread 并提交首轮；传输缓冲和共享交接规则见 [Web thread](../../../thread-window-web/src/thread/thread.md)。
 - 当前展示只按 `createdAt` 选择最新 Thread。旧 Thread 的消息和结果不抢占当前展示，仍可从 ThreadWindow 历史找回。
 - 启动先列出历史并恢复选中 Thread，但保持只显示角色；后续新建 Thread 接管展示。桌宠重连会重新列出、resume 当前选择；ThreadWindow 的连接语义见[其模块文档](../../../thread-window-web/thread-window-web.md)。
 - 当前 Thread 被删除时选择剩余历史中最新创建的一项；列表为空则清空选择。重连后的列表也要确认旧 ID 仍存在，不能继续 resume 离线期间已被删除的 Thread。

@@ -21,7 +21,7 @@
 
 - renderer 使用 `contextIsolation: true`、`nodeIntegration: false`；preload 只暴露受控配置与回调。
 - React ThreadWindow 和桌宠直接连接 `/api/thread?acceptServerRequests=1`，共享后端历史与请求。Electron main 不 mirror Thread 消息。
-- Swift Host 继续拥有 PromptPanel、Settings、AgentTrigger、焦点恢复和 Dynamic Tool Provider；本包不实现 macOS 能力或 Plugin 生命周期。
+- Swift Host 继续拥有 PromptPanel、Settings、AgentTrigger、焦点恢复和 Dynamic Tool Provider；本包不实现 macOS 能力或管理内置业务模块生命周期。
 - ThreadWindow 当前不做断线恢复；桌宠重连后重新列出并恢复最新创建的 Thread，保持本次 renderer 的隐藏状态。
 
 ## Supervisor 与构建

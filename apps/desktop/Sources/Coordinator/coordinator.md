@@ -20,7 +20,8 @@
 - `AppCoordinator.init` 保存依赖后会调用 `bootstrap()`；不要在外部重复手动调用。
 - `bootstrap()` 会安装外观回调并启动外观监听、设置 PromptPanel 回调、注册热键和应用内快捷键、安装 app-server health 回调，并启动 Electron shell health 链路。AgentTrigger runtime reload 由 `AppServices.init` 负责。
 - 子模块回调统一在 `bootstrap()` 阶段注入闭包；外观系统回调只转给 `AppearanceThemeService.systemAppearanceDidChange()`，其他闭包内只允许 `send(.xxx)` 或打开 PromptPanel。
-- 应用退出由 `WispPocketApplicationDelegate` 接收 macOS termination 回调并调用 `shutdown()`；不要绕过 Coordinator 直接 stop Electron shell。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一 AppDelegate shutdown 链路。
+- 应用退出由 `WispPocketApplicationDelegate` 接收 macOS termination 回调并等待异步 `shutdown()`；AppKit 延迟答复与去重由 [应用入口](../../desktop.md) 持有。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一退出链路。
+- 内置模块由 bootstrap 启动；`shutdown()` 先通过 [BuiltinFeatures](../AppServices/PlatformBridge/platform-bridge.md) 停止采集、操作和录制监听，并等待 Automation 完成取消处理与 Run 终态写入，再关闭外部连接。Settings / ThreadWindow 关闭与 agent-server 暂时不可用不触发内置模块停机。
 - 测试模式走 `AppServices.testing()` 注入 nop 替身，跳过窗口/进程/激活策略副作用。
 - 窗口生命周期由 lifecycle 控制器闭环：Electron ThreadWindow 由 `ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 管理，`SettingsLifecycle` 管 Settings；Coordinator 不持有 AppKit 对象。
 - 应用内快捷键（如 `showThreadWindow` ⌘L 唤起 ThreadWindow）使用 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)` 在 `setupHotkey()` 中注册，仅当 handAgent 持有焦点时生效。不走 `HotkeyRegistering` 协议和 Carbon Events 全局通道。配置 UI 复用 `KeyboardShortcuts.Recorder`，监听通过 `KeyboardShortcuts.Shortcut(event:)` 比对。`shutdown()` 中 `NSEvent.removeMonitor` 清理。
@@ -29,7 +30,7 @@
 - PromptPanel show/toggle 只负责显示原生输入面板和刷新 action 定义，不触发 ThreadWindow prepare。ThreadWindow 预热由 Electron main 在 agent-server ready 后主动完成。
 - PromptPanel 与 ThreadWindow handoff 语义：无论是提交首轮 prompt，还是 PromptPanel 仍可见时触发 `openHistory`，都必须先用 `hide(restoringFocus: false)` 隐藏 PromptPanel，不恢复唤起前的前台应用。提交首轮 prompt 的生产路径先由 Swift `/api/thread` client 创建 thread 并提交首轮 `UserInput`，拿到 `thread.started.threadId` 后再发送 `thread_window.focus(threadId)` 给 Electron main；`openHistory` 仍发送 `thread_window.open_history`。这样 Electron `BrowserWindow.show()/focus()` 后不会被 PromptPanel 的焦点恢复逻辑推到后台。
 - 上一条是明确的防回归红线，不是实现细节建议：这个 bug 已多次出现。今后只要修改 `showThreadWindow` 快捷键、`openHistory`、PromptPanel hide/focus restore、ThreadWindow open/focus ack 任一环节，就必须同时保留自动化顺序断言，并重跑 manual QA 里的“首次 PromptPanel -> ThreadWindow 历史入口 handoff”。
-- Settings 打开时会创建模型、外观、builtin tool、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel。Coordinator 只负责注入，不直接读写 `~/.spotAgent/actions` 或 `~/.spotAgent/mcp.json`。
+- Settings 打开时会创建模型、外观、工具、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel；工具页接收同一个 `BuiltinFeatures`。Coordinator 只负责注入，配置写入由对应 Store 负责。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
 - `AppCoordinator` 在 app-server available 后通过 `ActivityWindowCommanding.showActivityWindow()` 显示桌宠。桌宠交互与 Thread 投影由 Electron renderer 处理，首次文字输入仍走 PromptPanel；Coordinator 不解析 Activity 状态。
 - `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving` 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。

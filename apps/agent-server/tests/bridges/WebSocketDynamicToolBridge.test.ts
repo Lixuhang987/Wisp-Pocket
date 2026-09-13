@@ -13,6 +13,27 @@ function captureSends(bridge: WebSocketDynamicToolBridge, clientId = "swift-host
 }
 
 describe("WebSocketDynamicToolBridge", () => {
+  it("allows the same call to succeed after a synchronous transport send failure", async () => {
+    const bridge = new WebSocketDynamicToolBridge();
+    let attempts = 0;
+    const token = bridge.attach("swift-host", () => {
+      if (++attempts === 1) throw new Error("transport send failed");
+    });
+    const request = {
+      clientId: "swift-host", threadId: "thread-retry", turnId: "turn-retry", callId: "call-retry",
+      namespace: "automation", tool: "run", arguments: { policyId: "saved-policy" },
+    };
+    try {
+      await expect(bridge.call(request)).rejects.toThrow("transport send failed");
+      const retry = bridge.call(request);
+      bridge.handleResponse({
+        callId: request.callId, success: true, contentItems: [{ type: "inputText", text: "completed" }],
+      }, token);
+      await expect(retry).resolves.toMatchObject({ callId: request.callId, success: true });
+      expect(attempts).toBe(2);
+    } finally { bridge.close(); }
+  });
+
   it("rejects with offline error before a provider registers", async () => {
     const bridge = new WebSocketDynamicToolBridge();
 

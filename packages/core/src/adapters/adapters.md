@@ -5,5 +5,5 @@
 ## 直接子节点
 
 - `filesystem/`：Blob、Workspace、Permission 与日志文件实现。
-- `providers/`：LLM Provider 与 Mock 实现。
+- [providers/providers.md](./providers/providers.md)：LLM Provider、图片/工具结果适配与 Mock 实现。
 - `mcp/`：MCP transport client 实现。

@@ -1,4 +1,5 @@
 # React Dynamic Tools Removal Spec
+> 历史迁移规格。文中的 Plugin / plugin manager 描述已由 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 的内置模块方案替代；它们不再是保留要求。通道与状态的当前约束以 [根架构](../../../handAgent.md) 为准。 Issue #1 后，React 仍不读取或发送工具集合，但服务端会在未显式指定集合时采用当前在线 Provider 声明；本文“没有默认能力 / React Thread 没有 Dynamic Tool”的旧结论已失效。
 
 ## Background
 

@@ -5,7 +5,7 @@
 - **完成即迁移**：当本文中的待办项被代码实现并通过测试覆盖后，必须将该项**从本文移除**，并按主题分组追加到 manual-qa
 - **同步更新模块文档**：若条目跨多个模块，迁移时同步更新对应 `<dir>.md` 索引。
 
-最后核对日期：2026-09-13。
+最后核对日期：2026-09-14。
 
 ---
 
@@ -30,21 +30,9 @@
 
 ## Thread / Turn 破坏性重构遗留
 
-### 后端 Thread 所有权重构（Issue #2）
-
-- 已实现并提交：core `ThreadRegistry` / `Thread` 统一管理加载、历史、输入队列、Turn、交互请求、工具激活、中断、删除与关闭；agent-server 仅负责 socket、协议翻译与依赖组合。
-- 已实现并提交：持久化确认顺序、保存失败暂停与恢复、连接断开后继续执行、删除晚到结果隔离、MCP 并发复用与有界清理。
-- 已实现并提交：Permission 仅支持 once / always；永久规则按工具名称跨 Thread 与重启生效，Web 与 Swift 设置同步。
-- 后续回收策略：半小时无输入后的内存回收仍不实现。
-
-### 前后端状态所有权收敛（Issue #3）
-
-- [实施规格 #3](https://github.com/Lixuhang987/Wisp-Pocket/issues/3) 已按六项确认约束发布，标记 `ready-for-agent`；未开始实现。基线与验证状态见 [规格入口](./issue-3-design.md)。
-- [ ] 实现前读取目标目录文档链至根架构，从主 checkout 用规定脚本创建并初始化 worktree，确认 CodeGraph 路径并运行分层基线。
-- [ ] 完成实现与验证，更新 owning 模块文档；由独立、无上下文继承的子 agent 审核规格、代码与文档，更新 manual-qa 后提交。
-
 ### 后续能力与验证
 
+- 后续回收策略：半小时无输入后的内存回收尚未实现。
 - 对齐 codex 更完整 Thread / Turn 语义：
   - `thread.archive` / `thread.unarchive`：本轮已选择 `thread.delete` 作为最小可用删除语义，归档能力后续单独设计。
   - `thread.read`：按 threadId 拉取完整 thread 快照或分页读取历史。

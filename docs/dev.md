@@ -39,9 +39,16 @@
 - 窗口或热键：检查辅助功能权限，再观察 PromptPanel、ThreadWindow 和桌宠的实际所有者。桌宠位置与隔离 QA 配置见 [Electron main](../apps/electron-shell/src/main/main.md)。
 - 平台 Tool：先跑对应 core/Swift 测试，真实屏幕录制、AX 和焦点行为进入 manual QA。
 
+## 内置功能实机数据
+
+- 正常入口为 Settings → 工具，两个开关保存到 `~/.spotAgent/builtin-features.json`；Context History 与 Automation 业务数据分别保存在同级 `context-history/`、`automation/`，详见 [Host Automation](../apps/host-automation/host-automation.md)。
+- 启动 Swift Host 时设置 `HANDAGENT_HOST_DATA_HOME=/绝对路径/qa-home`，只将上述配置和两个业务目录放在该路径的 `.spotAgent/` 下。它不改变模型设置、Thread 数据库、AgentTrigger、Append Prompt 或其他设置的 home。
+- 记录实际启动的 bundle、版本、进程与 TCC 权限，验收动作见 [人工说明入口](./human/human.md)。新构建测试与旧实例隔离，不能从工作区路径推断运行的二进制来源。
+
 ## 打包边界
 
 - `package-app.sh` 会构建 React、Electron 和 Swift release，并签名 app bundle。
+- Swift 可执行产物是 `HandAgentDesktop` 和 Chrome Native Messaging helper；`HandAgentHostAutomation` 为主程序链接的内部 target，不产生独立 Context History、Automation 或原子 Plugin 可执行程序。
 - 默认 ad-hoc 签名使用稳定 designated requirement，减少重建后 TCC 身份漂移。
 - 正式签名通过 `HANDAGENT_PACKAGE_CODESIGN_IDENTITY` 配置；bundle id 或 requirement 变化时同步设置 `HANDAGENT_PACKAGE_CODESIGN_REQUIREMENT`。
 - TypeScript 产物不会被运行中 desktop 自动热替换；修改后重新构建并重启。

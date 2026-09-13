@@ -91,7 +91,10 @@ export class VercelClient implements LLMClient {
     );
     const request: VercelStreamRequest = {
       model: this.model,
-      messages: await toVercelMessages(messages, options),
+      messages: await toVercelMessages(messages, {
+        ...options,
+        toolResultImages: this.api === "chat" ? "user" : "native",
+      }),
       tools: toVercelTools(tools),
       abortSignal: options?.signal,
     };

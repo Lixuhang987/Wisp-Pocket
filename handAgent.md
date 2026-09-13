@@ -16,7 +16,7 @@ flowchart TD
   A -->|/api/thread| S
   S --> C[packages/core<br/>Conversation Runtime]
   S --> T[packages/thread-store<br/>Thread rollout]
-  D --> P[apps/builtin-plugins<br/>Host Automation]
+  D --> H[apps/host-automation<br/>Context History / Automation]
 ```
 
 ## 所有权
@@ -29,14 +29,14 @@ flowchart TD
 | `apps/agent-server` | WebSocket 路由、协议翻译、依赖组合与持久化适配 |
 | `packages/core` | Conversation Runtime、协议 DTO、LLM/Tool/Workspace/Permission 抽象 |
 | `packages/thread-store` | SQLite rollout 与 Thread 派生视图 |
-| `apps/builtin-plugins` | 宿主原子能力、Context History 与 Automation |
+| `apps/host-automation` | 应用进程内的 Context History、Automation 业务状态与持久化 |
 
 ## 跨层合约
 
 - 初始上下文只来自用户主动提交的 Input Item。未主动交付的屏幕、剪贴板、文件和 App 状态由 Tool 按需读取。
 - `/api/thread` 承载 `ThreadCommand`、`ThreadNotification`、`ServerRequest` 与 `ClientResponse`。ThreadWindow 和桌宠分别连接并共享后端 Thread；Swift 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`。
 - `/api/activity` 只发送 Agent Activity，不承载 Thread 消息或历史。
-- `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 统一暴露原生与 enabled Plugin 的能力。
+- `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 统一暴露原生能力与已启用的 Context History / Automation，并向两个业务模块提供共享 macOS 实现。
 - Electron UI Shell 是 agent-server 的唯一 supervisor，也是 ThreadWindow 与桌宠的唯一宿主；关闭 UI 窗口不停止 agent-server。
 - 拖入以 `UserInput.mode: "inspect"` 授权读取本次资料；执行建议须等后续明确用户消息。图片/PDF 先保存 Blob 副本，再读取；输入队列由 core Thread 持久化协调。
 - 建议按钮发送普通 UserInput；Permission/Workspace 保持 ClientResponse。core 请求表只接受一次有效回执，`request.resolved` 同步清理两端展示。
@@ -44,8 +44,9 @@ flowchart TD
 
 ## 状态源
 
-- Swift Host 持久化模型设置、主题偏好、AgentTrigger 与 Plugin enablement；React 只消费解析后的主题。
-- 两种 React 界面各持 UI 投影，权威历史共用同一个 Thread。桌宠的当前 Thread、气泡隐藏和回复草稿是界面状态；Swift 与 Electron main 不 mirror 消息或历史。
+- Swift Host 持久化模型设置、主题偏好、AgentTrigger 与两个内置功能的启用选择；React 只消费解析后的主题。
+- Context History 的采集与 Automation 的录制、执行由 Swift Host 应用生命周期管理。关闭窗口继续运行，禁用对应功能或完全退出时清理；长期业务数据由各模块持久化。正常退出等待 Automation 取消结果落盘后再答复 AppKit。
+- 两种 React 界面各持 store 和输入控制器，分别管理后端事实投影、首轮关联和界面偏好；权威历史共用同一个 Thread。桌宠的当前 Thread、气泡隐藏和回复草稿是界面状态；Swift 与 Electron main 不 mirror 消息或历史。
 - core ThreadRegistry / Thread 持有运行中的 Thread、历史、Turn、请求和工具状态；agent-server 仅持有订阅、连接和请求路由。
 - Thread 历史主文件是 `~/.spotAgent/threads.sqlite`；其他本地配置和数据路径由 owning 模块文档说明。
 

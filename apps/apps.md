@@ -1,6 +1,6 @@
 # apps
 
-`apps/` 放可执行入口、用户界面与宿主适配。产品术语见 [Desktop Experience](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md) 和 [Host Automation](/Users/mu9/proj/handAgent/apps/builtin-plugins/CONTEXT.md)。
+`apps/` 放可执行入口、用户界面与宿主适配。产品术语见 [Desktop Experience](./desktop/CONTEXT.md) 和 [Host Automation](./host-automation/CONTEXT.md)。
 
 ## 直接子节点
 
@@ -8,7 +8,7 @@
 - [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md)：Electron UI Shell、桌宠与 agent-server supervisor。
 - [thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：React ThreadWindow 与两界面共用的 Thread 客户端。
 - [agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：Conversation Runtime 的本地服务组合根。
-- [builtin-plugins/builtin-plugins.md](/Users/mu9/proj/handAgent/apps/builtin-plugins/builtin-plugins.md)：官方 Host Automation Plugin。
+- [host-automation/host-automation.md](./host-automation/host-automation.md)：应用内 Context History、Automation 与业务持久化。
 - [chrome-bookmarks-extension/chrome-bookmarks-extension.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-extension/chrome-bookmarks-extension.md)：Chrome 书签事件采集端。
 - [chrome-bookmarks-native-host/chrome-bookmarks-native-host.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-native-host/chrome-bookmarks-native-host.md)：Chrome Native Messaging 到 Swift Host 的转发器。
 

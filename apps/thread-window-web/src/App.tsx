@@ -13,10 +13,10 @@ import {
   encodeThreadDelete,
   encodeThreadStart,
   encodeWorkspaceAnswer,
-  type UserInput,
 } from "./protocol/threadProtocol.ts";
 import { createThreadWindowStore } from "./store/threadWindowStore.ts";
 import { ThreadSocketClient } from "./thread/threadSocketClient.ts";
+import { ThreadInputController } from "./thread/threadInputController.ts";
 import { useSidebarLayout } from "./utils/sidebarLayout.ts";
 
 function now() {
@@ -29,6 +29,7 @@ function id(prefix: string) {
 
 export function App() {
   const clientRef = useRef<ThreadSocketClient | null>(null);
+  const inputControllerRef = useRef<ThreadInputController | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [deleteTargetThreadId, setDeleteTargetThreadId] = useState<string | null>(null);
   const sidebarLayout = useSidebarLayout();
@@ -44,19 +45,23 @@ export function App() {
     const socket = new ThreadSocketClient({
       url: getThreadWebSocketURL(),
       onConnectionState: (connectionState) => createThreadWindowStore.getState().setConnectionState(connectionState),
+      onNotification: (notification) => inputs.handleNotification(notification),
+      onRequest: (request) => createThreadWindowStore.getState().handleRequest(request),
+    });
+    const inputs = new ThreadInputController({
+      getState: createThreadWindowStore.getState,
+      client: socket,
       onNotification: (notification) => {
-        createThreadWindowStore.getState().handleNotification(notification);
         if (notification.type === "thread.started") {
           setActiveThreadId(notification.threadId);
         }
       },
-      onRequest: (request) => createThreadWindowStore.getState().handleRequest(request),
     });
     clientRef.current = socket;
+    inputControllerRef.current = inputs;
     socket.connect();
     const disposeInitialPromptReceiver = installInitialPromptReceiver((payload) => {
-      createThreadWindowStore.getState().enqueueInitialPrompt(payload);
-      clientRef.current?.startInitialPrompt(payload);
+      inputs.startInitialPrompt(payload);
     });
 
     return () => {
@@ -64,6 +69,9 @@ export function App() {
       socket.disconnect();
       if (clientRef.current === socket) {
         clientRef.current = null;
+      }
+      if (inputControllerRef.current === inputs) {
+        inputControllerRef.current = null;
       }
     };
   }, []);
@@ -112,16 +120,7 @@ export function App() {
         <ThreadWorkspacePane
           threadId={activeThreadId}
           onSubmit={(threadId, userInput) => {
-            const latestThread = createThreadWindowStore.getState().threadsById[threadId];
-            if (!latestThread || createThreadWindowStore.getState().connectionState !== "connected") {
-              return;
-            }
-            clientRef.current?.submitOp(threadId, {
-              type: "user_input",
-              opId: id("op"),
-              timestamp: now(),
-              payload: cloneUserInput(userInput),
-            });
+            inputControllerRef.current?.submitComposerInput(threadId, userInput);
           }}
           onStop={(threadId) => {
             const latestThread = createThreadWindowStore.getState().threadsById[threadId];
@@ -192,8 +191,4 @@ export function App() {
       </section>
     </main>
   );
-}
-
-function cloneUserInput(input: UserInput): UserInput {
-  return structuredClone(input);
 }

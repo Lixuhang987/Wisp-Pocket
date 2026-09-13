@@ -17,6 +17,7 @@
 - command socket 路径必须保持短路径，避免超过 macOS Unix socket path 长度限制。
 - 空行被忽略；非空行原样交给上层 `parseCommand()`，本目录不做协议语义校验。
 - 输出必须是单行 JSON + `\n`；Swift `ElectronShellOutputDecoder` 依赖换行切 event。
+- [Swift 停机](../../../../desktop/Sources/AppServices/ElectronShell/electron-shell.md)可能先关闭 stdout 读取端；回执的异步 `EPIPE` 视为连接已结束，不能进入 Electron 异常对话框阻断退出。已不可写的流不再接收事件，其他输出错误仍保留原错误语义。
 - stdout 只允许写 bridge event。日志、diagnostic、agent-server 输出都必须写 stderr。
 
 ## 修改约束
@@ -24,3 +25,4 @@
 - 不在本目录处理 command ack；解析失败 ack 由 `main.ts` 根据原始 line 中的 `commandId` 兜底发送。
 - 不引入重试、队列或文件轮询；bridge 只负责流切分和写出。
 - 修改切行、socket command 或写出格式时，同步更新 `tests/swiftBridge/jsonLineBridge.test.ts`、`tests/swiftBridge/commandSocketServer.test.ts` 和 Swift output/socket 相关测试。
+- 修改输出关闭或错误处理时，经 [测试入口](../../../tests/tests.md) 的 `host-shutdown` 用例验证真实子进程管道、shutdown 回调与退出码；真实 Electron 和 agent-server 的退出另做实机验收。

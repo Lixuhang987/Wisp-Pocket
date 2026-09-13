@@ -1,4 +1,5 @@
 import XCTest
+import HandAgentHostAutomation
 @testable import HandAgentDesktop
 
 final class AppServerConnectionTests: XCTestCase {
@@ -94,6 +95,43 @@ final class DynamicToolProviderConnectionClientTests: XCTestCase {
         XCTAssertEqual(sent[0]["clientId"] as? String, "swift-host")
     }
 
+    func testEnablementRefreshesConnectedProviderDeclaration() async throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("builtin-provider-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let host = MacPlatformProvider()
+        let settings = BuiltinFeatureSettingsStore(homeDirectoryURL: home)
+        let features = BuiltinFeatures(
+            settingsStore: settings,
+            contextHistory: ContextHistoryModule(store: ContextHistoryStore(directoryURL: home.appendingPathComponent("history")), host: host),
+            automation: AutomationModule(store: AutomationStore(directoryURL: home.appendingPathComponent("automation")), host: host)
+        )
+        features.start()
+        defer { features.stop() }
+        let transport = RecordingAppServerConnectionTransport()
+        let connection = AppServerConnection(
+            serverURL: URL(string: "ws://127.0.0.1:4317/api/dynamic-tools")!,
+            transport: transport,
+            reconnectDelay: 0
+        )
+        let client = DynamicToolProviderConnectionClient(
+            connection: connection,
+            providerService: DynamicToolProviderService(provider: host, builtinFeatures: features)
+        )
+        client.connect()
+        defer { client.disconnect() }
+        await Task.yield()
+        func advertisedAutomation() -> Bool {
+            (transport.tasks[0].sentObjects.last?["tools"] as? [[String: Any]])?
+                .contains { $0["namespace"] as? String == "automation" } == true
+        }
+        XCTAssertFalse(advertisedAutomation())
+        settings.update { $0.automationEnabled = true }
+        XCTAssertTrue(advertisedAutomation())
+        settings.update { $0.automationEnabled = false }
+        XCTAssertFalse(advertisedAutomation())
+        XCTAssertEqual(transport.tasks[0].sentObjects.count, 3)
+    }
+
     func testConnectionHandlesDynamicToolRequest() async {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
@@ -176,7 +214,7 @@ final class SwiftThreadClientTests: XCTestCase {
         XCTAssertEqual(start["type"] as? String, "thread.start")
         let startPayload = start["payload"] as? [String: Any]
         let dynamicTools = startPayload?["dynamicTools"] as? [[String: Any]]
-        XCTAssertEqual(dynamicTools?.count, 8)
+        XCTAssertEqual(dynamicTools?.count, 9)
         XCTAssertTrue(dynamicTools?.contains { $0["name"] as? String == "screen_capture" } == true)
 
         transport.tasks[0].succeedReceive(
@@ -202,7 +240,7 @@ final class SwiftThreadClientTests: XCTestCase {
         XCTAssertEqual(op?["type"] as? String, "user_input")
     }
 
-    func testSubmitInitialPromptIncludesPluginDynamicToolsFromProvider() async throws {
+    func testSubmitInitialPromptIncludesBuiltinDynamicToolsFromProvider() async throws {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
             serverURL: URL(string: "ws://127.0.0.1:4317/api/thread")!,
@@ -214,9 +252,9 @@ final class SwiftThreadClientTests: XCTestCase {
             dynamicToolsProvider: {
                 MacHostDynamicTools.toolSpecs + [[
                     "clientId": "swift-host",
-                    "namespace": "screen_reader",
-                    "name": "snapshot",
-                    "description": "Read the current screen.",
+                    "namespace": "context_history",
+                    "name": "activity_index",
+                    "description": "Read the activity index.",
                     "inputSchema": ["type": "object"],
                 ]]
             }
@@ -231,9 +269,9 @@ final class SwiftThreadClientTests: XCTestCase {
         let start = transport.tasks[0].sentObjects[0]
         let startPayload = start["payload"] as? [String: Any]
         let dynamicTools = startPayload?["dynamicTools"] as? [[String: Any]]
-        XCTAssertEqual(dynamicTools?.count, 9)
+        XCTAssertEqual(dynamicTools?.count, 10)
         XCTAssertTrue(dynamicTools?.contains {
-            $0["namespace"] as? String == "screen_reader" && $0["name"] as? String == "snapshot"
+            $0["namespace"] as? String == "context_history" && $0["name"] as? String == "activity_index"
         } == true)
 
         transport.tasks[0].succeedReceive(

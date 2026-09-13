@@ -17,7 +17,7 @@
 ├── CONTEXT-MAP.md
 ├── apps/
 │   ├── desktop/CONTEXT.md
-│   └── builtin-plugins/CONTEXT.md
+│   └── host-automation/CONTEXT.md
 ├── packages/
 │   └── core/CONTEXT.md
 └── docs/adr/                  # 有系统级决策时再创建

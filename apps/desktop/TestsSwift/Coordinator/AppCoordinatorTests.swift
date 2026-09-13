@@ -101,6 +101,7 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(appliedPolicies, [.accessory])
         appliedPolicies.removeAll()
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
+        XCTAssertEqual(appliedPolicies, [])
         coordinator.send(.threadWindowClosed)
 
         XCTAssertEqual(appliedPolicies, [])
@@ -201,7 +202,7 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testSystemAppearanceChangeSendsResolvedThemeToElectron() {
+    func testSystemAppearanceChangeSendsResolvedThemeToElectron() async {
         let client = RecordingThreadWindowCommandClient()
         let observer = RecordingAppearanceChangeObserver()
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
@@ -233,7 +234,7 @@ final class AppCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(client.sentThemes.last, HostThemePayload(preference: .system, resolved: .dark))
 
-        coordinator.shutdown()
+        await coordinator.shutdown()
         XCTAssertEqual(observer.stopCount, 1)
     }
 
@@ -292,7 +293,7 @@ final class AppCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(activityClient.showCount, 1)
         XCTAssertEqual(visibleStatusBubblePanelCount(), 0)
-        coordinator.shutdown()
+        await coordinator.shutdown()
         closeStatusBubblePanels()
     }
 
@@ -309,7 +310,7 @@ final class AppCoordinatorTests: XCTestCase {
             )
         )
 
-        coordinator.shutdown()
+        await coordinator.shutdown()
         try await Task.sleep(for: .milliseconds(10))
 
         XCTAssertFalse(app.windows.contains { $0 is PromptPanelWindow && $0.isVisible })

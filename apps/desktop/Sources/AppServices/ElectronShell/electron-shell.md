@@ -8,12 +8,12 @@
 - Swift 启动 Electron 时通过 `HANDAGENT_INITIAL_THEME` 传入当前真实 host theme JSON，字段与 `theme.changed` payload 相同：`{ preference, resolved }`。该值必须来自 `AppearanceThemeService.currentTheme`，不能固定写成 dark 或 light 后再依赖运行时同步纠偏。
 - Swift 启动 Electron 时把子进程 stdin 指向 `/dev/null`，避免 Electron CLI 在 pipe stdin 未 EOF 时阻塞加载 main entry；`ElectronShellCommand` 通过 `HANDAGENT_ELECTRON_COMMAND_SOCKET` 指向的本地 Unix domain socket 发送。
 - Electron -> Swift 的 `ElectronShellEvent` 通过 stdout newline-delimited JSON 回传。
-- 主动停机时先通过 command socket 发送 `shutdown` command；Electron 未在 2 秒内退出时才兜底 `terminate()`，主动停机不作为 fatal termination 上报。
+- 主动停机时先通过 command socket 发送 `shutdown` command；宿主仍运行时，Electron 未在 2 秒内退出才兜底 `terminate()`，主动停机不作为 fatal termination 上报。Swift 进程退出可能先关闭 stdout 读取端，Electron 的 [输出桥](../../../../electron-shell/src/main/swiftBridge/swiftBridge.md)必须容纳回执的 `EPIPE`，继续完成退出。
 - Electron 作为前台 ThreadWindow host 收到 `Command+Q` 时可能自行 clean exit；Swift 侧把 `Electron shell exited with status 0` 解释为宿主退出请求，上报给 Coordinator 调用 Swift `NSApplication.terminate`，不弹 fatal alert。非 0 status 仍作为异常退出上报。
 - 在 `agent_server.health available=true` 与 `thread_window.prepared` 同时成立后，向 `AgentServerHealth` 暴露可提交状态。
 - 作为 `ThreadWindowCommanding` 实现，只接收 Coordinator 的 openInitialPrompt/openHistory/focus/themeChanged 意图；`theme.changed` 不参与 ThreadWindow 可用性 gate。启动初值由 `HANDAGENT_INITIAL_THEME` 提供，运行中变化仍由 `theme.changed` command 提供。
 - 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`。
-- 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行 macOS host dynamic tools，并把 plugin namespace 请求分派给 Swift plugin manager。
+- 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行原生工具，并直接分派到已启用的 Context History / Automation。业务模块生命周期归 [AppServices](../app-services.md)，不随 server health 或窗口关闭而停机。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
 - 桌宠的点击、拖入、回复与历史由 Electron renderer 处理；Swift 只负责显示窗口的 command，不接管桌宠交互。
 - `bash ./scripts/swiftw run HandAgentDesktop` 会先构建 `handagent-electron-shell`，确保开发态 `dist/main/main.js` 存在；不要依赖旧 worktree 残留产物。

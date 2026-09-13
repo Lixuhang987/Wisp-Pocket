@@ -18,9 +18,9 @@
 
 - `thread.start` 只创建 Thread，初始与后续输入均经 `op.submit(UserInput)`；公开 Op 只接受 UserInput 或 Interrupt。
 - 新建 Thread 会通知所有已连接客户端并建立普通通知订阅。声明 `acceptServerRequests=1` 的订阅者才能接收并回答交互请求；桌宠和 ThreadWindow 可同时呈现同一请求。
-- ClientResponse 由 agent-server 包装为内部 Op；core 只消费一次有效回执，并发布 `request.resolved`。snapshot 的 `pendingRequests` 恢复当前待答表。
+- ClientResponse 独立传输，由 agent-server 检查连接与订阅资格后交给所属 Thread 的待答表；core 只消费一次有效回执，并发布 `request.resolved`。内部 Op 类型不改变此接入规则；snapshot 的 `pendingRequests` 恢复当前待答表。
 - `thread.resume` 返回 snapshot；恢复历史与断线后的重新订阅由各客户端明确发起。
-- `thread.started.createdAt` 与历史列表创建时间用于选择最新 Thread，不能用最后消息时间替代。
+- `thread.started.payload.createdAt` 与历史列表创建时间用于选择最新 Thread，不能用最后消息时间替代。
 - `user.message.recorded.pending` 表示输入已接收但尚未开始。输入的 `messageId` 与其 `turn.started.turnId` 对应，开始后清除 pending。
 - `workspace.listed` 与 `thread.listed` 是不带 `threadId` 的连接级响应；带 `threadId` 的消息按订阅路由。
 - `thread.deleted` 携带目标 ID：删除成功广播全部连接，`not_found` 只回发起连接。客户端收到成功结果或重连后的权威列表时清理被删 Thread。

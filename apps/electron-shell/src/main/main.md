@@ -28,7 +28,7 @@
 
 - `agent_server.health available=true` 到达后，runtime 才主动调用 `prewarmer.prepare()`；Swift 不发送 `thread_window.prepare`。
 - `theme.changed` command 必须同时调用 ThreadWindow prewarmer 和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。启动期同样使用 Swift 传入的 `{ preference, resolved }`，不要在 Electron main 固定 dark/light 或自行解析系统外观。
-- ThreadWindow 预热时只把当前 host theme 与只读 `availableSkills` 传给 prewarmer；skills 由本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）读取。Electron 不读取 dynamic tool 环境变量，不向 ThreadWindow preload 传递默认 dynamic tools，不读取 plugin binary、不管理 plugin 生命周期。
+- ThreadWindow 预热时只把当前 host theme 与只读 `availableSkills` 传给 prewarmer；skills 由本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）读取。Dynamic Tool 的声明、调用与内置模块生命周期由 Swift Host 管理，Electron 不向 ThreadWindow preload 传递默认 dynamic tools。
 - `prewarmAfterServerReadyPromise` 用来合并并发预热；改动预热流程时必须保持只发一次对应的 prepared / prepare_failed 结果。
 - ThreadWindow 关闭后发送 `thread_window.closed`；如果窗口曾 prepared 且 agent-server 仍 available，runtime 会再次主动预热。桌宠保留同一 renderer 和当前 UI 状态。
 - 桌宠点击、输入焦点、滚动和 drop 由 renderer 正常接收；ThreadWindow 的 show/focus 仍走独立 command 生命周期。

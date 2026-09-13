@@ -1,7 +1,9 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 import CoreGraphics
 import Foundation
+import HandAgentHostAutomation
 import ImageIO
 @preconcurrency import ScreenCaptureKit
 import UniformTypeIdentifiers
@@ -9,9 +11,11 @@ import Vision
 
 private let macPlatformAXWindowNumberAttribute = "AXWindowNumber"
 
-struct PlatformBridgeError: Error {
+struct PlatformBridgeError: LocalizedError {
     let code: String
     let message: String
+
+    var errorDescription: String? { "\(code): \(message)" }
 }
 
 @MainActor
@@ -20,7 +24,7 @@ protocol PlatformProvider {
 }
 
 @MainActor
-final class MacPlatformProvider: PlatformProvider {
+final class MacPlatformProvider: PlatformProvider, HostAutomationCapabilities {
     func handle(method: String, args: Any?) async throws -> Any? {
         switch method {
         case "clipboard.read":
@@ -28,7 +32,14 @@ final class MacPlatformProvider: PlatformProvider {
         case "app.list":
             return appList()
         case "app.frontmost":
-            return frontmostApp()
+            return try await frontmostAppWindow()
+        case "app.activate":
+            let arguments = args as? [String: Any] ?? [:]
+            if let bundleId = arguments["bundleId"], !(bundleId is String), !(bundleId is NSNull) {
+                throw PlatformBridgeError(code: "invalid_argument", message: "app.activate bundleId must be a string")
+            }
+            try await activateApp(bundleId: arguments["bundleId"] as? String)
+            return ["activated": true, "app": try readFrontmostAppWindow()["app"] ?? NSNull()]
         case "window.list":
             return windowList()
         case "screen.capture":
@@ -38,13 +49,86 @@ final class MacPlatformProvider: PlatformProvider {
         case "accessibility.snapshot":
             return try accessibilitySnapshot(args: args)
         case "accessibility.action":
-            return try accessibilityAction(args: args)
+            return try await accessibilityAction(args: args)
         default:
             throw PlatformBridgeError(
                 code: "unknown_method",
                 message: "Unknown platform method: \(method)"
             )
         }
+    }
+
+    func frontmostAppWindow() async throws -> [String: Any] {
+        try readFrontmostAppWindow()
+    }
+
+    func accessibilitySnapshot() async throws -> [String: Any] {
+        let frontmost = try readFrontmostAppWindow()
+        guard let app = frontmost["app"] as? [String: Any], let pid = app["pid"] as? Int else {
+            throw PlatformBridgeError(code: "not_found", message: "No frontmost app is available")
+        }
+        let root = try accessibilitySnapshot(args: ["kind": "app", "pid": pid])
+        return ["root": root, "app": app, "window": frontmost["window"] ?? [:]]
+    }
+
+    func captureScreenshot() async throws -> [String: Any] {
+        try await captureScreen(args: nil)
+    }
+
+    func activateApp(bundleId: String?) async throws {
+        let app: NSRunningApplication?
+        if let bundleId, !bundleId.isEmpty {
+            app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first
+        } else {
+            app = NSWorkspace.shared.frontmostApplication
+        }
+        guard let app else {
+            throw PlatformBridgeError(code: "not_found", message: "No running app found for app.activate")
+        }
+        try await activateRunningApplication(app)
+    }
+
+    func performAction(_ arguments: [String: Any]) async throws {
+        try await performAccessibilityAction(MacPlatformAccessibilityActionRequest.parseAutomation(arguments: arguments))
+    }
+
+    private func activateRunningApplication(_ app: NSRunningApplication) async throws {
+        try Task.checkCancellation()
+        guard !app.isTerminated else {
+            throw PlatformBridgeError(code: "action_failed", message: "The target app terminated before activation")
+        }
+        if !app.isActive, app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            NSApp.activate(ignoringOtherApps: true)
+        } else if !app.isActive && !app.activate(options: [.activateAllWindows]) {
+            guard MacPlatformAccessibilityPermission.isTrusted() else {
+                throw MacPlatformAccessibilityPermission.deniedError()
+            }
+            let element = AXUIElementCreateApplication(app.processIdentifier)
+            let result = AXUIElementSetAttributeValue(element, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+            guard result == .success else {
+                throw PlatformBridgeError(
+                    code: "action_failed",
+                    message: "Cannot activate the background app through Accessibility: \(result.readableName)"
+                )
+            }
+        }
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        var activeSince: ContinuousClock.Instant?
+        repeat {
+            try Task.checkCancellation()
+            guard !app.isTerminated else {
+                throw PlatformBridgeError(code: "action_failed", message: "The target app terminated during activation")
+            }
+            if NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier, app.isActive {
+                activeSince = activeSince ?? clock.now
+                if let activeSince, clock.now - activeSince >= .milliseconds(150) { return }
+            } else {
+                activeSince = nil
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        } while clock.now < deadline
+        throw PlatformBridgeError(code: "action_failed", message: "The target app did not become the stable frontmost app")
     }
 
     private func readClipboard() -> [String: Any?] {
@@ -71,13 +155,23 @@ final class MacPlatformProvider: PlatformProvider {
             }
     }
 
-    private func frontmostApp() -> [String: Any?] {
-        let app = NSWorkspace.shared.frontmostApplication
-        return [
-            "name": app?.localizedName as Any?,
-            "bundleId": app?.bundleIdentifier as Any?,
-            "pid": app.map { Int($0.processIdentifier) } as Any?,
+    private func readFrontmostAppWindow() throws -> [String: Any] {
+        guard let app = NSWorkspace.shared.frontmostApplication else {
+            throw PlatformBridgeError(code: "not_found", message: "No frontmost app is available")
+        }
+        let appInfo: [String: Any?] = [
+            "name": app.localizedName,
+            "bundleId": app.bundleIdentifier,
+            "pid": Int(app.processIdentifier),
             "resolution": "best_effort",
+        ]
+        let window = selectFrontmostWindow(appProcessIdentifier: Int(app.processIdentifier), windows: windowList())
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return [
+            "app": appInfo.compactMapValues { $0 },
+            "window": window?.compactMapValues { $0 } ?? [:],
+            "timestamp": formatter.string(from: Date()),
         ]
     }
 
@@ -91,14 +185,15 @@ final class MacPlatformProvider: PlatformProvider {
                 "id": info[kCGWindowNumber as String] as? Int as Any?,
                 "title": info[kCGWindowName as String] as? String as Any?,
                 "appName": info[kCGWindowOwnerName as String] as? String as Any?,
+                "ownerPid": info[kCGWindowOwnerPID as String] as? Int as Any?,
             ]
         }
     }
 
-    private func captureScreen(args: Any?) async throws -> [String: Any?] {
+    private func captureScreen(args: Any?) async throws -> [String: Any] {
         let argsDict = args as? [String: Any] ?? [:]
         let target = argsDict["target"] as? [String: Any]
-        let kind = target?["kind"] as? String
+        let request = try MacPlatformScreenCaptureTarget.parse(args: argsDict)
 
         let hasScreenCaptureAccess = try MacPlatformScreenCapturePermission.ensureAllowed()
 
@@ -112,15 +207,9 @@ final class MacPlatformProvider: PlatformProvider {
             )
         }
 
-        switch kind {
-        case "window":
-            guard let windowId = (target?["windowId"] as? NSNumber)?.intValue else {
-                throw PlatformBridgeError(
-                    code: "invalid_argument",
-                    message: "screen.capture window target requires integer windowId"
-                )
-            }
-            guard let window = content.windows.first(where: { Int($0.windowID) == windowId }) else {
+        switch request {
+        case .window(let windowId):
+            guard let window = content.windows.first(where: { $0.windowID == windowId }) else {
                 throw PlatformBridgeError(code: "not_found", message: "No window found with id \(windowId)")
             }
             let image = try await captureImage(
@@ -128,55 +217,45 @@ final class MacPlatformProvider: PlatformProvider {
                 width: max(64, Int(window.frame.width)),
                 height: max(64, Int(window.frame.height))
             )
-            return try makeResponse(image: image, target: target)
+            return try MacPlatformScreenshotResponse.make(image: image, target: target)
 
-        case "region":
-            guard
-                let x = (target?["x"] as? NSNumber)?.intValue,
-                let y = (target?["y"] as? NSNumber)?.intValue,
-                let width = (target?["width"] as? NSNumber)?.intValue,
-                let height = (target?["height"] as? NSNumber)?.intValue
-            else {
+        case .region(let displayId, let cropRect):
+            let display = try resolveDisplay(displayId: displayId, content: content)
+            guard CGRect(x: 0, y: 0, width: display.width, height: display.height).contains(cropRect) else {
                 throw PlatformBridgeError(
                     code: "invalid_argument",
-                    message: "screen.capture region target requires integer x/y/width/height"
+                    message: "screen.capture region must fit inside display bounds (\(display.width)x\(display.height))"
                 )
             }
-            let display = try resolveDisplay(displayId: target?["displayId"] as? String, content: content)
             let full = try await captureImage(
                 filter: SCContentFilter(display: display, excludingWindows: []),
                 width: display.width,
                 height: display.height
             )
-            let cropRect = CGRect(x: x, y: y, width: width, height: height)
             guard let cropped = full.cropping(to: cropRect) else {
                 throw PlatformBridgeError(
-                    code: "invalid_argument",
-                    message: "Region rect (\(x),\(y) \(width)x\(height)) is outside display bounds (\(display.width)x\(display.height))"
+                    code: "capture_failed",
+                    message: "Screen capture could not crop the requested region"
                 )
             }
-            return try makeResponse(image: cropped, target: target)
+            return try MacPlatformScreenshotResponse.make(image: cropped, target: target)
 
-        default:
-            let display = try resolveDisplay(
-                displayId: target?["displayId"] as? String ?? target?["screenId"] as? String,
-                content: content
-            )
+        case .display(let displayId):
+            let display = try resolveDisplay(displayId: displayId, content: content)
             let image = try await captureImage(
                 filter: SCContentFilter(display: display, excludingWindows: []),
                 width: display.width,
                 height: display.height
             )
-            return try makeResponse(image: image, target: target)
+            return try MacPlatformScreenshotResponse.make(image: image, target: target)
         }
     }
 
-    private func resolveDisplay(displayId: String?, content: SCShareableContent) throws -> SCDisplay {
-        if
-            let displayId,
-            let id = UInt32(displayId),
-            let found = content.displays.first(where: { $0.displayID == id })
-        {
+    private func resolveDisplay(displayId: UInt32?, content: SCShareableContent) throws -> SCDisplay {
+        if let displayId {
+            guard let found = content.displays.first(where: { $0.displayID == displayId }) else {
+                throw PlatformBridgeError(code: "not_found", message: "No display found with id \(displayId)")
+            }
             return found
         }
         guard let first = content.displays.first else {
@@ -198,30 +277,6 @@ final class MacPlatformProvider: PlatformProvider {
                 message: "ScreenCaptureKit capture failed: \(error.localizedDescription)"
             )
         }
-    }
-
-    private func makeResponse(image: CGImage, target: [String: Any]?) throws -> [String: Any?] {
-        guard let png = pngData(from: image) else {
-            throw PlatformBridgeError(code: "encode_failed", message: "Failed to encode captured image as PNG")
-        }
-        return [
-            "imageBase64": png.base64EncodedString(),
-            "mimeType": "image/png",
-            "width": image.width,
-            "height": image.height,
-            "target": target,
-            "resolution": "best_effort",
-        ]
-    }
-
-    private func pngData(from image: CGImage) -> Data? {
-        let mutable = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(mutable, UTType.png.identifier as CFString, 1, nil) else {
-            return nil
-        }
-        CGImageDestinationAddImage(dest, image, nil)
-        guard CGImageDestinationFinalize(dest) else { return nil }
-        return mutable as Data
     }
 
     private func readOCR(args: Any?) async throws -> [String: Any] {
@@ -271,11 +326,16 @@ final class MacPlatformProvider: PlatformProvider {
     }
 
     private func accessibilitySnapshot(args: Any?) throws -> [String: Any?] {
+        let request = try MacPlatformAccessibilitySnapshotRequest.parse(args: args)
         guard MacPlatformAccessibilityPermission.isTrusted() else {
             throw MacPlatformAccessibilityPermission.deniedError()
         }
-        let request = try MacPlatformAccessibilitySnapshotRequest.parse(args: args)
         let root = try resolveSnapshotRoot(for: request.target)
+        var role: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(root.element, kAXRoleAttribute as CFString, &role)
+        guard result == .success else {
+            throw PlatformBridgeError(code: "snapshot_failed", message: "Accessibility snapshot failed: \(result.readableName)")
+        }
         return snapshot(
             element: root.element,
             target: request.target.dictionary,
@@ -286,23 +346,39 @@ final class MacPlatformProvider: PlatformProvider {
         )
     }
 
-    private func accessibilityAction(args: Any?) throws -> [String: Any?] {
+    private func accessibilityAction(args: Any?) async throws -> [String: Any] {
+        let request = try MacPlatformAccessibilityActionRequest.parse(args: args)
+        try await performAccessibilityAction(request)
+        return [
+            "ok": true,
+            "target": request.target.dictionary,
+            "action": request.action.dictionary,
+            "resolution": "best_effort",
+        ]
+    }
+
+    private func performAccessibilityAction(_ request: MacPlatformAccessibilityActionRequest) async throws {
+        try Task.checkCancellation()
         guard MacPlatformAccessibilityPermission.isTrusted() else {
             throw MacPlatformAccessibilityPermission.deniedError()
         }
-        let request = try MacPlatformAccessibilityActionRequest.parse(args: args)
-        let element = try resolveActionTarget(request.target)
+        if case .position(let x, let y, let button) = request.target {
+            try performMouseClick(at: CGPoint(x: x, y: y), button: button)
+            return
+        }
 
         switch request.action {
         case .press:
-            try performPress(on: element, actionName: "press")
+            try performPress(on: resolveActionTarget(request.target), actionName: "press")
         case .click:
+            let element = try resolveActionTarget(request.target)
             do {
                 try performPress(on: element, actionName: "click")
             } catch {
                 try performMouseClick(on: element)
             }
         case .setValue(let value):
+            let element = try resolveActionTarget(request.target)
             let result = AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, value as CFTypeRef)
             guard result == .success else {
                 throw PlatformBridgeError(
@@ -310,14 +386,50 @@ final class MacPlatformProvider: PlatformProvider {
                     message: "accessibility.action set_value failed: \(result.readableName)"
                 )
             }
+        case .typeText(let text):
+            let element = try resolveActionTarget(request.target)
+            try await prepareKeyboardTarget(element, target: request.target)
+            try Task.checkCancellation()
+            for event in try MacPlatformKeyboard.textEvents(text) { event.post(tap: .cghidEventTap) }
+        case .hotkey(let hotkey):
+            if request.target != .frontmostApp {
+                try await prepareKeyboardTarget(resolveActionTarget(request.target), target: request.target)
+            } else if NSWorkspace.shared.frontmostApplication == nil {
+                throw PlatformBridgeError(code: "not_found", message: "No frontmost app for hotkey")
+            }
+            try Task.checkCancellation()
+            for event in try MacPlatformKeyboard.hotkeyEvents(hotkey) { event.post(tap: .cghidEventTap) }
         }
+    }
 
-        return [
-            "ok": true,
-            "target": request.target.dictionary,
-            "action": request.action.dictionary,
-            "resolution": "best_effort",
-        ]
+    private func prepareKeyboardTarget(_ element: AXUIElement, target: MacPlatformAccessibilityActionTarget) async throws {
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(element, &pid) == .success,
+              let app = NSRunningApplication(processIdentifier: pid) else {
+            throw PlatformBridgeError(code: "not_found", message: "No running app owns the keyboard target")
+        }
+        if target == .frontmostApp {
+            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {
+                throw PlatformBridgeError(code: "action_failed", message: "The focused input no longer belongs to the frontmost app")
+            }
+            return
+        }
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != pid || !app.isActive {
+            try await activateRunningApplication(app)
+        }
+        let result: AXError
+        if copyStringAttribute(element, kAXRoleAttribute) == kAXWindowRole {
+            result = AXUIElementPerformAction(element, kAXRaiseAction as CFString)
+        } else {
+            result = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        }
+        guard result == .success else {
+            throw PlatformBridgeError(code: "action_failed", message: "Cannot focus keyboard target: \(result.readableName)")
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {
+            throw PlatformBridgeError(code: "action_failed", message: "The target app lost focus before keyboard input")
+        }
     }
 
     private func resolveSnapshotRoot(
@@ -389,7 +501,30 @@ final class MacPlatformProvider: PlatformProvider {
         case .element(let pid, let path):
             let root = AXUIElementCreateApplication(pid_t(pid))
             return try element(root: root, path: path)
+        case .selector(let role, let title):
+            guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
+                throw PlatformBridgeError(code: "not_found", message: "No frontmost app for AX selector")
+            }
+            let app = AXUIElementCreateApplication(pid)
+            guard let element = findElement(role: role, title: title, in: app, depth: 0) else {
+                throw PlatformBridgeError(code: "not_found", message: "No accessibility element matched role/title selector")
+            }
+            return element
+        case .position:
+            throw PlatformBridgeError(code: "invalid_argument", message: "A position can only be used with click")
         }
+    }
+
+    private func findElement(role: String?, title: String?, in element: AXUIElement, depth: Int) -> AXUIElement? {
+        if (role == nil || copyStringAttribute(element, kAXRoleAttribute) == role),
+           (title == nil || copyStringAttribute(element, kAXTitleAttribute) == title) {
+            return element
+        }
+        guard depth < 8 else { return nil }
+        for child in copyElementArrayAttribute(element, kAXChildrenAttribute).prefix(80) {
+            if let match = findElement(role: role, title: title, in: child, depth: depth + 1) { return match }
+        }
+        return nil
     }
 
     private func appForWindow(windowId: Int?) throws -> NSRunningApplication {
@@ -512,10 +647,16 @@ final class MacPlatformProvider: PlatformProvider {
             )
         }
         let point = CGPoint(x: x + width / 2, y: y + height / 2)
-        guard let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left),
-              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: point, mouseButton: .left) else {
+        try performMouseClick(at: point, button: .left)
+    }
+
+    private func performMouseClick(at point: CGPoint, button: MacPlatformMouseButton) throws {
+        guard let down = CGEvent(mouseEventSource: nil, mouseType: button.downEvent, mouseCursorPosition: point, mouseButton: button.cgButton),
+              let up = CGEvent(mouseEventSource: nil, mouseType: button.upEvent, mouseCursorPosition: point, mouseButton: button.cgButton) else {
             throw PlatformBridgeError(code: "action_failed", message: "accessibility.action click failed: cannot create mouse event")
         }
+        down.setIntegerValueField(.mouseEventClickState, value: 1)
+        up.setIntegerValueField(.mouseEventClickState, value: 1)
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
     }
@@ -677,6 +818,51 @@ enum MacPlatformScreenCapturePermission {
     }
 }
 
+enum MacPlatformScreenCaptureTarget: Equatable {
+    case display(id: UInt32?)
+    case window(id: UInt32)
+    case region(displayId: UInt32?, rect: CGRect)
+
+    static func parse(args: [String: Any]) throws -> MacPlatformScreenCaptureTarget {
+        if let target = args["target"], !(target is [String: Any]) {
+            throw PlatformBridgeError(code: "invalid_argument", message: "screen.capture target must be an object")
+        }
+        let target = args["target"] as? [String: Any] ?? [:]
+        if let kind = target["kind"], !(kind is String) {
+            throw PlatformBridgeError(code: "invalid_argument", message: "screen.capture target kind must be a string")
+        }
+        var displayId: UInt32?
+        for key in ["displayId", "screenId"] {
+            guard let value = target[key] else { continue }
+            guard let string = value as? String, let id = UInt32(string), id > 0 else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "screen.capture \(key) must be a positive display identifier string")
+            }
+            guard displayId == nil || displayId == id else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "screen.capture displayId and screenId must agree")
+            }
+            displayId = id
+        }
+        switch target["kind"] as? String ?? "display" {
+        case "display":
+            return .display(id: displayId)
+        case "window":
+            guard let integer = intValue(target["windowId"]), let id = UInt32(exactly: integer), id > 0 else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "screen.capture window target requires a positive integer windowId")
+            }
+            return .window(id: id)
+        case "region":
+            guard let x = intValue(target["x"]), let y = intValue(target["y"]),
+                  let width = intValue(target["width"]), let height = intValue(target["height"]),
+                  x >= 0, y >= 0, width > 0, height > 0 else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "screen.capture region requires integer x/y >= 0 and width/height > 0")
+            }
+            return .region(displayId: displayId, rect: CGRect(x: x, y: y, width: width, height: height))
+        default:
+            throw PlatformBridgeError(code: "invalid_argument", message: "screen.capture target kind must be display, window or region")
+        }
+    }
+}
+
 struct MacPlatformAccessibilitySnapshotRequest: Equatable {
     let target: MacPlatformAccessibilitySnapshotTarget
     let maxDepth: Int
@@ -718,14 +904,20 @@ enum MacPlatformAccessibilitySnapshotTarget: Equatable {
     }
 
     static func parse(args: [String: Any]) throws -> MacPlatformAccessibilitySnapshotTarget {
+        if let kind = args["kind"], !(kind is String) {
+            throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.snapshot kind must be a string")
+        }
         let kind = args["kind"] as? String ?? "frontmost_app"
         switch kind {
         case "frontmost_app":
             return .frontmostApp
         case "app":
-            return .app(pid: intValue(args["pid"]), bundleId: args["bundleId"] as? String)
+            if let bundleId = args["bundleId"], !(bundleId is String) {
+                throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.snapshot bundleId must be a string")
+            }
+            return .app(pid: try nativeIdentifier(args["pid"], name: "pid", maximum: Int(Int32.max)), bundleId: args["bundleId"] as? String)
         case "window":
-            return .window(windowId: intValue(args["windowId"]))
+            return .window(windowId: try nativeIdentifier(args["windowId"], name: "windowId", maximum: Int(UInt32.max)))
         case "element":
             guard let elementId = args["elementId"] as? String else {
                 throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.snapshot element target requires elementId")
@@ -744,16 +936,41 @@ struct MacPlatformAccessibilityActionRequest: Equatable {
 
     static func parse(args: Any?) throws -> MacPlatformAccessibilityActionRequest {
         let argsDict = args as? [String: Any] ?? [:]
-        guard let targetDict = argsDict["target"] as? [String: Any] else {
-            throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.action requires target")
+        if let target = argsDict["target"], !(target is [String: Any]), !(target is NSNull) {
+            throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.action target must be an object")
         }
         guard let actionDict = argsDict["action"] as? [String: Any] else {
             throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.action requires action")
         }
-        return MacPlatformAccessibilityActionRequest(
-            target: try MacPlatformAccessibilityActionTarget.parse(args: targetDict),
-            action: try MacPlatformAccessibilityAction.parse(args: actionDict)
-        )
+        let target = try MacPlatformAccessibilityActionTarget.parse(args: argsDict["target"] as? [String: Any] ?? [:])
+        let action = try MacPlatformAccessibilityAction.parse(args: actionDict)
+        if case .position = target, action != .click {
+            throw PlatformBridgeError(code: "invalid_argument", message: "A position can only be used with click")
+        }
+        return MacPlatformAccessibilityActionRequest(target: target, action: action)
+    }
+
+    static func parseAutomation(arguments: [String: Any]) throws -> MacPlatformAccessibilityActionRequest {
+        guard let kind = arguments["action"] as? String else {
+            throw PlatformBridgeError(code: "invalid_argument", message: "Automation action requires an action name")
+        }
+        for key in ["selector", "position"] {
+            if let value = arguments[key], !(value is [String: Any]), !(value is NSNull) {
+                throw PlatformBridgeError(code: "invalid_argument", message: "Automation \(key) must be an object")
+            }
+        }
+        var action = arguments
+        action["kind"] = kind
+        var target: [String: Any] = [:]
+        if let selector = arguments["selector"] as? [String: Any], !selector.isEmpty {
+            target = selector
+            target["kind"] = "selector"
+        } else if let position = arguments["position"] as? [String: Any] {
+            target = position
+            target["kind"] = "position"
+            if let button = arguments["button"] { target["button"] = button }
+        }
+        return try parse(args: ["target": target, "action": action])
     }
 }
 
@@ -761,6 +978,8 @@ enum MacPlatformAccessibilityActionTarget: Equatable {
     case frontmostApp
     case window(windowId: Int?)
     case element(pid: Int, path: [Int])
+    case selector(role: String?, title: String?)
+    case position(x: Double, y: Double, button: MacPlatformMouseButton)
 
     var dictionary: [String: Any] {
         switch self {
@@ -772,22 +991,53 @@ enum MacPlatformAccessibilityActionTarget: Equatable {
             return value
         case .element(let pid, let path):
             return ["kind": "element", "elementId": elementId(pid: pid, path: path)]
+        case .selector(let role, let title):
+            var value: [String: Any] = ["kind": "selector"]
+            if let role { value["role"] = role }
+            if let title { value["title"] = title }
+            return value
+        case .position(let x, let y, let button):
+            return ["kind": "position", "x": x, "y": y, "button": button.rawValue]
         }
     }
 
     static func parse(args: [String: Any]) throws -> MacPlatformAccessibilityActionTarget {
+        if let kind = args["kind"], !(kind is String) {
+            throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.action target kind must be a string")
+        }
         let kind = args["kind"] as? String ?? "frontmost_app"
         switch kind {
         case "frontmost_app":
             return .frontmostApp
         case "window":
-            return .window(windowId: intValue(args["windowId"]))
+            return .window(windowId: try nativeIdentifier(args["windowId"], name: "windowId", maximum: Int(UInt32.max)))
         case "element":
             guard let elementId = args["elementId"] as? String else {
                 throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.action element target requires elementId")
             }
             let parsed = try parseElementId(elementId)
             return .element(pid: parsed.pid, path: parsed.path)
+        case "selector":
+            for key in ["role", "title"] where args[key] != nil && !(args[key] is String) {
+                throw PlatformBridgeError(code: "invalid_argument", message: "AX selector \(key) must be a string")
+            }
+            let role = args["role"] as? String
+            let title = args["title"] as? String
+            guard role != nil || title != nil else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "An AX selector requires role or title")
+            }
+            return .selector(role: role, title: title)
+        case "position":
+            guard let x = finiteCoordinate(args["x"]), let y = finiteCoordinate(args["y"]) else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "A click position requires finite x/y coordinates")
+            }
+            if let button = args["button"], !(button is String) {
+                throw PlatformBridgeError(code: "invalid_argument", message: "Click button must be left, right or other")
+            }
+            guard let button = MacPlatformMouseButton(rawValue: args["button"] as? String ?? "left") else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "Click button must be left, right or other")
+            }
+            return .position(x: x, y: y, button: button)
         default:
             throw PlatformBridgeError(code: "invalid_argument", message: "Unknown accessibility.action target kind: \(kind)")
         }
@@ -798,6 +1048,8 @@ enum MacPlatformAccessibilityAction: Equatable {
     case press
     case click
     case setValue(String)
+    case typeText(String)
+    case hotkey(MacPlatformHotkey)
 
     var dictionary: [String: Any] {
         switch self {
@@ -807,6 +1059,10 @@ enum MacPlatformAccessibilityAction: Equatable {
             return ["kind": "click"]
         case .setValue(let value):
             return ["kind": "set_value", "value": value]
+        case .typeText(let text):
+            return ["kind": "type_text", "text": text]
+        case .hotkey(let hotkey):
+            return ["kind": "hotkey", "keys": hotkey.keys]
         }
     }
 
@@ -822,27 +1078,239 @@ enum MacPlatformAccessibilityAction: Equatable {
                 throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.action set_value requires value")
             }
             return .setValue(value)
+        case "type_text":
+            guard let text = args["text"] as? String else {
+                throw PlatformBridgeError(code: "invalid_argument", message: "accessibility.action type_text requires text")
+            }
+            return .typeText(text)
+        case "hotkey":
+            return .hotkey(try MacPlatformHotkey.parse(args["keys"]))
         default:
             throw PlatformBridgeError(code: "invalid_argument", message: "Unknown accessibility.action kind: \(kind ?? "nil")")
         }
     }
 }
 
+enum MacPlatformMouseButton: String {
+    case left, right, other
+
+    var cgButton: CGMouseButton {
+        switch self {
+        case .left: .left
+        case .right: .right
+        case .other: .center
+        }
+    }
+
+    var downEvent: CGEventType {
+        switch self {
+        case .left: .leftMouseDown
+        case .right: .rightMouseDown
+        case .other: .otherMouseDown
+        }
+    }
+
+    var upEvent: CGEventType {
+        switch self {
+        case .left: .leftMouseUp
+        case .right: .rightMouseUp
+        case .other: .otherMouseUp
+        }
+    }
+}
+
+struct MacPlatformHotkey: Equatable {
+    let keyCode: CGKeyCode
+    let modifiers: CGEventFlags
+    let keys: [String]
+
+    static func parse(_ value: Any?) throws -> MacPlatformHotkey {
+        let keys: [String]
+        if let array = value as? [String] {
+            keys = array.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        } else if let string = value as? String {
+            keys = string.split { $0 == "+" || $0 == "," || $0.isWhitespace }.map { $0.lowercased() }
+        } else {
+            throw PlatformBridgeError(code: "invalid_argument", message: "hotkey requires a keys string or string array")
+        }
+        var modifiers = CGEventFlags()
+        var keyCode: CGKeyCode?
+        for key in keys {
+            switch key {
+            case "command", "cmd", "meta": modifiers.insert(.maskCommand)
+            case "control", "ctrl": modifiers.insert(.maskControl)
+            case "option", "alt": modifiers.insert(.maskAlternate)
+            case "shift": modifiers.insert(.maskShift)
+            default:
+                guard keyCode == nil, let code = MacPlatformKeyboard.keyCode(for: key) else {
+                    throw PlatformBridgeError(code: "invalid_argument", message: "Unsupported or ambiguous hotkey key: \(key)")
+                }
+                keyCode = code
+            }
+        }
+        guard let keyCode else {
+            throw PlatformBridgeError(code: "invalid_argument", message: "hotkey requires one non-modifier key")
+        }
+        return MacPlatformHotkey(keyCode: keyCode, modifiers: modifiers, keys: keys)
+    }
+}
+
+enum MacPlatformKeyboard {
+    private static let keyCodes: [String: Int] = [
+        "a": kVK_ANSI_A, "b": kVK_ANSI_B, "c": kVK_ANSI_C, "d": kVK_ANSI_D,
+        "e": kVK_ANSI_E, "f": kVK_ANSI_F, "g": kVK_ANSI_G, "h": kVK_ANSI_H,
+        "i": kVK_ANSI_I, "j": kVK_ANSI_J, "k": kVK_ANSI_K, "l": kVK_ANSI_L,
+        "m": kVK_ANSI_M, "n": kVK_ANSI_N, "o": kVK_ANSI_O, "p": kVK_ANSI_P,
+        "q": kVK_ANSI_Q, "r": kVK_ANSI_R, "s": kVK_ANSI_S, "t": kVK_ANSI_T,
+        "u": kVK_ANSI_U, "v": kVK_ANSI_V, "w": kVK_ANSI_W, "x": kVK_ANSI_X,
+        "y": kVK_ANSI_Y, "z": kVK_ANSI_Z,
+        "0": kVK_ANSI_0, "1": kVK_ANSI_1, "2": kVK_ANSI_2, "3": kVK_ANSI_3,
+        "4": kVK_ANSI_4, "5": kVK_ANSI_5, "6": kVK_ANSI_6, "7": kVK_ANSI_7,
+        "8": kVK_ANSI_8, "9": kVK_ANSI_9,
+        "return": kVK_Return, "enter": kVK_Return, "tab": kVK_Tab,
+        "escape": kVK_Escape, "esc": kVK_Escape, "space": kVK_Space,
+        "delete": kVK_Delete, "backspace": kVK_Delete,
+        "left": kVK_LeftArrow, "right": kVK_RightArrow,
+        "up": kVK_UpArrow, "down": kVK_DownArrow,
+        "home": kVK_Home, "end": kVK_End, "pageup": kVK_PageUp, "pagedown": kVK_PageDown,
+        "forwarddelete": kVK_ForwardDelete,
+    ]
+
+    static func keyCode(for token: String) -> CGKeyCode? {
+        if let code = keyCodes[token] { return CGKeyCode(code) }
+        if token.hasPrefix("keycode:"), let code = UInt16(token.dropFirst("keycode:".count)), code <= 127 {
+            return code
+        }
+        return nil
+    }
+
+    static func keyName(for keyCode: CGKeyCode) -> String {
+        keyCodes.keys.sorted().first { keyCodes[$0] == Int(keyCode) } ?? "keyCode:\(keyCode)"
+    }
+
+    static func hotkeyEvents(_ hotkey: MacPlatformHotkey) throws -> [CGEvent] {
+        guard let down = CGEvent(keyboardEventSource: nil, virtualKey: hotkey.keyCode, keyDown: true),
+              let up = CGEvent(keyboardEventSource: nil, virtualKey: hotkey.keyCode, keyDown: false) else {
+            throw PlatformBridgeError(code: "action_failed", message: "Cannot create hotkey events")
+        }
+        down.flags = hotkey.modifiers
+        up.flags = hotkey.modifiers
+        return [down, up]
+    }
+
+    static func textEvents(_ text: String) throws -> [CGEvent] {
+        let characters = Array(text.utf16)
+        var events: [CGEvent] = []
+        var offset = 0
+        while offset < characters.count {
+            // CGEvent text payloads are small; keep UTF-16 surrogate pairs together.
+            var end = min(offset + 20, characters.count)
+            if end < characters.count, (0xD800...0xDBFF).contains(characters[end - 1]) { end -= 1 }
+            let chunk = Array(characters[offset..<end])
+            guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
+                  let up = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) else {
+                throw PlatformBridgeError(code: "action_failed", message: "Cannot create text input events")
+            }
+            for event in [down, up] {
+                event.flags = []
+                chunk.withUnsafeBufferPointer { buffer in
+                    event.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress)
+                }
+                events.append(event)
+            }
+            offset = end
+        }
+        return events
+    }
+
+    static func text(from event: CGEvent) -> String? {
+        var length = 0
+        var characters = [UniChar](repeating: 0, count: 256)
+        characters.withUnsafeMutableBufferPointer { buffer in
+            event.keyboardGetUnicodeString(
+                maxStringLength: buffer.count, actualStringLength: &length, unicodeString: buffer.baseAddress
+            )
+        }
+        guard length > 0, length <= characters.count else { return nil }
+        return String(utf16CodeUnits: characters, count: length)
+    }
+}
+
+enum MacPlatformScreenshotResponse {
+    static func make(image: CGImage, target: [String: Any]?) throws -> [String: Any] {
+        let original = try pngData(from: image)
+        let scale = min(1, 480 / Double(max(image.width, image.height)))
+        let thumbnail: CGImage
+        if scale == 1 {
+            thumbnail = image
+        } else {
+            let width = max(1, Int((Double(image.width) * scale).rounded(.down)))
+            let height = max(1, Int((Double(image.height) * scale).rounded(.down)))
+            guard let context = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else {
+                throw PlatformBridgeError(code: "encode_failed", message: "Cannot allocate screenshot thumbnail")
+            }
+            context.interpolationQuality = .high
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            guard let resized = context.makeImage() else {
+                throw PlatformBridgeError(code: "encode_failed", message: "Cannot resize screenshot thumbnail")
+            }
+            thumbnail = resized
+        }
+        var result: [String: Any] = [
+            "imageBase64": original.base64EncodedString(),
+            "thumbnailBase64": try pngData(from: thumbnail).base64EncodedString(),
+            "mimeType": "image/png", "width": image.width, "height": image.height,
+            "thumbnailWidth": thumbnail.width, "thumbnailHeight": thumbnail.height,
+            "resolution": "best_effort",
+        ]
+        if let target { result["target"] = target }
+        return result
+    }
+
+    private static func pngData(from image: CGImage) throws -> Data {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
+            throw PlatformBridgeError(code: "encode_failed", message: "Cannot create PNG encoder")
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            throw PlatformBridgeError(code: "encode_failed", message: "Cannot encode screenshot PNG")
+        }
+        return data as Data
+    }
+}
+
+func selectFrontmostWindow(appProcessIdentifier: Int, windows: [[String: Any?]]) -> [String: Any?]? {
+    windows.first { $0["ownerPid"] as? Int == appProcessIdentifier }
+}
+
+private func finiteCoordinate(_ value: Any?) -> Double? {
+    guard let number = value as? NSNumber,
+          CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite else { return nil }
+    return number.doubleValue
+}
+
 private func parseElementId(_ elementId: String) throws -> (pid: Int, path: [Int]) {
-    let parts = Dictionary(uniqueKeysWithValues: elementId.split(separator: ";").compactMap { part -> (String, String)? in
-        let pair = part.split(separator: ":", maxSplits: 1).map(String.init)
-        guard pair.count == 2 else { return nil }
-        return (pair[0], pair[1])
-    })
-    guard let pidString = parts["pid"], let pid = Int(pidString) else {
-        throw PlatformBridgeError(code: "invalid_argument", message: "elementId must include pid, for example pid:123;path:0.1")
+    var parts: [String: String] = [:]
+    for part in elementId.split(separator: ";", omittingEmptySubsequences: false) {
+        let pair = part.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        guard pair.count == 2, ["pid", "path"].contains(pair[0]), parts[pair[0]] == nil else {
+            throw PlatformBridgeError(code: "invalid_argument", message: "elementId requires unique pid/path fields, for example pid:123;path:0.1")
+        }
+        parts[pair[0]] = pair[1]
+    }
+    guard let pidString = parts["pid"], let pid = Int(pidString), pid > 0, Int32(exactly: pid) != nil else {
+        throw PlatformBridgeError(code: "invalid_argument", message: "elementId must include a positive 32-bit pid, for example pid:123;path:0.1")
     }
     let pathString = parts["path"] ?? ""
     let path: [Int]
     if pathString.isEmpty {
         path = []
     } else {
-        path = try pathString.split(separator: ".").map { item in
+        path = try pathString.split(separator: ".", omittingEmptySubsequences: false).map { item in
             guard let index = Int(item), index >= 0 else {
                 throw PlatformBridgeError(code: "invalid_argument", message: "elementId path must contain non-negative integer indexes")
             }
@@ -864,7 +1332,8 @@ struct MacPlatformCGWindowMetadata: Equatable {
 }
 
 private func cgWindowMetadata(windowId: Int) -> MacPlatformCGWindowMetadata? {
-    let windows = CGWindowListCopyWindowInfo([.optionIncludingWindow], CGWindowID(windowId)) as? [[String: Any]] ?? []
+    guard let id = CGWindowID(exactly: windowId), id > 0 else { return nil }
+    let windows = CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]] ?? []
     guard let info = windows.first,
           let ownerPid = intValue(info[kCGWindowOwnerPID as String]) else {
         return nil
@@ -928,8 +1397,16 @@ private func normalizedNonEmptyTitle(_ title: String?) -> String? {
 }
 
 private func intValue(_ value: Any?) -> Int? {
-    if let int = value as? Int { return int }
-    return (value as? NSNumber)?.intValue
+    guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+    return Int(exactly: number.doubleValue)
+}
+
+private func nativeIdentifier(_ value: Any?, name: String, maximum: Int) throws -> Int? {
+    guard let value else { return nil }
+    guard let identifier = intValue(value), (1...maximum).contains(identifier) else {
+        throw PlatformBridgeError(code: "invalid_argument", message: "\(name) must be an integer between 1 and \(maximum)")
+    }
+    return identifier
 }
 
 private func doubleValue(_ value: Any?) -> Double? {

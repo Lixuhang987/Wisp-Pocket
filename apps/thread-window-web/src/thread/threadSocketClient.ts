@@ -1,10 +1,8 @@
 import {
   encodeThreadList,
   encodeThreadResume,
-  encodeThreadStart,
   encodeOpSubmit,
   encodeWorkspaceList,
-  type InitialPromptPayload,
   type RuntimeOp,
   isServerRequest,
   isThreadNotification,
@@ -32,7 +30,6 @@ export class ThreadSocketClient {
   private socket: WebSocketLike | null = null;
   private manuallyClosed = false;
   private outboundQueue: string[] = [];
-  private readonly pendingInitialPrompts = new Map<string, InitialPromptPayload>();
 
   constructor(private readonly options: {
     url: string;
@@ -80,18 +77,6 @@ export class ThreadSocketClient {
       threadId,
       commandId: this.nextId(),
       timestamp: this.now(),
-    }));
-  }
-
-  startInitialPrompt(prompt: InitialPromptPayload): void {
-    if (this.pendingInitialPrompts.has(prompt.clientRequestId)) {
-      throw new Error(`Initial prompt ${prompt.clientRequestId} is already pending`);
-    }
-    this.pendingInitialPrompts.set(prompt.clientRequestId, prompt);
-    this.sendRaw(encodeThreadStart({
-      commandId: prompt.clientRequestId,
-      timestamp: this.now(),
-      workspaceId: null,
     }));
   }
 
@@ -144,38 +129,10 @@ export class ThreadSocketClient {
 
       if (isThreadNotification(value)) {
         this.options.onNotification(value);
-        this.handleNotificationSideEffects(value);
       } else if (isServerRequest(value)) {
         this.options.onRequest(value);
       }
     };
-  }
-
-  private handleNotificationSideEffects(notification: ThreadNotification): void {
-    if (notification.type === "thread.error") {
-      if (notification.commandId) {
-        this.pendingInitialPrompts.delete(notification.commandId);
-      }
-      return;
-    }
-
-    if (notification.type !== "thread.started" || !notification.commandId) {
-      return;
-    }
-
-    const pending = this.pendingInitialPrompts.get(notification.commandId);
-    if (!pending) {
-      return;
-    }
-
-    this.pendingInitialPrompts.delete(notification.commandId);
-    this.resumeThread(notification.threadId);
-    this.submitOp(notification.threadId, {
-      type: "user_input",
-      opId: pending.clientRequestId,
-      timestamp: this.now(),
-      payload: pending.userInput,
-    });
   }
 
   private hasActiveSocket(): boolean {

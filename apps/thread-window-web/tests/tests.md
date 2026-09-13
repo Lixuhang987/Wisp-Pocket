@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- `use-cases/`：initial prompt、历史、Composer 提交与后端 pending 投影、socket 和请求生命周期。
+- `use-cases/`：通过真实 store、输入控制器与 socket 验证首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期。
 - `boundaries/`：协议 guard、preload 配置和主题边界。
 - 目录根测试：组件、布局、滚动、持久化和 design token 的局部回归。
 
@@ -15,3 +15,5 @@
 - 覆盖 live/snapshot 的图片/PDF Blob 引用、建议回复、输入 pending、`request.resolved` 与同一请求去重；两界面共用 store 合约，不能恢复 renderer 自有执行队列。
 - Vitest 同时收集 `.test.ts` 与 `.test.tsx`，避免消息组件用例被遗漏。
 - 涉及真实 Electron 窗口、焦点或视口避让的行为保留到 manual QA。
+- 首轮创建验证状态/UI 回调先于 resume 与首轮提交；Composer 同时观察忙碌/等待回复时的实际发送、服务端确认后的 pending 投影与跨 Thread 隔离，不测试内部集合或文件布局。
+- 偏好 round-trip 只证明展开集合保存；草稿的切换、提交和页面重建行为保留人工 QA，不能用静态组件渲染代替实机验收。

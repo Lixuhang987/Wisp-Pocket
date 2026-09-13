@@ -14,12 +14,15 @@ import type { AgentActivityEvent } from "@handagent/core/protocol/types/AgentAct
 import type { FilePermissionPolicy } from "@handagent/core/adapters/filesystem/FilePermissionPolicy.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
+import { DynamicToolAdapter } from "@handagent/core/tools/DynamicToolAdapter.ts";
+import { WebSocketDynamicToolBridge } from "../../src/bridges/WebSocketDynamicToolBridge.ts";
 import { AgentActivityPublisher } from "../../src/activity/AgentActivityPublisher.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
 import {
   attachActivitySocketHandlers,
+  attachDynamicToolSocketHandlers,
   attachThreadSocketHandlers,
   createMCPClientFromConfig,
   resolveLLMMode,
@@ -122,6 +125,99 @@ async function waitForClose(socket: WebSocket, timeoutMs = 250): Promise<boolean
   });
   return Promise.race([close, timeout]);
 }
+
+describe("dynamic tool declaration refresh", () => {
+  it("keeps a saved automation call pending until its provider reports the actual result", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket();
+    const bridge = new WebSocketDynamicToolBridge();
+    try {
+      attachDynamicToolSocketHandlers(socket, { bridge });
+      socket.emit("message", Buffer.from(JSON.stringify({ channel: "dynamic_tools", type: "provider_hello", clientId: "swift-host", tools: [] })));
+      const tool = new DynamicToolAdapter({
+        clientId: "swift-host", namespace: "automation", name: "run", description: "Run saved policy",
+        inputSchema: { type: "object" },
+      }, bridge);
+      let settled = false;
+      const result = tool.call({ policyId: "waiting-policy" }, { threadId: "long-thread", turnId: "long-turn", toolCallId: "long-run" });
+      const observed = result.then((value) => { settled = true; return value; }, (error) => { settled = true; throw error; });
+      const success = expect(observed).resolves.toMatchObject({ callId: "long-run", success: true });
+      await vi.advanceTimersByTimeAsync(17_000);
+      expect(settled).toBe(false);
+      const request = lastSent<{ payload: { callId: string } }>(socket);
+      socket.emit("message", Buffer.from(JSON.stringify({
+        channel: "dynamic_tools", type: "tool_call_response",
+        payload: { callId: request.payload.callId, success: true, contentItems: [{ type: "inputText", text: '{"run":{"status":"completed"}}' }] },
+      })));
+      await success;
+    } finally {
+      bridge.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves an in-flight call when the same provider updates its tools", async () => {
+    const socket = new FakeSocket();
+    const bridge = new WebSocketDynamicToolBridge();
+    attachDynamicToolSocketHandlers(socket, { bridge });
+    const receive = (message: unknown) => socket.emit("message", Buffer.from(JSON.stringify(message)));
+    receive({ channel: "dynamic_tools", type: "provider_hello", clientId: "swift-host", tools: [] });
+    const response = bridge.call({
+      clientId: "swift-host", threadId: "thread-refresh", turnId: "turn-refresh", callId: "run-refresh",
+      namespace: "automation", tool: "run", arguments: { policyId: "saved-policy" },
+    });
+    expect(lastSent(socket)).toMatchObject({ type: "tool_call_request", payload: { callId: "run-refresh" } });
+    receive({
+      channel: "dynamic_tools", type: "provider_hello", clientId: "swift-host",
+      tools: [{ clientId: "swift-host", namespace: "automation", name: "run", description: "Run saved policy", inputSchema: { type: "object" } }],
+    });
+    const refreshedTools = bridge.availableTools();
+    receive({
+      channel: "dynamic_tools", type: "tool_call_response",
+      payload: { callId: "run-refresh", success: true, contentItems: [{ type: "inputText", text: "completed" }] },
+    });
+    await expect(response).resolves.toMatchObject({ callId: "run-refresh", success: true });
+    expect(refreshedTools).toMatchObject([{ clientId: "swift-host", namespace: "automation", name: "run" }]);
+    receive({ channel: "dynamic_tools", type: "provider_hello", clientId: "swift-host", tools: [] });
+    expect(bridge.availableTools()).toEqual([]);
+    socket.emit("close");
+    await expect(bridge.call({
+      clientId: "swift-host", threadId: "thread-refresh", turnId: "turn-refresh", callId: "after-close",
+      namespace: "automation", tool: "history", arguments: {},
+    })).rejects.toThrow("offline");
+  });
+
+  it("keeps the replacement provider's declarations and calls when an old socket refreshes", async () => {
+    const bridge = new WebSocketDynamicToolBridge();
+    const oldSocket = new FakeSocket();
+    const newSocket = new FakeSocket();
+    const hello = (name: string) => Buffer.from(JSON.stringify({
+      channel: "dynamic_tools", type: "provider_hello", clientId: "swift-host",
+      tools: [{ clientId: "swift-host", namespace: "host", name, description: name, inputSchema: { type: "object" } }],
+    }));
+    attachDynamicToolSocketHandlers(oldSocket, { bridge });
+    attachDynamicToolSocketHandlers(newSocket, { bridge });
+    try {
+      oldSocket.emit("message", hello("old"));
+      newSocket.emit("message", hello("current"));
+      oldSocket.emit("message", hello("stale-refresh"));
+      expect(bridge.availableTools()).toMatchObject([{ name: "current" }]);
+      const result = bridge.call({
+        clientId: "swift-host", threadId: "thread", turnId: "turn", callId: "current-call",
+        namespace: "host", tool: "current", arguments: {},
+      });
+      expect(lastSent(newSocket)).toMatchObject({ type: "tool_call_request", payload: { callId: "current-call" } });
+      oldSocket.emit("close");
+      newSocket.emit("message", Buffer.from(JSON.stringify({
+        channel: "dynamic_tools", type: "tool_call_response",
+        payload: { callId: "current-call", success: true, contentItems: [{ type: "inputText", text: "current" }] },
+      })));
+      await expect(result).resolves.toMatchObject({ callId: "current-call", success: true });
+    } finally {
+      bridge.close();
+    }
+  });
+});
 
 describe("attachThreadSocketHandlers", () => {
   it("only detaches subscriptions when a UI socket closes", async () => {

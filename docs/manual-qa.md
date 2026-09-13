@@ -4,10 +4,20 @@
 
 ## 验收前提
 
-- 已完成依赖安装。
-- 已通过 `bash ./scripts/test.sh`。
-- 已通过 `bash ./scripts/swiftw test`。
-- 已通过 `bash ./scripts/swiftw build`。
+先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
+
+## 本次合并验证（2026-09-14）
+
+- **范围**：在独立 worktree 将 Issue #3/#4 合入 main，保留 Issue #1 桌宠及后端持久输入语义；实施与检查结果见 [合并计划](./medium-powers/plans/2026-09-13-issue-4-main-merge.md)。
+- **自动检查**：验证桌宠与 ThreadWindow 的独立投影、首轮关联、忙碌/等待回复时立即提交、后端 pending、建议与唯一请求回执；同时验证内置模块 Provider 的当前声明、token 隔离、长调用、图片消费和正常退出取消落盘。`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 Electron build 全部通过；结果分别保存在本次合并 worktree 的 `.cache/issue-4-main-final-web-electron.json`、`issue-4-main-final-swift.json`。
+- **审核与保留**：独立文档审核已核对 Issue #1/#3/#4、修改目录的逐级指南、代码与归档；本地链接及冲突检查通过，main 的桌宠布局、缩放、后端 Thread 与附件路径无非预期代码变化。
+- **实机边界**：本次没有启动合并产物或操作已有 App，没有新增实机通过结论。Issue #1 尚未验收的分项继续保留；已归档的桌宠分项和 Issue #4 九项只证明记录中的构建与环境，不据此宣称合并产物已重新验收。
+
+## Issue #4 内置模块验收状态
+
+- **已归档**：CH1–CH5、AU1–AU3、HOST1 九项已在原功能分支完成，见 [实机归档](./archive.md)；不重新列为待验。实机使用 mock LLM 与真实系统、模块、存储及 Dynamic Tool 通路，未验证真实外部模型推理。
+- **证据根目录**：`/Users/mu9/proj/handAgent/.worktrees/issue-4-builtin-modules`，现存脱敏汇总和原始证据清理边界见 [实施记录](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。可复用动作见 [实机步骤](./human/builtin-features-qa.md)。
+- **未验边界**：macOS TCC 拒绝没有通过撤销既有授权实测；无可见窗口的 Swift Host 自激活未记为通过。九项通过不覆盖这两种场景。
 
 ## 待验收项
 
@@ -60,7 +70,7 @@
   3. 确认桌宠相关文案使用“桌宠”或“月见八千代”，不把桌宠称为“Wisp”。
   4. 确认 Swift target、npm package、环境变量和协议事件等内部构建标识仍可正常工作。
 
-### 文档卫生回归
+## 文档卫生回归
 
 - **范围**：`AGENTS.md`、`CONTEXT-MAP.md`、三个 `CONTEXT.md`、`handAgent.md`、`README.md`、`DESIGN.md`、各级目录指南与 `docs/*.md`。
 - **验收步骤**：
@@ -80,7 +90,7 @@
 - **合并后验证（2026-09-13）**：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 `pnpm --filter handagent-electron-shell build` 全部通过；合并前记录的两项 Swift 失败未再出现。README、TODO 与本文的本地链接 / 锚点、冲突标记和 `git diff --check` 检查通过。
 - **验收步骤**：
   1. 从首页阅读使用场景，确认能理解快捷键输入、桌宠资料拖入、近期活动检索和收藏触发任务各自解决的问题。
-  2. 确认 Context History 默认关闭、书签连接仍在完善；桌宠拖入与轻量对话已实现，原生交互仍有待验项；桌宠内切换对话、分享 / 标记入口与个人记忆属于后续规划。
+  2. 确认 Context History 与 Automation 为默认关闭的内置功能，说明与已归档范围一致；书签连接仍在完善；桌宠拖入与轻量对话已实现，原生交互仍有待验项；桌宠内切换对话、分享 / 标记入口与个人记忆属于后续规划。
   3. 检查顶部导航、工程设计表格、开发验证折叠区及文档链接，确认在 GitHub 页面可正常阅读与跳转。
   4. 检查 TODO，确认已实现的桌宠基础能力不再列为未实现，后续能力与实机待验项分别保留在对应清单。
 
@@ -105,7 +115,7 @@
   4. 缩小窗口高度，确认 popover 自动避让或保持在视口内可滚动。
   5. 点击历史 thread 删除按钮，确认 Radix AlertDialog 居中、`Escape` / 取消不删除、确认后删除。
 
-### AgentTrigger 设置二级菜单与默认 Package
+## AgentTrigger 设置二级菜单与默认 Package
 
 - **状态**：已实现，待实机 QA。
 - **自动化验证**：`bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
@@ -117,7 +127,7 @@
   5. 删除某条 Instance，确认列表立即移除且 runtime reload。
   6. 删除内置 package 目录后重启，确认启动期恢复内置 manifest，且不覆盖用户已有实例。
 
-### 默认 Websearch 与 Responses SSE 回归
+## 默认 Websearch 与 Responses SSE 回归
 
 - **状态**：已实现，待真实 provider 实机 QA；上次阻塞在本地 provider 返回 401 invalidated oauth token。
 - **自动化验证**：`pnpm exec vitest run packages/core/tests/tools/websearch-use-cases.test.ts packages/core/tests/permission/security-use-cases.test.ts packages/core/tests/llm/vercel-client.test.ts`、`bash ./scripts/test.sh`。
@@ -129,24 +139,21 @@
   5. 去掉 `TAVILY_API_KEY` 后重启，确认 `web_search` 返回明确缺 key 错误且 App 不崩溃。
   6. 请求抓取 localhost、127.0.0.1 或私网地址，确认 `fetch_page` 拒绝。
 
-### Context History 与自进化 Automation 官方 Plugin
+## Issue #3 前后端状态所有权收敛
 
-- **状态**：已实现，待实机 QA。
-- **自动化验证**：`bash ./scripts/swiftw test --filter PluginDynamicToolsTests`、`bash ./scripts/swiftw test --filter ContextHistoryPluginCoreTests`、`bash ./scripts/swiftw test --filter AutomationRuntimeTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
-- **验收步骤**：
-  1. 启动桌面 App，确认官方 Plugin Manifest 写入 `~/.spotAgent/plugins/`；Atomic Capability Plugin 默认 enabled，Context History 与 Automation 默认 disabled。
-  2. 启用 Context History 后重启，确认 Dynamic Tool 列表包含 activity index、sample details、thumbnails、original screenshot，并且 index 不返回完整 AX 树或原图。
-  3. 切换前台 app/window 并等待采样 tick，确认 activity sample、周期 sample 和 60 秒截图记录按预期出现。
-  4. 启用 Automation runtime 后重启，确认 record、policy、run、history、repair tools 暴露。
-  5. 录制 click / setValue / typeText / hotkey / waitFor / assertion，确认每个 event 含 before/after app-window、AX、screenshot evidence。
-  6. 用最小 policy 调用 `automation.run`，失败时确认 run 记录、repair request、fallback patch 和 `automation.history` 都可追踪。
-  7. 调用 `automation.repair_apply`，确认 policy version 增加、repair request 变为 `applied`，重复 apply 会失败。
-  8. 修改官方 manifest 的非 enabled 字段后重启，确认 installer 修复 manifest 且保留用户 enabled 选择。
+- **状态**：前端职责拆分与后端保留核查已完成，输入行为已按 Issue #1 的后端持久队列对齐，尚未进行本组桌面实机回归；自动化与提交前检查结果见 [规格入口](./issue-3-design.md)。构建、store 测试与静态组件渲染不计作以下验收。
+- [ ] **草稿隔离与提交**：在 Thread A、B 分别编辑含文本和 Input Item 的草稿，来回切换确认各自保留；分别提交后只清空本 Thread 的草稿，运行中也立即提交，服务端保存后显示待处理。
+- [ ] **页面重建与偏好**：调整 Workspace 分组展开，编辑草稿并展开消息或工具详情后重载 Web 页面；草稿与组件临时展开恢复初始状态，Workspace 分组展开保留，搜索词清空。
+- [ ] **提交与待处理**：空闲、运行和等待普通回复时分别提交输入；确认均立即发送、接收确认后显示 pending，后端按接收顺序处理，各自开始后只清除对应标记，A、B 互不影响。前端不提供移除已提交等待项的操作。
+- [ ] **首轮关联与占位**：经 preload initial-prompt fallback 连续创建两个 Thread，交错返回创建通知；核对各自先加载再提交首轮，snapshot 保留首轮摘要占位，正式输入记录替换本地摘要且保留其他已保存 pending，内容不串线。
+- [ ] **历史与流式展示**：显式打开历史 Thread，核对文本、图片、Append Prompt 和文本选区内容；连续回复更新同一消息，重复 assistant delta 不重复显示。后台创建导致选中项切换仍按 [既有缺陷](./bugs.md) 单独复现，不记为本轮已修复。
+- [ ] **请求面板**：在不同 Thread 触发 Permission / Workspace 请求，回答后确认只清理对应面板；分别检查完成、中断、失败和 Thread error 后的请求清理及另一 Thread 的面板保留。
+- [ ] **连接与缓冲**：延迟 socket open，核对已缓冲命令和 ClientResponse 的发送顺序；意外断连后显示 disconnected 并禁用 Composer，ThreadWindow 保持无自动重连与自动订阅恢复；显式 resume 可恢复 snapshot 中的待答请求，桌宠重连按 Issue #1 条目另验。
+- [ ] **宿主窗口回执**：关闭 Settings 后从 PromptPanel 提交，确认隐藏面板时 Swift Host 回落到 accessory；ThreadWindow 打开回执和关闭均不再次改变 Swift Host 的 Dock / Cmd+Tab 可见性。本轮只校正相关测试的观察阶段。
 
 ## Issue #2 后端 Thread 所有权重构
 
 - **自动化状态**：实现与自动化回归已提交；以下项目保留为真实 agent-server / UI 环境的人工验收。
-
 - [ ] 启动 agent-server，创建两个 Thread；分别连续提交两轮输入，确认历史和流式通知不串线。
 - [ ] 执行期间关闭全部 Thread UI 连接，确认 Turn 继续运行；重新连接后用 `thread.resume` 读取结果。
 - [ ] 在权限请求中分别选择“本次允许”和“永久允许”，确认永久规则在另一 Thread、不同参数和重启后仍按完整工具名称命中。

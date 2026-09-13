@@ -6,7 +6,7 @@
 
 | 子节点 | 子文档 | 职责 |
 |------|------|------|
-| `use-cases/` | 无独立子文档 | `desktop-startup`、`thread-window-commands`、`pet-window` 主路径用例 |
+| `use-cases/` | 无独立子文档 | `desktop-startup`、`thread-window-commands`、`pet-window` 与真实进程管道的 `host-shutdown` 用例 |
 | `activity-window/` | [activity-window/activity-window.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/activity-window/activity-window.md) | 桌宠 React 交互、Thread 消息呈现和拖入分流 |
 | `main/` | [main/main.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/main/main.md) | 初始主题和 macOS Dock 策略 |
 | `preload/` | [preload/preload.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/preload/preload.md) | preload 注入的 main-world globals 和 IPC bridge |
@@ -24,6 +24,7 @@ pnpm --filter handagent-electron-shell build
 ```
 
 - `pnpm --filter handagent-electron-shell test` 现在会先执行 `tsc -p tsconfig.json`，生成 `dist/main/*` 和 `dist/preload/*.cjs`，因为 `tests/preload/*` 直接加载 CommonJS preload 产物验证 main-world globals。
+- `host-shutdown` 消费构建后的真实 parser、runtime 与 bridge，以 Node 子进程的 stdout 管道验证正常 ack、读取端关闭后的退出及非 `EPIPE` 错误可见性。`stopSupervisor` / `quit` 使用边界回调记录；测试证明这些调用与 Node 测试进程退出，不替代真实 Electron、agent-server 进程清理的实机证据。
 
 单文件示例：
 

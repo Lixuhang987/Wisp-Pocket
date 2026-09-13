@@ -17,7 +17,8 @@
 - Thread 持有唯一执行队列，每条输入各自形成 Turn。执行中的新输入照常持久化并显示待处理，不中断当前 Turn，也不混入当前模型输入副本。
 - 当前 Turn 结束后依次处理队列。模型和工具等待不占用短操作队列，中断、回执和删除可及时进入。
 - 重启恢复从持久历史重建未开始输入；resume 只恢复可见状态，下一条 UserInput 才唤起保留的队列。已开始但未结束的 Turn 标记为中断/失败，不自动重放。
-- 存储失败暂停后续执行；恢复只基于已确认落盘历史，不把 renderer 内存当作输入真源。
+- 输入保存后才确认并执行，最终结果保存后才发布成功；存储失败暂停后续执行，恢复只基于已确认落盘历史。
+- `ThreadStorage` 表达实际存储需求；[agent-server 持久化适配](../../../../apps/agent-server/src/thread/thread.md)承担输入转换、历史增量与恢复，core 不依赖 SQLite 或连接身份。
 
 ## 拖入与请求
 
@@ -26,5 +27,6 @@
 - Permission/Workspace 仍由 `ThreadRequests` 持有。一次有效 ClientResponse 消耗一个请求，随后发布 `request.resolved`；两种界面同时回复也只产生一次决定。
 - snapshot 包含当前待答请求；请求解决、取消或超时后同步清理。Permission/Workspace 的既有时限不用于建议等待。
 - Thread 关闭、中断或删除后，旧执行的晚到结果不能修改历史；共享服务不随单个 Thread 释放。
+- 中断有独立完成等待上限（默认 3 秒），随后停止旧 Turn 投影，不无限等待外部 Tool Promise。现有 Dynamic Tool 协议没有远程 cancel；Automation 宿主取消由禁用功能或退出应用触发，见 [Swift 平台桥](../../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
 
 协议合约见 [protocol](../protocol/protocol.md)，持久化恢复见 [thread-store](../../../thread-store/thread-store.md)。
