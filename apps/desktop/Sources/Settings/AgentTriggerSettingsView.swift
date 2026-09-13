@@ -306,6 +306,7 @@ private struct PackageDetailView: View {
         scheduleAt = ""
         timezone = "Asia/Shanghai"
         promptTemplate = package.defaultPromptTemplate
+        viewModel.clearSaveError()
     }
 }
 

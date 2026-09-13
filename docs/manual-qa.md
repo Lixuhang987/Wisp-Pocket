@@ -161,6 +161,16 @@
   5. 删除某条 Instance，确认列表立即移除且 runtime reload。
   6. 删除内置 package 目录后重启，确认启动期恢复内置 manifest，且不覆盖用户已有实例。
 
+### AgentTrigger 新增表单错误关闭回归
+
+- **状态**：2026-09-14 已修复旧 P3，待主 checkout 重新打包实机验收；[实施与验证边界](./medium-powers/plans/2026-09-14-agenttrigger-form-errors.md)。
+- **自动化覆盖**：真实 SwiftUI 新增、无效保存、取消/收起、重新展开，覆盖 Chrome 空文件夹与 System Clock 空标题四条流程，并从新建 Store 读回既有记录。旧实现连续两次失败，修复后四项通过；测试窗口不显示，不把它计作实机通过。
+- **原失败证据**：主 checkout `2920af8` 产物的 Computer Use AX 与截图确认 Chrome 两条关闭路径残留红色错误，详见 `.cache/live-qa-20260914/trigger-form-repro.json`。当时已正常退出测试 App，4317 已释放。
+- **验收步骤**：
+  1. Chrome Bookmarks 详情页新增自动化，先选择文件夹，再空标题保存；确认 `标题不能为空`，点击取消，确认表单及红色错误一起消失。
+  2. 重新展开，不选文件夹保存；确认 `至少选择一个收藏夹文件夹`，点击收起，确认错误清除。再展开时标题与文件夹选择为空、提示词恢复 Package 默认值，不显示旧错误。
+  3. 在 System Clock 详情页用空标题重复取消与收起路径；保存失败时错误仍可见，关闭后清除，再展开时标题与时间点为空、时区恢复默认值。各次关闭后已有列表与 `instances.json` 不变。
+
 ## 默认 Websearch 与 Responses SSE 回归
 
 - **状态**：已实现，待真实 provider 实机 QA；上次阻塞在本地 provider 返回 401 invalidated oauth token。

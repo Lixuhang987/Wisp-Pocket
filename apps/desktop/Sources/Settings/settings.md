@@ -49,6 +49,7 @@ Append Prompt 只定义 trigger/title/description/template/globalShortcut。Prom
 - **SwiftLint 约束**：仓库根 `.swiftlint.yml` 只对 `apps/desktop/Sources/Settings` 与 `apps/desktop/Sources/AppServices/AgentSettings` 启用，并强制裸输入、硬编码颜色和常见裸动作按钮约束（`SettingsStyles.swift` 在 `excluded` 内）。脚本入口 `bash ./scripts/swiftlint.sh` 通过 SwiftPM `SwiftLintCommandPlugin` 运行，并被 `scripts/test.sh` 在其他检查之前调用。
 - **ViewModel 是配置代理层**：模型和 Agent builtin tool 使用 `AgentSettingsStore`；内置功能使用 `BuiltinFeatureSettingsStore`，只观察模块公开的采集状态；Append Prompt / MCP / 权限 / Workspace 代理各自共享 JSON 文件。
 - **AgentTrigger 独立于现有手动 trigger**：Settings 里的 AgentTrigger 页只服务后台自动触发能力，不复用 Append Prompt 的 package 目录、配置语义或提交流程。
+- **AgentTrigger 表单错误生命周期**：保存失败时保留表单及错误；取消或收起时，局部字段和 ViewModel 的本次错误必须一起重置，不写入已有 Instance 或重载 runtime。错误仍由 ViewModel 单独持有。
 - **写入时统一 trim**：所有字符串字段在 setter 或创建入口中 trim。
 - **不要把 store 直接传给 View**：始终经过 ViewModel。
 - **Tab 增加规则**：新建 Tab 先在 `SettingsTab` enum 增 case、标题和图标，再在 `SettingsView.tabContent` 接入内容。

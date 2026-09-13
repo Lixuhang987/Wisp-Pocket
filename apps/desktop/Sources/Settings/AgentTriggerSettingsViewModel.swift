@@ -91,6 +91,10 @@ final class AgentTriggerSettingsViewModel {
         saveErrorMessage = nil
     }
 
+    func clearSaveError() {
+        saveErrorMessage = nil
+    }
+
     func instances(forPackageId id: String) -> [AgentTriggerInstance] {
         instances.filter { $0.packageId == id }
     }
