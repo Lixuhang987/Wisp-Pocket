@@ -23,9 +23,9 @@
 - [x] 原实现出现 `env: electron: No such file or directory` 与 ready timeout；限制仅无 repo root 的 packaged fallback 使用全局 Electron 后，用例通过。
 - [x] `AppServicesTests`、TypeScript/Web、Swift test（340 项）与 Swift build 全部通过；更新 owning 文档与手工 QA 项。
 - [x] 独立子 agent 审核本计划、全部修改目录指南、代码与 QA 文档；更新启动合约、测试边界和打包依赖，并把 P1 移为待实机回归，恢复完整 QA-START。
-- [ ] 主 agent 复核审核结论后提交。
-- [ ] 合入主分支，重新打包并通过 Computer Use 验证冷启动、后端健康和后续生命周期用例。
+- [x] 主 agent 复核审核结论后提交，`627e91b` 已合入主分支并重新打包。
+- [ ] 完成全部冷启动与生命周期实机回归；默认启动、焦点、真实模型回复、关闭和重开历史已有观察，失效 binary 覆盖与完整重启尚未验证。前台 Electron 退出触发的宿主挂起另由 [退出修复计划](./2026-09-14-electron-host-exit.md) 处理。
 
 ## 验证边界
 
-进程测试的 pnpm/Electron 为系统边界替身，只证明配置到子进程与 ready 解码的链路。真实 runtime、窗口、模型与生命周期继续由 [manual-qa.md](../../manual-qa.md#打包应用-electron-冷启动回归) 实机项证明。该修复不宣称产物已是脱离 checkout 的自包含发行包；本次自动检查与文档审核没有新增实机通过结论。
+进程测试的 pnpm/Electron 为系统边界替身，只证明配置到子进程与 ready 解码的链路。真实 runtime、窗口、模型与生命周期的前置观察及待验边界见 [manual-qa.md](../../manual-qa.md#打包应用-electron-冷启动回归)，本组尚未完整验收。该修复不宣称产物已是脱离 checkout 的自包含发行包。

@@ -25,6 +25,7 @@
 
 从主 checkout 的 `main` 打包，使用可丢弃资料；真实模型与可控 fixture 的结论分别记录。已有桌宠、Thread 与触发器详细分项继续按下文逐项验收，本节补足当前产品的其他入口。
 
+- [ ] QA-START 启动与生命周期：默认冷启动显示桌宠，按本机热键配置唤出 PromptPanel / 历史；Escape 恢复原应用焦点，首次提交与模型回复可见；关闭 ThreadWindow 后后端继续运行，重新打开恢复历史。从前台 ThreadWindow 和 Swift Host 分别正常退出，确认宿主、Electron、agent-server 全部结束且 4317 释放；重启后历史与设置保留。退出修复及前置观察见下方两项，完整流程尚待复验。
 - [ ] QA-INPUT 主动输入：PromptPanel 纯文字、Append Prompt、文本选区和区域截图可确认提交；取消捕获不提交，输入附件与实际选区/图像一致；ThreadWindow 可查看历史内容并继续回复。
 - [ ] QA-SETTINGS 设置：模型 provider/API/model/base URL 保存与热加载、无效配置错误可见；主题同步 PromptPanel/Settings/ThreadWindow/桌宠，热键编辑与恢复正常；不输出模型密钥。
 - [ ] QA-TOOLS 工具与工作区：真实界面完成 Workspace 选择、文件读写、权限本次允许/拒绝/记住决定、工具详情展开；MCP 配置的启用与错误可见，测试仅使用本轮工作区和可丢弃工具。
@@ -33,7 +34,7 @@
 
 ### 打包应用 Electron 冷启动回归
 
-- **状态**：2026-09-14 已修复，待合入 `main` 后重新打包实机验收；原 P1「打包应用无法找到已安装的 Electron，冷启动直接失败」从 `bugs.md` 移至本节。
+- **状态**：2026-09-14 修复已以 `627e91b` 合入 `main` 并重新打包；默认启动已有实机观察，失效 binary 覆盖与完整生命周期仍待验收。
 - **自动检查**：`AppServicesTests`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`（340 项）与 `bash ./scripts/swiftw build` 均通过。进程用例使用外部 pnpm/Electron 边界替身，只证明启动配置、真实 Process 与 ready 解码；实现及验证边界见 [修复计划](./medium-powers/plans/2026-09-14-packaged-electron-startup.md)。
 - **原失败证据**：主 checkout 的 `.cache/live-qa-20260914/` 中 `baseline.json`、`app.log`、`plain-launch-error.log`；源码 `ca1c02b`、macOS 15.5 arm64，正常打开包与直接运行 binary 均出现 `env: electron: No such file or directory` / status 127，4317 未监听。原失败实例已停止，后端未启动。
 - **回归步骤**：
@@ -41,7 +42,16 @@
   2. 设置指向已不存在旧路径的 `HANDAGENT_ELECTRON_BINARY` 再次冷启动，确认仍使用 workspace Electron，子进程不再继承失效覆盖值。
   3. 两次启动均核对实际 Electron main 来自当前 bundle，runtime 来自当前 checkout；确认 `agent_server.health available=true` 与 `thread_window.prepared` 后才可提交，首次 PromptPanel 提交能打开 ThreadWindow。
   4. 继续完成 QA-START 的焦点、关闭窗口、正常退出清理与重启历史恢复，不把冷启动通过等同于完整生命周期通过。
-- **未验边界**：本次尚无修复后的实机结论；无法定位 checkout 时保留全局 runtime 路径，不据此宣称自包含发行包，详见 [打包边界](./dev.md#打包边界)。
+- **前置观察**：`627e91b` 产物默认启动显示桌宠，全局 `Command+Shift+Space` 唤出面板、Escape 返回 iTerm2，真实 Responses 模型返回 `QA_START_OK` 且 Thread 落盘；关闭窗口后后端继续运行，本机 `Command+H` 可重开历史。随后从 ThreadWindow 退出时出现宿主挂起，退出修复后的完整复验见下节；本组未归档为通过。
+- **未验边界**：失效 `HANDAGENT_ELECTRON_BINARY` 冷启动和完整重启尚未实测。无法定位 checkout 时保留全局 runtime 路径，不据此宣称自包含发行包，详见 [打包边界](./dev.md#打包边界)。
+
+### Electron 正常退出后的宿主清理回归
+
+- **状态**：2026-09-14 退出调度修复已在独立 worktree 实现，待合入 `main` 后重新打包实机复验；原 P2「从 Electron 正常退出后 Swift Host 挂起」从 `bugs.md` 移至本节。
+- **自动检查**：隔离 XCTest 子进程使用真实 AppKit 与生产退出链路，旧实现两次超时，延迟到主 run loop 后正常退出。`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`（341 项）与 `bash ./scripts/swiftw build` 全部通过；在途 Automation 用例继续核对取消落盘先于退出答复，分工见 [修复计划](./medium-powers/plans/2026-09-14-electron-host-exit.md)。
+- **原失败证据**：主 checkout 的 `.cache/live-qa-20260914/fixed-launch-error.log` 与 `host-exit.sample.txt`。`627e91b` 产物从前台 ThreadWindow 收到 `Command+Q` 后，Electron / agent-server 已退出、4317 已释放，Swift Host 持续残留；该测试宿主已停止。
+- **回归步骤**：重新打包后完整执行 QA-START，分别验证前台 ThreadWindow 的 `Command+Q` 与 Swift Host 原生退出入口；以实际进程结束和端口释放为准，再启动并恢复同一 Thread 历史。启用 Automation 的在途取消与落盘按 QA-HOST 复验，关闭窗口继续运行的行为保持不变。
+- **未验边界**：本次没有修复后包的实机通过结论；真实 AppKit 子进程测试不证明 Electron / agent-server 打包运行、真实窗口或完整重启流程。
 
 ### Issue #1 月见八千代桌宠与 Thread 轻量对话
 

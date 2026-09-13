@@ -4,6 +4,7 @@
 
 ## 直接子节点
 
+- [2026-09-14-electron-host-exit.md](./2026-09-14-electron-host-exit.md)：全功能 QA 发现的 Electron clean exit 后 Swift 宿主退出卡死。
 - [2026-09-14-packaged-electron-startup.md](./2026-09-14-packaged-electron-startup.md)：全功能 QA 发现的打包冷启动路径缺陷及回归边界。
 - [2026-09-14-pet-compact-hover.md](./2026-09-14-pet-compact-hover.md)：桌宠常态收紧、悬停统一滚动与点击回复的待确认实施计划。
 - [2026-09-13-issue-4-main-merge.md](./2026-09-13-issue-4-main-merge.md)：合入内置模块并保留 main 桌宠行为的合并决策与检查边界。

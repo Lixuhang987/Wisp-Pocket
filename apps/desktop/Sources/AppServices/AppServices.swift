@@ -103,7 +103,13 @@ final class AppServices {
             NSApplication.shared.setActivationPolicy($0)
         },
         terminateApplication: @escaping @MainActor () -> Void = {
-            NSApplication.shared.terminate(nil)
+            // AppKit's terminateLater loop must not hold the task running MainActor cleanup.
+            NSApplication.shared.perform(
+                #selector(NSApplication.terminate(_:)),
+                with: nil,
+                afterDelay: 0,
+                inModes: [.common]
+            )
         },
         environment: [String: String] = ProcessInfo.processInfo.environment,
         showsFatalAlert: Bool = true,

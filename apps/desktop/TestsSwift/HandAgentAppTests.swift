@@ -5,6 +5,91 @@ import XCTest
 
 @MainActor
 final class HandAgentAppTests: XCTestCase {
+    func testElectronExitCompletesAppKitTermination() throws {
+        let recordKey = "HANDAGENT_TEST_APPKIT_TERMINATION_RECORD"
+        if let path = ProcessInfo.processInfo.environment[recordKey] {
+            try runAppKitTerminationChild(recordURL: URL(fileURLWithPath: path))
+            return
+        }
+
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let recordURL = directory.appendingPathComponent("termination.txt")
+        try Data().write(to: recordURL)
+        let child = Process()
+        let output = Pipe()
+        let exited = DispatchSemaphore(value: 0)
+        child.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        child.arguments = [
+            "xctest", "-XCTest",
+            "HandAgentDesktopTests.HandAgentAppTests/testElectronExitCompletesAppKitTermination",
+            Bundle(for: Self.self).bundlePath,
+        ]
+        var environment = ProcessInfo.processInfo.environment
+        environment[recordKey] = recordURL.path
+        child.environment = environment
+        child.standardOutput = output
+        child.standardError = output
+        child.terminationHandler = { _ in exited.signal() }
+        try child.run()
+        let completed = exited.wait(timeout: .now() + 5) == .success
+        if !completed {
+            child.terminate()
+            if exited.wait(timeout: .now() + 2) == .timedOut {
+                kill(child.processIdentifier, SIGKILL)
+                child.waitUntilExit()
+            }
+        }
+        let diagnostics = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        let record = try String(contentsOf: recordURL, encoding: .utf8)
+        XCTAssertTrue(completed, "AppKit termination hung after: \(record)\n\(diagnostics)")
+        XCTAssertEqual(child.terminationStatus, 0, diagnostics)
+        XCTAssertEqual(record, "requested-from-task\nshutdown-complete\n")
+    }
+
+    private func runAppKitTerminationChild(recordURL: URL) throws {
+        let record = try FileHandle(forWritingTo: recordURL)
+        let home = recordURL.deletingLastPathComponent()
+        let application = NSApplication.shared
+        application.setActivationPolicy(.prohibited)
+        let shell = ElectronShellProcess(launchPath: "/bin/sh", arguments: ["-c", "exit 0"], environment: [:])
+        let server = ElectronBackedAppServer(shell: shell)
+        let coordinator = AppCoordinator(services: AppServices(
+            appServer: server,
+            threadWindowCommandClient: server,
+            settingsStore: AgentSettingsStore(homeDirectoryURL: home),
+            agentTriggerStore: AgentTriggerStore(homeDirectoryURL: home),
+            appearanceChangeObserver: NopAppearanceChangeObserver(),
+            actionManifestStore: ActionManifestStore(actionsDirectoryURL: home.appendingPathComponent("actions")),
+            hotkeyRegistrar: NopHotkeyRegistrar(),
+            settingsWindowPresenter: NopSettingsWindowPresenter(),
+            fatalAlertPresenter: NopFatalAlertPresenter(),
+            setActivationPolicy: { _ in },
+            environment: [:],
+            showsFatalAlert: false,
+            promptPanelPresentationMode: .hiddenForTesting
+        ))
+        let requestTermination = server.onHostTerminationRequest
+        server.onHostTerminationRequest = {
+            withUnsafeCurrentTask { task in
+                let checkpoint = task == nil ? "requested-without-task\n" : "requested-from-task\n"
+                record.write(Data(checkpoint.utf8))
+            }
+            requestTermination?()
+        }
+        let delegate = WispPocketApplicationDelegate()
+        delegate.coordinator = coordinator
+        delegate.replyToTermination = { app, shouldTerminate in
+            record.write(Data("shutdown-complete\n".utf8))
+            app.reply(toApplicationShouldTerminate: shouldTerminate)
+        }
+        application.delegate = delegate
+        withExtendedLifetime((coordinator, delegate)) {
+            application.run()
+        }
+    }
+
     func testTerminationWaitsForInFlightRunToBeCancelledAndSaved() async throws {
         let fixture = try AutomationUseCaseFixture()
         defer { fixture.cleanup() }
