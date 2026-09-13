@@ -24,8 +24,9 @@
 - [x] `AppServicesTests`、TypeScript/Web、Swift test（340 项）与 Swift build 全部通过；更新 owning 文档与手工 QA 项。
 - [x] 独立子 agent 审核本计划、全部修改目录指南、代码与 QA 文档；更新启动合约、测试边界和打包依赖，并把 P1 移为待实机回归，恢复完整 QA-START。
 - [x] 主 agent 复核审核结论后提交，`627e91b` 已合入主分支并重新打包。
-- [ ] 完成全部冷启动与生命周期实机回归；默认启动、焦点、真实模型回复、关闭和重开历史已有观察，失效 binary 覆盖与完整重启尚未验证。前台 Electron 退出触发的宿主挂起另由 [退出修复计划](./2026-09-14-electron-host-exit.md) 处理。
+- [x] 主分支当前包已通过默认与失效 binary 覆盖启动、焦点、真实模型回复、关闭窗口后台运行、正常退出及重启历史恢复；[退出修复](./2026-09-14-electron-host-exit.md) 的挂起未复现，结果已归档。
+- [ ] 直接观测默认与失效覆盖启动的 health / prepared 事件及提交门控；功能成功不代替内部消息时序证据。
 
 ## 验证边界
 
-进程测试的 pnpm/Electron 为系统边界替身，只证明配置到子进程与 ready 解码的链路。真实 runtime、窗口、模型与生命周期的前置观察及待验边界见 [manual-qa.md](../../manual-qa.md#打包应用-electron-冷启动回归)，本组尚未完整验收。该修复不宣称产物已是脱离 checkout 的自包含发行包。
+进程测试的 pnpm/Electron 为系统边界替身，只证明配置到子进程与 ready 解码的链路。2026-09-14 当前主分支包的真实启动、窗口、模型与生命周期已验证，记录见 [QA 归档](../../archive.md) 与主 checkout `.cache/live-qa-20260914/lifecycle.json`。stdout 与已过滤统一日志未直接捕获 health / prepared 事件，剩余门控时序检查见 [manual-qa.md](../../manual-qa.md#打包应用-electron-冷启动回归)。该修复不宣称产物已是脱离 checkout 的自包含发行包。

@@ -236,3 +236,27 @@
 - **验证过程**：真实 Responses 回复后从前台 ThreadWindow 按原生 `Command+Q`，确认 Host、pnpm、Electron CLI、Electron、agent-server 全部退出且 4317 释放；重新启动并显式选择原 Thread，两条消息恢复。再完成一轮真实回复，从前台 Swift Settings 按 `Command+Q`，全部进程与端口再次清理。此前 `Command+W` 只关窗口，同一后端继续运行。
 - **证据**：`.cache/live-qa-20260914/lifecycle.json` 中两轮 PID、UI、设置 hash 和持久 Thread 记录；默认轮询 305ms 后与重启轮询 101ms 后全部进程已结束，不把该轮询耗时宣称为精确退出性能。两轮 Host PID 分别为 63123、72433。
 - **结论**：正常退出与重启回归通过，原宿主挂起未再出现；不再存在另一 worktree 占用端口的阻塞。本项没有启用在途 Automation，其取消与落盘继续留在 QA-HOST，未据此新增通过结论。
+
+
+- **回归步骤**：
+  1. 在没有全局 `electron`、已安装 `pnpm` 和 workspace 依赖的主 checkout 重新打包；不设置 `HANDAGENT_ELECTRON_BINARY` / `HANDAGENT_ELECTRON_MAIN`，正常打开 `dist/Wisp Pocket.app`，确认桌宠出现且没有启动失败弹窗。
+  2. 设置指向已不存在旧路径的 `HANDAGENT_ELECTRON_BINARY` 再次冷启动，确认仍使用 workspace Electron，子进程不再继承失效覆盖值。
+
+### 打包冷启动功能回归
+
+- **验证日期**：2026-09-14。
+- **验证环境**：主 checkout `main` / `eb111d6`，macOS 15.5 arm64，正式模型模式 `dist/Wisp Pocket.app`；三项基线、打包与签名检查通过，无全局 `electron`，已安装 workspace 依赖。
+- **验证过程**：默认冷启动显示桌宠且无失败弹窗；退出后用 `open -n --env HANDAGENT_ELECTRON_BINARY=/tmp/handagent-missing-electron-20260914` 再启动，事先确认覆盖路径不存在，实际仍启动当前 checkout 的 Electron 与 bundle main。仅 Swift Host 环境保留覆盖值，pnpm、Electron CLI、Electron 均不再继承；真实模型分别回复 `QA_LIFECYCLE_OK` 与 `QA_STALE_START_OK`。
+- **证据**：`.cache/live-qa-20260914/lifecycle.json`，Host SHA256 `a13166b21bb03c1065fefbaefdfc90928123a50122d8c4de33eb1098a89dab0e`，进程环境、命令行、Computer Use 与 SQLite 记录。
+- **结论**：默认及失效 binary 覆盖的功能回归通过，两个测试实例已完全退出；不证明内部 health / prepared 事件的发送时序，该剩余检查继续保留。
+
+
+4. 继续完成 QA-START 的焦点、关闭窗口、正常退出清理与重启历史恢复，不把冷启动通过等同于完整生命周期通过。
+
+### 冷启动后的生命周期衔接
+
+- **验证日期**：2026-09-14。
+- **验证环境**：macOS 15.5 arm64，主 checkout `main` / `eb111d6` 当前包，真实 Responses / `gpt-5.5`，三项检查与打包通过。
+- **验证过程**：完整执行默认和失效 binary 覆盖两次启动的 PromptPanel、真实回复、关窗后台运行、历史恢复与两种前台原生退出入口。
+- **证据**：`.cache/live-qa-20260914/lifecycle.json` 以及本文件 QA-START、正常退出复验记录；设置 hash 不变，全部进程结束且 4317 释放。
+- **结论**：生命周期衔接通过；历史由显式选择恢复，未宣称自动恢复选中项；Automation 在途取消另验。

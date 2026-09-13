@@ -33,16 +33,13 @@
 
 ### 打包应用 Electron 冷启动回归
 
-- **状态**：2026-09-14 修复已以 `627e91b` 合入 `main` 并重新打包；默认启动已有实机观察，失效 binary 覆盖与完整生命周期仍待验收。
+- **状态**：2026-09-14 默认冷启动、失效 binary 覆盖与完整生命周期的功能实测已归档；本节只保留启动就绪事件的直接观测。
 - **自动检查**：`AppServicesTests`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`（340 项）与 `bash ./scripts/swiftw build` 均通过。进程用例使用外部 pnpm/Electron 边界替身，只证明启动配置、真实 Process 与 ready 解码；实现及验证边界见 [修复计划](./medium-powers/plans/2026-09-14-packaged-electron-startup.md)。
 - **原失败证据**：主 checkout 的 `.cache/live-qa-20260914/` 中 `baseline.json`、`app.log`、`plain-launch-error.log`；源码 `ca1c02b`、macOS 15.5 arm64，正常打开包与直接运行 binary 均出现 `env: electron: No such file or directory` / status 127，4317 未监听。原失败实例已停止，后端未启动。
-- **回归步骤**：
-  1. 在没有全局 `electron`、已安装 `pnpm` 和 workspace 依赖的主 checkout 重新打包；不设置 `HANDAGENT_ELECTRON_BINARY` / `HANDAGENT_ELECTRON_MAIN`，正常打开 `dist/Wisp Pocket.app`，确认桌宠出现且没有启动失败弹窗。
-  2. 设置指向已不存在旧路径的 `HANDAGENT_ELECTRON_BINARY` 再次冷启动，确认仍使用 workspace Electron，子进程不再继承失效覆盖值。
-  3. 两次启动均核对实际 Electron main 来自当前 bundle，runtime 来自当前 checkout；确认 `agent_server.health available=true` 与 `thread_window.prepared` 后才可提交，首次 PromptPanel 提交能打开 ThreadWindow。
-  4. 继续完成 QA-START 的焦点、关闭窗口、正常退出清理与重启历史恢复，不把冷启动通过等同于完整生命周期通过。
-- **前置观察**：`627e91b` 产物默认启动显示桌宠，全局 `Command+Shift+Space` 唤出面板、Escape 返回 iTerm2，真实 Responses 模型返回 `QA_START_OK` 且 Thread 落盘；关闭窗口后后端继续运行，本机 `Command+H` 可重开历史。随后从 ThreadWindow 退出时出现宿主挂起，退出修复后的完整复验见下节；本组未归档为通过。
-- **未验边界**：失效 `HANDAGENT_ELECTRON_BINARY` 冷启动和完整重启尚未实测。无法定位 checkout 时保留全局 runtime 路径，不据此宣称自包含发行包，详见 [打包边界](./dev.md#打包边界)。
+
+- **剩余验证**：默认与失效 binary 两次启动直接捕获 `agent_server.health available=true`、`thread_window.prepared`，核对两者到达前不能提交、到达后首次提交打开 ThreadWindow；同时记录实际 runtime 和 main 路径。当前功能成功不代替内部事件时序证据。
+- **当前证据**：`.cache/live-qa-20260914/lifecycle.json`；启动、焦点、真实回复、关窗后台运行、两种前台退出和重启历史恢复已进入 [归档](./archive.md)。失效覆盖仅保留在 Host 环境，子进程实际使用主 checkout runtime 与当前 bundle main。
+- **未验边界**：stdout 与已过滤统一日志均未捕获这两个内部事件，不能推断消息时序；猜测的 `/health` 返回 404 不记为产品缺陷。无法定位 checkout 时保留全局 runtime 路径，不据此宣称自包含发行包，详见 [打包边界](./dev.md#打包边界)。
 
 ### Issue #1 月见八千代桌宠与 Thread 轻量对话
 
