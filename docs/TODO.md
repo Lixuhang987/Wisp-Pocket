@@ -9,14 +9,6 @@
 
 ---
 
-## Issue #1 实机验收流程（2026-09-13）
-
-- [x] 核对 GitHub Issue #1、现有 manual QA 和目录文档链；按用户指定分支，在 `.worktrees/issue-1-pet-main-20260913` 验证现有实现。
-- [x] 保存开始时的源码差异；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均通过。
-- [x] 重新打包并从默认 `dist` 路径启动，使用 Computer Use 观察原生界面；窗口、进程、日志和持久化证据写入本轮临时证据目录。
-- [ ] 逐项更新 manual QA；通过项或缺陷用技能脚本归档，每次文档修改立即提交；确认需改代码时记录缺陷并结束本轮 QA。
-- [ ] 记录基线、实际覆盖范围与清理状态，核对相关 QA 文档后提交。
-
 ## Wisp Pocket 桌宠后续能力
 
 Issue #1 的拖入、读取与 Thread 轻量交互已实现；实施与检查状态见 [实施记录](./medium-powers/plans/2026-09-13-desktop-pet.md)，原生待验项见 [manual QA](./manual-qa.md)。

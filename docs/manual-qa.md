@@ -18,7 +18,8 @@
 - **自动化入口**：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`pnpm --filter handagent-electron-shell build`；后端 `pet-conversation`、renderer `pet-interaction` 和原生边界 `pet-window` 用例不能替代本节实机验收。
 - **材料与记录**：使用可丢弃的文本、PNG/JPEG/WebP 图片、可访问的公共网页链接与有可复制正文的 PDF；记录源应用、实际松手区域、Thread 身份、可见结果和必要系统证据。需要真实模型理解的项目使用有效 provider；可控 fixture 的结果单独注明。
 - **本轮基线（2026-09-13）**：在用户指定分支的现有 worktree 验证，TypeScript/Web、Swift test/build 与打包均通过；源码为 `0194a22` 加开始时已有的 8 个未提交文件，差异快照和本轮日志保存在 `/tmp/issue1-live-qa-20260913-1030/`。使用默认 `dist/Wisp Pocket.app`、真实模型设置和独立桌宠位置文件；外置 `/tmp` 包缺少可解析的 `zod`，不作为本轮正常启动环境。
-- **模型环境对照（2026-09-13）**：当前 provider 的 `responses` 路径出现空流或 `unexpected EOF`；同一 provider/model 的 `chat` 路径通过真实请求返回 `QA_OK`。后续测试临时将 `llm.api` 改为 `chat`，仅修改该字段，结束后恢复原始设置。对照结果见本轮 `evidence/chat-provider-probe.json`，设置变化与恢复依据见 `evidence/model-config-change.json`。
+- **模型环境对照（2026-09-13）**：当前 provider 的 `responses` 路径出现空流或 `unexpected EOF`；同一 provider/model 的 `chat` 路径通过真实请求返回 `QA_OK`。图片测试临时将 `llm.api` 改为 `chat`；本轮结束时已恢复原始 `responses` 设置，原始文件 SHA256 一致，密钥备份已删除。对照结果见本轮 `evidence/chat-provider-probe.json`，设置变化与恢复依据见 `evidence/model-config-change.json`。
+- **本轮结束（2026-09-13）**：启动/首次文字、移动/位置恢复、文本与图片两区域拖入已归档；用户确认的悬停视觉问题已记录到 bugs，转入独立修改阶段。链接及后续分项仍待验。App/后端与 4317 已停止，测试文稿和 Finder 窗口已关闭；浏览器空间 51 已由用户接管而保留。清理证据见本轮 `evidence/qa-paused-cleanup.json`。
 
 - [ ] 角色图集与主题：观察空闲、处理、等待、失败和移动状态，角色不闪透明空帧；亮暗主题文字可读，启用减少动态效果后动画停止。
 
@@ -32,7 +33,7 @@
 - [ ] 建议与普通消息：在等价样本中点击建议、输入同一句话、输入不同自由回复；都形成普通用户历史并继续同一 Thread，后续执行及结果留在桌宠消息中。
 - [ ] 持续等待：建议或追问放置超过一分钟仍在等待，不自动执行、重试或消失；普通回复能立即继续处理，不被排在等待结束之后。
 - [ ] 常态最新消息：气泡持续显示最新一条面向用户的 assistant 内容，最多约四行；用户新消息和工具调用不替换它，长消息可在展开历史读全。
-- [ ] 悬停与历史滚动：鼠标进入气泡展开受限高度历史，桌宠在左、用户在右；长历史可滚动，查看旧消息时新内容不强制拉回底部，回复框保持可用。
+
 - [ ] 输入焦点：点击回复框输入后把鼠标移出，历史保持展开且可继续输入；回复框失焦且鼠标在外时折叠，中文输入法与 Enter/Shift+Enter 正常。
 - [ ] 隐藏与恢复：主动隐藏气泡后后台进度和结果不弹回；点击角色或再次拖入恢复。隐藏不提交消息、不回答询问、不取消正在执行的任务。
 - [ ] 最新 Thread 选择：让 A 等待或执行，再创建 B；B 接管桌宠，A 后续进度/结果不抢回气泡；A 的历史仍能从现有 ThreadWindow 历史入口找回。
