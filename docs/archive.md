@@ -74,3 +74,15 @@
 - **清理证据**：`CGGetEventTapList` 按 Host PID 核对，开始前 0、录制中 1、正常停止后 0。有效禁用轮 `au1-live-disable2` 在 34.16 秒观察内随 CUA 关闭开关释放监听；工具声明退至 9，旧调用明确禁用失败，重新启用后旧会话明确不存在。退出轮监听也为 1→0；经 `osascript` Command-Q，Host 22071 / Electron 22072 / Node 22083 全部退出。同 home 重启 Host 40110 / Node 40126 后无监听，旧录制不存在，Automation 仍启用。
 - **证据边界**：首份显式 Trace 的前台证据混入其他应用，不计通过；CUA 注入事件未进入 event tap 的空 Trace、被辅助计时器先行停止的禁用轮均不计通过。有效实时录制使用上述原生快捷键。未撤销用户既有 macOS TCC 授权来制造权限拒绝。
 - **结论**：AU1 完整通过；本次录制均已结束，两个有效 Trace 留在隔离目录供后续验证，原始桌面证据待 HOST1 清理。
+
+
+- [ ] **AU2 持久流程重跑**：保存 Trace/Policy 后重启，按 policyId 在真实窗口执行步骤、条件与断言，经 history 核对结果与证据。
+
+### AU2：Policy 持久化与重启后真实执行
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 (24F74)，本 worktree 构建 SHA-256 `b86c404631a0bb81b1a62ac0624e30770ac06c2a1b94eb9cb6a8b6c14cc95be7`，隔离 home-final-20260913，真实 Provider 与 fixture；Automation on，Context History off。
+- **验证过程**：从 AU1 的有效 Trace 创建 `au2-trace-20260913` v1；通过 branch 入口创建 `au2-branch-20260913` v1；通过完整 policy 入口创建 `au2-policy-20260913` v7。核对返回内容与磁盘对象一致。将受控窗口改成基准文本，经 `osascript` Command-Q 退出并同 home 重启 Host 43006 / Node 43020；三个 Policy 和原 Trace 的 SHA-256 均不变。分别按 policyId 真实执行，CUA 确认 Saved 文本依次为 `AU1 recorded 中文 Ω 2026`、`AU2 branch 中文 Ω 2026`、`AU2 explicit policy 中文 2026`。
+- **证据**：`.cache/issue-4-qa/AU2-before-restart.json`、`AU2-{trace,branch,policy,history}-verdict.json`、`AU2-final-evidence.jsonl`、`responses/au2-*`。对应 Run `8C477DBF-B0FD-4752-B185-D50BECC17FAB`、`BFF04BD2-1F62-4B09-AB2D-1AB445F00339`、`A1642C64-F4AC-446F-B708-FC3AE9C7FD3D` 均 completed，分别保留 5/4/4 个已完成步骤及版本 1/1/7；后两个 Run 匹配 QA Input 条件、完成 waitFor 与 Saved 断言。真实 history 返回相同版本、分支、进度、AX 与图片，图片 SHA 与各 Run 响应一致；最终 PNG 的 fixture 裁剪已实际查看，与 CUA 相符。
+- **退出观察**：原 Host 40110 已退出，Node 40126 曾为僵尸、Electron 40111 曾停在 NSAlert；后续核对三个 PID 均不存在。未取得该模态框错误正文，不将其当作已诊断缺陷；退出可靠性仍在 HOST1 收尾时核对。
+- **结论**：AU2 的保存、重启、真实步骤/条件/断言执行及历史读回完整通过；未调用真实外部模型。
