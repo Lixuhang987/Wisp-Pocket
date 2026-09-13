@@ -65,20 +65,36 @@ export function App({ controller: suppliedController }: { controller?: PetThread
 
   useLayoutEffect(() => {
     window.handAgentPet?.setLayout(layout);
+    const conversation = bubbleRef.current;
+    const elements = [petRef.current, ...conversation?.querySelectorAll<HTMLElement>("[data-pet-interactive]") ?? []]
+      .filter((element): element is HTMLElement => element !== null);
     const reportRegions = () => {
-      const elements = [petRef.current, bubbleRef.current].filter((element): element is HTMLElement => element !== null);
+      const history = conversation?.querySelector<HTMLElement>(".pet-history");
+      const historyRect = history?.getBoundingClientRect();
       window.handAgentPet?.setInteractiveRegions(elements.map((element) => {
         const rect = element.getBoundingClientRect();
-        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-      }));
+        const clip = history?.contains(element) ? historyRect : undefined;
+        const x = Math.max(rect.left, clip?.left ?? rect.left);
+        const y = Math.max(rect.top, clip?.top ?? rect.top);
+        return {
+          x, y,
+          width: Math.min(rect.right, clip?.right ?? rect.right) - x,
+          height: Math.min(rect.bottom, clip?.bottom ?? rect.bottom) - y,
+        };
+      }).filter((rect) => rect.width > 0 && rect.height > 0));
     };
     reportRegions();
     const observer = new ResizeObserver(reportRegions);
     observer.observe(document.documentElement);
-    if (bubbleRef.current) observer.observe(bubbleRef.current);
+    for (const element of elements) observer.observe(element);
+    conversation?.addEventListener("scroll", reportRegions, true);
     window.addEventListener("resize", reportRegions);
-    return () => { observer.disconnect(); window.removeEventListener("resize", reportRegions); };
-  }, [layout]);
+    return () => {
+      observer.disconnect();
+      conversation?.removeEventListener("scroll", reportRegions, true);
+      window.removeEventListener("resize", reportRegions);
+    };
+  }, [layout, thread?.messages, thread?.permissionRequests, thread?.workspaceRequests]);
 
   function attempt(action: () => void): boolean {
     try { action(); setError(null); return true; }
@@ -131,22 +147,24 @@ export function App({ controller: suppliedController }: { controller?: PetThread
           }}
           onDragEnter={(event) => dragOver(event, "conversation")}
           onDragOver={(event) => dragOver(event, "conversation")} onDrop={(event) => void drop(event, "conversation")}>
-          <header className="pet-heading">
-            <span className="pet-heading__status"><i data-busy={thread?.status === "running"} />{status}</span>
-            <div className="pet-heading__actions">
-              <button type="button" aria-label="隐藏气泡" title="隐藏气泡" onClick={hide}>×</button>
-            </div>
-          </header>
-          {displayedError && <p className="pet-error" role="alert">{displayedError}</p>}
-          {expanded && thread ? (
-            <PetConversation thread={thread} controller={controller} draft={draft} setDraft={setDraft}
-              onRespond={respond} attempt={attempt} threadURL={threadURL()} />
-          ) : (
+          <div className="pet-current-bubble" data-pet-interactive>
+            <header className="pet-heading">
+              <span className="pet-heading__status"><i data-busy={thread?.status === "running"} />{status}</span>
+              <div className="pet-heading__actions">
+                <button type="button" aria-label="隐藏气泡" title="隐藏气泡" onClick={hide}>×</button>
+              </div>
+            </header>
+            {displayedError && <p className="pet-error" role="alert">{displayedError}</p>}
             <p className="pet-latest" data-testid="pet-latest" aria-live="polite">
               {snapshot.latestAssistant?.text ?? (reading ? "正在接收你交给我的内容。" : thread?.status === "running" ? "我先看看你交给我的内容。" : "把内容拖给我，我们接着聊。")}
             </p>
+            {dropTarget === "conversation" && <div className="pet-drop-label">添加到当前对话</div>}
+          </div>
+          {expanded && thread && (
+            <PetConversation thread={thread} latestAssistantId={snapshot.latestAssistant?.id}
+              controller={controller} draft={draft} setDraft={setDraft}
+              onRespond={respond} attempt={attempt} threadURL={threadURL()} />
           )}
-          {dropTarget === "conversation" && <div className="pet-drop-label">添加到当前对话</div>}
         </section>
       )}
       <button ref={petRef} className={`pet-character ${moving ? "is-moving" : ""} ${dropTarget === "pet" ? "is-drop-target" : ""}`}

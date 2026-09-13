@@ -260,7 +260,11 @@ export class ActivityWindowController {
 
 function boundsFor(position: PetPosition, layout: PetLayout, workArea: Rectangle): Rectangle {
   const width = Math.min(layoutSizes[layout].width, workArea.width);
-  const height = Math.min(layoutSizes[layout].height, workArea.height);
+  // 悬停只使用锚点上方的空间，不能为了容纳历史把已有气泡和角色推走。
+  const availableHeight = layout === "expanded"
+    ? Math.max(layoutSizes.compact.height, position.bottom - workArea.y)
+    : workArea.height;
+  const height = Math.min(layoutSizes[layout].height, workArea.height, availableHeight);
   return {
     x: Math.round(Math.min(Math.max(position.right - width, workArea.x), workArea.x + workArea.width - width)),
     y: Math.round(Math.min(Math.max(position.bottom - height, workArea.y), workArea.y + workArea.height - height)),

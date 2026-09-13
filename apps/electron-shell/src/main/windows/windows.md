@@ -24,9 +24,9 @@
 ## 桌宠 ActivityWindow 前提
 
 - 窗口透明、无边框、置顶；`showInactive()` 负责启动展示。保留 `focusable: true`、`acceptFirstMouse: true`，让回复框通过正常点击获得焦点。
-- 初次位置在主屏工作区右下角；之后保存角色右下角的 DIP 坐标。`pet`、`compact`、`expanded` 改变窗口外框时保留同一锚点；恢复位置、屏幕变动和拖动均将完整窗口限制在目标工作区内。
+- 初次位置在主屏工作区右下角；之后保存角色右下角的 DIP 坐标。布局按此锚点计算；工作区不变时，`compact` 与 `expanded` 切换保留同一锚点，上方空间不足则缩短 `expanded` 高度。恢复位置、屏幕变动和拖动仍将完整窗口限制在目标工作区内。
 - 位置存储只保存窗口坐标，消息、当前 Thread 和回复草稿仍归 renderer。已有桌宠窗口被重复显示或 ThreadWindow 关闭时，继续使用同一 renderer。
-- renderer 通过 [preload](../../preload/preload.md) 上报当前角色和聊天区域的 DOM 矩形；main 用系统光标轮询决定 `setIgnoreMouseEvents(..., { forward: true })`。外部应用拖入时也能恢复命中，不能只依赖 renderer 的 mousemove。
+- renderer 按[桌宠布局](../../activity-window/activity-window.md)逐个裁剪可见气泡，经 [preload](../../preload/preload.md) 上报角色和各交互表面的本地矩形；main 再按窗口边界裁剪，用系统光标轮询决定 `setIgnoreMouseEvents(..., { forward: true })`。透明间隙保持穿透，外部应用拖入时也能恢复命中，不能只依赖 renderer 的 mousemove。
 - `beginMove`、`move`、`endMove` 只使用 main 读取的系统光标。拖动期间保留鼠标事件，让 renderer 的 pointer capture 跨窗口边界继续工作；结束后保存位置并恢复局部命中。
 - 鼠标和焦点直接进入桌宠 renderer，保留输入、滚动和原生 drop；窗口控制器不把这些事件转换为 ThreadWindow 聚焦请求。
 - 窗口只 load `dist/activity-window/index.html`；preload 注入 Thread endpoint 和 host theme。加载期间收到的新 theme 在 loaded 后补发，后续通过 `handagent:theme-changed` 推送。

@@ -9,6 +9,17 @@
 
 ---
 
+## 桌宠悬停浮动气泡调整（2026-09-13）
+
+目标与接口边界见[实施计划](./medium-powers/plans/2026-09-13-pet-floating-bubbles.md)。
+
+- [x] 核对代码范围及目录文档链到 `handAgent.md`；复用当前 Issue #1 独立 worktree，保存已有未提交差异，确认 CodeGraph 路径与已通过的分层基线。
+- [x] 先写用户用例回归，再修改主气泡、历史与原生窗口布局。
+- [x] 通过相关测试及 TypeScript/Web、Swift test/build 提交前检查与打包。
+- [ ] 完成当前包实机视觉验证。
+- [x] 独立无上下文子 agent 审核并更新 spec/代码相关文档与 manual QA，核对缺陷状态。
+- [ ] 提交本次代码及文档，完成项移出 TODO。
+
 ## Wisp Pocket 桌宠后续能力
 
 Issue #1 的拖入、读取与 Thread 轻量交互已实现；实施与检查状态见 [实施记录](./medium-powers/plans/2026-09-13-desktop-pet.md)，原生待验项见 [manual QA](./manual-qa.md)。

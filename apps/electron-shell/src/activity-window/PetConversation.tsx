@@ -3,8 +3,9 @@ import type { ThreadState } from "../../../thread-window-web/src/store/threadWin
 import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentUrl.ts";
 import type { PetThreadController } from "./petThreadController.ts";
 
-export function PetConversation({ thread, controller, draft, setDraft, onRespond, attempt, threadURL }: {
+export function PetConversation({ thread, latestAssistantId, controller, draft, setDraft, onRespond, attempt, threadURL }: {
   thread: ThreadState;
+  latestAssistantId?: string;
   controller: PetThreadController;
   draft: string;
   setDraft: (text: string) => void;
@@ -26,9 +27,13 @@ export function PetConversation({ thread, controller, draft, setDraft, onRespond
     }}>
       {thread.messages.map((message) => {
         if (message.type === "tool_call") return null;
-        if (message.type === "error") return <p className="pet-error" key={message.id}>{message.message}</p>;
+        if (message.type === "error") return <p className="pet-message pet-error" data-pet-interactive key={message.id}>{message.message}</p>;
+        if (message.type === "assistant_message" && message.id === latestAssistantId) return message.awaitingReply && message.suggestedReplies?.length
+          ? <div className="pet-suggestions pet-current-suggestions" key={message.id}>
+            {message.suggestedReplies.map((reply) => <button type="button" data-pet-interactive key={reply} onClick={() => onRespond(reply)}>{reply}</button>)}
+          </div> : null;
         const user = message.type === "user_message";
-        return <article className="pet-message" data-author={user ? "user" : "assistant"} key={message.id}>
+        return <article className="pet-message" data-pet-interactive data-author={user ? "user" : "assistant"} key={message.id}>
           {user && message.inputItems.map((item) => item.type === "image"
             ? <img key={item.id} src={attachmentUrl(item, threadURL)} alt={item.name ?? "交给桌宠的图片"} draggable={false} />
             : item.type === "pdf" ? <span className="pet-attachment" key={item.id}>PDF · {item.name}</span> : null)}
@@ -39,7 +44,7 @@ export function PetConversation({ thread, controller, draft, setDraft, onRespond
           </div>}
         </article>;
       })}
-      {thread.permissionRequests.map((request) => <section className="pet-request" key={request.id} aria-label="执行权限">
+      {thread.permissionRequests.map((request) => <section className="pet-request" data-pet-interactive key={request.id} aria-label="执行权限">
         <p>允许使用 {request.toolName}？</p>
         <pre>{request.argumentsJSON}</pre>
         <div className="pet-request__actions">
@@ -47,7 +52,7 @@ export function PetConversation({ thread, controller, draft, setDraft, onRespond
           <button type="button" onClick={() => attempt(() => controller.answerPermission(request.id, "deny"))}>拒绝</button>
         </div>
       </section>)}
-      {thread.workspaceRequests.map((request) => <section className="pet-request" key={request.id} aria-label="选择工作区">
+      {thread.workspaceRequests.map((request) => <section className="pet-request" data-pet-interactive key={request.id} aria-label="选择工作区">
         <p>{request.prompt}</p>
         <div className="pet-suggestions">
           {request.candidates.map((candidate) => <button key={candidate.id} type="button" title={candidate.description}
@@ -56,8 +61,8 @@ export function PetConversation({ thread, controller, draft, setDraft, onRespond
         </div>
       </section>)}
     </div>
-    <form className="pet-reply" onSubmit={(event) => { event.preventDefault(); onRespond(draft); }}>
-      <textarea aria-label="回复当前对话" placeholder="说说你的想法…" rows={1} value={draft}
+    <form className="pet-reply" data-pet-interactive onSubmit={(event) => { event.preventDefault(); onRespond(draft); }}>
+      <textarea aria-label="回复当前对话" placeholder="说说你的想法…" rows={2} value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); onRespond(draft); }

@@ -30,17 +30,21 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--pet-acce
 .pet-character.is-drop-target { background: var(--ha-color-accent-subtle); outline: 2px solid var(--pet-accent); outline-offset: -2px; }
 .pet-conversation {
   position: absolute; right: 8px; bottom: 212px; left: 8px; height: 148px;
+}
+.pet-conversation.is-expanded { top: 8px; bottom: 0; height: auto; }
+.pet-current-bubble {
+  position: absolute; right: 0; bottom: 0; left: 0; height: 148px;
   display: flex; flex-direction: column; padding: var(--ha-spacing-sm) var(--ha-spacing-md); border: 1px solid var(--pet-border);
   border-radius: var(--ha-radius-xl) var(--ha-radius-xl) var(--ha-radius-md) var(--ha-radius-xl); background: var(--pet-surface); box-shadow: var(--pet-shadow);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
 }
-.pet-conversation::after {
+.pet-current-bubble::after {
   position: absolute; right: 76px; bottom: -7px; content: ""; width: 12px; height: 12px;
   background: var(--pet-surface); border-right: 1px solid var(--pet-border); border-bottom: 1px solid var(--pet-border);
   transform: rotate(45deg);
 }
-.pet-conversation.is-expanded { height: calc(100% - 224px); }
-.pet-conversation.is-drop-target { outline: 2px solid var(--pet-accent); outline-offset: -2px; background: var(--pet-soft); }
+.pet-conversation.is-expanded .pet-current-bubble { bottom: 212px; }
+.pet-conversation.is-drop-target .pet-current-bubble { outline: 2px solid var(--pet-accent); outline-offset: -2px; background: var(--pet-soft); }
 .pet-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ha-spacing-xs); flex-shrink: 0; min-height: 24px; margin-bottom: var(--ha-spacing-xxs); }
 .pet-heading__status { display: flex; align-items: center; gap: var(--ha-spacing-xs); font-size: var(--ha-typography-caption-size); color: var(--pet-muted); }
 .pet-heading__status i { width: 5px; height: 5px; background: var(--pet-accent); border-radius: 50%; }
@@ -48,25 +52,40 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--pet-acce
 .pet-heading button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: var(--pet-muted); cursor: pointer; font-size: var(--ha-typography-title-size); }
 .pet-heading button:hover { background: var(--pet-soft); color: var(--pet-ink); }
 .pet-latest { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; margin: 0; font-size: var(--ha-typography-caption-size); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pet-history { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: var(--ha-spacing-xs) 2px var(--ha-spacing-sm); }
-.pet-message { width: fit-content; max-width: 94%; margin: 0 0 var(--ha-spacing-sm); border-radius: var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-xs); padding: var(--ha-spacing-xs) var(--ha-spacing-sm); background: var(--pet-soft); font-size: var(--ha-typography-caption-size); line-height: 1.65; overflow-wrap: anywhere; }
+.pet-conversation.is-expanded .pet-latest { display: block; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.pet-history {
+  position: absolute; top: 0; right: 0; bottom: calc(212px + 148px + var(--ha-spacing-xs)); left: 0;
+  display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  padding: var(--ha-spacing-xxs) 2px;
+}
+.pet-history > * { flex-shrink: 0; }
+.pet-history > :first-child { margin-top: auto; }
+.pet-history > :last-child { margin-bottom: 0; }
+.pet-message { width: fit-content; max-width: 94%; margin: 0 0 var(--ha-spacing-sm); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-xs); padding: var(--ha-spacing-xs) var(--ha-spacing-sm); background: var(--pet-surface); box-shadow: var(--pet-shadow); font-size: var(--ha-typography-caption-size); line-height: 1.65; overflow-wrap: anywhere; }
 .pet-message[data-author="user"] { margin-left: auto; background: var(--pet-user); border-radius: var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-xs) var(--ha-radius-lg); }
 .pet-message p, .pet-request p { margin: 0; white-space: pre-wrap; }
 .pet-message small { display: block; margin-top: var(--ha-spacing-xxs); color: var(--pet-muted); font-size: var(--ha-typography-caption-size); }
 .pet-message img { display: block; max-width: 100%; max-height: 160px; border-radius: var(--ha-radius-md); }
 .pet-attachment { display: block; font-size: var(--ha-typography-caption-size); }
 .pet-suggestions { display: flex; flex-direction: column; gap: var(--ha-spacing-xs); margin-top: var(--ha-spacing-xs); }
+.pet-current-suggestions { align-items: flex-start; margin: 0 0 var(--ha-spacing-sm); }
+.pet-current-suggestions button { max-width: 94%; box-shadow: var(--pet-shadow); }
 .pet-suggestions button, .pet-request button { padding: var(--ha-spacing-xs) var(--ha-spacing-sm); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-md); color: var(--pet-accent); background: var(--pet-surface); text-align: left; cursor: pointer; font-size: var(--ha-typography-caption-size); line-height: 1.4; }
 .pet-suggestions button:hover, .pet-request button:hover { border-color: var(--pet-accent); }
-.pet-reply { display: flex; flex-shrink: 0; gap: var(--ha-spacing-xs); align-items: flex-end; padding-top: var(--ha-spacing-sm); border-top: 1px solid var(--pet-border); }
-.pet-reply textarea { flex: 1; min-width: 0; resize: none; min-height: 34px; max-height: 68px; padding: var(--ha-spacing-xs); border: 0; border-radius: var(--ha-radius-md); color: var(--pet-ink); background: var(--pet-soft); font-size: var(--ha-typography-caption-size); line-height: 1.4; }
+.pet-reply {
+  position: absolute; top: calc(100% - 208px + var(--ha-spacing-xs)); left: 0; width: calc(100% - 192px);
+  display: flex; flex-direction: column; gap: var(--ha-spacing-xxs); padding: var(--ha-spacing-xs);
+  border: 1px solid var(--pet-border); border-radius: var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-xs) var(--ha-radius-lg);
+  background: var(--pet-user); box-shadow: var(--pet-shadow);
+}
+.pet-reply textarea { width: 100%; min-width: 0; resize: none; min-height: 34px; max-height: 68px; padding: var(--ha-spacing-xxs); border: 0; border-radius: var(--ha-radius-md); color: var(--pet-ink); background: transparent; font-size: var(--ha-typography-caption-size); line-height: 1.4; }
 .pet-reply textarea::placeholder { color: var(--pet-muted); }
-.pet-reply > button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; color: var(--ha-color-on-accent); background: var(--pet-accent); font-size: var(--ha-typography-title-size); cursor: pointer; }
+.pet-reply > button { align-self: flex-end; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; color: var(--ha-color-on-accent); background: var(--pet-accent); font-size: var(--ha-typography-title-size); cursor: pointer; }
 .pet-reply > button:disabled { opacity: .4; cursor: default; }
 .pet-drop-label { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); padding: var(--ha-spacing-xxs) var(--ha-spacing-sm); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-pill); background: var(--pet-surface); color: var(--pet-accent); box-shadow: var(--pet-shadow); white-space: nowrap; font-size: var(--ha-typography-caption-size); pointer-events: none; }
-.pet-conversation > .pet-drop-label { top: 5px; bottom: auto; }
+.pet-current-bubble > .pet-drop-label { top: 5px; bottom: auto; }
 .pet-error { margin: 3px 0 7px; color: var(--ha-color-error); font-size: var(--ha-typography-caption-size); line-height: 1.5; overflow-y: auto; }
-.pet-request { margin: 0 0 var(--ha-spacing-sm); padding: var(--ha-spacing-xs); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-lg); font-size: var(--ha-typography-caption-size); line-height: 1.5; }
+.pet-request { margin: 0 0 var(--ha-spacing-sm); padding: var(--ha-spacing-xs); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-lg); background: var(--pet-surface); box-shadow: var(--pet-shadow); font-size: var(--ha-typography-caption-size); line-height: 1.5; }
 .pet-request pre { max-height: 100px; overflow: auto; white-space: pre-wrap; font-size: var(--ha-typography-caption-size); }
 .pet-request__actions { display: flex; gap: var(--ha-spacing-xs); margin-top: var(--ha-spacing-xs); }
 @media (prefers-reduced-motion: reduce) { *, *::after { animation: none !important; scroll-behavior: auto !important; } }

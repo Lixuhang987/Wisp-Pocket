@@ -4,11 +4,12 @@
 
 ## 直接子节点
 
-- `pet-interaction.test.tsx`：启动仅角色、最新 assistant、悬停/焦点、隐藏恢复、建议/自由回复、待处理输入、最终 drop 区域及服务端错误展示/恢复。
+- `pet-interaction.test.tsx`：启动仅角色、主气泡连续性、独立历史与可见命中矩形、悬停/焦点、隐藏恢复、建议/自由回复、待处理输入、最终 drop 区域及服务端错误展示/恢复。
 
 ## 验证边界
 
 - 使用 Testing Library 操作真实 React 组件，以 fake WebSocket 提供 Thread 通知；不再使用 Activity-only fixture 代表桌宠功能。
+- 悬停用例验证主气泡节点保留、最新正文唯一、旧消息可见及当前建议通过普通回复发送；几何 fixture 只验证逐气泡命中、历史视口裁剪与滚动后重新上报，不证明真实 CSS 位置或系统穿透。
 - 文件拖入用浏览器 File/DataTransfer 边界读取图片/PDF bytes，不依赖原文件路径。
 - 保存失败覆盖带 threadId 与连接级错误两种路径；错误受主动隐藏控制，恢复后不能留下过期提示。
 - 后端真实读取、SQLite/Blob 保存、独占回执与队列恢复由 [agent-server 用例](../../../agent-server/tests/tests.md)验证。

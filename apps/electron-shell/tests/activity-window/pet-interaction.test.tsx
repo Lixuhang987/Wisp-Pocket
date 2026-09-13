@@ -76,7 +76,7 @@ describe("桌宠的轻量交互", () => {
     expect(screen.getByTestId("pet-latest").className).toContain("pet-latest");
     expect(window.handAgentPet?.setLayout).toHaveBeenLastCalledWith("compact");
     fireEvent.mouseEnter(bubble);
-    expect(screen.getByRole("log").textContent).toContain("第五行全文");
+    expect(screen.getByTestId("pet-latest").textContent).toContain("第五行全文");
     expect(screen.getByRole("log").querySelector('[data-author="user"]')?.textContent).toContain("我的资料");
     const input = screen.getByRole("textbox", { name: "回复当前对话" });
     act(() => input.focus());
@@ -84,6 +84,61 @@ describe("桌宠的轻量交互", () => {
     expect(screen.getByRole("log")).toBeTruthy();
     act(() => input.blur());
     expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("悬停保留同一个最新回复气泡，较早消息独立展开且建议继续走普通回复", () => {
+    mount(); startThread("前一条桌宠回复");
+    act(() => Socket.latest.receive(note("assistant.delta", {
+      threadId: "a", turnId: "second-turn", itemId: "latest-answer",
+      payload: { text: "最新的回复留在角色头上", suggestedReplies: ["继续阅读"], awaitingReply: true },
+    })));
+    const latest = screen.getByTestId("pet-latest");
+    const surface = latest.parentElement;
+    fireEvent.mouseEnter(screen.getByTestId("pet-conversation"));
+    expect(screen.getByTestId("pet-latest")).toBe(latest);
+    expect(latest.parentElement).toBe(surface);
+    expect(screen.getAllByText("最新的回复留在角色头上")).toHaveLength(1);
+    const history = screen.getByRole("log");
+    expect(history.querySelector('[data-author="assistant"]')?.textContent).toContain("前一条桌宠回复");
+    expect(history.querySelector('[data-author="user"]')?.textContent).toContain("我的资料");
+    fireEvent.click(screen.getByRole("button", { name: "继续阅读" }));
+    expect(Socket.latest.sent.at(-1)).toMatchObject({
+      type: "op.submit", threadId: "a", payload: { op: { payload: { items: [{ type: "text", text: "继续阅读" }] } } },
+    });
+    fireEvent.mouseLeave(screen.getByTestId("pet-conversation"));
+    expect(screen.getByTestId("pet-latest")).toBe(latest);
+  });
+
+  it("上报独立气泡的可见命中矩形，滚动裁剪后仍让透明间隙穿透", () => {
+    let scrollOffset = 0;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains("pet-character")) return new DOMRect(176, 432, 192, 208);
+      if (this.dataset.testid === "pet-conversation") return new DOMRect(8, 8, 352, 632);
+      if (this.classList.contains("pet-current-bubble")) return new DOMRect(8, 280, 352, 148);
+      if (this.getAttribute("role") === "log") return new DOMRect(8, 8, 352, 264);
+      if (this.dataset.author === "user") return new DOMRect(132, -10 - scrollOffset, 228, 48);
+      if (this.dataset.author === "assistant") return new DOMRect(8, 60 - scrollOffset, 260, 58);
+      if (this.classList.contains("pet-reply")) return new DOMRect(8, 440, 160, 110);
+      return new DOMRect();
+    });
+    mount(); startThread("前一条桌宠回复");
+    act(() => Socket.latest.receive(note("assistant.delta", {
+      threadId: "a", turnId: "second-turn", itemId: "latest-answer", payload: { text: "最新回复" },
+    })));
+    fireEvent.mouseEnter(screen.getByTestId("pet-conversation"));
+    const regions = () => vi.mocked(window.handAgentPet!.setInteractiveRegions).mock.lastCall![0];
+    expect(regions()).toEqual(expect.arrayContaining([
+      { x: 8, y: 280, width: 352, height: 148 },
+      { x: 132, y: 8, width: 228, height: 30 },
+      { x: 8, y: 60, width: 260, height: 58 },
+      { x: 8, y: 440, width: 160, height: 110 },
+    ]));
+    const hitsGap = () => regions().some((r) => 340 >= r.x && 340 < r.x + r.width && 100 >= r.y && 100 < r.y + r.height);
+    expect(hitsGap()).toBe(false);
+    scrollOffset = 100;
+    fireEvent.scroll(screen.getByRole("log"));
+    expect(regions()).toContainEqual({ x: 8, y: 8, width: 260, height: 10 });
+    expect(hitsGap()).toBe(false);
   });
 
   it("隐藏后后台结果仍隐藏，点击角色恢复；最新用户消息不覆盖桌宠消息", () => {

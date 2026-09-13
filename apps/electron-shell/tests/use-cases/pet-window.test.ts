@@ -132,6 +132,23 @@ describe("桌宠原生窗口用例", () => {
     expect(JSON.parse(readFileSync(positionPath, "utf8"))).toEqual({ right: 0, bottom: 564 });
   });
 
+  it("靠近上边缘悬停时缩短历史窗口，主气泡与角色的锚点保持原位", async () => {
+    const positionPath = createPositionPath();
+    writeFileSync(positionPath, JSON.stringify({ right: 900, bottom: 440 }));
+    const screen = new FakeScreen({ x: 0, y: 30, width: 1000, height: 670 });
+    const { bridge, window } = await createHarness({ positionPath, screen });
+    bridge.setLayout("compact");
+    const compactBounds = { ...window.bounds };
+    const savedPosition = readFileSync(positionPath, "utf8");
+    bridge.setLayout("expanded");
+    expect(window.bounds.x + window.bounds.width).toBe(compactBounds.x + compactBounds.width);
+    expect(window.bounds.y + window.bounds.height).toBe(compactBounds.y + compactBounds.height);
+    expect(window.bounds.y).toBe(screen.workArea.y);
+    expect(readFileSync(positionPath, "utf8")).toBe(savedPosition);
+    bridge.setLayout("compact");
+    expect(window.bounds).toEqual(compactBounds);
+  });
+
   it("配置损坏时仍可显示，并只允许当前桌宠的有效 IPC 改变窗口", async () => {
     const positionPath = createPositionPath();
     writeFileSync(positionPath, "{unfinished");

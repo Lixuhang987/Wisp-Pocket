@@ -37,5 +37,5 @@ pnpm --filter handagent-electron-shell exec vitest run tests/use-cases/thread-wi
 - 新增 Swift bridge command/event 时，必须同时覆盖 protocol parser/encoder 和 runtime ack 语义；相关断言优先放进已有的 `protocol/`、`preload/` 或 `serverSupervisor/` 边界测试目录。
 - 新增 preload global 时，验证 `contextBridge` 调用，不依赖真实 renderer；测试 `.cjs` preload 产物时要在 Node module load 层 mock `require("electron")`，因为 `vi.doMock("electron", ...)` 不会拦截 CJS `require`。
 - 新增 supervisor 行为时，覆盖用户主动 stop、readiness late resolve、非零退出 restart、最大重启次数四类边界。
-- 桌宠 renderer 复用 `/api/thread` fixture；真实 Thread/SQLite/Blob 编排由 agent-server `pet-conversation` 覆盖，原生窗口 IPC 与位置文件由 `pet-window` 覆盖。
+- 桌宠 renderer 复用 `/api/thread` fixture；真实 Thread/SQLite/Blob 编排由 agent-server `pet-conversation` 覆盖。`pet-window` 从真实 preload 经 IPC 验证位置文件和窗口锚点，包括上边缘展开时缩短历史窗口；Electron 与系统屏幕使用替身，不能据此宣称原生视觉通过。
 - `.test.tsx` 必须进入 Vitest include；UI 断言不能替代 macOS 实机的跨应用拖放、焦点、滚动与透明穿透。

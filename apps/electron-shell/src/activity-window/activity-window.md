@@ -5,12 +5,12 @@
 ## 直接子节点
 
 - `App.tsx`：两处拖入区域、气泡显隐、悬停/焦点、回复及窗口桥接。
-- `PetConversation.tsx`：左右历史、持久附件、建议与 Permission/Workspace 面板。
+- `PetConversation.tsx`：独立历史与回复气泡、持久附件、建议与 Permission/Workspace 请求。
 - `petThreadController.ts`：Thread 连接、创建时间选择、隐藏状态和提交入口。
 - `readDroppedItems.ts`：同步捕获浏览器拖入数据，异步读取用户交付文件。
 - `PetSprite.tsx`：图集播放及 reduced-motion 行为。
 - [assets/assets.md](./assets/assets.md)：角色图集来源与播放合约。
-- `styles.css`：共享主题 token、四行折叠和受限滚动布局。
+- `styles.css`：共享主题 token、固定主气泡、透明历史与受限滚动布局。
 - `main.tsx`、`index.html`：renderer 入口。
 
 ## Thread 与输入边界
@@ -27,12 +27,14 @@
 
 ## 展示与原生边界
 
-- 角色在下、气泡在上。常态取最新非空 assistant 消息并限制约四行；工具调用不进入桌宠历史。
-- 悬停展开有高度限制的历史；回复区或其控件保持焦点时继续展开，鼠标离开且失焦才折叠。滚动查看旧消息时，新消息不会强制跳回底部。
+- 角色在下、气泡在上。常态取最新非空 assistant 消息并限制约四行；展开保留同一主气泡节点及其相对角色的位置，长正文在原气泡内滚动读全。工具调用不进入桌宠历史。
+- 历史在主气泡上方受限滚动，当前主气泡正文不重复进入历史，当前建议单独呈现；回复框是角色左侧的独立表面，各气泡之间保留透明间隙。
+- 悬停或回复区及控件保持焦点时继续展开，鼠标离开且失焦才折叠。滚动查看旧消息时，新消息不会强制跳回底部。
 - 主动隐藏只改 UI。后台更新不会解除隐藏；点击角色或再次拖入恢复。启动无首次纯文字输入框，首次文字仍由 PromptPanel 承接。
-- renderer 只上报布局和 DOM 命中矩形，并发出移动意图；[原生窗口](../main/windows/windows.md)负责系统光标、位置文件、屏幕限制和透明区域穿透。
+- renderer 只上报布局、命中矩形和移动意图；[原生窗口](../main/windows/windows.md)负责系统光标、位置文件、屏幕限制，并在上方空间不足时缩短历史窗口以保持主气泡与角色锚点。
+- 命中矩形只包含角色、主气泡、逐条历史/请求/当前建议及回复表面；历史矩形与滚动视口取交集，滚动和尺寸变化后重新上报，透明容器保留穿透。
 - 角色点击只恢复气泡；首次文字与完整历史继续通过现有 PromptPanel/ThreadWindow 入口访问。输入、滚动或 drop 不转换为窗口聚焦请求。
-- 主题消费 Swift 解析的 resolved 值，不持久化主题偏好；气泡和控件遵守 [DESIGN.md](../../../../DESIGN.md) 的共享 token 约束。
+- 主题消费 Swift 解析的 resolved 值，不持久化主题偏好；气泡和控件的视觉形态与共享 token 遵守 [DESIGN.md](../../../../DESIGN.md)。
 - `styles.css` 直接导入 ThreadWindow 的生成主题，使用普通 CSS 的 `--ha-*` 变量；图集尺寸来自播放合约，不依赖 Tailwind 处理桌宠样式。
 
 ## 验证入口
