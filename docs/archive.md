@@ -17,3 +17,16 @@
 - **结论**：本分项通过。模型返回 `AI SDK stream finished without assistant content or tool calls`，两端均显示失败、输入已保存并等待回复；本结论只覆盖启动、首次文字入口及历史不自动弹出，不代表模型理解或建议流程通过。
 - **工具边界**：全局快捷键须通过系统 `osascript` 发送；Computer Use 的 `typeText` 未完整输入中文，改用 settable 文本控件并在提交前核对全文。二者均不记为产品缺陷。
 - **清理状态**：首次进程已正常退出；重启实例继续用于下一项 QA。测试 Thread 保留为验收证据，用户模型设置未修改。
+
+
+- [ ] 移动与位置恢复：拖动角色换位置，松手后可再次点击；重启 App 恢复位置，关闭 ThreadWindow 后桌宠仍可继续交互。
+
+### Issue #1 移动与位置恢复
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 / arm64、1440×932 单屏；指定 `codex/issue-1-pet-main-20260913` worktree 的默认打包产物，源码及通过的 TypeScript/Web、Swift test/build 基线与本次启动验收一致。位置使用 `/tmp/issue1-live-qa-20260913-1030/pet-position-fresh-1230.json`。
+- **验证过程**：用系统原生鼠标事件从角色内部 `(1324,830)` 拖到 `(1040,570)`；窗口由 `(1224,700)` 变为 `(940,440)`，位置文件写入 `{right:1132,bottom:648}`。松手后 Computer Use 点击角色，当前 Thread 历史与回复框正常出现。通过 PromptPanel 和本机已配置的历史快捷键打开 ThreadWindow，关闭后再次点击桌宠仍能恢复同一 Thread。展开历史触发边缘避让后收起，退出前最终窗口为 `(940,466,192,208)`、锚点为 `{right:1132,bottom:674}`；系统退出并重新启动后两者精确一致，角色可见。
+- **证据**：本轮证据根目录 `/tmp/issue1-live-qa-20260913-1030/` 中的 `evidence/windows-before-drag.txt`、`windows-after-native-drag.txt`、`windows-position-before-restart.txt`、`windows-position-after-restart.txt`、`position-before-restart.json`，以及 `logs/desktop-restart.log`、`desktop-position-restored.log`；Computer Use 的角色、历史和回复框窗口树。
+- **结论**：通过。验证覆盖原生拖动、松手后点击、关闭完整窗口后的桌宠交互与重启恢复。
+- **工具边界**：Computer Use 的 drag 不移动系统光标；12 秒原生光标采样保持同一点，位置文件也不变。按用户指定的系统 `osascript` 路径发送原生输入后拖动正常，此差异不记为产品缺陷。
+- **清理状态**：上一实例及其后端已正常退出；恢复位置的新实例继续用于后续 QA，未修改用户默认位置文件。
