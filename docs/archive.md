@@ -61,3 +61,16 @@
 - **证据**：`.cache/issue-4-qa/CH5-final-evidence.jsonl`、`ch5-{disabled,exited}-verdict.json`、`CH5-restarted-verdict.json`、`responses/ch5-*`。真实工具重新读到 CH2 的活动与 AX `461F697A-7AE6-4B14-BADB-F4F455891C9E`、`BEDC87FA-E929-47C3-B8FE-6220890C406A`，AX 保留受控文本；原图 `D07CB80E-152E-44DD-B24D-6C65CE00F892` 的 sampleId、1440×932 尺寸与内容一致，解码后 SHA-256 仍为 `d548ba238de665fdd0cc5838b2791a142603fc87abafe6126e69ea9f06e4846c`。
 - **证据边界**：首次退出辅助脚本只等 12 秒，并将 Node 的 `Z / defunct` 记录判为存活；后续确认两个服务端口关闭、Electron/Node 均消失，以上最终证据为准。索引查询一次超出公开上限返回明确错误，改用合法 `limit:200` 后读回；辅助解析误读图片层级不计作产品失败。
 - **结论**：CH5 全部步骤通过；开关恢复为本项开始时的两个 on。进程、隔离数据与原始图片待 HOST1 统一清理，未改动用户 Thread。
+
+
+- [ ] **AU1 录制与保存**：实际受控操作跨工具调用保留会话，停止保存 Trace；验证显式事件与真实用户事件、证据时间/引用及监听清理。
+
+### AU1：跨调用录制、真实事件与监听清理
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 (24F74)，本 worktree 已验证的构建（SHA-256 `b86c404631a0bb81b1a62ac0624e30770ac06c2a1b94eb9cb6a8b6c14cc95be7`），隔离 home-final-20260913，真实 Swift Provider、fixture PID 76018；Context History 暂停，Automation 启用，已有系统授权有效。
+- **验证过程**：CUA 实际点击输入框、设置 `AU1 recorded 中文 Ω 2026`、点击 Apply，`osascript` 向核对过的前台 fixture 发送 Command-A；经五次 `record_event` 登记动作与断言，停止保存 `au1-explicit2-trace-20260913`。五个事件共享 recordingId，具有独立 timestamp 和前后证据，全部取证目标均为 fixture；CUA 和工具 PNG 均确认 Saved 文本。
+- **证据**：`AU1-explicit-verdict.json`、`AU1-live-verdict.json`、`AU1-final-evidence.jsonl` 与 `responses/au1-*` 位于 `.cache/issue-4-qa/`。真实事件 Trace `au1-live-native-trace` 记录 `command+left`、`command+shift+right` 两条 `macos_event_tap` 事件，时间分别为 11:59:16.541Z / 11:59:16.753Z；停止证据时间 11:59:17Z，CUA 确认选中 `au1live93`。两条事件均通过 `evidenceRef=finalEvidence` 引用共享证据、标记 `recording_stop`，没有重复内联前后图片；工具图片内容索引有效，PNG 1440×932 可解码。
+- **清理证据**：`CGGetEventTapList` 按 Host PID 核对，开始前 0、录制中 1、正常停止后 0。有效禁用轮 `au1-live-disable2` 在 34.16 秒观察内随 CUA 关闭开关释放监听；工具声明退至 9，旧调用明确禁用失败，重新启用后旧会话明确不存在。退出轮监听也为 1→0；经 `osascript` Command-Q，Host 22071 / Electron 22072 / Node 22083 全部退出。同 home 重启 Host 40110 / Node 40126 后无监听，旧录制不存在，Automation 仍启用。
+- **证据边界**：首份显式 Trace 的前台证据混入其他应用，不计通过；CUA 注入事件未进入 event tap 的空 Trace、被辅助计时器先行停止的禁用轮均不计通过。有效实时录制使用上述原生快捷键。未撤销用户既有 macOS TCC 授权来制造权限拒绝。
+- **结论**：AU1 完整通过；本次录制均已结束，两个有效 Trace 留在隔离目录供后续验证，原始桌面证据待 HOST1 清理。
