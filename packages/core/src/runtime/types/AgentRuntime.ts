@@ -13,7 +13,7 @@ export type AssistantMessageStartEvent = {
 export type AssistantMessageDeltaEvent = {
   type: "assistant_message_delta";
   messageId: string;
-  payload: { text: string };
+  payload: { text: string; suggestedReplies?: string[]; awaitingReply?: boolean };
 };
 
 export type AssistantMessageEndEvent = {
@@ -66,6 +66,7 @@ export type AgentRuntimeRunOptions = {
   threadId?: string;
   turnId?: string;
   signal?: AbortSignal;
+  interactionMode?: "inspect" | "reply";
 };
 
 export type AgentRuntimeEventSink = (event: AgentRuntimeEvent) => void;
@@ -75,4 +76,3 @@ export type ToolExecutionResult = {
   status: "success" | "error";
   durationMs: number;
 };
-

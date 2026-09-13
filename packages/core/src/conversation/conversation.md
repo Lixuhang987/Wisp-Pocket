@@ -1,44 +1,15 @@
 # conversation
 
-UI / 持久化用的消息模型，**不是** LLM 面向的消息。LLM 视角是 `runtime/AgentMessage`；UI 视角是 `ConversationMessage`。两者的翻译由 agent-server 的 `MessageTranslator.agentMessagesToConversation` 维护，流式事件管道后续由 `core Thread` 触发。
+本目录定义 UI 与 snapshot 使用的 ConversationMessage。模型输入使用 runtime 的 AgentMessage，二者由 agent-server 翻译，供 ThreadWindow 与桌宠消费。
 
-## 文件
+## 直接子节点
 
-| 文件 | 职责 |
-|------|------|
-| `ConversationMessage.ts` | `ConversationMessage`（id / role / text / inputItems? / status / createdAt / updatedAt / toolCall? / error?）+ `ConversationMessageStatus`（`streaming \| running \| completed \| failed`）+ `ToolMessageStatus` |
+- `types/`：ConversationMessage、消息状态与 Tool 展示类型。
 
-## 与 AgentMessage 的关系
+## 投影合约
 
-| 维度 | `AgentMessage`（runtime） | `ConversationMessage`（UI） |
-|------|---------------------------|------------------------------|
-| 受众 | LLM | React ThreadWindow UI |
-| 字段 | role / content / toolCalls? / toolCallId / name / inputItems? | id / role / text / inputItems? / status / 时间戳 / toolCall? / error? |
-| 状态 | 隐式（一次完整文本） | 显式（`streaming → completed`） |
-| 序列 | 严格按 LLM 调用顺序 | UI 列表顺序，可能合并 / 重排 |
-
-## 状态流
-
-```
-user → 立即 completed
-assistant → streaming（assistant_message_start）
-        → streaming（assistant_message_delta，逐段拼接）
-        → completed（assistant_message_end）
-tool → running（tool_call）→ completed | failed（tool_result.status）
-system → 立即 completed
-```
-
-## 编辑此目录的约束
-
-- 不要把 LLM 内部字段（如 `toolCalls` 列表）平铺到 `ConversationMessage`；UI 只关心一段文本 + 一个 toolCall 元信息。
-- `inputItems` 只用于 user role 的 UI / snapshot 回显，不改变 `text` 仍是可搜索、可预览的扁平文本语义。
-- 新增 status 时要同时考虑：runtime 事件 → MessageTranslator 翻译 → React ThreadWindow 渲染三处。
-- `toolCall.name` 是 UI 显示用，不是 ID；如需要联动 audit 审计请通过 `ThreadAuditEvent.toolCallId`。
-- `ConversationMessage` 是协议字段（被 `thread.snapshot` 引用），改动时务必同步 [protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)。
-
-## 相关文档
-
-- 协议引用：[protocol/protocol.md](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)
-- LLM 视角：[runtime/runtime.md](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md)
-- 翻译实现：[apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)
-- 渲染端：[apps/thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)
+- 用户消息同时保留可预览的扁平文本和结构化 Input Item；图片/PDF 回显使用已保存的 Blob 引用。
+- `pending` 表示已接收、未开始的用户输入，与 Tool/assistant 的 streaming 或 running 状态不同。
+- assistant 的建议与等待状态属于普通消息投影，不属于 ServerRequest。新用户输入或新 Turn 开始后清除旧等待展示，历史仍保留建议文字。
+- live 与 snapshot 使用稳定消息身份，避免恢复后重复显示。Tool 名称是展示字段，关联审计使用 toolCallId。
+- 新字段需要同时检查 [protocol](../protocol/protocol.md)、[翻译层](../../../../apps/agent-server/src/protocol/protocol.md)和两种 React 界面。

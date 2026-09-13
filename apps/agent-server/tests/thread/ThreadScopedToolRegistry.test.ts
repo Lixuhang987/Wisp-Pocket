@@ -414,6 +414,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     ]);
     expect(result.messages.at(-1)).toEqual({
       role: "assistant",
+      id: expect.any(String),
       content: "Mock file.write completed for hello.txt.",
     });
   });

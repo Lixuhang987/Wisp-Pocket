@@ -11,6 +11,7 @@ import { settleWithin } from "./utils/settleWithin.ts";
 
 export class Thread {
   readonly requests: ThreadRequests;
+  readonly createdAt: string;
   private history: AgentMessage[];
   private readonly tools: ThreadTools;
   private runtime: ThreadRuntime;
@@ -23,15 +24,29 @@ export class Thread {
 
   constructor(readonly id: string, private readonly services: ThreadServices, data: PersistedThread, status: RunStatus = "idle") {
     this.history = structuredClone(data.messages);
+    this.inputs = structuredClone(data.pendingInputs ?? []);
+    this.createdAt = data.metadata.createdAt;
     this.state = status;
     this.tools = services.createTools(data.metadata.dynamicTools ?? []);
     this.runtime = services.createRuntime(id, this.tools);
-    this.requests = new ThreadRequests(id, (request) => services.publish(request), () => !!this.active && !this.active.controller.signal.aborted && !this.closed);
+    this.requests = new ThreadRequests(id, (request) => services.publish(request), () => !!this.active && !this.active.controller.signal.aborted && !this.closed,
+      60_000, (requestId) => services.publish({ type: "request.resolved", threadId: id, notificationId: crypto.randomUUID(), timestamp: this.now(), payload: { requestId } }));
   }
 
   get status(): RunStatus { return this.state; }
   get needsRecovery(): boolean { return this.faulted; }
-  snapshot() { return { messages: this.services.projection.conversation(structuredClone(this.history)), status: this.state }; }
+  snapshot() {
+    const pending = new Set(this.inputs.map((input) => input.opId));
+    return {
+      messages: this.services.projection.conversation(structuredClone(this.history)).map((message) => {
+        if (message.role === "user" && pending.has(message.id)) return { ...message, pending: true };
+        if (message.role === "assistant" && this.active) return { ...message, awaitingReply: false };
+        return message;
+      }),
+      status: this.state,
+      pendingRequests: this.requests.snapshot(),
+    };
+  }
 
   async submit(op: Op): Promise<void> {
     if (op.type === "client_response") {
@@ -41,13 +56,11 @@ export class Thread {
     if (op.type === "interrupt") return this.interrupt();
     await this.serial(async () => {
       this.requireWritable();
-      if (this.active) {
-        this.inputs.push(structuredClone(op));
-        return;
-      }
+      if (this.history.some((message) => message.role === "user" && message.id === op.opId)) return;
       try {
-        await this.recordInput(op);
-        if (!this.closed) this.start(op.opId);
+        const saved = await this.recordInput(op);
+        this.inputs.push(saved);
+        if (!this.closed) this.startQueued();
       } catch (error) { this.fail(error); throw error; }
     });
   }
@@ -61,6 +74,7 @@ export class Thread {
       const data = await this.services.storage.getThread(this.id);
       if (!data) throw new Error(`Thread not found: ${this.id}`);
       this.history = structuredClone(data.messages);
+      this.inputs = structuredClone(data.pendingInputs ?? []);
       this.runtime = this.services.createRuntime(this.id, this.tools);
       this.faulted = false;
       this.state = status ?? "idle";
@@ -68,7 +82,6 @@ export class Thread {
   }
 
   async interrupt(): Promise<void> {
-    this.inputs = [];
     let active = this.active;
     active?.controller.abort();
     this.requests.cancel();
@@ -76,7 +89,6 @@ export class Thread {
       await this.serial(async () => {
         active = this.active;
         active?.controller.abort();
-        this.inputs = [];
         this.requests.cancel();
       });
     }
@@ -93,14 +105,12 @@ export class Thread {
         await this.persistCompletion(interrupted.id, "interrupted");
         await this.write(() => this.services.storage.persistError(this.id, "本轮运行已中断。", "run_interrupted"));
       } catch (error) { this.fail(error); }
-      this.startQueued();
     });
   }
 
   async close(): Promise<void> {
     this.closed = true;
     this.tools.cancelRefresh();
-    this.inputs = [];
     this.requests.cancel();
     await this.interrupt();
     await this.control;
@@ -117,23 +127,26 @@ export class Thread {
     if (this.faulted) throw new Error("Thread 保存失败，请重新打开后继续。");
   }
 
-  private async recordInput(input: QueuedInput): Promise<void> {
-    const message = await this.write(() => this.services.storage.persistUserInput(this.id, input.payload));
+  private async recordInput(input: QueuedInput): Promise<QueuedInput> {
+    const message = await this.write(() => this.services.storage.persistUserInput(this.id, input.payload, input.opId));
+    const payload = { ...input.payload, items: message.role === "user" && message.inputItems ? message.inputItems : input.payload.items };
     const text = this.services.projection.summarizeInput(input.payload);
     await this.write(() => this.services.storage.autoTitle(this.id, text));
     const notification: ThreadNotification = {
       type: "user.message.recorded", threadId: this.id,
       notificationId: `${this.id}-${input.opId}-user-recorded`, timestamp: this.now(),
-      payload: { messageId: input.opId, text, items: structuredClone(input.payload.items) },
+      payload: { messageId: input.opId, text, items: structuredClone(payload.items), pending: true },
     };
     await this.write(() => this.services.storage.persistNotifications(this.id, [notification]));
-    if (this.closed) return;
-    this.history.push(structuredClone(message));
-    this.services.publish(notification);
+    if (!this.closed) {
+      this.history.push(structuredClone(message));
+      this.services.publish(notification);
+    }
+    return { opId: input.opId, payload: structuredClone(payload) };
   }
 
-  private start(id: string): void {
-    const active: ActiveTurn = { id, controller: new AbortController(), sequence: 0, done: Promise.resolve() };
+  private start(input: QueuedInput): void {
+    const active: ActiveTurn = { id: input.opId, input, controller: new AbortController(), sequence: 0, done: Promise.resolve() };
     this.active = active;
     this.state = "running";
     // Execution waits for the accepting short operation, but never occupies its queue.
@@ -151,11 +164,28 @@ export class Thread {
         await this.write(() => this.services.storage.persistNotifications(this.id, [started]));
         if (this.valid(active)) this.services.publish(started);
       });
-      while (this.valid(active)) {
-        if (!this.tools.isActivated() && this.history.some((message) => message.role === "tool" && message.name === META_TOOL_NAME)) await this.tools.activate();
-        await this.tools.refresh();
+      if (this.valid(active)) {
+        const inspecting = active.input.payload.mode === "inspect";
+        if (!inspecting) {
+          if (!this.tools.isActivated() && this.history.some((message) => message.role === "tool" && message.name === META_TOOL_NAME)) await this.tools.activate();
+          await this.tools.refresh();
+        }
         if (!this.valid(active)) return;
-        const messages = this.services.projection.runtimeMessages(structuredClone(this.history));
+        const pending = new Set([...this.inputs.map((input) => input.opId), active.id]);
+        const inputMessage = this.history.find((message) => message.role === "user" && message.id === active.id);
+        const ordered = this.history.filter((message) => message.role !== "user" || !message.id || !pending.has(message.id));
+        if (inputMessage) ordered.push(inputMessage);
+        const messages = this.services.projection.runtimeMessages(structuredClone(ordered));
+        if (inspecting && this.services.prepareInput) {
+          const prepared = await this.services.prepareInput(active.input.payload, active.controller.signal);
+          if (!this.valid(active)) return;
+          await this.appendGenerated(active, prepared.messages);
+          messages.push(...structuredClone(prepared.messages));
+          if (prepared.error) {
+            await this.finishWithMessage(active, prepared.error, "completed");
+            return;
+          }
+        }
         const base = messages.length;
         const events: ThreadAuditEvent[] = [];
         const notifications: ThreadNotification[] = [];
@@ -166,47 +196,69 @@ export class Thread {
           if (notification) { notifications.push(notification); this.services.publish(notification); }
           const audit = this.services.projection.audit(event, time);
           if (audit) events.push(audit);
-        }, { threadId: this.id, turnId: active.id, signal: active.controller.signal });
+        }, { threadId: this.id, turnId: active.id, signal: active.controller.signal,
+          ...(inspecting ? { interactionMode: "inspect" as const }
+            : this.history.some((message) => message.role === "user" && message.inputMode === "inspect") ? { interactionMode: "reply" as const } : {}) });
         if (!this.valid(active)) return;
         // The runtime owns a detached summary working copy; only committed deltas enter history.
-        const committed = structuredClone(result.messages);
-        let again = false;
+        const committed = structuredClone(result.messages).map((message, index) => index >= base && message.role === "assistant" && message.id
+          ? { ...message, id: `${this.id}-${active.id}-${message.id}` } : message);
         await this.serial(async () => {
           if (!this.valid(active)) return;
           await this.write(() => this.services.storage.persistRunDelta(this.id, base, committed, events, notifications));
           if (!this.valid(active)) return;
           this.history.push(...committed.slice(base));
-          const queued = this.inputs.splice(0);
-          for (const input of queued) {
-            if (!this.valid(active)) return;
-            await this.recordInput(input);
-          }
-          if (!this.valid(active)) return;
-          if (queued.length) { again = true; return; }
           await this.persistCompletion(active.id, "completed", () => this.valid(active));
           if (!this.valid(active)) return;
           this.state = "idle";
           this.active = undefined;
+          this.startQueued();
         });
-        if (!again) return;
       }
     } catch (error) {
-      if (this.valid(active)) this.fail(error);
+      if (this.valid(active)) {
+        try {
+          await this.finishWithMessage(active, `这次没能完成：${error instanceof Error ? error.message : String(error)}\n输入已经保存，你可以补充说明后继续。`, "failed");
+        } catch (saveError) { this.fail(saveError); }
+      }
     }
   }
 
   private startQueued(): void {
-    if (this.closed || this.faulted || this.inputs.length === 0) return;
-    const [first, ...rest] = this.inputs.splice(0);
-    void this.serial(async () => {
-      this.requireWritable();
-      await this.recordInput(first);
-      this.inputs.push(...rest);
-      this.start(first.opId);
-    }).catch((error) => this.fail(error));
+    if (this.active || this.closed || this.faulted || this.inputs.length === 0) return;
+    this.start(this.inputs.shift()!);
   }
 
-  private async persistCompletion(turnId: string, status: "completed" | "interrupted", canPublish: () => boolean = () => true): Promise<void> {
+  private async appendGenerated(active: ActiveTurn, messages: AgentMessage[]): Promise<void> {
+    if (!messages.length) return;
+    await this.serial(async () => {
+      if (!this.valid(active)) return;
+      await this.write(() => this.services.storage.persistRunDelta(this.id, 0, messages, []));
+      if (this.valid(active)) this.history.push(...structuredClone(messages));
+    });
+  }
+
+  private async finishWithMessage(active: ActiveTurn, text: string, status: "completed" | "failed"): Promise<void> {
+    await this.serial(async () => {
+      if (!this.valid(active)) return;
+      const messageId = "input-result";
+      const notification = this.services.projection.notification(this.id, active.id,
+        { type: "assistant_message_delta", messageId, payload: { text, awaitingReply: true } }, this.now(), ++active.sequence);
+      const message: AgentMessage = { role: "assistant", id: `${this.id}-${active.id}-${messageId}`, content: text, awaitingReply: true };
+      await this.write(() => this.services.storage.persistRunDelta(this.id, 0, [message], [], notification ? [notification] : []));
+      if (!this.valid(active)) return;
+      this.history.push(message);
+      if (notification) this.services.publish(notification);
+      await this.persistCompletion(active.id, status, () => this.valid(active));
+      if (!this.valid(active)) return;
+      this.requests.cancel();
+      this.state = status === "completed" ? "idle" : "failed";
+      this.active = undefined;
+      this.startQueued();
+    });
+  }
+
+  private async persistCompletion(turnId: string, status: "completed" | "interrupted" | "failed", canPublish: () => boolean = () => true): Promise<void> {
     const notifications: ThreadNotification[] = [
       { type: "turn.completed", threadId: this.id, turnId, notificationId: `${this.id}-${turnId}-${status}`, timestamp: this.now(), payload: { status } },
       { type: "thread.status.changed", threadId: this.id, notificationId: `${this.id}-${turnId}-status-${status}`, timestamp: this.now(), payload: { value: status === "completed" ? "idle" : status } },
@@ -227,7 +279,6 @@ export class Thread {
     const active = this.active;
     active?.controller.abort();
     this.active = undefined;
-    this.inputs = [];
     this.requests.cancel();
     this.faulted = true;
     this.state = "failed";

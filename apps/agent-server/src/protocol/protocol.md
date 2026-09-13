@@ -1,27 +1,18 @@
 # protocol
 
-`protocol/` 是 agent-server 的翻译层。跨进程 DTO 的真相在 core；本目录只在 runtime、UI projection 和持久化表达之间转换。
+本目录在 runtime、UI 与持久化表达之间转换。跨进程 DTO 的真相在 [core protocol](../../../../packages/core/src/protocol/protocol.md)。
 
-## 直接文件
+## 直接子节点
 
-- `MessageTranslator.ts`：runtime event 到 ThreadNotification / ThreadAuditEvent、AgentMessage 到 ConversationMessage、Input Item 与 image STUB 的转换。
+- `MessageTranslator.ts`：内部事件到通知/审计、AgentMessage 到 ConversationMessage，以及 Input Item 保存与模型展开。
 
 ## 边界
 
-- `AgentRuntimeEvent` 是执行视角；`ThreadNotification` 是 UI 协议视角；`ThreadAuditEvent` 是持久化审计视角。三者不可互换。
-- assistant 与 Tool item ID 必须包含 Turn 身份；notification ID 还要在 active Turn 内唯一，避免流式片段被误去重。
-- 图片先写 BlobStore，Thread 中保存可恢复 STUB；进入 LLM 前才展开为多模态内容。
-- user message 同时保留扁平内容和结构化 Input Item，保证 live 与 snapshot round-trip。
-- Permission/Workspace 的 ServerRequest 由 request broker 产生；workspace list 与 Dynamic Tool frame 不经过本目录。
+- runtime event、ThreadNotification 和 ThreadAuditEvent 表达不同所有权；新事件分别判断是否映射 UI 与审计。
+- assistant/Tool item ID 包含 Thread 与 Turn 身份；流式 notification 在 active Turn 内唯一。live 与 snapshot 保留稳定消息身份、建议回复和等待标记。
+- 用户消息保留扁平预览与结构化 Input Item。图片/PDF 先写 Blob，将上传 bytes 规范化为 blobId；进入模型时图片再展开为多模态内容，PDF 正文由读取适配器提供。
+- snapshot 只让最新且尚未被用户回答的 assistant 询问保持等待；core 再按当前 active Turn 和输入队列修正投影。
+- Permission/Workspace 的 ServerRequest 来自 core 请求表，不由消息翻译生成；建议等待只映射为普通 assistant 内容。
+- 本目录使用注入的 BlobStore，不创建存储、读取真实配置或发送 socket。
 
-## 修改约束
-
-- 新 runtime event 必须判断 UI notification 与审计是否都需要映射。
-- 新 Input Item 必须同时覆盖持久化、snapshot、live notification 与 LLM 输入转换。
-- 本目录不创建 BlobStore、不读真实配置路径、不发送 WebSocket。
-
-## 相关文档
-
-- [core protocol](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)
-- [core runtime](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md)
-- [thread persistence](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)
+新 Input Item 必须同时覆盖持久保存、snapshot、live 和模型输入；调用与读取边界见 [thread](../thread/thread.md)。

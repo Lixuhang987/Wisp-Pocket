@@ -77,6 +77,9 @@ final class AppCoordinatorTests: XCTestCase {
         )
 
         coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
+        // 提交时隐藏 PromptPanel 会恢复宿主策略；这里只检查后续 Electron 事件。
+        XCTAssertEqual(appliedPolicies, [.accessory])
+        appliedPolicies.removeAll()
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
 
         XCTAssertEqual(appliedPolicies, [])
@@ -94,6 +97,9 @@ final class AppCoordinatorTests: XCTestCase {
         )
 
         coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
+        // 提交时隐藏 PromptPanel 会恢复宿主策略；这里只检查后续 Electron 事件。
+        XCTAssertEqual(appliedPolicies, [.accessory])
+        appliedPolicies.removeAll()
         client.complete(commandId: "open-initial-prompt-1", kind: .openInitialPrompt, ok: true)
         coordinator.send(.threadWindowClosed)
 

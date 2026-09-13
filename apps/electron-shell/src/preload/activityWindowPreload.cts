@@ -7,16 +7,20 @@ type HostTheme = {
 
 declare global {
   interface Window {
-    handAgentActivityWindowConfig?: { activityWebSocketURL?: string };
+    handAgentActivityWindowConfig?: { threadWebSocketURL?: string };
     handAgentTheme?: HostTheme;
     handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
-    handAgentActivityWindow?: {
-      focusThread(threadId: string | null): void;
+    handAgentPet?: {
+      setLayout(mode: "pet" | "compact" | "expanded"): void;
+      setInteractiveRegions(rectangles: Array<{ x: number; y: number; width: number; height: number }>): void;
+      beginMove(): void;
+      move(): void;
+      endMove(): void;
     };
   }
 }
 
-const activityWebSocketURL = "ws://127.0.0.1:4317/api/activity";
+const threadWebSocketURL = readThreadWebSocketURL();
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 let latestTheme = readInitialTheme();
 const themeHandlers = new Set<(theme: HostTheme) => void>();
@@ -33,10 +37,10 @@ ipcRenderer.on("handagent:theme-changed", (_event: unknown, theme: HostTheme) =>
 
 contextBridge.executeInMainWorld({
   func: (url: string, theme: HostTheme) => {
-    window.handAgentActivityWindowConfig = { activityWebSocketURL: url };
+    window.handAgentActivityWindowConfig = { threadWebSocketURL: url };
     window.handAgentTheme = theme;
   },
-  args: [activityWebSocketURL, latestTheme],
+  args: [threadWebSocketURL, latestTheme],
 });
 
 contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (theme: HostTheme) => void) => {
@@ -47,11 +51,34 @@ contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (them
   };
 });
 
-contextBridge.exposeInMainWorld("handAgentActivityWindow", {
-  focusThread(threadId: string | null): void {
-    ipcRenderer.send("activity-window:focus-thread", threadId);
+contextBridge.exposeInMainWorld("handAgentPet", {
+  setLayout(mode: "pet" | "compact" | "expanded"): void {
+    ipcRenderer.send("pet-window:set-layout", mode);
   },
+  setInteractiveRegions(rectangles: Array<{ x: number; y: number; width: number; height: number }>): void {
+    ipcRenderer.send("pet-window:set-interactive-regions", rectangles);
+  },
+  beginMove(): void { ipcRenderer.send("pet-window:begin-move"); },
+  move(): void { ipcRenderer.send("pet-window:move"); },
+  endMove(): void { ipcRenderer.send("pet-window:end-move"); },
 });
+
+function readThreadWebSocketURL(): string {
+  const fallback = "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1";
+  const prefix = "--handagent-pet-thread-websocket-url=";
+  const raw = process.argv.find((arg) => arg.startsWith(prefix));
+  if (!raw) return fallback;
+  try {
+    const url = new URL(decodeURIComponent(raw.slice(prefix.length)));
+    if (url.protocol !== "ws:" || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) || url.pathname !== "/api/thread") {
+      return fallback;
+    }
+    url.searchParams.set("acceptServerRequests", "1");
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
 
 function readInitialTheme(): HostTheme {
   const raw = process.argv.find((arg) => arg.startsWith("--handagent-theme="));

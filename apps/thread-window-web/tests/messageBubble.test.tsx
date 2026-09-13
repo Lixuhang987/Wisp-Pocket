@@ -4,6 +4,19 @@ import { describe, expect, it, vi } from "vitest";
 import { ThreadItemBubble } from "../src/components/ThreadItemBubble.tsx";
 
 describe("ThreadItemBubble", () => {
+  it("renders persisted image copies, PDF names and pending input from the shared history", () => {
+    const html = renderToStaticMarkup(React.createElement(ThreadItemBubble, {
+      item: { type: "user_message", id: "saved", text: "", pending: true, inputItems: [
+        { type: "image", id: "image", mimeType: "image/png", blobId: "blob-saved-image" },
+        { type: "pdf", id: "pdf", mimeType: "application/pdf", name: "保存的报告.pdf", blobId: "blob-saved-pdf" },
+      ] }, onCopy: vi.fn(),
+    }));
+    expect(html).toContain('src="http://127.0.0.1:4317/api/blobs/blob-saved-image"');
+    expect(html).toContain("PDF · 保存的报告.pdf");
+    expect(html).toContain("待处理");
+    expect(html).not.toContain("base64,undefined");
+  });
+
   it("renders user messages as image strip, chip row, and text block based on input items", () => {
     const html = renderToStaticMarkup(
       React.createElement(ThreadItemBubble, {

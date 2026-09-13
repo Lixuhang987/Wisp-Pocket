@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- `2026-09-13-pet-floating-bubbles.md`：紧凑独立气泡、右侧常驻对话与角色缩放的实施及验证边界。
+- `2026-09-13-desktop-pet.md`：Issue #1 实施记录与待实机验收入口；当前接口合约已归 owning 模块文档。
 - `2026-06-24-chrome-bookmarks-folder-picker.md`
 - `2026-06-24-websearch-tool.md`
 - `2026-06-25-context-history-plugin.md`

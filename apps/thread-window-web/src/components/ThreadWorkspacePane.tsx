@@ -11,7 +11,6 @@ type ThreadWorkspacePaneProps = {
   threadId: string | null;
   onSubmit(threadId: string, input: UserInput): void;
   onStop(threadId: string): void;
-  onRemoveQueuedInput(threadId: string, index: number): void;
   onAnswerPermission(requestId: string, decision: "allow" | "deny", scope: "once" | "always"): void;
   onAnswerWorkspace(requestId: string, workspaceId: string | null): void;
 };
@@ -20,7 +19,6 @@ export function ThreadWorkspacePane({
   threadId,
   onSubmit,
   onStop,
-  onRemoveQueuedInput,
   onAnswerPermission,
   onAnswerWorkspace,
 }: ThreadWorkspacePaneProps) {
@@ -77,6 +75,9 @@ export function ThreadWorkspacePane({
               items={thread.messages}
               errorMessage={thread.errorMessage}
               isRunning={thread.status === "running"}
+              onRespond={(text) => {
+                if (connectionState === "connected") onSubmit(thread.threadId, { items: [{ type: "text", id: crypto.randomUUID(), text }] });
+              }}
             />
             <RequestPanels
               permissionRequests={thread.permissionRequests}
@@ -88,12 +89,10 @@ export function ThreadWorkspacePane({
           <Composer
             disabled={connectionState !== "connected"}
             stopDisabled={connectionState !== "connected" || thread.status !== "running"}
-            queuedInputs={thread.queuedComposerInputs}
             availableSkills={availableSkills}
             inputItems={composerInputItems}
             onInputItemsChange={updateComposerInputItems}
             onSubmit={submitComposerInput}
-            onRemoveQueuedInput={(index) => onRemoveQueuedInput(thread.threadId, index)}
             onStop={() => onStop(thread.threadId)}
           />
         </>

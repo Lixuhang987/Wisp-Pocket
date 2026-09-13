@@ -9,12 +9,14 @@ export class ThreadRequests {
   private readonly permissions = new Map<string, PermissionPending>();
   private readonly workspaces: WorkspacePending[] = [];
   private activeWorkspace?: WorkspacePending;
+  private readonly visibleRequests = new Map<string, ServerRequest>();
 
   constructor(
     private readonly threadId: string,
     private readonly emit: (request: ServerRequest) => void,
     private readonly canAsk: () => boolean,
     private readonly timeoutMs = 60_000,
+    private readonly onResolved: (requestId: string) => void = () => {},
   ) {}
 
   askPermission = (request: PermissionRequest): Promise<PermissionResolution> => {
@@ -23,10 +25,11 @@ export class ThreadRequests {
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this.permissions.delete(requestId);
+        this.resolved(requestId);
         resolve({ decision: "deny", reason: "permission request timed out" });
       }, this.timeoutMs);
       this.permissions.set(requestId, { resolve, timer });
-      this.emit({ type: "permission.requested", requestId, threadId: this.threadId,
+      this.present({ type: "permission.requested", requestId, threadId: this.threadId,
         timestamp: new Date().toISOString(), payload: {
           toolName: request.toolName, toolCallId: request.toolCallId,
           arguments: request.arguments, timeoutMs: this.timeoutMs,
@@ -49,6 +52,7 @@ export class ThreadRequests {
       if (response.payload.scope && !["once", "always"].includes(response.payload.scope)) return;
       clearTimeout(pending.timer);
       this.permissions.delete(response.requestId);
+      this.resolved(response.requestId);
       pending.resolve({ decision: response.payload.decision, remember: response.payload.scope, reason: response.payload.reason });
     } else if (this.activeWorkspace?.id === response.requestId) {
       const id = response.payload.workspaceId;
@@ -58,8 +62,9 @@ export class ThreadRequests {
   }
 
   cancel(): void {
-    for (const pending of this.permissions.values()) {
+    for (const [id, pending] of this.permissions) {
       clearTimeout(pending.timer);
+      this.resolved(id);
       pending.resolve({ decision: "deny", reason: "thread interrupted" });
     }
     this.permissions.clear();
@@ -73,7 +78,7 @@ export class ThreadRequests {
     if (!next) return;
     this.activeWorkspace = next;
     next.timer = setTimeout(() => this.finishWorkspace({ cancelled: true }), this.timeoutMs);
-    this.emit({ type: "workspace.requested", requestId: next.id, threadId: this.threadId,
+    this.present({ type: "workspace.requested", requestId: next.id, threadId: this.threadId,
       timestamp: new Date().toISOString(), payload: {
         toolCallId: next.request.toolCallId, prompt: next.request.prompt,
         candidates: next.request.candidates, timeoutMs: this.timeoutMs,
@@ -85,7 +90,19 @@ export class ThreadRequests {
     if (!active) return;
     clearTimeout(active.timer);
     this.activeWorkspace = undefined;
+    this.resolved(active.id);
     active.resolve(result);
     this.dispatchWorkspace();
+  }
+
+  snapshot(): ServerRequest[] { return structuredClone([...this.visibleRequests.values()]); }
+
+  private present(request: ServerRequest): void {
+    this.visibleRequests.set(request.requestId, request);
+    this.emit(request);
+  }
+
+  private resolved(requestId: string): void {
+    if (this.visibleRequests.delete(requestId)) this.onResolved(requestId);
   }
 }

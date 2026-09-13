@@ -12,9 +12,9 @@
 ## 架构红线
 
 - 状态模型使用 Observation：`@Observable`、`@Bindable`、`@State`；非状态依赖标记 `@ObservationIgnored`。不要引入 Combine 状态栈。
-- Swift 原生 UI 只保留 PromptPanel 和 Settings。ThreadWindow、StatusBubble 与完整 Thread 状态属于 Electron/React。
+- Swift 原生 UI 只保留 PromptPanel 和 Settings。ThreadWindow、桌宠及其 UI 投影属于 Electron/React，权威 Thread 状态属于 core。
 - 模块协调统一进入 `AppCoordinator.send(.action)`；窗口生命周期由专用 lifecycle 对象持有。
-- 初始上下文只允许用户主动提交的 Input Item。屏幕、窗口、文件、剪贴板和 App 状态通过 Tool 读取。
+- 初始上下文只允许用户主动提交的 Input Item；未主动交付的屏幕、窗口、文件、剪贴板和 App 状态通过 Tool 读取。
 - Swift 的 `/api/thread` client 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`；持续通知和交互式请求由 React 处理。
 - Swift 通过 `/api/dynamic-tools` 暴露原生与 Plugin Dynamic Tool，不在宿主层编排 LLM/Tool 循环。
 

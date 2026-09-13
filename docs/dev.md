@@ -17,6 +17,7 @@
 - agent-server 按文件戳热加载模型与 Tool 设置；正常修改无需重启。
 - 图片输入要求支持多模态的 API；`completion` 路径不支持图片。
 - `web_search` 需要 agent-server 环境中的 `TAVILY_API_KEY`；`fetch_page` 会请求目标公共 URL。
+- 桌宠拖入的 PDF 先保存副本并在本地提取文字，再交给模型；扫描版、加密或损坏文档会说明读取障碍，不承诺 OCR。
 
 ## 验证入口
 
@@ -35,7 +36,7 @@
 - 无法提交：区分 agent-server health、hidden ThreadWindow prepared 与模型 API key；不要把连接失败归因于 provider。
 - provider 地址错误：检查 `baseUrl` 和 `api` 是否匹配服务端协议。
 - 图片失败：确认模型 API 支持多模态，并区分 Blob 落盘、STUB 展开和 provider 拒绝。
-- 窗口或热键：检查辅助功能权限，再观察 PromptPanel、ThreadWindow 和 StatusBubble 的实际所有者。
+- 窗口或热键：检查辅助功能权限，再观察 PromptPanel、ThreadWindow 和桌宠的实际所有者。桌宠位置与隔离 QA 配置见 [Electron main](../apps/electron-shell/src/main/main.md)。
 - 平台 Tool：先跑对应 core/Swift 测试，真实屏幕录制、AX 和焦点行为进入 manual QA。
 
 ## 打包边界
@@ -50,4 +51,4 @@
 - 用户主动输入才可进入初始上下文；宿主状态通过 Tool 按需读取。
 - core 不依赖产品 UI 或 macOS；平台能力通过 Dynamic Tool Provider 接入。
 - Tool 名称使用稳定点号形式，输入、输出、Permission 和错误语义必须明确。
-- 视觉常量只修改 `design/tokens.json`，再运行 `pnpm generate:theme-tokens`。
+- 视觉常量只修改 `design/tokens.json`，再运行 `pnpm generate:theme-tokens`；桌宠结构与角色图集边界见 [DESIGN.md](../DESIGN.md)。

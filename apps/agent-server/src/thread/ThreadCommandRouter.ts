@@ -25,6 +25,7 @@ export class ThreadCommandRouter {
     private readonly publisher: ThreadNotificationPublisher,
     private readonly workspaceRegistry?: WorkspaceRegistry,
     private readonly now: () => string = () => new Date().toISOString(),
+    private readonly defaultDynamicTools: () => DynamicToolSpec[] = () => [],
   ) {}
 
   async receive(command: ThreadCommand, connectionId: string): Promise<void> {
@@ -69,7 +70,7 @@ export class ThreadCommandRouter {
   ): Promise<void> {
     const thread = await this.threads.create({
       workspaceId: command.payload.workspaceId,
-      dynamicTools: command.payload.dynamicTools,
+      dynamicTools: command.payload.dynamicTools ?? this.defaultDynamicTools(),
     });
     const threadId = thread.id;
     this.publisher.subscribe(connectionId, threadId);
@@ -79,7 +80,7 @@ export class ThreadCommandRouter {
       notificationId: this.makeNotificationId(),
       commandId: command.commandId,
       timestamp: this.now(),
-      payload: { preview: null },
+      payload: { preview: null, createdAt: thread.createdAt },
     });
   }
 
@@ -129,10 +130,12 @@ export class ThreadCommandRouter {
   ): Promise<void> {
     const targetThreadId = command.payload.targetThreadId;
     const deleted = await this.threads.delete(targetThreadId);
-    this.publisher.publishToConnection(connectionId, {
+    const notification: ThreadNotification = {
       type: "thread.deleted", notificationId: this.makeNotificationId(), commandId: command.commandId,
       timestamp: this.now(), payload: { targetThreadId, status: deleted ? "deleted" : "not_found" },
-    });
+    };
+    if (deleted) this.publisher.publish(notification);
+    else this.publisher.publishToConnection(connectionId, notification);
   }
 
   private async handleListWorkspaces(

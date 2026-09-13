@@ -19,6 +19,7 @@ import {
   composeUserContent,
   composeUserInputContent,
   deriveTitle,
+  storeUserInput,
 } from "../protocol/MessageTranslator.ts";
 
 export type CreatePersistedThreadInput = {
@@ -87,11 +88,14 @@ export class ThreadPersistence {
     ]);
   }
 
-  async persistUserInput(threadId: string, userInput: UserInput): Promise<AgentMessage> {
+  async persistUserInput(threadId: string, userInput: UserInput, messageId?: string): Promise<AgentMessage> {
+    const savedInput = await storeUserInput(userInput, this.blobStore);
     const userMessage: AgentMessage = {
       role: "user",
-      content: await composeUserInputContent(userInput, this.blobStore),
-      inputItems: userInput.items.map((item) => ({ ...item })),
+      ...(messageId ? { id: messageId } : {}),
+      content: await composeUserInputContent(savedInput, this.blobStore),
+      inputItems: savedInput.items,
+      ...(savedInput.mode ? { inputMode: savedInput.mode } : {}),
     };
     await this.appendAndPersist(threadId, [
       { kind: "response_item", payload: userMessage },
@@ -122,68 +126,33 @@ export class ThreadPersistence {
     timestamp = this.now(),
   ): Promise<"failed" | "interrupted" | null> {
     const thread = await this.getThread(threadId);
-    if (!thread || !isIncompleteTurn(thread.messages)) {
-      return null;
+    if (!thread) return null;
+    const history = unwrap(await this.store.loadHistory({ threadId }));
+    const unfinished = new Set<string>();
+    for (const item of history.rolloutItems) {
+      if (item.kind !== "event_msg") continue;
+      if (item.payload.type === "turn.started") unfinished.add(item.payload.turnId);
+      if (item.payload.type === "turn.completed") unfinished.delete(item.payload.turnId);
     }
-
-    const lastError = [...thread.events]
-      .filter((event): event is Extract<ThreadAuditEvent, { type: "error" }> => event.type === "error")
-      .reverse()
-      .find(
-        (event) =>
-          event.type === "error" &&
-          event.timestamp.localeCompare(thread.metadata.updatedAt) >= 0,
-    );
-    if (lastError?.code === RUN_INTERRUPTED_CODE) {
-      return "interrupted";
-    }
-    if (lastError) {
-      unwrap(await this.store.replaceResponseItems(
-        threadId,
-        [
-          ...thread.messages,
-          {
-            role: "assistant",
-            content: lastError.message,
-          },
-        ],
-        timestamp,
-      ));
-      return "failed";
-    }
-
-    unwrap(await this.store.replaceResponseItems(
-      threadId,
-      [
-        ...thread.messages,
-        {
-          role: "assistant",
-          content: RUN_LOST_AFTER_RESTART_MESSAGE,
-        },
-      ],
-      timestamp,
-    ));
-
+    // Receipt and execution are separate facts: a queued input has no started Turn.
+    if (unfinished.size === 0) return null;
+    const lastError = [...thread.events].reverse().find((event) =>
+      event.type === "error" && event.timestamp.localeCompare(thread.metadata.updatedAt) >= 0);
+    const status = lastError?.type === "error" && lastError.code === RUN_INTERRUPTED_CODE ? "interrupted" : "failed";
+    const message = lastError?.type === "error" ? lastError.message : RUN_LOST_AFTER_RESTART_MESSAGE;
     await this.appendAndPersist(threadId, [
-      {
-        kind: "turn_context",
-        payload: {
-          turnId: `${threadId}-recovery`,
-          status: "failed",
-          timestamp,
-          auditEvents: [
-            {
-              type: "error",
-              timestamp,
-              message: RUN_LOST_AFTER_RESTART_MESSAGE,
-              code: RUN_LOST_AFTER_RESTART_CODE,
-            },
-          ],
-        },
-      },
+      { kind: "response_item", payload: { role: "assistant", id: `recovery-${crypto.randomUUID()}`, content: message, awaitingReply: true } },
+      ...[...unfinished].map((turnId): RolloutItem => ({
+        kind: "event_msg", payload: { type: "turn.completed", threadId, turnId,
+          notificationId: `recovery-${crypto.randomUUID()}`, timestamp, payload: { status } },
+      })),
+      { kind: "turn_context", payload: {
+        turnId: `${threadId}-recovery`, status, timestamp,
+        auditEvents: [{ type: "error", timestamp, message,
+          code: lastError?.type === "error" ? lastError.code : RUN_LOST_AFTER_RESTART_CODE }],
+      } },
     ]);
-
-    return "failed";
+    return status;
   }
 
   async persistRunResult(
@@ -312,10 +281,6 @@ export const RUN_LOST_AFTER_RESTART_MESSAGE = "本轮运行因 agent-server 重�
 
 function generateThreadId(): string {
   return `thread-${crypto.randomUUID()}`;
-}
-
-function isIncompleteTurn(messages: AgentMessage[]): boolean {
-  return messages.at(-1)?.role === "user";
 }
 
 function unwrap<T>(result: ThreadStoreResult<T>): T {

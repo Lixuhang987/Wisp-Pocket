@@ -18,6 +18,6 @@
 
 - `AppServices.defaultRuntime` 是生产组合点；`AppServices.testing` 提供无窗口、无进程副作用的替身。
 - 启动支持文件必须在 AgentTrigger reload 前准备，确保内置 Package 和 Native Messaging manifest 可见。
-- Electron UI Shell health、ThreadWindow command、StatusBubble show、Swift thread client 与 Dynamic Tool Provider 使用同一组显式服务，不通过全局单例互找。
+- Electron UI Shell health、ThreadWindow command、桌宠显示、Swift thread client 与 Dynamic Tool Provider 使用同一组显式服务，不通过全局单例互找。
 - enabled Plugin 的安装、生命周期和 Tool 列表属于 Swift Host；agent-server 只看到 Provider 暴露的 spec。
 - Shutdown 必须清理进程、socket、observer 和 callback，避免旧服务事件进入下一次启动。

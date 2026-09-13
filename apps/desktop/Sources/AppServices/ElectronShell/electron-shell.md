@@ -15,7 +15,7 @@
 - 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`。
 - 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行 macOS host dynamic tools，并把 plugin namespace 请求分派给 Swift plugin manager。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
-- Electron StatusBubble 点击只尝试聚焦已有 ThreadWindow；无法聚焦时不再让 Coordinator 打开 Swift PromptPanel。
+- 桌宠的点击、拖入、回复与历史由 Electron renderer 处理；Swift 只负责显示窗口的 command，不接管桌宠交互。
 - `bash ./scripts/swiftw run HandAgentDesktop` 会先构建 `handagent-electron-shell`，确保开发态 `dist/main/main.js` 存在；不要依赖旧 worktree 残留产物。
 
 ## 文件
@@ -43,7 +43,7 @@
 
 - 不持有 ThreadWindow thread 缓存、消息或历史状态。
 - 不解析 `/api/thread` 的 `ThreadNotification`。
-- 不消费完整 `/api/thread` 状态；AgentTrigger 命中由 SwiftThreadClient 直连 `/api/thread`，权限/工作区请求由 React ThreadWindow 的 `acceptServerRequests=1` 连接处理。
+- 不消费完整 `/api/thread` 状态；AgentTrigger 命中由 SwiftThreadClient 直连，权限/工作区请求由 ThreadWindow 和桌宠的交互式连接呈现，core 仲裁唯一回执。
 - 新增 host dynamic tool 时，先在 `MacHostDynamicTools` 与 `MacPlatformProvider` 同步 spec / method 映射。
 - 不承载 PromptPanel、Settings、Hotkey 或焦点恢复；这些仍由 Swift 宿主负责。
 

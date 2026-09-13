@@ -16,7 +16,7 @@ export interface ThreadStorage {
   deleteThread(id: string): Promise<void>;
   recoverIncompleteTurnForSnapshot(id: string): Promise<"failed" | "interrupted" | null>;
   resetThread(id: string): Promise<void>;
-  persistUserInput(id: string, input: UserInput): Promise<AgentMessage>;
+  persistUserInput(id: string, input: UserInput, messageId?: string): Promise<AgentMessage>;
   autoTitle(id: string, text: string): Promise<void>;
   persistRunDelta(id: string, base: number, messages: AgentMessage[], events: ThreadAuditEvent[], notifications?: ThreadNotification[]): Promise<void>;
   persistNotifications(id: string, notifications: ThreadNotification[]): Promise<void>;
@@ -39,8 +39,10 @@ export type ThreadServices = {
   publish: (message: ThreadNotification | ServerRequest) => void;
   createRuntime: (id: string, tools: ThreadTools) => ThreadRuntime;
   createTools: (dynamicTools: DynamicToolSpec[]) => ThreadTools;
+  prepareInput?: (input: UserInput, signal: AbortSignal) => Promise<PreparedInput>;
   now?: () => string;
   stopTimeoutMs?: number;
 };
 export type QueuedInput = { opId: string; payload: UserInput };
-export type ActiveTurn = { id: string; controller: AbortController; done: Promise<void>; sequence: number };
+export type PreparedInput = { messages: AgentMessage[]; error?: string };
+export type ActiveTurn = { id: string; input: QueuedInput; controller: AbortController; done: Promise<void>; sequence: number };

@@ -5,9 +5,10 @@ interface MessageListProps {
   items: ThreadItem[];
   errorMessage: string | null;
   isRunning?: boolean; // 是否正在运行
+  onRespond?: (text: string) => void;
 }
 
-export function MessageList({ items, errorMessage, isRunning = false }: MessageListProps) {
+export function MessageList({ items, errorMessage, isRunning = false, onRespond }: MessageListProps) {
   const handleCopy = (text: string) => {
     // 显示复制成功反馈（可选）
     console.log('已复制:', text.slice(0, 50));
@@ -33,6 +34,7 @@ export function MessageList({ items, errorMessage, isRunning = false }: MessageL
             key={item.id}
             item={item}
             onCopy={handleCopy}
+            onRespond={onRespond}
             // 只有最后一条 assistant 消息在运行时显示打字指示器
             isRunning={isRunning && item.type === 'assistant_message' && index === lastAssistantIndex}
           />

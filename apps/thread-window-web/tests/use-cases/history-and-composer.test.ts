@@ -199,142 +199,46 @@ describe("threadWindowStore", () => {
     expect((store.getState().threadsById["thread-1"].messages[0] as any).text).toBe("hello");
   });
 
-  it("queues composer input while the thread is running without appending a user message", () => {
+  it("keeps every received input pending until its own turn starts", () => {
     const store = createThreadWindowStore;
     store.getState().ensureThreadState("thread-1");
-    store.getState().handleNotification({
-      type: "turn.started",
-      threadId: "thread-1",
-      notificationId: "n-running",
-      turnId: "turn-1",
-      timestamp,
-      payload: {},
-    });
-
-    store.getState().queueComposerInput("thread-1", {
-      type: "user_input",
-      opId: "op-1",
-      timestamp,
-      payload: { items: [{ type: "text", id: "text-2", text: "second" }] },
-    });
-
-    const thread = store.getState().threadsById["thread-1"];
-    expect(thread.messages).toEqual([]);
-    expect(thread.queuedComposerInputs).toEqual([expect.objectContaining({ op: expect.objectContaining({ type: "user_input" }) })]);
-    expect(store.getState().takeNextQueuedInputForDispatch("thread-1")).toBeNull();
+    store.getState().handleNotification({ type: "turn.started", threadId: "thread-1", notificationId: "running", turnId: "first", timestamp, payload: {} });
+    for (const id of ["second", "third"]) {
+      store.getState().handleNotification({
+        type: "user.message.recorded", threadId: "thread-1", notificationId: id, timestamp,
+        payload: { messageId: id, text: id, pending: true, items: [{ type: "text", id, text: id }] },
+      });
+    }
+    expect(store.getState().threadsById["thread-1"].messages).toMatchObject([
+      { id: "second", pending: true }, { id: "third", pending: true },
+    ]);
+    store.getState().handleNotification({ type: "turn.completed", threadId: "thread-1", notificationId: "done", turnId: "first", timestamp, payload: { status: "completed" } });
+    store.getState().handleNotification({ type: "turn.started", threadId: "thread-1", notificationId: "start-second", turnId: "second", timestamp, payload: {} });
+    expect(store.getState().threadsById["thread-1"].messages).toMatchObject([
+      { id: "second", pending: false }, { id: "third", pending: true },
+    ]);
   });
 
-  it("dispatches queued composer input one item at a time after the thread leaves running", () => {
+  it("restores pending inputs and unexpired questions from authoritative snapshots", () => {
     const store = createThreadWindowStore;
-    store.getState().ensureThreadState("thread-1");
     store.getState().handleNotification({
-      type: "turn.started",
-      threadId: "thread-1",
-      notificationId: "n-running",
-      turnId: "turn-1",
-      timestamp,
-      payload: {},
+      type: "thread.snapshot", threadId: "thread-1", notificationId: "restored", timestamp,
+      payload: { status: "idle", messages: [
+        { id: "question", role: "assistant", text: "怎么处理？", suggestedReplies: ["整理摘要"], awaitingReply: true, status: "completed", createdAt: timestamp, updatedAt: timestamp },
+        { id: "queued", role: "user", text: "补充", pending: true, status: "completed", createdAt: timestamp, updatedAt: timestamp },
+      ] },
     });
-    store.getState().queueComposerInput("thread-1", {
-      type: "user_input",
-      opId: "op-1",
-      timestamp,
-      payload: { items: [{ type: "text", id: "text-2", text: "second" }] },
-    });
-    store.getState().queueComposerInput("thread-1", {
-      type: "user_input",
-      opId: "op-2",
-      timestamp,
-      payload: { items: [{ type: "text", id: "text-3", text: "third" }] },
-    });
-    store.getState().handleNotification({
-      type: "turn.completed",
-      threadId: "thread-1",
-      notificationId: "n-completed-1",
-      turnId: "turn-1",
-      timestamp,
-      payload: { status: "completed" },
-    });
-
-    const firstDispatch = store.getState().takeNextQueuedInputForDispatch("thread-1");
-    expect(firstDispatch?.op.type).toBe("user_input");
-    expect(store.getState().takeNextQueuedInputForDispatch("thread-1")).toBeNull();
-
-    store.getState().handleNotification({
-      type: "turn.started",
-      threadId: "thread-1",
-      notificationId: "n-running-2",
-      turnId: "turn-2",
-      timestamp,
-      payload: {},
-    });
-    store.getState().handleNotification({
-      type: "turn.completed",
-      threadId: "thread-1",
-      notificationId: "n-completed-2",
-      turnId: "turn-2",
-      timestamp,
-      payload: { status: "completed" },
-    });
-
-    const pendingDispatch = store.getState().takeNextQueuedInputForDispatch("thread-1");
-    expect(pendingDispatch?.op.type).toBe("user_input");
-    expect(store.getState().threadsById["thread-1"].queuedComposerInputs).toEqual([]);
+    expect(store.getState().threadsById["thread-1"].messages).toMatchObject([
+      { id: "question", suggestedReplies: ["整理摘要"], awaitingReply: true }, { id: "queued", pending: true },
+    ]);
   });
 
-  it("removes a queued composer input by index", () => {
+  it("uses server resolution to clear the same request in every view", () => {
     const store = createThreadWindowStore;
-    store.getState().ensureThreadState("thread-1");
-    store.getState().queueComposerInput("thread-1", {
-      type: "user_input",
-      opId: "op-1",
-      timestamp,
-      payload: { items: [{ type: "text", id: "text-1", text: "first" }] },
-    });
-    store.getState().queueComposerInput("thread-1", {
-      type: "user_input",
-      opId: "op-2",
-      timestamp,
-      payload: { items: [{ type: "text", id: "text-2", text: "second" }] },
-    });
-
-    store.getState().removeQueuedComposerInput("thread-1", 0);
-
-    expect(store.getState().threadsById["thread-1"].queuedComposerInputs).toHaveLength(1);
-  });
-
-  it("holds queued composer input while a submitted input is waiting for turn start", () => {
-    const store = createThreadWindowStore;
-    store.getState().ensureThreadState("thread-1");
-
-    store.getState().markComposerInputDispatchPending("thread-1");
-    store.getState().queueComposerInput("thread-1", {
-      type: "user_input",
-      opId: "op-2",
-      timestamp,
-      payload: { items: [{ type: "text", id: "text-2", text: "second" }] },
-    });
-
-    expect(store.getState().takeNextQueuedInputForDispatch("thread-1")).toBeNull();
-
-    store.getState().handleNotification({
-      type: "turn.started",
-      threadId: "thread-1",
-      notificationId: "n-running",
-      turnId: "turn-1",
-      timestamp,
-      payload: {},
-    });
-    store.getState().handleNotification({
-      type: "turn.completed",
-      threadId: "thread-1",
-      notificationId: "n-completed",
-      turnId: "turn-1",
-      timestamp,
-      payload: { status: "completed" },
-    });
-
-    expect(store.getState().takeNextQueuedInputForDispatch("thread-1")?.op.type).toBe("user_input");
+    store.getState().handleRequest({ type: "permission.requested", threadId: "thread-1", requestId: "req", timestamp,
+      payload: { toolName: "file.write", toolCallId: "tool", arguments: {} } });
+    store.getState().handleNotification({ type: "request.resolved", threadId: "thread-1", notificationId: "resolved", timestamp, payload: { requestId: "req" } });
+    expect(store.getState().threadsById["thread-1"].permissionRequests).toEqual([]);
   });
 
   it("does not append duplicate assistant delta notifications", () => {

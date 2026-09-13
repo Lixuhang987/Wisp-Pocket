@@ -13,6 +13,7 @@ export type ThreadStartedNotification = {
   timestamp: string;
   payload: {
     preview: string | null;
+    createdAt?: string;
   };
 };
 
@@ -34,6 +35,7 @@ export type UserMessageRecordedNotification = {
     messageId: string;
     text: string;
     items?: InputItem[];
+    pending?: boolean;
   };
 };
 
@@ -55,6 +57,8 @@ export type AssistantDeltaNotification = {
   timestamp: string;
   payload: {
     text: string;
+    suggestedReplies?: string[];
+    awaitingReply?: boolean;
   };
 };
 
@@ -154,6 +158,14 @@ export type WorkspaceListedNotification = {
   };
 };
 
+export type RequestResolvedNotification = {
+  type: "request.resolved";
+  threadId: string;
+  notificationId: string;
+  timestamp: string;
+  payload: { requestId: string };
+};
+
 export type ThreadNotification =
   | ThreadStartedNotification
   | ThreadSnapshotNotification
@@ -167,4 +179,5 @@ export type ThreadNotification =
   | ThreadListedNotification
   | ThreadDeletedNotification
   | ThreadErrorNotification
-  | WorkspaceListedNotification;
+  | WorkspaceListedNotification
+  | RequestResolvedNotification;

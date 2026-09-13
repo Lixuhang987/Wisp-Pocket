@@ -1,20 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { ArrowUp, Plus, Square, Trash2 } from 'lucide-react';
-import type { AvailableSkill, InputItem, RuntimeOp, UserInput } from '../protocol/threadProtocol.ts';
-import type { QueuedComposerInput } from '../store/threadWindowStore.ts';
+import { ArrowUp, Plus, Square } from 'lucide-react';
+import type { AvailableSkill, InputItem, UserInput } from '../protocol/threadProtocol.ts';
 import { cn } from '../utils/cn.ts';
 
 interface ComposerProps {
   disabled: boolean;
   stopDisabled: boolean;
-  queuedInputs?: QueuedComposerInput[];
   availableSkills?: AvailableSkill[];
   inputItems: InputItem[];
   onInputItemsChange: (items: InputItem[]) => void;
   onSubmit: (input: UserInput) => void;
   onStop: () => void;
-  onRemoveQueuedInput?: (index: number) => void;
 }
 
 const MAX_ROWS = 5;
@@ -28,13 +25,11 @@ export const SLASH_MENU_CONTENT_STYLE: React.CSSProperties = {
 export function Composer({
   disabled,
   stopDisabled,
-  queuedInputs = [],
   availableSkills = [],
   inputItems,
   onInputItemsChange,
   onSubmit,
   onStop,
-  onRemoveQueuedInput,
 }: ComposerProps) {
   const items = useMemo(() => normalizeComposerItems(inputItems), [inputItems]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,7 +88,7 @@ export function Composer({
         return;
       }
     }
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSubmit(e);
       return;
@@ -120,40 +115,6 @@ export function Composer({
       onSubmit={handleSubmit}
       className="flex min-w-0 flex-col items-center justify-end overflow-hidden bg-app-canvas/85 px-lg py-md"
     >
-      {queuedInputs.length > 0 ? (
-        <div
-          data-queued-composer-panel="true"
-          className="mb-xs max-h-[156px] min-w-0 w-full max-w-[720pt] overflow-y-auto rounded-2xl border border-app-hairline bg-app-surface-elevated/95 px-xs py-xs shadow-[var(--thread-window-floating-shadow)]"
-        >
-          <div className="space-y-1">
-            {queuedInputs.map((queuedInput, index) => {
-              const queuedText = inputItemsPreview(queuedInput.op);
-              return (
-              <div
-                key={`${index}-${queuedText}`}
-                data-queued-composer-item="true"
-                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-xs rounded-xl px-xs py-1 text-sm text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted/60"
-              >
-                <span className="font-code text-xs text-app-text-muted/70">↳</span>
-                <span className="truncate text-app-text-primary" title={queuedText}>
-                  {queuedText}
-                </span>
-                <span className="whitespace-nowrap text-xs text-app-text-muted">待发送</span>
-                <button
-                  type="button"
-                  aria-label={`移除排队输入 ${index + 1}`}
-                  onClick={() => onRemoveQueuedInput?.(index)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-muted transition-colors duration-200 hover:bg-app-surface-muted hover:text-app-text-primary focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
-                >
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>
-              </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
       <Popover.Root
         open={slashState.visible}
         onOpenChange={(open) => {
@@ -281,37 +242,6 @@ export function Composer({
   );
 }
 
-export function inputItemsPreview(input: QueuedComposerInput | UserInput | InputItem[] | RuntimeOp): string {
-  if (!Array.isArray(input) && "op" in input) {
-    return inputItemsPreview(input.op);
-  }
-
-  if (!Array.isArray(input) && "type" in input && input.type === "interrupt") {
-    return "停止当前运行";
-  }
-
-  const items = Array.isArray(input)
-    ? input
-    : "items" in input
-      ? input.items
-      : input.payload.items;
-
-  const parts = items.map((item) => {
-    switch (item.type) {
-      case "text":
-        return item.text;
-      case "text_selection":
-        return item.text;
-      case "skill":
-        return item.title || item.prompt;
-      case "image":
-        return "图片附件";
-    }
-  }).filter((part) => part.length > 0);
-
-  return parts.join(" ") || "后续输入";
-}
-
 export function createEmptyComposerItems(): InputItem[] {
   return [{ type: "text", id: newId("text"), text: "" }];
 }
@@ -349,7 +279,7 @@ export function isComposerInputSubmittable(inputItems: InputItem[]): boolean {
     if (item.type === "text") return item.text.trim().length > 0;
     if (item.type === "text_selection") return item.text.trim().length > 0;
     if (item.type === "skill") return item.prompt.trim().length > 0;
-    return item.base64.length > 0;
+    return !!(item.base64 || item.blobId);
   });
 }
 
@@ -413,6 +343,8 @@ function chipLabel(item: Exclude<InputItem, { type: "text" }>): string {
       return `Skill · ${item.title || item.actionId}`;
     case "image":
       return "Image region";
+    case "pdf":
+      return `PDF · ${item.name}`;
     case "text_selection":
       return "Text selection";
   }
