@@ -49,3 +49,15 @@
 - **证据**：关闭期间新增 7 个 Activity Sample 与 1 个 Screenshot Record；7 份 AX 详情可读。截图 57E4E898-8AB5-4718-949B-D33B55D62FC8（2026-09-13T11:04:47Z，sampleId=33961BCA-FB2F-47AB-BEF2-65A4B1CDBFCC）原图 1440×932，经工具内容索引取出后以 ImageIO/sips 完整解码。原始时间、前台变化和窗口计数在 .cache/issue-4-qa/CH4-final-evidence.jsonl、CH4-closed-monitor.json、CH4-final-verdict.json、responses/ch4-*。期间用户前台还切至其他已有应用，产品窗口始终关闭；后续外部终端标题变化引起的 context_changed 在工具与 CUA 设置页明确可见，稳定 fixture 下工具状态恢复，未把不一致证据拼接为成功截图。
 - **清理状态**：ThreadWindow 保持关闭，Settings 为后续开关验收重新打开；本项没有创建或修改用户 Thread。
 - **结论**：CH4 完整通过。
+
+
+- [ ] **CH5 停机与重启**：禁用后和完全退出后均无新写入；重启遵守配置并能读取旧活动、AX 与图片。
+
+### CH5：禁用、退出与重启
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 (24F74)，`codex/issue-4-builtin-modules` 的 `dist/Wisp Pocket.app`；主程序 SHA-256 `b86c404631a0bb81b1a62ac0624e30770ac06c2a1b94eb9cb6a8b6c14cc95be7`。内置数据隔离在 `.cache/issue-4-qa/home-final-20260913`，真实 Dynamic Tool Provider 与真实 macOS 能力；模型为 mock。
+- **验证过程**：CUA 禁用 Context History 后，旧声明调用明确返回 `context_history is disabled`，工具数 21→17；观察 65.22 秒，340 个历史文件无内容、大小或 mtime 变化。CUA 重新启用并核对配置两个 true、21 个工具后，经 `osascript` 核对前台 PID 并发送 Command-Q。再观察 65.22 秒，370 个文件完全不变。确认 Host 70353、Electron 70354、Node 70357 均已退出；同 home 重启到 Host 22071 / Node 22083，CUA 工具页仍显示两个开关 on，采集恢复。
+- **证据**：`.cache/issue-4-qa/CH5-final-evidence.jsonl`、`ch5-{disabled,exited}-verdict.json`、`CH5-restarted-verdict.json`、`responses/ch5-*`。真实工具重新读到 CH2 的活动与 AX `461F697A-7AE6-4B14-BADB-F4F455891C9E`、`BEDC87FA-E929-47C3-B8FE-6220890C406A`，AX 保留受控文本；原图 `D07CB80E-152E-44DD-B24D-6C65CE00F892` 的 sampleId、1440×932 尺寸与内容一致，解码后 SHA-256 仍为 `d548ba238de665fdd0cc5838b2791a142603fc87abafe6126e69ea9f06e4846c`。
+- **证据边界**：首次退出辅助脚本只等 12 秒，并将 Node 的 `Z / defunct` 记录判为存活；后续确认两个服务端口关闭、Electron/Node 均消失，以上最终证据为准。索引查询一次超出公开上限返回明确错误，改用合法 `limit:200` 后读回；辅助解析误读图片层级不计作产品失败。
+- **结论**：CH5 全部步骤通过；开关恢复为本项开始时的两个 on。进程、隔离数据与原始图片待 HOST1 统一清理，未改动用户 Thread。
