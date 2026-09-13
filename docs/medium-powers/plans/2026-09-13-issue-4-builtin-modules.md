@@ -2,13 +2,13 @@
 
 规格以 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 为准。基点为 `codex/issue-3-state-ownership-main-20260913` 的 `72787e2`；工作区为 `.worktrees/issue-4-builtin-modules`。本计划按已授权规格执行，不增加采集来源或自主修复能力。
 
-当前状态（2026-09-13）：独立 worktree、CodeGraph 与分层基线、内置实现及审核发现的修复均已完成；独立文档审核已与当前代码同步。实机验收已开始，九项尚无完整归档通过，Issue #4 未完成。
+当前状态（2026-09-13）：独立 worktree、CodeGraph、分层基线与初始重构审核已完成。实机已确认后台 Swift Host 激活缺陷，待修复，后续验收暂停；九项均未完整通过，Issue #4 未完成。
 
-验证记录：最后 Bridge 修复后的完整 Web 检查、版本保护后的完整 Swift test/build，以及最终打包均已通过，日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`。末次版本上界与发送失败回归分别见 `.cache/issue-4-version-green.log`、`.cache/issue-4-send-failure-green.log`；standards/spec 最终复核发现均已闭合。
+初始重构验证：完整 Web 检查、Swift test/build 及打包均已通过，日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`。版本上界与发送失败回归见 `.cache/issue-4-version-green.log`、`.cache/issue-4-send-failure-green.log`；此前 standards/spec 发现已闭合。这些检查不覆盖后续后台激活修复。
 
-最终产物为 `dist/Wisp Pocket.app`，使用 `--mock-llm` 避免外部模型依赖，系统能力与业务模块均保持真实实现；`codesign --verify --deep --strict` 已通过。主程序 SHA-256 为 `b3596abbecd8a2f8089c6154d90fae7845e7bd836078ef246e176b469e72c503`。该产物已用于 CH1 的部分实机步骤。
+缺陷复现产物为实施提交 `8911eaf` 的 `dist/Wisp Pocket.app`，使用 `--mock-llm`，系统能力与业务模块保持真实实现；`codesign --verify --deep --strict` 已通过。主程序 SHA-256 为 `b3596abbecd8a2f8089c6154d90fae7845e7bd836078ef246e176b469e72c503`。该产物仅支持已记录的 CH1 部分步骤。
 
-用户已明确恢复实机验收。CH1 已有证据、尚未完成的在途调用验证及其余八项状态统一维护在 [manual-qa](../../manual-qa.md)；测试数据使用 `.cache/issue-4-qa/home` 隔离 home，受控窗口由本次 fixture 提供。宿主激活失败仍待核实原因，进程与清理状态以每次验证证据为准。
+验收使用 `.cache/issue-4-qa/home` 隔离内置业务数据与受控 fixture。八项未完成验收留在 [manual-qa](../../manual-qa.md)，HOST1 已按 QA 流程移至 [后台激活缺陷](../../bugs.md)。本次发现缺陷后已正常退出宿主、释放监听并关闭 fixture；修复后重新记录产物、进程与清理证据。
 
 已有 CH1 原始记录位于 `.cache/issue-4-qa/` 下的 `provider-hellos.jsonl`、`ch1-restart.json` 与 `CH1-evidence.jsonl`。这些记录只支持已注明的部分步骤，不能代表九项完整验收。
 
@@ -22,15 +22,9 @@
 
 ## 明确接口
 
-系统边界使用 `@MainActor HostAutomationCapabilities`，只定义 `frontmostAppWindow()`、`accessibilitySnapshot()`、`captureScreenshot()`、`activateApp(bundleId:)` 和 `performAction(_:)`；前三者返回现有 JSON 对象，后两者失败时抛错。`MacPlatformProvider` 直接实现这些方法并共享已有 App/window、ScreenCaptureKit、AX 实现。
+Swift Host 通过固定的 `HostAutomationCapabilities` 共享 macOS 实现，`BuiltinFeatures` 显式组合两个模块；不建立模块注册表、能力发现或新运行协议。接口、Dynamic Tool 图片格式、callId 与声明刷新合约见 [平台桥](../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
 
-`DynamicToolResult` 只承载现有 `success` 与 `contentItems`，遵守已有 Dynamic Tool 文本和图片内容格式，不建立新的运行协议。
-
-`BuiltinFeatureSettings` 包含 `contextHistoryEnabled`、`automationEnabled`，缺省均为 false；Swift 的 `BuiltinFeatureSettingsStore` 原子写入 `.spotAgent/builtin-features.json`，写入失败时保留原有效设置并展示错误。
-
-`BuiltinFeatures` 明确持有 settings store、`ContextHistoryModule` 和 `AutomationModule`，提供 `start()` / `stop()`、当前工具声明和固定 namespace 分派。没有模块注册表、能力发现或通用加载器。
-
-`DynamicToolProviderService(provider: builtinFeatures:)` 仍接收真实 `tool_call_request`，响应保持 callId；`provider_hello` 包含原生工具与当前启用模块的工具。宿主能力收敛到 `host_macos`，补齐已有 activate、selector、type_text、hotkey 等操作。
+两个开关默认关闭，由 [宿主设置](../../../apps/desktop/Sources/AppServices/AgentSettings/agent-settings.md) 原子保存；写入失败保留原有效选择。业务生命周期和持久化边界见 [Host Automation](../../../apps/host-automation/host-automation.md)。
 
 ## 用例一：启用、采集、查询与重启
 
@@ -88,9 +82,17 @@
 
 ## 待完成的实机验证
 
-- 继续使用本 worktree 的同一构建，记录二进制、进程和权限环境；快捷键通过 `osascript` 发送。测试数据与用户现有业务记录隔离，配置与临时应用状态在验证后恢复。
+- 后台激活修复及检查完成后，重新打包本 worktree，记录新的二进制、进程和权限环境；快捷键通过 `osascript` 发送。测试数据与用户现有业务记录隔离，配置与临时应用状态在验证后恢复。
 - 实际启用采集，切换受控 App/window 并等待 30/60 秒；通过真实工具通路读回磁盘活动、AX、缩略图、原图并核验内容。
 - 关闭设置与会话窗口仍产生新样本；禁用与完全退出后不再写入，重启遵守保存的开关并可读旧记录。
 - 在受控、可撤销的桌面窗口录制操作，保存 Trace / Policy，重启后执行并检查实际界面结果；失败与修复数据按上述状态验证。清理测试录制、任务和进程。
 - 区分产品缺陷、系统权限、环境和测试工具限制；未执行项不得标通过。发现本规格阻断问题先修复再复验。
 - 根据实机结果同步相关中文文档与可核验证据，通过项按 QA 归档流程处理；如需修复代码，再完成对应检查与独立审核并提交。
+
+## 后台激活缺陷修复用例
+
+- **触发与目标**：Swift Host 在后台，通过真实 Provider 激活已运行应用。链路为 Provider → `activateRunningApplication` → AppKit 请求 → 实际前台状态；目标不存在或已退出时明确失败，不启动新应用。
+- **修复前证据**：`python3 .cache/issue-4-qa/activation-use-case.py resume-background-red` 已验证 `app_list` 的 Host `isActive:false`，随后产品 `app_activate` 失败。LaunchServices 启动相同 SHA 仍复现；`osascript` 设置 frontmost 后核对实际 PID 的系统对照仅证明存在可用路径。
+- **拟实施边界**：AppKit 激活请求被拒绝时，在已授权的 Accessibility 边界设置目标 `AXFrontmost`；保留权限不足、目标失效、超时和取消检查，以及连续 150ms 的稳定前台确认。请求被接受或 AX 返回 0 均不足以判成功。
+- **修复后验收**：重建并启动修复产物，用同一脚本、后台前提及真实 Provider 入口从失败转为通过；核对 Host 与 fixture 的实际前台 PID、真实可见窗口和响应一致。同步回归不存在目标、权限不足与取消边界，不能以替身或系统对照成功代替产品复验。
+- **恢复流程**：修复后将 HOST1 原完整条目恢复到 manual-qa，完成相应仓库检查与独立文档审核后提交，再继续 CH1 在途声明刷新及其余用例。记录与退出仍按逐项 QA 流程执行，未验证子项不随修复归档。

@@ -39,3 +39,16 @@
 - **期望结果**：`bridge.json` 指向当前 Swift bridge 正在监听的端口和 token；hello / folderTreeSnapshot 转发成功，Settings 表单可选择收藏夹并保存自动化。
 - **关键证据**：发现时 `bridge.json` 写入端口 `53317`，但 HandAgentDesktop 进程只监听旧端口 `53288`；旧端口携带当前 token 返回 `401`，新端口连接失败。
 - **根因边界**：问题在 Swift `AgentTriggerRuntime` / `ChromeBookmarksAgentTriggerProvider` / `ChromeBookmarksExtensionBridgeServer` 的 provider lifecycle 或 endpoint 写入；Settings UI 和 native host 只是读取磁盘 endpoint 后展示或转发。
+
+### Issue #4：后台 Swift Host 激活应用失败
+
+- **发现日期**：2026-09-13
+- **严重级别**：P1，阻断跨应用 Automation 实机验收。
+- **状态**：已确认，待修复；修复用例及拟采用的系统路径见 [Issue #4 实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
+- **复现步骤**：运行本分支实施提交 `8911eaf` 的签名产物及受控 AppKit fixture；经真实 Provider 的 `app_list` 确认 Swift Host `isActive:false` 且仍在运行，再经 server → Dynamic Tool bridge → Swift Provider 调用 `host_macos.app_activate`，目标为该 Host 的 bundleId。复现命令：`python3 .cache/issue-4-qa/activation-use-case.py resume-background-red`。
+- **实际结果**：前台 Host 激活 fixture 可成功；Host 退到后台后，请求激活自身返回 `success:false`、`action_failed: macOS refused to activate the running app`。同一产物通过 LaunchServices 重启后仍复现；此前受控 Automation 也停在激活步骤。
+- **期望结果**：在已授予系统控制权限且目标仍运行时完成请求的应用切换，确认目标稳定处于前台后返回成功；系统权限或目标失效时仍应明确失败。
+- **证据**：macOS 15.5 (24F74)，产物 SHA-256 `b3596abbecd8a2f8089c6154d90fae7845e7bd836078ef246e176b469e72c503`；`.cache/issue-4-qa/responses/` 下的 `resume-activate-fixture.json`、`resume-background-red-apps.json`、`resume-background-red-activate-host.json`，以及 `.cache/issue-4-qa/activation-use-case-evidence.jsonl`。后台前提与失败响应来自同一真实工具入口；此前 Automation 失败见 `CH1-evidence.jsonl`。
+- **系统对照**：同一 `osascript` / System Events 脚本设置 Host `frontmost=true` 后，实际前台 PID 与目标一致，再发送 Command-Q。已有系统控制权限下存在可用激活路径；这只是系统对照，不是产品修复或验收通过的证据。
+- **初步调用链 / 根因边界**：真实 Provider 请求 → `activateRunningApplication` → `NSRunningApplication.activate(options: [.activateAllWindows])` 被拒绝，尚未进入稳定前台等待。拟补的 Accessibility 路径与权限失败边界仍待实施、验证；工具或 AX 方法返回成功不能替代实际前台状态。
+- **验证与清理**：缺陷产物对应的 Web/Swift test/build、打包与签名检查已通过。2026-09-13 本次复现后暂停后续 QA，以 `osascript` 正常退出宿主，核对宿主退出、4317 监听释放，并关闭 fixture。HOST1 的读取、输入、图片及完整清理验收仍未完成，修复后恢复原完整条目继续；后续运行重新记录进程与清理状态。
