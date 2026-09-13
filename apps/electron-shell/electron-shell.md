@@ -15,7 +15,7 @@
 - agent-server ready 后由 Electron main 预热 hidden ThreadWindow；Swift 不发送 prepare command。
 - ThreadWindow 的 open/focus/close 与桌宠窗口的显示、位置和命中由 Electron main 管理；桌宠的回复、历史和气泡显隐由 renderer 管理。
 - 关闭 UI 窗口不停止 agent-server；Electron shutdown 才停止 supervisor。
-- 主题初值来自 `HANDAGENT_INITIAL_THEME`，后续 `theme.changed` 同步到两个 renderer；renderer 不持久化偏好。
+- 主题初值来自 `HANDAGENT_INITIAL_THEME`，后续 `theme.changed` 同步到两个 renderer；renderer 不持久化主题偏好。角色大小是[桌宠 renderer](./src/src.md)独立保存的本地界面偏好。
 
 ## 安全边界
 

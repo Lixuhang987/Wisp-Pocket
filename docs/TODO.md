@@ -14,10 +14,10 @@
 目标与接口边界见[实施计划](./medium-powers/plans/2026-09-13-pet-floating-bubbles.md)。
 
 - [x] 核对代码范围及目录文档链到 `handAgent.md`；复用当前 Issue #1 独立 worktree，保存已有未提交差异，确认 CodeGraph 路径与已通过的分层基线。
-- [ ] 按新增要求先写用例，再统一小气泡、调整左右位置、常驻选项与回复、实现角色独立缩放。
-- [ ] 通过相关测试及 TypeScript/Web、Swift test/build 提交前检查与打包。
+- [x] 按新增要求先写用例，再统一小气泡、调整左右位置、常驻选项与回复、实现角色独立缩放。
+- [x] 通过相关测试及 TypeScript/Web、Swift test/build 提交前检查与打包。
 - [ ] 完成当前包实机视觉验证。
-- [ ] 独立无上下文子 agent 审核最终 spec/代码相关文档与 manual QA，核对缺陷状态。
+- [x] 独立无上下文子 agent 审核最终 spec/代码相关文档与 manual QA，核对缺陷状态。
 - [ ] 提交本次代码及文档，完成项移出 TODO。
 
 ## Wisp Pocket 桌宠后续能力

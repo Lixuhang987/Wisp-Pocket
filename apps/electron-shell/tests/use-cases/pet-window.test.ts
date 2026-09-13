@@ -38,12 +38,12 @@ describe("桌宠原生窗口用例", () => {
     const { window, bridge, screen } = harness;
 
     expect(window.options).toMatchObject({
-      width: 192, height: 208, show: false, frame: false, transparent: true,
+      width: 208, height: 208, show: false, frame: false, transparent: true,
       alwaysOnTop: true, skipTaskbar: true, focusable: true,
       acceptFirstMouse: true, resizable: false,
       webPreferences: { contextIsolation: true, nodeIntegration: false },
     });
-    expect(window.bounds).toEqual({ x: 1224, y: 668, width: 192, height: 208 });
+    expect(window.bounds).toEqual({ x: 920, y: 668, width: 208, height: 208 });
     expect(window.showInactiveCount).toBe(1);
     expect(window.focusedSurface).toBe("other-app");
     expect(harness.mainWorld.handAgentActivityWindowConfig).toEqual({
@@ -54,15 +54,15 @@ describe("桌宠原生窗口用例", () => {
     ]);
 
     bridge.setLayout("compact");
-    expect(window.bounds).toEqual({ x: 1048, y: 506, width: 368, height: 370 });
+    expect(window.bounds).toEqual({ x: 920, y: 540, width: 496, height: 336 });
     bridge.setLayout("expanded");
-    expect(window.bounds).toEqual({ x: 1048, y: 236, width: 368, height: 640 });
+    expect(window.bounds).toEqual({ x: 920, y: 236, width: 496, height: 640 });
     bridge.setInteractiveRegions([
-      { x: 0, y: 0, width: 368, height: 412 },
-      { x: 176, y: 432, width: 192, height: 208 },
+      { x: 208, y: 0, width: 280, height: 412 },
+      { x: 72, y: 501, width: 128, height: 139 },
     ]);
 
-    screen.cursor = { x: 1098, y: 286 };
+    screen.cursor = { x: 1178, y: 286 };
     vi.advanceTimersByTime(32);
     expect(window.deliverMouse("mouseDown")).toBe("renderer");
     expect(window.focusedSurface).toBe("pet");
@@ -70,13 +70,13 @@ describe("桌宠原生窗口用例", () => {
     expect(window.deliverMouse("drop")).toBe("renderer");
     expect(window.rendererEvents).toEqual(["mouseDown", "mouseWheel", "drop"]);
 
-    screen.cursor = { x: 1068, y: 736 };
+    screen.cursor = { x: 940, y: 736 };
     vi.advanceTimersByTime(32);
     expect(window.deliverMouse("mouseDown")).toBe("other-app");
     expect(window.lastIgnoreOptions).toEqual({ forward: true });
 
     // 外部应用拖入只改变系统光标；没有 renderer mousemove 也必须恢复 drop 命中。
-    screen.cursor = { x: 1298, y: 736 };
+    screen.cursor = { x: 1050, y: 796 };
     vi.advanceTimersByTime(32);
     expect(window.deliverMouse("drop")).toBe("renderer");
   });
@@ -85,20 +85,20 @@ describe("桌宠原生窗口用例", () => {
     const harness = await createHarness();
     const { window, bridge, screen, positionPath } = harness;
     bridge.setLayout("expanded");
-    bridge.setInteractiveRegions([{ x: 176, y: 432, width: 192, height: 208 }]);
-    screen.cursor = { x: 1298, y: 736 };
+    bridge.setInteractiveRegions([{ x: 72, y: 501, width: 128, height: 139 }]);
+    screen.cursor = { x: 1050, y: 796 };
     bridge.beginMove();
-    screen.cursor = { x: 948, y: 636 };
+    screen.cursor = { x: 700, y: 696 };
     bridge.move();
-    expect(window.bounds).toEqual({ x: 698, y: 136, width: 368, height: 640 });
+    expect(window.bounds).toEqual({ x: 570, y: 136, width: 496, height: 640 });
 
     // pointer capture 期间即使光标离开已上报 DOM 矩形，也继续交给 renderer。
-    screen.cursor = { x: 718, y: 186 };
+    screen.cursor = { x: 590, y: 186 };
     vi.advanceTimersByTime(32);
     expect(window.deliverMouse("mouseMove")).toBe("renderer");
-    screen.cursor = { x: 948, y: 636 };
+    screen.cursor = { x: 700, y: 696 };
     bridge.endMove();
-    expect(JSON.parse(readFileSync(positionPath, "utf8"))).toEqual({ right: 1066, bottom: 776 });
+    expect(JSON.parse(readFileSync(positionPath, "utf8"))).toEqual({ right: 770, bottom: 776 });
 
     window.rendererState = { currentThreadId: "thread-1", draft: "继续阅读" };
     harness.runtime.handleThreadWindowClosed({ wasPrepared: true, wasVisible: true });
@@ -107,11 +107,11 @@ describe("桌宠原生窗口用例", () => {
     expect(harness.controller.currentWebContents()).toBe(window.webContents);
     expect(window.rendererState).toEqual({ currentThreadId: "thread-1", draft: "继续阅读" });
     expect(window.loadFileCount).toBe(1);
-    expect(window.bounds).toEqual({ x: 874, y: 568, width: 192, height: 208 });
+    expect(window.bounds).toEqual({ x: 570, y: 568, width: 208, height: 208 });
 
     window.destroy();
     const restored = await createHarness({ positionPath });
-    expect(restored.window.bounds).toEqual({ x: 874, y: 568, width: 192, height: 208 });
+    expect(restored.window.bounds).toEqual({ x: 570, y: 568, width: 208, height: 208 });
     expect(restored.window.focusedSurface).toBe("other-app");
   });
 
@@ -120,16 +120,29 @@ describe("桌宠原生窗口用例", () => {
     writeFileSync(positionPath, JSON.stringify({ right: 6200, bottom: 3500 }));
     const screen = new FakeScreen({ x: 0, y: 30, width: 1000, height: 670 });
     const { bridge, window } = await createHarness({ positionPath, screen });
-    expect(window.bounds).toEqual({ x: 808, y: 492, width: 192, height: 208 });
+    expect(window.bounds).toEqual({ x: 792, y: 492, width: 208, height: 208 });
 
     bridge.setLayout("expanded");
-    expect(window.bounds).toEqual({ x: 632, y: 60, width: 368, height: 640 });
+    expect(window.bounds).toEqual({ x: 504, y: 60, width: 496, height: 640 });
     screen.workArea = { x: -900, y: 24, width: 900, height: 540 };
     screen.emit("work-area-changed");
-    expect(window.bounds).toEqual({ x: -368, y: 24, width: 368, height: 540 });
+    expect(window.bounds).toEqual({ x: -496, y: 24, width: 496, height: 540 });
     bridge.setLayout("pet");
-    expect(window.bounds).toEqual({ x: -192, y: 356, width: 192, height: 208 });
-    expect(JSON.parse(readFileSync(positionPath, "utf8"))).toEqual({ right: 0, bottom: 564 });
+    expect(window.bounds).toEqual({ x: -496, y: 356, width: 208, height: 208 });
+    expect(JSON.parse(readFileSync(positionPath, "utf8"))).toEqual({ right: -296, bottom: 564 });
+  });
+
+  it("角色在左、对话在右，各布局保持角色右下角锚点", async () => {
+    const positionPath = createPositionPath();
+    writeFileSync(positionPath, JSON.stringify({ right: 500, bottom: 700 }));
+    const screen = new FakeScreen({ x: 0, y: 30, width: 1000, height: 770 });
+    const { bridge, window } = await createHarness({ positionPath, screen });
+    for (const layout of ["compact", "expanded", "pet"] as const) {
+      bridge.setLayout(layout);
+      expect(window.bounds.x).toBe(300);
+      expect(window.bounds.y + window.bounds.height).toBe(700);
+      expect(JSON.parse(readFileSync(positionPath, "utf8"))).toEqual({ right: 500, bottom: 700 });
+    }
   });
 
   it("靠近上边缘悬停时缩短历史窗口，主气泡与角色的锚点保持原位", async () => {
@@ -162,15 +175,15 @@ describe("桌宠原生窗口用例", () => {
     bridge.move();
     expect(window.bounds).toEqual(expectedBounds);
 
-    bridge.setInteractiveRegions([{ x: 0, y: 0, width: 368, height: 100 }]);
-    screen.cursor = { x: window.bounds.x + 40, y: window.bounds.y + 40 };
+    bridge.setInteractiveRegions([{ x: 208, y: 0, width: 280, height: 100 }]);
+    screen.cursor = { x: window.bounds.x + 240, y: window.bounds.y + 40 };
     ipcMain.emit("pet-window:set-interactive-regions", { sender: window.webContents }, [
       { x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 100 },
     ]);
     vi.advanceTimersByTime(32);
     expect(window.deliverMouse("mouseDown")).toBe("renderer");
     bridge.setLayout("pet");
-    expect(window.bounds).toEqual({ x: 1224, y: 668, width: 192, height: 208 });
+    expect(window.bounds).toEqual({ x: 920, y: 668, width: 208, height: 208 });
   });
 });
 

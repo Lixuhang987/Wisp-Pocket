@@ -22,6 +22,7 @@ let controller: PetThreadController;
 let sequence = 0;
 const note = (type: string, extra: object = {}) => ({ type, notificationId: String(++sequence), timestamp: "2026-09-13T01:00:00.000Z", ...extra });
 beforeEach(() => {
+  localStorage.clear();
   Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
   globalThis.ResizeObserver = class { observe() {} disconnect() {} unobserve() {} };
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -67,23 +68,73 @@ describe("桌宠的轻量交互", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("启动只显示角色；最新消息常态折叠，悬停历史与输入焦点控制展开", () => {
+  it("启动只显示角色；有对话后最新消息、建议和回复常驻，悬停与焦点只展开历史", () => {
     mount();
     expect(screen.getByRole("button", { name: /月见八千代/ })).toBeTruthy();
     expect(screen.queryByRole("textbox")).toBeNull();
     startThread();
     const bubble = screen.getByTestId("pet-conversation");
+    const input = screen.getByRole("textbox", { name: "回复当前对话" });
+    expect(screen.getByRole("button", { name: "请整理这份资料" })).toBeTruthy();
+    expect(screen.queryByRole("log")).toBeNull();
     expect(screen.getByTestId("pet-latest").className).toContain("pet-latest");
     expect(window.handAgentPet?.setLayout).toHaveBeenLastCalledWith("compact");
     fireEvent.mouseEnter(bubble);
     expect(screen.getByTestId("pet-latest").textContent).toContain("第五行全文");
     expect(screen.getByRole("log").querySelector('[data-author="user"]')?.textContent).toContain("我的资料");
-    const input = screen.getByRole("textbox", { name: "回复当前对话" });
     act(() => input.focus());
     fireEvent.mouseLeave(bubble);
     expect(screen.getByRole("log")).toBeTruthy();
     act(() => input.blur());
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "回复当前对话" })).toBe(input);
+    expect(screen.getByRole("button", { name: "请整理这份资料" })).toBeTruthy();
+    expect(window.handAgentPet?.setLayout).toHaveBeenLastCalledWith("compact");
+  });
+
+  it("常态即可点击当前建议和发送自由回复，不需要先展开历史", () => {
+    mount(); startThread("看看这些安排。");
+    fireEvent.click(screen.getByRole("button", { name: "请整理这份资料" }));
+    expect(Socket.latest.sent.at(-1)).toMatchObject({
+      type: "op.submit", threadId: "a", payload: { op: { payload: { items: [{ type: "text", text: "请整理这份资料" }] } } },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "回复当前对话" }), { target: { value: "先只看第一项" } });
+    fireEvent.click(screen.getByRole("button", { name: "发送回复" }));
+    expect(Socket.latest.sent.at(-1)).toMatchObject({
+      type: "op.submit", threadId: "a", payload: { op: { payload: { items: [{ type: "text", text: "先只看第一项" }] } } },
+    });
+  });
+
+  it("右键调节角色大小、刷新实际命中并恢复偏好，回复节点与草稿保持不变", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (!this.classList.contains("pet-character")) return new DOMRect();
+      const width = Number.parseFloat(this.style.width);
+      const height = Number.parseFloat(this.style.height);
+      return new DOMRect(200 - width, 640 - height, width, height);
+    });
+    mount(); startThread("同一段回复");
+    const pet = screen.getByRole("button", { name: /月见八千代/ });
+    const latest = screen.getByTestId("pet-latest");
+    const input = screen.getByRole("textbox", { name: "回复当前对话" });
+    fireEvent.change(input, { target: { value: "保留这份草稿" } });
+    expect(pet.style.width).toBe("128px");
+    fireEvent.contextMenu(pet);
+    const slider = screen.getByRole("slider", { name: "桌宠大小" });
+    fireEvent.change(slider, { target: { value: "150" } });
+    expect(pet.style.width).toBe("192px");
+    expect(Number.parseFloat(pet.style.height)).toBe(208);
+    expect(screen.getByTestId("pet-latest")).toBe(latest);
+    expect(screen.getByRole("textbox", { name: "回复当前对话" })).toBe(input);
+    expect((input as HTMLTextAreaElement).value).toBe("保留这份草稿");
+    expect(window.handAgentPet?.setInteractiveRegions).toHaveBeenLastCalledWith(expect.arrayContaining([
+      { x: 8, y: 432, width: 192, height: 208 },
+    ]));
+    cleanup(); mount();
+    const restoredPet = screen.getByRole("button", { name: /月见八千代/ });
+    expect(restoredPet.style.width).toBe("192px");
+    fireEvent.contextMenu(restoredPet);
+    expect((screen.getByRole("slider", { name: "桌宠大小" }) as HTMLInputElement).value).toBe("150");
+    fireEvent.click(screen.getByRole("button", { name: "恢复默认大小" }));
+    expect(restoredPet.style.width).toBe("128px");
   });
 
   it("悬停保留同一个最新回复气泡，较早消息独立展开且建议继续走普通回复", () => {

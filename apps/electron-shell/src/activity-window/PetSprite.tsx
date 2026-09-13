@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import spriteURL from "./assets/yachiyo.webp";
+import { petWindowLayout } from "../petWindowLayout.ts";
 
 // hatch-pet/references/animation-rows.md: 8 × 9 atlas, 192 × 208 cells.
 const animations = {
@@ -10,7 +11,7 @@ const animations = {
   running: { row: 7, durations: [120, 120, 120, 120, 120, 220] },
 } as const;
 
-export function PetSprite({ state }: { state: keyof typeof animations }) {
+export function PetSprite({ state, scale }: { state: keyof typeof animations; scale: number }) {
   const [frame, setFrame] = useState({ row: 0, column: 0 });
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -32,5 +33,7 @@ export function PetSprite({ state }: { state: keyof typeof animations }) {
     reducedMotion.addEventListener("change", play);
     return () => { clearTimeout(timer); reducedMotion.removeEventListener("change", play); };
   }, [state]);
-  return <span aria-hidden="true" className="pet-sprite" style={{ backgroundImage: `url(${spriteURL})`, backgroundPosition: `${-frame.column * 192}px ${-frame.row * 208}px` }} />;
+  const { width, height } = petWindowLayout.character;
+  return <span aria-hidden="true" className="pet-sprite" style={{ width, height, transform: `scale(${scale})`,
+    backgroundImage: `url(${spriteURL})`, backgroundPosition: `${-frame.column * width}px ${-frame.row * height}px` }} />;
 }

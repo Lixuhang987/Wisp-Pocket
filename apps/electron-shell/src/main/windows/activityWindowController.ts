@@ -1,8 +1,9 @@
 import type { BrowserWindowConstructorOptions, Point, Rectangle } from "electron";
 import type { HostTheme } from "../protocol/electronShellProtocol.js";
 import { PetPositionStore, type PetPosition } from "./petPositionStore.js";
+import { petWindowLayout, type PetLayout } from "../../petWindowLayout.js";
 
-export type PetLayout = "pet" | "compact" | "expanded";
+export type { PetLayout } from "../../petWindowLayout.js";
 
 export type BrowserWindowLike = {
   webContents: {
@@ -35,14 +36,8 @@ type Options = {
   onRendererCrashed?: (reason: string) => void;
 };
 
-const PET_WIDTH = 192;
-const PET_HEIGHT = 208;
 const WINDOW_MARGIN = 24;
-const layoutSizes: Record<PetLayout, { width: number; height: number }> = {
-  pet: { width: PET_WIDTH, height: PET_HEIGHT },
-  compact: { width: 368, height: 370 },
-  expanded: { width: 368, height: 640 },
-};
+const layoutSizes = petWindowLayout.sizes;
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 
 export class ActivityWindowController {
@@ -135,7 +130,7 @@ export class ActivityWindowController {
     if (this.window) return this.window;
     const primaryArea = this.options.screenProvider.getPrimaryWorkArea();
     this.position ??= this.options.positionStore.load() ?? {
-      right: primaryArea.x + primaryArea.width - WINDOW_MARGIN,
+      right: primaryArea.x + primaryArea.width - WINDOW_MARGIN - layoutSizes.compact.width + petWindowLayout.character.right,
       bottom: primaryArea.y + primaryArea.height - WINDOW_MARGIN,
     };
     const additionalArguments = [`--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`];
@@ -217,8 +212,8 @@ export class ActivityWindowController {
 
   private workAreaForPosition(position: PetPosition): Rectangle {
     return this.options.screenProvider.getWorkAreaForPoint({
-      x: position.right - PET_WIDTH / 2,
-      y: position.bottom - PET_HEIGHT / 2,
+      x: position.right - petWindowLayout.character.width / 2,
+      y: position.bottom - petWindowLayout.character.height / 2,
     });
   }
 
@@ -227,12 +222,11 @@ export class ActivityWindowController {
     const previousBounds = this.bounds;
     this.window.setBounds(boundsFor(position, this.layout, workArea));
     this.bounds = this.window.getBounds();
-    this.position = { right: this.bounds.x + this.bounds.width, bottom: this.bounds.y + this.bounds.height };
+    this.position = { right: this.bounds.x + Math.min(petWindowLayout.character.right, this.bounds.width), bottom: this.bounds.y + this.bounds.height };
     if (previousBounds) {
-      // renderer 的 ResizeObserver 回报新矩形前，已知命中区域随右下锚点一起移动。
+      // 对话列在角色右侧；宽度变化不改变本地 x，展开只增加锚点上方的空间。
       this.interactiveRegions = clipRegions(this.interactiveRegions.map((region) => ({
         ...region,
-        x: region.x + this.bounds!.width - previousBounds.width,
         y: region.y + this.bounds!.height - previousBounds.height,
       })), this.bounds);
     }
@@ -266,7 +260,7 @@ function boundsFor(position: PetPosition, layout: PetLayout, workArea: Rectangle
     : workArea.height;
   const height = Math.min(layoutSizes[layout].height, workArea.height, availableHeight);
   return {
-    x: Math.round(Math.min(Math.max(position.right - width, workArea.x), workArea.x + workArea.width - width)),
+    x: Math.round(Math.min(Math.max(position.right - Math.min(petWindowLayout.character.right, width), workArea.x), workArea.x + workArea.width - width)),
     y: Math.round(Math.min(Math.max(position.bottom - height, workArea.y), workArea.y + workArea.height - height)),
     width,
     height,
