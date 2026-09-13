@@ -1,9 +1,12 @@
 # research
 
-本目录保存会影响产品与交互设计判断的外部研究。每篇注明核验日期、官方来源与验证边界；研究建议不代表 Wisp Pocket 已实现的能力，也不替代 owning 模块的架构事实。
+本目录保存会影响产品与交互设计判断的外部研究与对应的现状审计。每篇注明核验日期、官方来源或代码基线与验证边界；研究建议不代表 Wisp Pocket 已实现的能力，也不替代 owning 模块的架构事实。
 
 ## 直接子节点
 
+- [2026-09-14-pet-products.md](./2026-09-14-pet-products.md)：多桌宠、角色提示与历史组织的12类产品/系统先例，区分已发布能力、测试功能与历史资料。
+- [2026-09-14-pet-platform-hci.md](./2026-09-14-pet-platform-hci.md)：多窗口、拖放、焦点与系统限制，以及4篇原始人机交互研究的适用范围。
+- [2026-09-14-pet-codebase.md](./2026-09-14-pet-codebase.md)：基线代码的32项能力事实与多桌宠设计的具体缺口，含文件/行号证据。
 - [2026-09-13-desktop-agent-ui-references.md](./2026-09-13-desktop-agent-ui-references.md)：面向日常用户的桌面 Agent 界面参考、能力边界与 Wisp Pocket 交互映射。
 - [2026-09-13-design-os.md](./2026-09-13-design-os.md)：评估 Design OS 工作流时阅读，涵盖核心理念、分阶段产物与 UI 交接边界。
 - [2026-09-13-stitch-skills.md](./2026-09-13-stitch-skills.md)：评估 Stitch 技能库时阅读，涵盖设计规范、界面生成、代码转换与多页构建循环。

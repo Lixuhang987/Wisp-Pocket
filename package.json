@@ -4,6 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.5.2",
   "scripts": {
+    "prototype:pet": "python3 -m http.server 4179 --bind 127.0.0.1 --directory apps",
     "build:electron-shell": "pnpm --filter handagent-electron-shell build",
     "build:thread-window-web": "pnpm --filter handagent-thread-window-web build",
     "generate:theme-tokens": "node scripts/generate-theme-tokens.mjs",

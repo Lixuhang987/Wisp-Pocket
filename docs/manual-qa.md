@@ -1,10 +1,28 @@
 # 手工验收清单
 
-本文记录已实现、自动化测试不足以证明真实系统行为的回归项。仍未修复的缺陷放 [bugs.md](/Users/mu9/proj/handAgent/docs/bugs.md)。
+本文记录已实现能力的系统回归项，以及研究/一次性原型的验证范围；每组状态明确区分生产实现、模拟与原生实测。仍未修复的产品缺陷放 [bugs.md](/Users/mu9/proj/handAgent/docs/bugs.md)。
 
 ## 验收前提
 
 先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
+
+## 多桌宠主入口研究与原型（2026-09-14）
+
+- **状态**：研究、详细设计与一次性原型完成；多桌宠、人设注入、独立宠历史、完整控制和 ThreadWindow 解耦尚未接入生产。入口为[设计总览](./design/pet-dialogue/pet-dialogue.md)，实际结果与可复现命令见[原型验证](./design/pet-dialogue/prototype-results.md)。
+- **执行流程**：从主 checkout 通过脚本初始化 `pet-dialogue-design-20260914` worktree 与 CodeGraph；完成 Web/TypeScript、Swift build 基线后读取代码与逐级目录指南；核对 Issue #1、现有紧凑方案和用户截图；并行研究产品、平台/HCI与现状代码，完成自主质询、反例审查、角色/运行/恢复设计及提议 ADR。完成的研究流程从 TODO 迁至本组，生产实施项仍在 TODO。
+- **浏览器证据**：A/B/C 分别完成同一 PDF→八千代→Miku→小八许可→模拟成果链，各7项共21项断言通过；补充25项验证每宠草稿/筛选、人设快照、默认 Workspace、新建/追加、重试、停止与队列、显示切换及后台/隐藏行为。1440×900与1280×800共7组布局边界检查通过；五个独立状态模型场景通过。原始记录在[证据索引](./design/pet-dialogue/evidence/evidence.md)。
+- **原生限定证据**：Electron 42.3.3、macOS 15.5、内建 Retina 单屏下11项检查通过，涉及三透明窗口、锚点、收起/单槽/恢复与内存草稿；全部实验窗口、进程和临时配置已清理。中文仅脚本写入，不能据此勾选真实 IME 或跨 App 焦点验收。
+- **仓库检查**：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`pnpm --filter handagent-electron-shell build` 通过；原型 JS 语法检查通过。生产测试通过不代表设计中的新增能力已落地。
+- **验证边界**：UI 只读本地静态资源并在内存模拟，不调用模型或写真实文件；转交与保存使用固定示例。没有真人任务成功率、性能基准、跨应用拖放、透明命中、系统焦点/IME、多屏、Spaces、VoiceOver、真实宿主取消的通过结论。原 Issue #1 待验项继续保留。
+- **独立文档审核**：不继承研究/实现上下文的子 agent 已读取 Issue #1、完整设计、改动目录指南及其父链至 `handAgent.md`，复核生产关键代码、来源锚点、原始验证记录与代表截图。已统一 Thread 创建快照、请求有效期、Workspace/权限范围、可选语音、现状模块位置与来源平台限制；33份改动 Markdown 的本地链接有效，未发现阻塞本次研究与设计交付的文档矛盾。生产 P0–P3 保持未完成，截图与模拟检查未替代原生或真人验收。
+
+复核本次设计产物时：
+
+1. 从设计总览进入三条研究线、60项能力、18个场景、28个反例与 P0–P3 路线，核对“当前/提议/原型”标记、固定角色快照、Workspace 与权限范围。
+2. 运行 `pnpm prototype:pet`，以同一活动材料比较 A/B/C；在每种方向切全量/单位置，浏览不同宠的历史和人设，尝试新建与追加、停止与继续、许可与成果。
+3. 在独立状态模型逐步推进五个引导场景；对照原始记录确认延迟接收、重复回执、目标删除和重启均没有越界投递或自动执行。
+4. 如需重新运行原生实验，使用原型结果页命令；它自动退出，每次产生独立缓存记录。按原生报告逐项解释结果，不能以窗口截图代替真实跨 App 验收。
+5. 实施生产方案时按[完整场景](./design/pet-dialogue/journeys.md)和[原生/真人门槛](./design/pet-dialogue/delivery-and-validation.md)另立实际验证记录，99%仍作为待证明目标。
 
 ## 本次合并验证（2026-09-14）
 

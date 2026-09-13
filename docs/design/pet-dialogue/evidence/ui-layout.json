@@ -1,0 +1,701 @@
+{
+  "method": "Real browser controls; DOM geometry; screenshots with reduced motion, CSS pixel clipping.",
+  "layouts": [
+    {
+      "name": "ui-a",
+      "variant": "A",
+      "display": "all",
+      "width": 1440,
+      "height": 900,
+      "documentWidth": 1440,
+      "documentHeight": 900,
+      "pets": [
+        {
+          "id": "yachiyo",
+          "rect": {
+            "x": 850,
+            "y": 601.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 601.5,
+            "right": 1000,
+            "bottom": 790,
+            "left": 850
+          },
+          "sprite": {
+            "x": 861,
+            "y": 601.5,
+            "width": 128,
+            "height": 139,
+            "top": 601.5,
+            "right": 989,
+            "bottom": 740.5,
+            "left": 861
+          }
+        },
+        {
+          "id": "miku",
+          "rect": {
+            "x": 1055,
+            "y": 601.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 601.5,
+            "right": 1205,
+            "bottom": 790,
+            "left": 1055
+          },
+          "sprite": {
+            "x": 1066,
+            "y": 601.5,
+            "width": 128,
+            "height": 139,
+            "top": 601.5,
+            "right": 1194,
+            "bottom": 740.5,
+            "left": 1066
+          }
+        },
+        {
+          "id": "xiaoba",
+          "rect": {
+            "x": 1260,
+            "y": 601.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 601.5,
+            "right": 1410,
+            "bottom": 790,
+            "left": 1260
+          },
+          "sprite": {
+            "x": 1271,
+            "y": 601.5,
+            "width": 128,
+            "height": 139,
+            "top": 601.5,
+            "right": 1399,
+            "bottom": 740.5,
+            "left": 1271
+          }
+        }
+      ],
+      "panel": {
+        "x": 792,
+        "y": 214.03125,
+        "width": 326,
+        "height": 363.96875,
+        "top": 214.03125,
+        "right": 1118,
+        "bottom": 578,
+        "left": 792
+      },
+      "input": {
+        "x": 814,
+        "y": 486.40625,
+        "width": 282,
+        "height": 45.59375,
+        "top": 486.40625,
+        "right": 1096,
+        "bottom": 532,
+        "left": 814
+      },
+      "checks": {
+        "petsWithinViewport": true,
+        "inputWithinViewport": true,
+        "panelWithinViewport": true,
+        "panelDoesNotCoverPets": true
+      }
+    },
+    {
+      "name": "ui-b",
+      "variant": "B",
+      "display": "all",
+      "width": 1440,
+      "height": 900,
+      "documentWidth": 1440,
+      "documentHeight": 900,
+      "pets": [
+        {
+          "id": "yachiyo",
+          "rect": {
+            "x": 798,
+            "y": 244.5,
+            "width": 150,
+            "height": 167.5,
+            "top": 244.5,
+            "right": 948,
+            "bottom": 412,
+            "left": 798
+          },
+          "sprite": {
+            "x": 809,
+            "y": 244.5,
+            "width": 128,
+            "height": 139,
+            "top": 244.5,
+            "right": 937,
+            "bottom": 383.5,
+            "left": 809
+          }
+        },
+        {
+          "id": "miku",
+          "rect": {
+            "x": 1011,
+            "y": 244.5,
+            "width": 150,
+            "height": 167.5,
+            "top": 244.5,
+            "right": 1161,
+            "bottom": 412,
+            "left": 1011
+          },
+          "sprite": {
+            "x": 1022,
+            "y": 244.5,
+            "width": 128,
+            "height": 139,
+            "top": 244.5,
+            "right": 1150,
+            "bottom": 383.5,
+            "left": 1022
+          }
+        },
+        {
+          "id": "xiaoba",
+          "rect": {
+            "x": 1224,
+            "y": 244.5,
+            "width": 150,
+            "height": 167.5,
+            "top": 244.5,
+            "right": 1374,
+            "bottom": 412,
+            "left": 1224
+          },
+          "sprite": {
+            "x": 1235,
+            "y": 244.5,
+            "width": 128,
+            "height": 139,
+            "top": 244.5,
+            "right": 1363,
+            "bottom": 383.5,
+            "left": 1235
+          }
+        }
+      ],
+      "panel": {
+        "x": 34,
+        "y": 430,
+        "width": 1372,
+        "height": 358,
+        "top": 430,
+        "right": 1406,
+        "bottom": 788,
+        "left": 34
+      },
+      "input": {
+        "x": 1123,
+        "y": 588,
+        "width": 259,
+        "height": 45.59375,
+        "top": 588,
+        "right": 1382,
+        "bottom": 633.59375,
+        "left": 1123
+      },
+      "checks": {
+        "petsWithinViewport": true,
+        "inputWithinViewport": true,
+        "panelWithinViewport": true,
+        "panelDoesNotCoverPets": true
+      }
+    },
+    {
+      "name": "ui-c",
+      "variant": "C",
+      "display": "all",
+      "width": 1440,
+      "height": 900,
+      "documentWidth": 1440,
+      "documentHeight": 900,
+      "pets": [
+        {
+          "id": "yachiyo",
+          "rect": {
+            "x": 50,
+            "y": 601.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 601.5,
+            "right": 200,
+            "bottom": 790,
+            "left": 50
+          },
+          "sprite": {
+            "x": 61,
+            "y": 601.5,
+            "width": 128,
+            "height": 139,
+            "top": 601.5,
+            "right": 189,
+            "bottom": 740.5,
+            "left": 61
+          }
+        },
+        {
+          "id": "miku",
+          "rect": {
+            "x": 217.5,
+            "y": 601.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 601.5,
+            "right": 367.5,
+            "bottom": 790,
+            "left": 217.5
+          },
+          "sprite": {
+            "x": 228.5,
+            "y": 601.5,
+            "width": 128,
+            "height": 139,
+            "top": 601.5,
+            "right": 356.5,
+            "bottom": 740.5,
+            "left": 228.5
+          }
+        },
+        {
+          "id": "xiaoba",
+          "rect": {
+            "x": 385,
+            "y": 601.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 601.5,
+            "right": 535,
+            "bottom": 790,
+            "left": 385
+          },
+          "sprite": {
+            "x": 396,
+            "y": 601.5,
+            "width": 128,
+            "height": 139,
+            "top": 601.5,
+            "right": 524,
+            "bottom": 740.5,
+            "left": 396
+          }
+        }
+      ],
+      "panel": {
+        "x": 816,
+        "y": 103,
+        "width": 596,
+        "height": 689,
+        "top": 103,
+        "right": 1412,
+        "bottom": 792,
+        "left": 816
+      },
+      "input": {
+        "x": 995,
+        "y": 699.40625,
+        "width": 394,
+        "height": 45.59375,
+        "top": 699.40625,
+        "right": 1389,
+        "bottom": 745,
+        "left": 995
+      },
+      "checks": {
+        "petsWithinViewport": true,
+        "inputWithinViewport": true,
+        "panelWithinViewport": true,
+        "panelDoesNotCoverPets": true
+      }
+    },
+    {
+      "name": "ui-solo",
+      "variant": "A",
+      "display": "solo",
+      "width": 1440,
+      "height": 900,
+      "documentWidth": 1440,
+      "documentHeight": 900,
+      "pets": [
+        {
+          "id": "miku",
+          "rect": {
+            "x": 1189,
+            "y": 601.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 601.5,
+            "right": 1339,
+            "bottom": 790,
+            "left": 1189
+          },
+          "sprite": {
+            "x": 1200,
+            "y": 601.5,
+            "width": 128,
+            "height": 139,
+            "top": 601.5,
+            "right": 1328,
+            "bottom": 740.5,
+            "left": 1200
+          }
+        }
+      ],
+      "panel": {
+        "x": 1056,
+        "y": 205.03125,
+        "width": 326,
+        "height": 372.96875,
+        "top": 205.03125,
+        "right": 1382,
+        "bottom": 578,
+        "left": 1056
+      },
+      "input": {
+        "x": 1078,
+        "y": 486.40625,
+        "width": 282,
+        "height": 45.59375,
+        "top": 486.40625,
+        "right": 1360,
+        "bottom": 532,
+        "left": 1078
+      },
+      "checks": {
+        "petsWithinViewport": true,
+        "inputWithinViewport": true,
+        "panelWithinViewport": true,
+        "panelDoesNotCoverPets": true
+      }
+    },
+    {
+      "name": "ui-1280",
+      "variant": "A",
+      "display": "all",
+      "width": 1280,
+      "height": 800,
+      "documentWidth": 1280,
+      "documentHeight": 800,
+      "pets": [
+        {
+          "id": "yachiyo",
+          "rect": {
+            "x": 690,
+            "y": 501.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 501.5,
+            "right": 840,
+            "bottom": 690,
+            "left": 690
+          },
+          "sprite": {
+            "x": 701,
+            "y": 501.5,
+            "width": 128,
+            "height": 139,
+            "top": 501.5,
+            "right": 829,
+            "bottom": 640.5,
+            "left": 701
+          }
+        },
+        {
+          "id": "miku",
+          "rect": {
+            "x": 895,
+            "y": 501.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 501.5,
+            "right": 1045,
+            "bottom": 690,
+            "left": 895
+          },
+          "sprite": {
+            "x": 906,
+            "y": 501.5,
+            "width": 128,
+            "height": 139,
+            "top": 501.5,
+            "right": 1034,
+            "bottom": 640.5,
+            "left": 906
+          }
+        },
+        {
+          "id": "xiaoba",
+          "rect": {
+            "x": 1100,
+            "y": 501.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 501.5,
+            "right": 1250,
+            "bottom": 690,
+            "left": 1100
+          },
+          "sprite": {
+            "x": 1111,
+            "y": 501.5,
+            "width": 128,
+            "height": 139,
+            "top": 501.5,
+            "right": 1239,
+            "bottom": 640.5,
+            "left": 1111
+          }
+        }
+      ],
+      "panel": {
+        "x": 632,
+        "y": 114.03125,
+        "width": 326,
+        "height": 363.96875,
+        "top": 114.03125,
+        "right": 958,
+        "bottom": 478,
+        "left": 632
+      },
+      "input": {
+        "x": 654,
+        "y": 386.40625,
+        "width": 282,
+        "height": 45.59375,
+        "top": 386.40625,
+        "right": 936,
+        "bottom": 432,
+        "left": 654
+      },
+      "checks": {
+        "petsWithinViewport": true,
+        "inputWithinViewport": true,
+        "panelWithinViewport": true,
+        "panelDoesNotCoverPets": true
+      }
+    },
+    {
+      "name": "ui-1280-b",
+      "variant": "B",
+      "display": "all",
+      "width": 1280,
+      "height": 800,
+      "documentWidth": 1280,
+      "documentHeight": 800,
+      "pets": [
+        {
+          "id": "yachiyo",
+          "rect": {
+            "x": 638,
+            "y": 144.5,
+            "width": 150,
+            "height": 167.5,
+            "top": 144.5,
+            "right": 788,
+            "bottom": 312,
+            "left": 638
+          },
+          "sprite": {
+            "x": 649,
+            "y": 144.5,
+            "width": 128,
+            "height": 139,
+            "top": 144.5,
+            "right": 777,
+            "bottom": 283.5,
+            "left": 649
+          }
+        },
+        {
+          "id": "miku",
+          "rect": {
+            "x": 851,
+            "y": 144.5,
+            "width": 150,
+            "height": 167.5,
+            "top": 144.5,
+            "right": 1001,
+            "bottom": 312,
+            "left": 851
+          },
+          "sprite": {
+            "x": 862,
+            "y": 144.5,
+            "width": 128,
+            "height": 139,
+            "top": 144.5,
+            "right": 990,
+            "bottom": 283.5,
+            "left": 862
+          }
+        },
+        {
+          "id": "xiaoba",
+          "rect": {
+            "x": 1064,
+            "y": 144.5,
+            "width": 150,
+            "height": 167.5,
+            "top": 144.5,
+            "right": 1214,
+            "bottom": 312,
+            "left": 1064
+          },
+          "sprite": {
+            "x": 1075,
+            "y": 144.5,
+            "width": 128,
+            "height": 139,
+            "top": 144.5,
+            "right": 1203,
+            "bottom": 283.5,
+            "left": 1075
+          }
+        }
+      ],
+      "panel": {
+        "x": 34,
+        "y": 330,
+        "width": 1212,
+        "height": 358,
+        "top": 330,
+        "right": 1246,
+        "bottom": 688,
+        "left": 34
+      },
+      "input": {
+        "x": 963,
+        "y": 488,
+        "width": 259,
+        "height": 45.59375,
+        "top": 488,
+        "right": 1222,
+        "bottom": 533.59375,
+        "left": 963
+      },
+      "checks": {
+        "petsWithinViewport": true,
+        "inputWithinViewport": true,
+        "panelWithinViewport": true,
+        "panelDoesNotCoverPets": true
+      }
+    },
+    {
+      "name": "ui-1280-c",
+      "variant": "C",
+      "display": "all",
+      "width": 1280,
+      "height": 800,
+      "documentWidth": 1280,
+      "documentHeight": 800,
+      "pets": [
+        {
+          "id": "yachiyo",
+          "rect": {
+            "x": 50,
+            "y": 501.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 501.5,
+            "right": 200,
+            "bottom": 690,
+            "left": 50
+          },
+          "sprite": {
+            "x": 61,
+            "y": 501.5,
+            "width": 128,
+            "height": 139,
+            "top": 501.5,
+            "right": 189,
+            "bottom": 640.5,
+            "left": 61
+          }
+        },
+        {
+          "id": "miku",
+          "rect": {
+            "x": 217.5,
+            "y": 501.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 501.5,
+            "right": 367.5,
+            "bottom": 690,
+            "left": 217.5
+          },
+          "sprite": {
+            "x": 228.5,
+            "y": 501.5,
+            "width": 128,
+            "height": 139,
+            "top": 501.5,
+            "right": 356.5,
+            "bottom": 640.5,
+            "left": 228.5
+          }
+        },
+        {
+          "id": "xiaoba",
+          "rect": {
+            "x": 385,
+            "y": 501.5,
+            "width": 150,
+            "height": 188.5,
+            "top": 501.5,
+            "right": 535,
+            "bottom": 690,
+            "left": 385
+          },
+          "sprite": {
+            "x": 396,
+            "y": 501.5,
+            "width": 128,
+            "height": 139,
+            "top": 501.5,
+            "right": 524,
+            "bottom": 640.5,
+            "left": 396
+          }
+        }
+      ],
+      "panel": {
+        "x": 656,
+        "y": 103,
+        "width": 596,
+        "height": 589,
+        "top": 103,
+        "right": 1252,
+        "bottom": 692,
+        "left": 656
+      },
+      "input": {
+        "x": 835,
+        "y": 599.40625,
+        "width": 394,
+        "height": 45.59375,
+        "top": 599.40625,
+        "right": 1229,
+        "bottom": 645,
+        "left": 835
+      },
+      "checks": {
+        "petsWithinViewport": true,
+        "inputWithinViewport": true,
+        "panelWithinViewport": true,
+        "panelDoesNotCoverPets": true
+      }
+    }
+  ]
+}

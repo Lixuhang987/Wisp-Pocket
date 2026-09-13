@@ -1,0 +1,1344 @@
+{
+  "checks": {
+    "explicitPetClickFocusesInput": true,
+    "arrowWithinInputDoesNotSwitchVariant": true,
+    "mikuDraftPreserved": true,
+    "yachiyoDraftPreserved": true,
+    "historyFilterIndependent": true,
+    "historyFilterRestored": true,
+    "historyRestoresThreadDraft": true,
+    "newThreadIgnoresHistoryFilter": true,
+    "oldThreadKeepsPromptVersion": true,
+    "newThreadUsesPromptVersion": true,
+    "panelDropAppends": true,
+    "bodyDropUsesProfileDefault": true,
+    "failedRunOffersRetry": true,
+    "retryReturnsReady": true,
+    "stopPausesQueue": true,
+    "stoppedQueueDoesNotRestartInBackground": true,
+    "explicitContinueDrainsQueue": true,
+    "soloOneFullPet": true,
+    "soloSwitchShowsCorrectPet": true,
+    "soloPreservesDraft": true,
+    "allModeThreeFullPets": true,
+    "denyPermissionContinuesQueue": true,
+    "backgroundPermissionKeepsSelectionAndFocus": true,
+    "hiddenCompletionStaysHidden": true,
+    "hiddenCompletionRetainsUnread": true
+  },
+  "observations": [
+    {
+      "step": "drafts-focus-keyboard",
+      "state": {
+        "variant": "C",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "y-book",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "八千代的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "Miku 的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 1,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    },
+    {
+      "step": "independent-history",
+      "state": {
+        "variant": "C",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "conversation-42",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "writing",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "八千代的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "Miku 的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-42",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 1,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    },
+    {
+      "step": "persona-version",
+      "state": {
+        "variant": "C",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "conversation-44",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "writing",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "八千代的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "Miku 的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-42",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-44",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 2,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    },
+    {
+      "step": "append-and-new-drop",
+      "state": {
+        "variant": "C",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "conversation-49",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "writing",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "八千代的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "Miku 的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-42",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-44",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-49",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "latestDelivery": {
+          "petId": "yachiyo",
+          "workspaceId": "book",
+          "sessionId": "conversation-49",
+          "names": [
+            "读书交换日 · 活动草案.pdf"
+          ],
+          "mode": "inspect"
+        },
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 2,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    },
+    {
+      "step": "failure-retry",
+      "state": {
+        "variant": "C",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "conversation-49",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "writing",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "八千代的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "Miku 的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-42",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-44",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-49",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "latestDelivery": {
+          "petId": "yachiyo",
+          "workspaceId": "book",
+          "sessionId": "conversation-49",
+          "names": [
+            "读书交换日 · 活动草案.pdf"
+          ],
+          "mode": "inspect"
+        },
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 2,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    },
+    {
+      "step": "stop-queue",
+      "state": {
+        "variant": "C",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "conversation-49",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "writing",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "八千代的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-42",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-44",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-49",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "latestDelivery": {
+          "petId": "yachiyo",
+          "workspaceId": "book",
+          "sessionId": "conversation-49",
+          "names": [
+            "读书交换日 · 活动草案.pdf"
+          ],
+          "mode": "inspect"
+        },
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 2,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    },
+    {
+      "step": "display-modes",
+      "state": {
+        "variant": "C",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "conversation-49",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "writing",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "八千代的独立草稿",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-42",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-44",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "conversation-49",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "切换显示也要保留这句",
+            "promptVersion": 2,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "latestDelivery": {
+          "petId": "yachiyo",
+          "workspaceId": "book",
+          "sessionId": "conversation-49",
+          "names": [
+            "读书交换日 · 活动草案.pdf"
+          ],
+          "mode": "inspect"
+        },
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 2,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    },
+    {
+      "step": "deny-and-background-permission",
+      "waiting": {
+        "variant": "A",
+        "display": "all",
+        "activePet": "xiaoba",
+        "selectedSessions": {
+          "yachiyo": "y-book",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "再轻松一点，控制在 150 字左右。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "waiting",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "request": "request-44",
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "receipts": [],
+        "profileVersions": {
+          "yachiyo": 1,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      },
+      "denied": {
+        "variant": "A",
+        "display": "all",
+        "activePet": "xiaoba",
+        "selectedSessions": {
+          "yachiyo": "y-book",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "再轻松一点，控制在 150 字左右。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "running",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "receipts": [
+          {
+            "requestId": "request-44",
+            "sessionId": "x-book",
+            "choice": "deny",
+            "count": 1
+          }
+        ],
+        "profileVersions": {
+          "yachiyo": 1,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      },
+      "background": {
+        "variant": "A",
+        "display": "all",
+        "activePet": "yachiyo",
+        "selectedSessions": {
+          "yachiyo": "y-book",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "再轻松一点，控制在 150 字左右。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "waiting",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 1,
+            "request": "request-48",
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "receipts": [
+          {
+            "requestId": "request-44",
+            "sessionId": "x-book",
+            "choice": "deny",
+            "count": 1
+          }
+        ],
+        "profileVersions": {
+          "yachiyo": 1,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      },
+      "focus": {
+        "id": "message-input",
+        "value": "后台决定不能打断这一句"
+      }
+    },
+    {
+      "step": "hidden-completion",
+      "state": {
+        "variant": "A",
+        "display": "all",
+        "activePet": "miku",
+        "selectedSessions": {
+          "yachiyo": "y-book",
+          "miku": "m-book",
+          "xiaoba": "x-book"
+        },
+        "historyFilters": {
+          "yachiyo": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "miku": {
+            "workspaceId": "all",
+            "query": ""
+          },
+          "xiaoba": {
+            "workspaceId": "all",
+            "query": ""
+          }
+        },
+        "defaultWorkspaces": {
+          "yachiyo": "book",
+          "miku": "book",
+          "xiaoba": "book"
+        },
+        "sessions": [
+          {
+            "id": "y-book",
+            "pet": "yachiyo",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "后台决定不能打断这一句",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "y-writing",
+            "pet": "yachiyo",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "再加一本适合周末读的散文。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "m-book",
+            "pet": "miku",
+            "workspace": "book",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 1,
+            "queue": 0
+          },
+          {
+            "id": "m-writing",
+            "pet": "miku",
+            "workspace": "writing",
+            "status": "ready",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-book",
+            "pet": "xiaoba",
+            "workspace": "book",
+            "status": "stopped",
+            "draft": "",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          },
+          {
+            "id": "x-project",
+            "pet": "xiaoba",
+            "workspace": "project",
+            "status": "ready",
+            "draft": "先把说明书框架列出来。",
+            "promptVersion": 1,
+            "unread": 0,
+            "queue": 0
+          }
+        ],
+        "receipts": [
+          {
+            "requestId": "request-44",
+            "sessionId": "x-book",
+            "choice": "deny",
+            "count": 1
+          },
+          {
+            "requestId": "request-48",
+            "sessionId": "x-book",
+            "choice": "cancelled",
+            "count": 1
+          }
+        ],
+        "profileVersions": {
+          "yachiyo": 1,
+          "miku": 1,
+          "xiaoba": 1
+        }
+      }
+    }
+  ]
+}

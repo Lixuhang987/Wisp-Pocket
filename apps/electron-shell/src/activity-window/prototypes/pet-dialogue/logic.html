@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>桌宠身份与对话归属 · 状态原型</title>
+<style>
+/* Portable prototype: small frozen subset of design/tokens.json, 2026-09-14. */
+:root{--canvas:#faf9f5;--surface:#efe9de;--ink:#141413;--muted:#6c6a64;--line:#e6dfd8;--accent:#cc785c;--soft:#f5e7de;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--canvas);font-size:15px}
+*{box-sizing:border-box}body{margin:0}main{max-width:1220px;margin:auto;padding:28px}h1{font-size:22px;font-weight:500;margin:4px 0 12px}h2{font-size:17px;font-weight:500;margin:0 0 12px}p{line-height:1.65;margin:8px 0}small,.muted{color:var(--muted)}header{max-width:900px;margin-bottom:22px}.eyebrow{font-size:12px;letter-spacing:.09em;color:var(--muted)}button{font:inherit;background:var(--canvas);border:1px solid var(--line);border-radius:8px;padding:9px 13px;cursor:pointer;color:inherit}button:hover{background:var(--surface)}button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:3px}button[aria-selected=true],button.primary{background:var(--accent);color:white;border-color:var(--accent)}button:disabled{opacity:.45;cursor:default}.toolbar,.tabs,.actions{display:flex;gap:8px;flex-wrap:wrap}.toolbar{margin:14px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--canvas)}.full{grid-column:1/-1}.pets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.pet{padding:14px;border:1px solid var(--line);border-radius:8px}.pet.active{border-color:var(--accent);background:var(--soft)}.pet strong{font-weight:500}.pet p{margin:5px 0;font-size:13px}.tag{display:inline-block;border:1px solid var(--line);border-radius:5px;padding:3px 5px;font-size:12px}.notice{padding:12px 16px;background:var(--surface);border-left:3px solid var(--accent);margin:16px 0;min-height:50px;line-height:1.6}.tabs{margin-bottom:12px}.steps{display:flex;flex-direction:column;gap:7px}.steps button{text-align:left}.steps .done{color:var(--muted)}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:9px 7px;vertical-align:top}th{font-weight:500;color:var(--muted)}.table-scroll{overflow:auto}.log{max-height:165px;overflow:auto;margin:0;padding-left:20px;font-size:13px;line-height:1.8}.metrics{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px}.metrics b{font-weight:500}a{color:var(--muted)}details{margin-top:16px}summary{cursor:pointer}.label{font-size:13px;color:var(--muted)}@media(max-width:760px){main{padding:16px}.grid{grid-template-columns:1fr}.pets{grid-template-columns:1fr}.full{grid-column:auto}}
+</style>
+<main>
+<header><div class="eyebrow">WISP POCKET / 一次性状态模型原型</div><h1>换了桌宠，刚才那份资料会交给谁？</h1><p>这个模型检验多桌宠的身份、对话、提示版本与请求归属。可自由点击，也可逐步演练五个容易混淆的情境。所有动作均为内存模拟；“重启”也只是模型事件，不验证真实持久化或系统拖放。</p><a href="./index.html?variant=A">查看交互方向原型 →</a></header>
+<div class="toolbar"><button id="reset">重置全部状态</button><button data-action="switchA">选八千代</button><button data-action="switchB">选 Miku</button><button data-action="switchC">选小八</button><button data-action="toggleMode">切换同屏 / 单位置</button></div>
+<section class="panel"><div class="metrics" id="metrics"></div><div id="pets" class="pets"></div><div id="notice" class="notice" role="status" aria-live="polite"></div><div class="table-scroll"><table><thead><tr><th>对话</th><th>所属桌宠 / 工作区</th><th>提示快照</th><th>运行</th><th>已保存待处理</th><th>待决定</th></tr></thead><tbody id="threads"></tbody></table></div><p id="delivery" class="label"></p></section>
+<div class="grid" style="margin-top:18px">
+<section class="panel"><h2>按情境走一遍</h2><div class="tabs" id="tabs" role="tablist" aria-label="状态情境"></div><p id="scenario-copy" class="muted"></p><div id="steps" class="steps"></div></section>
+<section class="panel"><h2>自由探索</h2><p class="label">动作作用于明确的对象；“完成读取”仍交给松手时捕获的对象。</p><div class="actions">
+<button data-action="captureNew">松手：给当前宠物新对话</button><button data-action="captureAppend">松手：追加当前对话</button><button data-action="finishDrop">完成异步读取</button><button data-action="newThread">新建当前宠物的对话</button><button data-action="editPersona">更新当前宠物提示</button><button data-action="startA">让八千代开始执行</button><button data-action="queueA">给八千代追加一句</button><button data-action="requestA">八千代请求写入许可</button><button data-action="allowA">回答该许可</button><button data-action="hide">隐藏对话表面</button><button data-action="completeA">八千代后台完成</button><button data-action="deleteTarget">删除捕获的追加目标</button><button data-action="disconnect">连接断开</button><button data-action="submit">尝试发送当前草稿</button><button data-action="restart">模拟服务重启</button><button data-action="resume">只恢复历史</button><button data-action="continueA">明确继续八千代待处理输入</button>
+</div><details><summary>本次动作记录</summary><ol class="log" id="log"></ol></details></section>
+<section class="panel full"><h2>正在检验的约定</h2><p>桌宠档案是稳定身份；每个 Thread 只归属一个档案，记录创建时的提示版本。Workspace 是可选文件边界。显示模式、当前选择和隐藏状态不更改这些归属。权限以请求身份回答一次，后台完成只更新状态。只有明确继续才开始处理重启后已保存的输入。</p><small>这是设计建议的可操作说明，并非 production 逻辑或自动化测试。主设计与实现验收范围见本工作树 docs/design/pet-dialogue/。</small></section>
+</div></main>
+<script id="pure-model">
+const PetModel=(()=>{
+  const initial=()=>({
+    selected:'a',mode:'all',visible:true,connected:true,serial:3,delivery:null,allowCount:0,
+    lastRequest:null,notice:'选择一个情境，或自由点击动作。',log:[],
+    pets:{a:{name:'八千代',revision:1,current:'t1'},b:{name:'Miku',revision:1,current:'t2'},c:{name:'小八',revision:1,current:'t3'}},
+    threads:{t1:{id:'t1',pet:'a',workspace:'读书会',revision:1,status:'idle',pending:0,request:null,unread:0},t2:{id:'t2',pet:'b',workspace:'随聊',revision:1,status:'idle',pending:0,request:null,unread:0},t3:{id:'t3',pet:'c',workspace:'读书会',revision:1,status:'idle',pending:0,request:null,unread:0}},
+    drafts:{a:'给资料补一条说明',b:'邀请语气轻松一点',c:'先给我看保存位置'}
+  });
+  function reduce(previous,action){
+    const s=structuredClone(previous);let note='';
+    const pet=()=>s.pets[s.selected];const current=()=>s.threads[pet().current];const threadA=()=>s.threads[s.pets.a.current];
+    function create(petId,workspace){const id='t'+(++s.serial);s.threads[id]={id,pet:petId,workspace,revision:s.pets[petId].revision,status:'idle',pending:0,request:null,unread:0};s.pets[petId].current=id;return s.threads[id];}
+    if(action.type==='select'){s.selected=action.pet;s.visible=true;note='选择'+pet().name+'；其他对话的归属、草稿与执行保持各自状态。';}
+    else if(action.type==='mode'){s.mode=s.mode==='all'?'single':'all';note='只切换展示方式；Thread、队列与请求不变。';}
+    else if(action.type==='capture'){if(s.delivery){note='上一份资料仍在读取或等待处理，先完成它再接下一份。';}else{s.delivery={pet:s.selected,thread:action.target==='append'?pet().current:null,workspace:current()?.workspace??'随聊',target:action.target,state:'reading'};note='已在松手时固定接收者 '+pet().name+'，开始异步读取。';}}
+    else if(action.type==='finishDrop'){
+      const d=s.delivery;
+      if(!d)note='没有正在读取的资料。';
+      else if(d.state==='held')note='目标已消失；资料继续保留，等待用户重新指定接收者。';
+      else if(!s.connected){d.state='held';note='读取已结束，但连接不可用；资料未发送，保留在本地待处理。';}
+      else if(d.target==='append'&&!s.threads[d.thread]){d.state='held';note='原追加目标已删除；保留资料并说明原因，不投递到当前另一只宠物。';}
+      else{const t=d.target==='append'?s.threads[d.thread]:create(d.pet,d.workspace);if(t.status==='running')t.pending++;else t.status='running';t.unread=s.selected===d.pet?0:t.unread+1;s.delivery=null;note='资料只进入 '+s.pets[d.pet].name+' 的 '+t.id+'；当前选择仍为 '+pet().name+'。';}
+    }
+    else if(action.type==='newThread'){const t=create(s.selected,current()?.workspace??'随聊');note='为 '+pet().name+' 新建 '+t.id+'，使用提示 v'+t.revision+'。';}
+    else if(action.type==='editPersona'){pet().revision++;note=pet().name+' 档案已为 v'+pet().revision+'；既有 Thread 保留原快照，新对话采用新版本。';}
+    else if(action.type==='startA'){const t=threadA();if(t){t.status='running';note='八千代开始处理；其他桌宠可继续对话。';}}
+    else if(action.type==='queueA'){const t=threadA();if(t){t.pending++;note='给八千代的后续输入已保存、待处理；不追加到当前屏幕上的其他对话。';}}
+    else if(action.type==='requestA'){const t=threadA();if(!t)note='八千代当前没有对话。';else if(t.request)note='该 Thread 已有待答请求。';else{const id=t.id+':permit-'+(++s.serial);t.request=id;t.status='permission';s.lastRequest={thread:t.id,id};note='八千代等待一次写入许可；仅增加待决定状态，不抢当前宠物或显示面。';}}
+    else if(action.type==='allowA'){const r=s.lastRequest;const t=r&&s.threads[r.thread];if(!t||t.request!==r.id)note='这条许可已失效或已解决；重复回答没有新的执行效力。';else{t.request=null;t.status='running';s.allowCount++;note='该请求接受第一次有效回执；许可次数为 '+s.allowCount+'。';}}
+    else if(action.type==='hide'){s.visible=false;note='表面已隐藏；执行、草稿与待答请求继续各自保留。';}
+    else if(action.type==='completeA'){const t=threadA();if(t?.request)note='八千代仍在等待许可；不能直接完成执行。';else if(t){t.status='idle';t.unread++;note='八千代已完成；更新未读标记，保持当前选择与隐藏状态。';}}
+    else if(action.type==='deleteTarget'){const id=s.delivery?.thread;if(id&&s.threads[id]){const p=s.threads[id].pet;delete s.threads[id];if(s.pets[p].current===id)s.pets[p].current=null;note='原追加目标已删除，延迟读取尚未完成。';}else note='没有可删除的已捕获追加目标。';}
+    else if(action.type==='disconnect'){s.connected=false;note='连接中断。已保存的输入仍属于服务器；新的草稿还未发送。';}
+    else if(action.type==='submit'){if(!s.connected)note='未发送：'+pet().name+' 的草稿仍在本地，界面不能声称已接收。';else{const t=current()??create(s.selected,'随聊');t.status==='running'?t.pending++:t.status='running';s.drafts[s.selected]='';note='当前输入已由模拟服务确认保存。';}}
+    else if(action.type==='restart'){s.connected=true;for(const t of Object.values(s.threads)){if(['running','permission'].includes(t.status))t.status='interrupted';t.request=null;}note='模拟重启：在途工作标为中断，待处理输入保留，请求失效；没有自动续跑。';}
+    else if(action.type==='resume'){s.connected=true;note='只恢复当前 Thread 的历史与状态；不执行其待处理输入。';}
+    else if(action.type==='continueA'){const t=threadA();if(!s.connected)note='连接未恢复，不能继续。';else if(t?.pending&&t.status!=='running'){t.pending--;t.status='running';note='收到明确继续意图，八千代开始处理一条已保存输入。';}else note='八千代没有可继续的待处理输入，或仍在运行。';}
+    s.notice=note||'状态未改变。';s.log.push(s.notice);return s;
+  }
+  return{initial,reduce};
+})();
+</script>
+<script>
+const actions={switchA:{type:'select',pet:'a'},switchB:{type:'select',pet:'b'},switchC:{type:'select',pet:'c'},toggleMode:{type:'mode'},captureNew:{type:'capture',target:'new'},captureAppend:{type:'capture',target:'append'},finishDrop:{type:'finishDrop'},newThread:{type:'newThread'},editPersona:{type:'editPersona'},startA:{type:'startA'},queueA:{type:'queueA'},requestA:{type:'requestA'},allowA:{type:'allowA'},hide:{type:'hide'},completeA:{type:'completeA'},deleteTarget:{type:'deleteTarget'},disconnect:{type:'disconnect'},submit:{type:'submit'},restart:{type:'restart'},resume:{type:'resume'},continueA:{type:'continueA'}};
+const scenarios=[
+{name:'延迟拖入',copy:'给八千代松手一份 PDF，读取尚未结束时切到 Miku。完成时观察真正接收者。',steps:[['captureNew','给八千代松手：新对话'],['switchB','读取中切到 Miku'],['finishDrop','完成 PDF 读取'],['toggleMode','切单位置，核对归属']]},
+{name:'隐藏的许可',copy:'八千代在后台等待许可，Miku 是当前对象。隐藏或重复回答都不能改变请求归属。',steps:[['startA','八千代开始执行'],['switchB','转去和 Miku 对话'],['requestA','八千代请求写入许可'],['hide','隐藏对话面'],['allowA','从待决定入口允许一次'],['allowA','模拟第二个窗口重复回答'],['completeA','八千代后台完成']]},
+{name:'提示修订',copy:'更新人设后，旧 Thread 应留在原提示快照；新对话用新版本。显示方式不改提示。',steps:[['editPersona','把八千代提示更新为 v2'],['toggleMode','切成单位置'],['newThread','新建八千代对话'],['switchB','切到 Miku，核对独立版本']]},
+{name:'目标删除',copy:'向既有对话追加 PDF，在读取期间该对话从另一界面被删除。不能把资料送往别处。',steps:[['captureAppend','松手：追加八千代当前对话'],['deleteTarget','另一界面删除该 Thread'],['switchB','此时转到 Miku'],['finishDrop','完成读取，观察保留与报错']]},
+{name:'恢复与继续',copy:'运行中已有一条输入落盘；断连后又有未发送草稿。恢复历史和继续执行必须不同。',steps:[['startA','开始八千代任务'],['queueA','追加并保存下一条输入'],['disconnect','断开连接'],['submit','尝试发送：仍是未发送草稿'],['restart','模拟服务重启'],['resume','只恢复历史'],['continueA','用户明确继续待处理输入']]}
+];
+let state=PetModel.initial(),scenario=0,step=0;
+const $=id=>document.getElementById(id);const escapeHTML=s=>String(s??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const statusLabels={idle:'空闲',running:'处理中',permission:'待许可',interrupted:'已中断'};
+function dispatch(key){state=PetModel.reduce(state,actions[key]);render();}
+function render(){
+  $('metrics').innerHTML='<span>当前：<b>'+state.pets[state.selected].name+'</b></span><span>显示：<b>'+(state.mode==='all'?'三宠同屏':'单个位置')+'</b></span><span>对话面：<b>'+(state.visible?'可见':'隐藏')+'</b></span><span>连接：<b>'+(state.connected?'在线':'断开')+'</b></span><span>生效许可：<b>'+state.allowCount+'</b></span>';
+  $('pets').innerHTML=Object.entries(state.pets).map(([id,p])=>'<article class="pet '+(id===state.selected?'active':'')+'"><strong>'+p.name+'</strong><p>当前对话 '+escapeHTML(p.current)+' · 档案 v'+p.revision+'</p><p>草稿：'+escapeHTML(state.drafts[id]||'空')+'</p><p>未读 '+Object.values(state.threads).filter(t=>t.pet===id).reduce((n,t)=>n+t.unread,0)+' · 待决定 '+Object.values(state.threads).filter(t=>t.pet===id&&t.request).length+'</p></article>').join('');
+  $('threads').innerHTML=Object.values(state.threads).map(t=>'<tr><td>'+t.id+'</td><td>'+state.pets[t.pet].name+' / '+t.workspace+'</td><td>v'+t.revision+'</td><td>'+statusLabels[t.status]+'</td><td>'+t.pending+'</td><td>'+escapeHTML(t.request||'无')+'</td></tr>').join('');
+  $('notice').textContent=state.notice;
+  const d=state.delivery;$('delivery').textContent=d?'在途资料：接收者 '+state.pets[d.pet].name+' / '+(d.thread||'待创建新对话')+' / '+d.workspace+'；'+(d.state==='reading'?'读取中':'本地保留，尚未投递'):'在途资料：无。';
+  $('tabs').innerHTML=scenarios.map((s,i)=>'<button role="tab" aria-selected="'+(i===scenario)+'" data-scenario="'+i+'">'+s.name+'</button>').join('');
+  $('scenario-copy').textContent=scenarios[scenario].copy;
+  $('steps').innerHTML=scenarios[scenario].steps.map(([key,label],i)=>'<button data-step="'+i+'" '+(i!==step?'disabled':'')+' class="'+(i===step?'primary':i<step?'done':'')+'">'+(i<step?'✓ ':String(i+1)+'. ')+label+'</button>').join('')+(step>=scenarios[scenario].steps.length?'<p class="muted">情境结束。可继续自由探索，或点情境名称从头开始。</p>':'');
+  $('log').innerHTML=state.log.slice(-12).map(x=>'<li>'+escapeHTML(x)+'</li>').join('');
+}
+document.addEventListener('click',event=>{const b=event.target.closest('button');if(!b)return;if(b.id==='reset'){state=PetModel.initial();step=0;render();}else if(b.dataset.action)dispatch(b.dataset.action);else if(b.dataset.scenario!==undefined){scenario=Number(b.dataset.scenario);step=0;state=PetModel.initial();render();}else if(b.dataset.step!==undefined){const key=scenarios[scenario].steps[step][0];step++;dispatch(key);}});
+window.getPetModelState=()=>structuredClone(state);render();
+</script>
+</html>

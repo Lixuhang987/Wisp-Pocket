@@ -54,7 +54,7 @@ Append Prompt 只定义 trigger/title/description/template/globalShortcut。Prom
 - **Tab 增加规则**：新建 Tab 先在 `SettingsTab` enum 增 case、标题和图标，再在 `SettingsView.tabContent` 接入内容。
 - **运行状态所有权**：Settings 不编排 LLM 或工具执行；内置功能启停由 `BuiltinFeatures` 管理，采集状态由 Context History 提供，agent-server 继续按既有时机读取模型与 Agent tool 配置。
 - **快捷键只有三类模型**：固定系统入口全局快捷键；manifest prompt 派生的 Action 快捷键；应用内快捷键（app-scoped，用 `NSEvent.addLocalMonitorForEvents` 监听，不走 `HotkeyRegistering` 协议）。
-- **测试**：`AppendPromptSettingsViewModelTests` 覆盖无参数 manifest 读写；`MCPSettingsViewModelTests` 覆盖 mcp.json 读写；`PermissionRulesViewModelTests` 覆盖权限规则读取、参数摘要和撤销。
+- **测试**：`AppendPromptSettingsViewModelTests` 覆盖无参数 manifest 读写；`MCPSettingsViewModelTests` 覆盖 mcp.json 读写；`PermissionRulesViewModelTests` 覆盖按工具名称读取永久允许/拒绝规则与撤销。
 
 ## 与其他模块的关系
 

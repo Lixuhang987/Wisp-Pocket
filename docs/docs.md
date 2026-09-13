@@ -10,7 +10,7 @@
 
 - [TODO.md](/Users/mu9/proj/handAgent/docs/TODO.md)：尚未实现的产品 / 架构待办；实现并验证后移出。
 - [bugs.md](/Users/mu9/proj/handAgent/docs/bugs.md)：当前仍未修复、需要排查的缺陷。
-- [manual-qa.md](/Users/mu9/proj/handAgent/docs/manual-qa.md)：已实现但需要人工回归或实机验收的项目。
+- [manual-qa.md](/Users/mu9/proj/handAgent/docs/manual-qa.md)：已实现能力的人工回归，以及一次性原型的证据与验证边界。
 - [archive.md](./archive.md)：已通过实机验收的原始条目与历史证据。
 - [dev.md](/Users/mu9/proj/handAgent/docs/dev.md)：本地启动、排查和验证边界。
 - [dependency-audit.md](/Users/mu9/proj/handAgent/docs/dependency-audit.md)：依赖收敛后仍保留的独立迁移项。
@@ -19,6 +19,7 @@
 - [adr/adr.md](/Users/mu9/proj/handAgent/docs/adr/adr.md)：跨模块架构决策、实现状态与排除范围。
 - [human/human.md](/Users/mu9/proj/handAgent/docs/human/human.md)：面向人工操作和系统能力的补充说明。
 - [research/research.md](./research/research.md)：外部产品与交互研究；区分官方事实、观察和设计建议。
+- [design/design.md](./design/design.md)：产品方案与一次性原型；设计后续交互时阅读，不视为已实现的架构事实。
 - [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：历史 spec / plan 集合。
 - [superpowers/superpowers.md](/Users/mu9/proj/handAgent/docs/superpowers/superpowers.md)：历史视觉 / 输入资料资产。
 

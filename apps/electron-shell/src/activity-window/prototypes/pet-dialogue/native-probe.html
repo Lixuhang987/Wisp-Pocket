@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src file: data:; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>Wisp Pocket · 原生窗口试验</title>
+  <link rel="stylesheet" href="../../../../../thread-window-web/src/styles/generated-theme.css">
+  <style>
+    :root { color-scheme: light; font-family: var(--ha-typography-body-family); }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; background: transparent; overflow: hidden; }
+    button, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    .stage { width: 100%; height: 100%; position: relative; color: var(--ha-color-text-primary); }
+    .pet { position: absolute; left: 72px; bottom: 32px; width: 128px; height: 139px; border: 0; padding: 0; background: transparent; }
+    .sprite { display: block; width: 192px; height: 208px; transform: scale(0.6666667); transform-origin: top left; background-image: url('../../assets/yachiyo.webp'); background-position: 0 0; }
+    .pet-label { position: absolute; bottom: 4px; left: 12px; width: 188px; text-align: center; pointer-events: none; }
+    .pet-label span { display: inline-block; padding: 4px 9px; border: 1px solid var(--ha-color-hairline); border-radius: 12px; background: var(--ha-color-surface); font-size: 11px; line-height: 16px; }
+    .dialog { position: absolute; left: 208px; right: 12px; bottom: 20px; max-height: calc(100% - 36px); overflow: auto; border: 1px solid var(--ha-color-hairline); border-radius: 16px; background: var(--ha-color-surface); padding: 14px; }
+    .dialog[hidden] { display: none; }
+    .dialog header { display: flex; gap: 8px; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 500; }
+    .dialog header button { border: 0; background: transparent; padding: 4px; font-size: 18px; }
+    .intro { font-size: 12px; line-height: 1.65; color: var(--ha-color-text-secondary); margin: 10px 0 14px; }
+    .message { border-radius: 11px; padding: 10px; margin: 0 0 10px; font-size: 13px; line-height: 1.6; background: var(--ha-color-canvas); }
+    label { display: block; font-size: 12px; margin-bottom: 6px; }
+    textarea { display: block; width: 100%; min-height: 118px; resize: none; border: 1px solid var(--ha-color-hairline); border-radius: 10px; background: var(--ha-color-canvas); padding: 9px; font-size: 13px; line-height: 1.6; outline-offset: 2px; }
+    .status { margin: 8px 0 0; font-size: 11px; line-height: 1.55; color: var(--ha-color-text-secondary); }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <button class="pet" id="pet-open" aria-label="打开桌宠对话"><span class="sprite" aria-hidden="true"></span></button>
+    <div class="pet-label"><span id="pet-name"></span></div>
+    <section class="dialog" id="dialog" hidden aria-label="原生窗口输入试验">
+      <header><span>原生窗口试验</span><button id="collapse" aria-label="收起对话">×</button></header>
+      <p class="intro">验证三个独立桌宠窗口、展开输入与单槽切换。此试验不连接对话服务。</p>
+      <p class="message" id="message"></p>
+      <label for="draft">和我说句话</label>
+      <textarea id="draft" placeholder="输入内容；收起后保留草稿"></textarea>
+      <p class="status">只保存在本次试验内存中；没有提交给模型。</p>
+    </section>
+  </main>
+  <script>
+    const fixture = new URLSearchParams(location.search);
+    document.querySelector('#pet-name').textContent = fixture.get('name') || '月见八千代';
+    document.querySelector('#message').textContent = `${fixture.get('role') || '把内容交给我'}。先告诉我你想完成什么。`;
+    const dialog = document.querySelector('#dialog');
+    const draft = document.querySelector('#draft');
+    const sprite = new Image();
+    let spriteLoaded = false;
+    window.probeReady = new Promise((resolve, reject) => {
+      sprite.onload = () => { spriteLoaded = true; requestAnimationFrame(() => requestAnimationFrame(resolve)); };
+      sprite.onerror = () => reject(new Error('本地图集加载失败'));
+      sprite.src = '../../assets/yachiyo.webp';
+    });
+    window.probeSetExpanded = (expanded) => { dialog.hidden = !expanded; };
+    function changeLayout(expanded) {
+      window.probeSetExpanded(expanded);
+      window.nativeProbe?.requestLayout(expanded ? 'expanded' : 'collapsed');
+    }
+    document.querySelector('#pet-open').addEventListener('click', () => changeLayout(true));
+    document.querySelector('#collapse').addEventListener('click', () => changeLayout(false));
+    window.probeSnapshot = () => ({
+      petId: fixture.get('id'), name: fixture.get('name'), expanded: !dialog.hidden,
+      draft: draft.value, activeElement: document.activeElement?.id || document.activeElement?.tagName,
+      spriteLoaded, spriteNaturalWidth: sprite.naturalWidth, spriteNaturalHeight: sprite.naturalHeight,
+      bodyBackground: getComputedStyle(document.body).backgroundColor,
+      dialogBackground: getComputedStyle(dialog).backgroundColor,
+      viewport: { width: innerWidth, height: innerHeight },
+      characterRect: document.querySelector('.pet').getBoundingClientRect().toJSON(),
+    });
+  </script>
+</body>
+</html>

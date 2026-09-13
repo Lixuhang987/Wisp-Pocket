@@ -12,6 +12,7 @@
 - `readDroppedItems.ts`：同步捕获浏览器拖入数据，异步读取用户交付文件。
 - `PetSprite.tsx`：原始图集取帧、角色缩放及 reduced-motion 行为。
 - [assets/assets.md](./assets/assets.md)：角色图集来源与播放合约。
+- [prototypes/prototypes.md](./prototypes/prototypes.md)：多桌宠对话的一次性 UI、状态模型和隔离原生实验；不接入生产运行链路。
 - `styles.css`：共享主题 token、紧凑气泡、右侧对话列与受限滚动布局。
 - `main.tsx`、`index.html`：renderer 入口。
 

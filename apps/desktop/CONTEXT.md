@@ -56,3 +56,23 @@ _Avoid_: Automation Policy、AgentTrigger Package
 **AgentTrigger Event**:
 AgentTrigger Instance 命中后产生的一次事实记录，可渲染为后台 `UserInput`。
 _Avoid_: Tool Call、Automation Run
+
+## 拟议概念（多桌宠设计，尚未实现）
+
+以下概念用于多桌宠主入口的设计讨论；不改变上文对当前产品的定义。
+
+**桌宠档案**:
+用户配置的一位持续存在的助手身份，关联名称、外观、角色提示和工作偏好；更换外观或桌面位置不改变其身份。
+_Avoid_: 皮肤（指代身份时）、Thread、Workspace
+
+**角色提示**:
+桌宠档案中的长期角色定位、工作习惯与表达偏好；它不等于某次输入使用的 Append Prompt，也不授予工具执行权。
+_Avoid_: 记忆、权限、人设（仅指外观时）
+
+**桌宠席位**:
+桌面上展示桌宠的一个位置；可以固定一位助手，也可以在同一位置切换不同助手。
+_Avoid_: Workspace、会话归属
+
+**桌宠会话面板**:
+从具体桌宠展开、保持该助手和当前对话身份的持续交互表面，用于完整阅读、输入与处理决定。
+_Avoid_: 新会话、ThreadWindow（仅因展开尺寸较大而混称时）

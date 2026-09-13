@@ -1,0 +1,443 @@
+{
+  "date": "2026-09-13T19:36:34.018Z",
+  "checks": {
+    "capturedRecipient": true,
+    "singleReply": true,
+    "promptSnapshot": true,
+    "deletedTargetHeld": true,
+    "explicitResume": true
+  },
+  "records": [
+    {
+      "name": "延迟拖入",
+      "labels": [
+        "1. 给八千代松手：新对话",
+        "2. 读取中切到 Miku",
+        "3. 完成 PDF 读取",
+        "4. 切单位置，核对归属"
+      ],
+      "state": {
+        "selected": "b",
+        "mode": "single",
+        "visible": true,
+        "connected": true,
+        "serial": 4,
+        "delivery": null,
+        "allowCount": 0,
+        "lastRequest": null,
+        "notice": "只切换展示方式；Thread、队列与请求不变。",
+        "log": [
+          "已在松手时固定接收者 八千代，开始异步读取。",
+          "选择Miku；其他对话的归属、草稿与执行保持各自状态。",
+          "资料只进入 八千代 的 t4；当前选择仍为 Miku。",
+          "只切换展示方式；Thread、队列与请求不变。"
+        ],
+        "pets": {
+          "a": {
+            "name": "八千代",
+            "revision": 1,
+            "current": "t4"
+          },
+          "b": {
+            "name": "Miku",
+            "revision": 1,
+            "current": "t2"
+          },
+          "c": {
+            "name": "小八",
+            "revision": 1,
+            "current": "t3"
+          }
+        },
+        "threads": {
+          "t1": {
+            "id": "t1",
+            "pet": "a",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t2": {
+            "id": "t2",
+            "pet": "b",
+            "workspace": "随聊",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t3": {
+            "id": "t3",
+            "pet": "c",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t4": {
+            "id": "t4",
+            "pet": "a",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "running",
+            "pending": 0,
+            "request": null,
+            "unread": 1
+          }
+        },
+        "drafts": {
+          "a": "给资料补一条说明",
+          "b": "邀请语气轻松一点",
+          "c": "先给我看保存位置"
+        }
+      }
+    },
+    {
+      "name": "隐藏的许可",
+      "labels": [
+        "1. 八千代开始执行",
+        "2. 转去和 Miku 对话",
+        "3. 八千代请求写入许可",
+        "4. 隐藏对话面",
+        "5. 从待决定入口允许一次",
+        "6. 模拟第二个窗口重复回答",
+        "7. 八千代后台完成"
+      ],
+      "state": {
+        "selected": "b",
+        "mode": "all",
+        "visible": false,
+        "connected": true,
+        "serial": 4,
+        "delivery": null,
+        "allowCount": 1,
+        "lastRequest": {
+          "thread": "t1",
+          "id": "t1:permit-4"
+        },
+        "notice": "八千代已完成；更新未读标记，保持当前选择与隐藏状态。",
+        "log": [
+          "八千代开始处理；其他桌宠可继续对话。",
+          "选择Miku；其他对话的归属、草稿与执行保持各自状态。",
+          "八千代等待一次写入许可；仅增加待决定状态，不抢当前宠物或显示面。",
+          "表面已隐藏；执行、草稿与待答请求继续各自保留。",
+          "该请求接受第一次有效回执；许可次数为 1。",
+          "这条许可已失效或已解决；重复回答没有新的执行效力。",
+          "八千代已完成；更新未读标记，保持当前选择与隐藏状态。"
+        ],
+        "pets": {
+          "a": {
+            "name": "八千代",
+            "revision": 1,
+            "current": "t1"
+          },
+          "b": {
+            "name": "Miku",
+            "revision": 1,
+            "current": "t2"
+          },
+          "c": {
+            "name": "小八",
+            "revision": 1,
+            "current": "t3"
+          }
+        },
+        "threads": {
+          "t1": {
+            "id": "t1",
+            "pet": "a",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 1
+          },
+          "t2": {
+            "id": "t2",
+            "pet": "b",
+            "workspace": "随聊",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t3": {
+            "id": "t3",
+            "pet": "c",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          }
+        },
+        "drafts": {
+          "a": "给资料补一条说明",
+          "b": "邀请语气轻松一点",
+          "c": "先给我看保存位置"
+        }
+      }
+    },
+    {
+      "name": "提示修订",
+      "labels": [
+        "1. 把八千代提示更新为 v2",
+        "2. 切成单位置",
+        "3. 新建八千代对话",
+        "4. 切到 Miku，核对独立版本"
+      ],
+      "state": {
+        "selected": "b",
+        "mode": "single",
+        "visible": true,
+        "connected": true,
+        "serial": 4,
+        "delivery": null,
+        "allowCount": 0,
+        "lastRequest": null,
+        "notice": "选择Miku；其他对话的归属、草稿与执行保持各自状态。",
+        "log": [
+          "八千代 档案已为 v2；既有 Thread 保留原快照，新对话采用新版本。",
+          "只切换展示方式；Thread、队列与请求不变。",
+          "为 八千代 新建 t4，使用提示 v2。",
+          "选择Miku；其他对话的归属、草稿与执行保持各自状态。"
+        ],
+        "pets": {
+          "a": {
+            "name": "八千代",
+            "revision": 2,
+            "current": "t4"
+          },
+          "b": {
+            "name": "Miku",
+            "revision": 1,
+            "current": "t2"
+          },
+          "c": {
+            "name": "小八",
+            "revision": 1,
+            "current": "t3"
+          }
+        },
+        "threads": {
+          "t1": {
+            "id": "t1",
+            "pet": "a",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t2": {
+            "id": "t2",
+            "pet": "b",
+            "workspace": "随聊",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t3": {
+            "id": "t3",
+            "pet": "c",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t4": {
+            "id": "t4",
+            "pet": "a",
+            "workspace": "读书会",
+            "revision": 2,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          }
+        },
+        "drafts": {
+          "a": "给资料补一条说明",
+          "b": "邀请语气轻松一点",
+          "c": "先给我看保存位置"
+        }
+      }
+    },
+    {
+      "name": "目标删除",
+      "labels": [
+        "1. 松手：追加八千代当前对话",
+        "2. 另一界面删除该 Thread",
+        "3. 此时转到 Miku",
+        "4. 完成读取，观察保留与报错"
+      ],
+      "state": {
+        "selected": "b",
+        "mode": "all",
+        "visible": true,
+        "connected": true,
+        "serial": 3,
+        "delivery": {
+          "pet": "a",
+          "thread": "t1",
+          "workspace": "读书会",
+          "target": "append",
+          "state": "held"
+        },
+        "allowCount": 0,
+        "lastRequest": null,
+        "notice": "原追加目标已删除；保留资料并说明原因，不投递到当前另一只宠物。",
+        "log": [
+          "已在松手时固定接收者 八千代，开始异步读取。",
+          "原追加目标已删除，延迟读取尚未完成。",
+          "选择Miku；其他对话的归属、草稿与执行保持各自状态。",
+          "原追加目标已删除；保留资料并说明原因，不投递到当前另一只宠物。"
+        ],
+        "pets": {
+          "a": {
+            "name": "八千代",
+            "revision": 1,
+            "current": null
+          },
+          "b": {
+            "name": "Miku",
+            "revision": 1,
+            "current": "t2"
+          },
+          "c": {
+            "name": "小八",
+            "revision": 1,
+            "current": "t3"
+          }
+        },
+        "threads": {
+          "t2": {
+            "id": "t2",
+            "pet": "b",
+            "workspace": "随聊",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t3": {
+            "id": "t3",
+            "pet": "c",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          }
+        },
+        "drafts": {
+          "a": "给资料补一条说明",
+          "b": "邀请语气轻松一点",
+          "c": "先给我看保存位置"
+        }
+      }
+    },
+    {
+      "name": "恢复与继续",
+      "labels": [
+        "1. 开始八千代任务",
+        "2. 追加并保存下一条输入",
+        "3. 断开连接",
+        "4. 尝试发送：仍是未发送草稿",
+        "5. 模拟服务重启",
+        "6. 只恢复历史",
+        "7. 用户明确继续待处理输入"
+      ],
+      "state": {
+        "selected": "a",
+        "mode": "all",
+        "visible": true,
+        "connected": true,
+        "serial": 3,
+        "delivery": null,
+        "allowCount": 0,
+        "lastRequest": null,
+        "notice": "收到明确继续意图，八千代开始处理一条已保存输入。",
+        "log": [
+          "八千代开始处理；其他桌宠可继续对话。",
+          "给八千代的后续输入已保存、待处理；不追加到当前屏幕上的其他对话。",
+          "连接中断。已保存的输入仍属于服务器；新的草稿还未发送。",
+          "未发送：八千代 的草稿仍在本地，界面不能声称已接收。",
+          "模拟重启：在途工作标为中断，待处理输入保留，请求失效；没有自动续跑。",
+          "只恢复当前 Thread 的历史与状态；不执行其待处理输入。",
+          "收到明确继续意图，八千代开始处理一条已保存输入。"
+        ],
+        "pets": {
+          "a": {
+            "name": "八千代",
+            "revision": 1,
+            "current": "t1"
+          },
+          "b": {
+            "name": "Miku",
+            "revision": 1,
+            "current": "t2"
+          },
+          "c": {
+            "name": "小八",
+            "revision": 1,
+            "current": "t3"
+          }
+        },
+        "threads": {
+          "t1": {
+            "id": "t1",
+            "pet": "a",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "running",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t2": {
+            "id": "t2",
+            "pet": "b",
+            "workspace": "随聊",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          },
+          "t3": {
+            "id": "t3",
+            "pet": "c",
+            "workspace": "读书会",
+            "revision": 1,
+            "status": "idle",
+            "pending": 0,
+            "request": null,
+            "unread": 0
+          }
+        },
+        "drafts": {
+          "a": "给资料补一条说明",
+          "b": "邀请语气轻松一点",
+          "c": "先给我看保存位置"
+        }
+      }
+    }
+  ]
+}
