@@ -188,3 +188,14 @@
 - **清理与恢复证据**：移除旧/当前两个隔离业务 home、原始 Provider 响应、整屏图片、日志、token、fixture bundle 和临时脚本，共 1569 个文件 / 385514942 字节。保留脱敏汇总与两张已查看的 fixture 图片，保留最终构建；清理没有操作真实用户业务目录。随后使用原有 /tmp/issue1-live/launch.sh 恢复 /tmp/issue1-live/app/Wisp Pocket.app，核对 Host PID 7775、4317 listener PID 7780；原启动配置文件未修改。4317 此时属于恢复的旧实例。
 - **证据位置**：.cache/issue-4-qa/HOST1-{setvalue,keyboard,image,invalid,ui,clipboard,process,restored,stopped,cleanup}-verdict.json、HOST1-old-instance-restored.json、HOST1-window.png、FINAL-QA-SUMMARY.json；AU2-policy-fixture.png 为保留的先前脱敏图片。原始桌面证据已按本项清理，已提交归档的文本和哈希保留。
 - **结论**：通过。CH1–CH5、AU1–AU3、HOST1 九项已逐项验收归档；已说明的权限与无窗口激活边界不计作通过场景。全部代码检查、打包、签名和独立文档审核已完成，修改仅在本地分支提交。
+
+
+- [ ] 常态紧凑布局：对话列约 210px 宽、回复框约 44px 高；分别观察零、一、多项及长建议，零选项不留占位，全部选项从回复框向上自然排列。比较各状态的回复框与角色锚点；顶部空间不足时裁剪上方内容。
+
+### Issue #5 常态紧凑布局
+
+- **验证日期**：2026-09-14。
+- **验证环境**：分支 `codex/pet-compact-hover-20260914` 的当前 `dist/Wisp Pocket.app`，mock LLM + 本地 WebSocket 夹具；屏幕 1440×932，可用区域顶部 y=34。Electron 包内 25 个文件与当前 worktree 构建一致。
+- **验证过程**：通过 Computer Use 观察零、一、四个有效选项。对话列均为 210px、回复框为 44px；零选项没有预留建议区域，最新气泡与回复框相隔 8px。四个选项均显示，长选项自然换行，窗口从 208px 增高至 383px，回复框始终位于屏幕 y=814。再以独立位置文件把角色底部置于 y=320；常态和悬停窗口均裁剪至 286px 高，角色与回复框的位置不变，回复框 y=268，悬停仍可滚动读取上方内容。
+- **证据**：本轮 Computer Use 截图和 `.worktrees/pet-compact-hover-20260914/.cache/pet-compact-hover/` 下的 `05-no-suggestions.json`、`06-one-suggestion.json`、`07-four-suggestions.json`、`17-edge-compact.json`、`18-edge-expanded.json`、`19-edge-scrolled.json`、`package-consistency.json`、`native-verification-summary.json`；实施与其他部分验证见[本轮计划](./medium-powers/plans/2026-09-14-pet-compact-hover.md)。
+- **结论**：本条常态紧凑布局通过。此结论不覆盖中文输入法、多屏/四角移动、真实系统透明穿透或真实模型理解，相关完整验收项继续保留。App、Electron、agent-server、夹具与底板均已停止，4317/4328/9237 端口已释放。

@@ -153,6 +153,23 @@ async function settled(h: Awaited<ReturnType<typeof harness>>) {
 }
 
 describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => {
+  it("空白回复框首次文字创建 Thread 并持久保存，后续文字继续同一对话", async () => {
+    const h = await harness(decisionClient());
+    h.pet.revealBubble();
+    expect(h.pet.getSnapshot()).toMatchObject({ threadId: null, bubbleVisible: true });
+    expect(h.pet.store.getState().history).toHaveLength(0);
+    await h.pet.respond("帮我安排阅读");
+    await settled(h);
+    const id = current(h).id;
+    const saved = await h.persistence.getThread(id);
+    expect(saved!.messages.find((message) => message.role === "user")?.content).toBe("帮我安排阅读");
+    expect(h.pet.getSnapshot().latestAssistant?.text).toContain("帮我安排阅读");
+    h.pet.respond("再补充十分钟");
+    await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("再补充十分钟"));
+    expect(current(h).id).toBe(id);
+    expect(h.pet.store.getState().history).toHaveLength(1);
+  });
+
   it.each(["online", "reconnect"])("完整窗口删除当前 Thread 后，桌宠 %s 回到仍存在的最新历史", async (connection) => {
     const h = await harness(decisionClient());
     h.pet.drop([textItem("第一份资料")], "pet"); await settled(h);

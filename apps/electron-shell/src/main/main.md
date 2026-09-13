@@ -13,7 +13,7 @@
 | `main.ts` | 无独立文档 | Electron process 入口，组装 bridge、runtime、supervisor、window controllers 和 IPC；读取 `HANDAGENT_INITIAL_THEME` 和 action manifest 以初始化 renderer 必需 UI 配置，不读取或转发默认 dynamic tools |
 | `electronShellRuntime.ts` | 无独立文档 | 可测试的 command / health / prewarm 状态机 |
 | `initialHostTheme.ts` | 无独立文档 | 解析 `HANDAGENT_INITIAL_THEME`，为 Electron window controllers 提供启动期 host theme 初值 |
-| `petWindowIpc.ts` | 无独立文档 | 校验当前桌宠 sender 和布局、命中区域、拖动 IPC |
+| `petWindowIpc.ts` | 无独立文档 | 校验当前桌宠 sender 和布局、可选内容高度、命中区域、拖动 IPC |
 | `macosDockApp.ts` | 无独立文档 | macOS regular activation policy 与 Dock 显示 |
 | `availableSkills.ts` | 无独立文档 | 读取本地 action manifest 根目录（`~/.spotAgent/actions`），解析启用项的 `action.json`，输出只读 `AvailableSkill[]` 供 ThreadWindow preload 注入 |
 
@@ -21,7 +21,7 @@
 
 - `main.ts` 是组合根：读取 env、创建 `JsonLineBridge`、`AgentServerSupervisor`、`ThreadWindowPrewarmer`、`ActivityWindowController`，在 `app.whenReady()` 后应用 macOS regular activation policy 并显示 Dock 图标，再把进程和窗口对象交给 `ElectronShellRuntime`。`HANDAGENT_INITIAL_THEME` 只作为启动期初值，必须经过 `initialHostTheme.ts` 校验后传给 window controllers。
 - `ElectronShellRuntime` 不直接 import Electron API；它只依赖窗口、event output 和 supervisor 生命周期接口，负责 command ack、health gate、host theme fan-out 和预热重入。
-- `petWindowIpc.ts` 只接受当前桌宠 `webContents`。拖动坐标由 main 读取系统光标；renderer 只上报本地 DOM 命中矩形及显式窗口意图。桥接合约见 [preload](../preload/preload.md)。
+- `petWindowIpc.ts` 只接受当前桌宠 `webContents`，校验布局与可选内容高度；高度只是窗口布局建议，不包含消息。拖动坐标由 main 读取系统光标；renderer 上报本地 DOM 命中矩形及显式窗口意图。桥接合约见 [preload](../preload/preload.md)。
 - 桌宠位置默认写入 `~/.spotAgent/pet-position.json`，路径由 main 注入。`HANDAGENT_PET_POSITION_PATH` 与 `HANDAGENT_PET_THREAD_WEBSOCKET_URL` 用于隔离原生 QA；URL 仍限 loopback `/api/thread`，由 preload 确保开启交互式请求。
 
 ## 状态机前提

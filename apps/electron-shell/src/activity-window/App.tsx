@@ -15,7 +15,7 @@ declare global {
     handAgentTheme?: HostTheme;
     handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
     handAgentPet?: {
-      setLayout(mode: "pet" | "compact" | "expanded"): void;
+      setLayout(mode: "pet" | "compact" | "expanded", contentHeight?: number): void;
       setInteractiveRegions(rectangles: Array<{ x: number; y: number; width: number; height: number }>): void;
       beginMove(): void;
       move(): void;
@@ -33,8 +33,11 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const thread = snapshot.threadId ? controller.store.getState().threadsById[snapshot.threadId] : undefined;
   const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState("");
+  const draftRevision = useRef(0);
+  const previousThread = useRef(snapshot.threadId);
+  const [submitting, setSubmitting] = useState(false);
+  const submissionPending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const displayedError = error ?? thread?.errorMessage ?? controller.store.getState().windowErrorMessage;
   const [reading, setReading] = useState(false);
@@ -46,18 +49,20 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   const petWidth = petWindowLayout.character.width * petScale;
   const petHeight = petWindowLayout.character.height * petScale;
   const petRef = useRef<HTMLButtonElement>(null);
+  const replyRef = useRef<HTMLTextAreaElement>(null);
+  const focusRequested = useRef(false);
   const stageRef = useRef<HTMLElement>(null);
   const movement = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const ignoreClick = useRef(false);
-  const visible = snapshot.bubbleVisible || error !== null || reading;
-  const expanded = visible && (hovered || focused);
+  const visible = snapshot.bubbleVisible;
+  const expanded = visible && hovered;
   const layout = expanded ? "expanded" : visible || sizeControlsOpen ? "compact" : "pet";
   const pending = thread?.messages.filter((item) => item.type === "user_message" && item.pending).length ?? 0;
   const waiting = !!(snapshot.latestAssistant?.awaitingReply || thread?.permissionRequests.length || thread?.workspaceRequests.length);
   const status = snapshot.connection !== "connected" ? "正在连接…"
-    : reading ? "正在接收…" : pending ? `${pending} 条待处理`
+    : reading ? "正在接收…" : submitting ? "正在发送…" : pending ? `${pending} 条待处理`
     : waiting ? "等你回复" : thread?.status === "running" ? "正在处理…" : "月见八千代";
-  const showStatus = snapshot.connection !== "connected" || reading || pending > 0 || thread?.status === "running"
+  const showStatus = snapshot.connection !== "connected" || reading || submitting || pending > 0 || thread?.status === "running"
     || !!thread?.permissionRequests.length || !!thread?.workspaceRequests.length;
 
   useEffect(() => {
@@ -71,13 +76,29 @@ export function App({ controller: suppliedController }: { controller?: PetThread
     return window.handAgentSubscribeThemeChange?.(applyTheme);
   }, []);
 
-  useEffect(() => { setDraft(""); setFocused(false); }, [snapshot.threadId]);
+  useEffect(() => {
+    if (previousThread.current !== null && previousThread.current !== snapshot.threadId) updateDraft("");
+    previousThread.current = snapshot.threadId;
+  }, [snapshot.threadId]);
 
   useLayoutEffect(() => {
-    window.handAgentPet?.setLayout(layout);
+    if (visible && focusRequested.current) {
+      focusRequested.current = false;
+      replyRef.current?.focus({ preventScroll: true });
+    }
+  }, [visible]);
+
+  useLayoutEffect(() => {
     const stage = stageRef.current;
     const elements = [...stage?.querySelectorAll<HTMLElement>("[data-pet-interactive]") ?? []];
+    const content = stage?.querySelector<HTMLElement>(".pet-history-content");
     const reportRegions = () => {
+      const reply = stage?.querySelector<HTMLElement>(".pet-reply");
+      const sizeControl = stage?.querySelector<HTMLElement>(".pet-size-control");
+      const conversationHeight = content && reply
+        ? content.scrollHeight + reply.offsetHeight + petWindowLayout.inset * (content.children.length ? 3 : 2) : 0;
+      const sizeControlHeight = sizeControl ? sizeControl.offsetHeight + petHeight + petWindowLayout.inset * 2 : 0;
+      window.handAgentPet?.setLayout(layout, layout === "compact" ? Math.ceil(Math.max(conversationHeight, sizeControlHeight)) : undefined);
       window.handAgentPet?.setInteractiveRegions(elements.map((element) => {
         const rect = element.getBoundingClientRect();
         const clip = element.closest<HTMLElement>("[data-pet-scroll-viewport]")?.getBoundingClientRect();
@@ -93,6 +114,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
     reportRegions();
     const observer = new ResizeObserver(reportRegions);
     observer.observe(document.documentElement);
+    if (content) observer.observe(content);
     for (const element of elements) observer.observe(element);
     stage?.addEventListener("scroll", reportRegions, true);
     window.addEventListener("resize", reportRegions);
@@ -101,15 +123,35 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       stage?.removeEventListener("scroll", reportRegions, true);
       window.removeEventListener("resize", reportRegions);
     };
-  }, [layout, petSize, sizeControlsOpen, thread?.messages, thread?.permissionRequests, thread?.workspaceRequests]);
+  }, [layout, petSize, sizeControlsOpen, visible, status, displayedError, thread?.messages, thread?.permissionRequests, thread?.workspaceRequests]);
 
   function attempt(action: () => void): boolean {
     try { action(); setError(null); return true; }
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); return false; }
   }
 
+  function updateDraft(text: string): void {
+    draftRevision.current += 1;
+    setDraft(text);
+  }
+
   function respond(text: string): void {
-    if (text.trim() && attempt(() => controller.respond(text))) setDraft("");
+    if (!text.trim() || submissionPending.current) return;
+    const revision = draftRevision.current;
+    attempt(() => {
+      const accepted = controller.respond(text);
+      if (!accepted) { updateDraft(""); return; }
+      submissionPending.current = true;
+      setSubmitting(true);
+      void accepted.then(() => {
+        if (draftRevision.current === revision) updateDraft("");
+      }).catch((failure: unknown) => {
+        setError(failure instanceof Error ? failure.message : String(failure));
+      }).finally(() => {
+        submissionPending.current = false;
+        setSubmitting(false);
+      });
+    });
   }
 
   function dragOver(event: DragEvent, target: PetDropTarget): void {
@@ -138,13 +180,16 @@ export function App({ controller: suppliedController }: { controller?: PetThread
     controller.hideBubble();
     setError(null);
     setHovered(false);
-    setFocused(false);
+    replyRef.current?.blur();
   }
 
   return (
     <main ref={stageRef} className="pet-stage" data-layout={layout} style={{
       "--pet-character-right": `${petWindowLayout.character.right}px`,
       "--pet-conversation-left": `${petWindowLayout.conversationLeft}px`,
+      "--pet-conversation-width": `${petWindowLayout.conversationWidth}px`,
+      "--pet-inset": `${petWindowLayout.inset}px`,
+      "--pet-reply-height": `${petWindowLayout.replyHeight}px`,
     } as CSSProperties} onDragLeave={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
     }}>
@@ -152,35 +197,24 @@ export function App({ controller: suppliedController }: { controller?: PetThread
         <section data-testid="pet-conversation" aria-label="当前对话"
           className={`pet-conversation ${expanded ? "is-expanded" : ""} ${dropTarget === "conversation" ? "is-drop-target" : ""}`}
           onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-          onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
-          }}
           onDragEnter={(event) => dragOver(event, "conversation")}
           onDragOver={(event) => dragOver(event, "conversation")} onDrop={(event) => void drop(event, "conversation")}>
-          {expanded && thread && (
-            <PetConversation thread={thread} latestAssistantId={snapshot.latestAssistant?.id}
-              controller={controller} attempt={attempt} threadURL={threadURL()} />
-          )}
-          <div className="pet-message pet-current-bubble" data-pet-interactive>
-            <div className="pet-message-body">
-              <span className={`pet-status ${showStatus ? "" : "is-visually-hidden"}`} role="status">{status}</span>
-              {displayedError && <p className="pet-error" role="alert">{displayedError}</p>}
-              <p className="pet-latest" data-testid="pet-latest" aria-live="polite">
-                {snapshot.latestAssistant?.text ?? (reading ? "正在接收你交给我的内容。" : thread?.status === "running" ? "我先看看你交给我的内容。" : "把内容拖给我，我们接着聊。")}
-              </p>
-            </div>
-            <button type="button" className="pet-hide" aria-label="隐藏气泡" title="隐藏气泡" onClick={hide}>×</button>
-            {dropTarget === "conversation" && <div className="pet-drop-label">添加到当前对话</div>}
-          </div>
-          {thread && <PetReply suggestedReplies={snapshot.latestAssistant?.awaitingReply ? snapshot.latestAssistant.suggestedReplies ?? [] : []}
-            draft={draft} setDraft={setDraft} onRespond={respond} />}
+          <PetConversation thread={thread} latestAssistant={snapshot.latestAssistant} expanded={expanded}
+            status={showStatus ? status : undefined} error={displayedError}
+            controller={controller} attempt={attempt} onRespond={respond} threadURL={threadURL()} />
+          <PetReply draft={draft} setDraft={updateDraft} onRespond={respond} inputRef={replyRef} submitting={submitting} />
+          {dropTarget === "conversation" && <div className="pet-drop-label">添加到当前对话</div>}
         </section>
       )}
       <button ref={petRef} data-pet-interactive className={`pet-character ${moving ? "is-moving" : ""} ${dropTarget === "pet" ? "is-drop-target" : ""}`}
         style={{ width: petWidth, height: petHeight }}
-        type="button" aria-label="月见八千代，点击显示对话，拖动移动位置" title="拖入内容开始新对话 · 拖动更换位置 · 右键调整大小"
+        type="button" aria-label="月见八千代，点击切换对话，拖动移动位置" title="点击显示或隐藏对话 · 拖入内容开始新对话 · 右键调整大小"
         onContextMenu={(event) => { event.preventDefault(); setSizeControlsOpen(true); }}
-        onClick={() => { if (ignoreClick.current) { ignoreClick.current = false; return; } controller.revealBubble(); }}
+        onClick={() => {
+          if (ignoreClick.current) { ignoreClick.current = false; return; }
+          if (visible) hide();
+          else { focusRequested.current = true; controller.revealBubble(); }
+        }}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           movement.current = { x: event.screenX, y: event.screenY, moved: false };
