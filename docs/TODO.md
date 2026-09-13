@@ -13,8 +13,8 @@
 
 - 规格：[移除通用 Plugin 框架并完成实机验证](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)。
 - 基点：`codex/issue-3-state-ownership-main-20260913` / `72787e2`；[实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
-- 初始重构与后台激活修复已完成；后台 Host 激活外部应用及可见 Settings 的自身激活已实机复验，相关检查与独立文档审核完成，证据见实施计划。HOST1 完整条目已恢复，九项均未完整通过。
-- [ ] 从全新隔离数据 home 完整验收 CH1，再逐项完成 [manual-qa](./manual-qa.md) 的其余用例并按 QA 流程更新、提交；保留权限拒绝、取消及其他未执行子项，部分证据不代表整项或 Issue #4 完成。
+- 初始重构与后台激活修复已完成；后台 Host 激活外部应用及可见 Settings 的自身激活已实机复验，相关检查与独立文档审核完成，证据见实施计划。HOST1 完整条目已恢复，CH1 已完整实机通过，其余八项待验收。
+- [ ] CH1 已按 QA 脚本归档；继续逐项完成 [manual-qa](./manual-qa.md) 的其余用例并按 QA 流程更新、提交；保留权限拒绝、取消及其他未执行子项，部分证据不代表整项或 Issue #4 完成。
 
 ## Wisp Pocket 桌宠交互
 

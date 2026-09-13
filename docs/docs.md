@@ -11,6 +11,7 @@
 - [TODO.md](/Users/mu9/proj/handAgent/docs/TODO.md)：尚未实现的产品 / 架构待办；实现并验证后移出。
 - [bugs.md](/Users/mu9/proj/handAgent/docs/bugs.md)：当前仍未修复、需要排查的缺陷。
 - [manual-qa.md](/Users/mu9/proj/handAgent/docs/manual-qa.md)：已实现但需要人工回归或实机验收的项目。
+- [archive.md](./archive.md)：已完整通过的实机验收项与验证证据。
 - [dev.md](/Users/mu9/proj/handAgent/docs/dev.md)：本地启动、排查和验证边界。
 - [dependency-audit.md](/Users/mu9/proj/handAgent/docs/dependency-audit.md)：依赖收敛后仍保留的独立迁移项。
 - [llm-api-integration.md](/Users/mu9/proj/handAgent/docs/llm-api-integration.md)：真实 LLM API 集成测试说明。
