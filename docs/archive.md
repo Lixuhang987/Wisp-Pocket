@@ -30,3 +30,15 @@
 - **结论**：通过。验证覆盖原生拖动、松手后点击、关闭完整窗口后的桌宠交互与重启恢复。
 - **工具边界**：Computer Use 的 drag 不移动系统光标；12 秒原生光标采样保持同一点，位置文件也不变。按用户指定的系统 `osascript` 路径发送原生输入后拖动正常，此差异不记为产品缺陷。
 - **清理状态**：上一实例及其后端已正常退出；恢复位置的新实例继续用于后续 QA，未修改用户默认位置文件。
+
+
+- [ ] 文本两区域拖入：从文本编辑器拖出选中文字，松手角色创建 Thread；再次松手气泡或历史追加同一 Thread，输入内容完整保留。
+
+### Issue #1 文本两区域拖入
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 / arm64、1440×932 单屏；用户指定分支的默认打包产物与真实 agent-server，TypeScript/Web、Swift test/build 基线均已通过。源应用为 TextEdit 的本轮临时文稿“未命名2”。
+- **验证过程**：用 Computer Use 写入并核对中文选区，以系统原生拖放从 TextEdit 拖至角色。第一段 `QA-ISSUE1-TEXT-A` 创建新 Thread，桌宠历史显示全文。将源文稿改为 `QA-ISSUE1-TEXT-B` 并全选，最终松手在气泡的稳定接收区域，桌宠同一历史新增完整补充文本，随后进入处理状态。
+- **证据**：`/tmp/issue1-live-qa-20260913-1030/evidence/text-two-targets.json` 显示相关 Thread 只有 `thread-3714ddbb-e575-47e8-87b0-6a60602e1733`；序列 1 和 8 的两条 user response_item 均含完整中文、对应 text Input Item 和 `inputMode: inspect`。`textedit-windows.txt`、`native-text-drop-a.log`、`native-text-drop-b-final.log`、`windows-text-b-target.txt` 记录源窗口及最终区域；Computer Use 已观察原文选区和包含 A、B 的桌宠历史。
+- **结论**：本分项通过；角色新建、气泡追加和输入留存均有真实 UI 与 SQLite 证据。模型服务仍返回空流或 `unexpected EOF`，本结论不涵盖内容理解、建议或后续执行。
+- **清理状态**：两个 QA Thread 及 TextEdit 临时文稿继续保留供本轮后续测试，未改用户原有文稿、模型设置或默认桌宠位置。
