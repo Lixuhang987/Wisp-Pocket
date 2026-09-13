@@ -25,3 +25,15 @@
 - **证据**：Settings 变化样本 04D27A92-9EA4-45D9-8A04-F0A0CB5DFD21（10:39:56Z）；fixture 变化样本 BEDC87FA-E929-47C3-B8FE-6220890C406A（10:41:04Z），同目标周期样本 461F697A-7AE6-4B14-BADB-F4F455891C9E（10:41:36Z），间隔 32 秒。截图 D07CB80E-152E-44DD-B24D-6C65CE00F892（2026-09-13T10:41:25Z）距上次截图 62 秒，sampleId 指向上述 fixture 变化样本；sample.thumbnailId 反向一致。三个样本的 AX app PID/bundleId、window id/ownerPid 均与活动元数据匹配，collection 正在运行且无错误。原始证据：.cache/issue-4-qa/CH2-final-evidence.jsonl、CH2-monitor.json、CH2-final-verdict.json 与 responses/ch2-final-*。
 - **清理状态**：本项保留隔离记录用于 CH3 图片读取，最终统一清理由 HOST1 记录。
 - **结论**：CH2 完整通过。
+
+
+- [ ] **CH3 查询与证据可读**：经真实工具读取索引、批量 AX 详情、缩略图和原图，核对内容、时间和标识；损坏/缺失证据与权限失败可定位。
+
+### Issue #4：CH3 查询与证据可读
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 (24F74)，54d48cb 修复产物 SHA-256 b86c404631a0bb81b1a62ac0624e30770ac06c2a1b94eb9cb6a8b6c14cc95be7；隔离 home-final-20260913，Host 70353 / Node 70357，真实 Provider 与系统能力。
+- **验证过程**：经 activity_index 核对只返回 id、timestamp、app/window、thumbnailId；按两个 fixture 样本 id 批量读取实际 AX，核对已观察的 QA Input / CH1 in-flight verified。QA 客户端从真实 thumbnails / screenshot_original 的 contentItems[imageContentIndex] 读取 PNG，解码后在图片查看器实际观察到 Window A 与 Saved 文本。
+- **证据**：截图 D07CB80E-152E-44DD-B24D-6C65CE00F892 的 sampleId 为 BEDC87FA-E929-47C3-B8FE-6220890C406A，时间 2026-09-13T10:41:25Z；缩略图 480×310、原图 1440×932，PNG 尺寸与返回元数据一致。缺失样本、空 ids、损坏 AX、缺失原图、损坏原图和原图无读取权限均 success:false，分别返回 not_found、invalid_arguments、read_failed 或 invalid_image。将隔离 AX 目录临时设为只读后，真实采集在 collection.lastErrorMessage 和 CUA 设置页共同显示 accessibility_snapshot / activity_sample: write_failed 与无写入权限原因；恢复后工具 lastErrorMessage=null，CUA 恢复“最近采样”。记录见 .cache/issue-4-qa/CH3-positive.json、CH3-negative.json、CH3-collection-failure.json、CH3-final-verdict.json、CH3-final-evidence.jsonl 与 responses/ch3-*。
+- **清理状态**：损坏/缺失演练的文件内容与文件权限均已恢复，目录权限恢复，恢复看守进程已停止；本项测试的是隔离数据文件读写权限，没有撤销或声称验证 macOS TCC 拒绝。业务数据保留至 HOST1 统一清理。
+- **结论**：CH3 完整通过。
