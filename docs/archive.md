@@ -86,3 +86,29 @@
 - **证据**：`.cache/issue-4-qa/AU2-before-restart.json`、`AU2-{trace,branch,policy,history}-verdict.json`、`AU2-final-evidence.jsonl`、`responses/au2-*`。对应 Run `8C477DBF-B0FD-4752-B185-D50BECC17FAB`、`BFF04BD2-1F62-4B09-AB2D-1AB445F00339`、`A1642C64-F4AC-446F-B708-FC3AE9C7FD3D` 均 completed，分别保留 5/4/4 个已完成步骤及版本 1/1/7；后两个 Run 匹配 QA Input 条件、完成 waitFor 与 Saved 断言。真实 history 返回相同版本、分支、进度、AX 与图片，图片 SHA 与各 Run 响应一致；最终 PNG 的 fixture 裁剪已实际查看，与 CUA 相符。
 - **退出观察**：原 Host 40110 已退出，Node 40126 曾为僵尸、Electron 40111 曾停在 NSAlert；后续核对三个 PID 均不存在。未取得该模态框错误正文，不将其当作已诊断缺陷；退出可靠性仍在 HOST1 收尾时核对。
 - **结论**：AU2 的保存、重启、真实步骤/条件/断言执行及历史读回完整通过；未调用真实外部模型。
+
+
+- [ ] **AU3 失败与显式修复**：失败保留进度、原因和证据；修复数据应用不改写失败 Run，只有真实重跑才产生新成功记录。
+
+### AU3：失败、显式修复、真实重跑与退出取消
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 (24F74)，codex/issue-4-builtin-modules worktree；真实 Swift Dynamic Tool Provider、macOS 系统能力和隔离业务 home-final-20260913，模型为 mock。最终取消复验使用修复提交 1381718 的签名包；Swift 主程序 SHA-256 ee8652922c8291e0a1f6e1dd2e38a81b5143a4f8ca7d9d6193311c9a12e516fb，Electron bridge SHA-256 edcf5250ad107b88ed8e9668d2726bdd85056d5dc757f9963669b0c389425cab。
+- **验证过程**：经实际工具分别触发步骤、条件和断言失败，检查进度、原因、阶段与可读图片。默认仅产生 pending Repair Request。显式 repair_apply 升至 v2，重复请求及过期 Patch/Request 均明确失败；应用修复不新增 Run、不改写旧失败文件。v2 真实执行后再以隔离持久 Patch fixture 验证 apply_patch 升至 v3，并再次实际执行，CUA 确认两个 Saved 结果。分别通过设置禁用和正常退出取消正在等待的流程，重启经 history 核对取消与旧记录。
+- **证据**：下列 Run 均经最终真实 history 读回；四个旧失败 Run 原文件 SHA 一致，v2/v3 成功 Run 图片与最初响应 SHA 一致，修复请求仍为 applied。
+
+| 场景 | Run | 结果 |
+| --- | --- | --- |
+| 步骤失败 | 09191C4E-920F-455F-B881-F8DAAFFF6D32 | failed，完成 2 步，steps |
+| 过期修复的来源失败 | 240A2346-E446-4068-B38B-692C81F3992A | failed，完成 2 步，steps |
+| 条件失败 | 5F5C173E-3434-4625-8482-E3FD0DCCAF79 | failed，完成 0 步，conditions |
+| 断言失败 | FF956139-0091-43D4-84ED-5415C883A606 | failed，完成 3 步，assertions |
+| v2 修复后重跑 | 86F8BA6C-AC49-4D2E-97C3-90F91B9B2517 | completed，完成 4 步，Saved: AU3 repair run verified 中文 |
+| v3 已有 Patch 入口后重跑 | 930BE25B-F82B-46D9-8207-8F53B2543159 | completed，完成 4 步，Saved: AU3 saved patch run verified 中文 |
+| 禁用取消 | 12F1AA4F-08EA-42E4-B02E-C875704F4905 | cancelled，保留 2 步，无新增修复请求 |
+| 正常退出取消 | 7410F4B8-E149-44A1-9BCC-572A52B75EDF | cancelled，保留 2 步，无新增修复请求 |
+
+- **退出证据**：单一辅助进程确认磁盘 running/两步完成后立即 osascript Command-Q，2.088 秒内 Host 95304、Electron 95308、Node 95367 全部结束。取消记录为 failureStage=steps、failedStepIndex=2、failureReason=automation run cancelled、evidence.cancelled=true；文件 SHA-256 f0a48ab84e25d759a0da7a03b188898b215aa8a76a8b096787125f0c40c64b0c，重启后不变。CUA 确认输入为 au3-cancel-persist reached，Saved 仍保留上次结果，等待后的 Apply 未执行。退出令工具连接关闭、辅助 HTTP 调用报 500；取消结论来自可信磁盘终态及重启后的实际 Provider history。
+- **修复与检查**：实测发现的 EPIPE 与退出未保存取消状态分别经 b22c542、1381718 修复，均完成红/绿回归、完整 Web、Swift test/build/package、签名核验和独立文档审核。较早的 AX cannot_complete 轮次不计为取消通过；旧包留下的 running 记录保留原证据，不作为本轮成功结果。
+- **证据位置**：.cache/issue-4-qa/AU3-final-history-verdict.json、AU3-{apply,run_repair,run_patch,cancel-disable}-verdict.json、au3-cancel-persist-{pending,verdict}.json、AU3-final-evidence.jsonl、cancel-shutdown-fixed-artifact.json。原始桌面响应和整屏图片在 HOST1 清理阶段移除，保留本脱敏记录与汇总。
+- **结论**：通过。全局配置恢复、受控窗口和数据清理继续随 HOST1 完成。

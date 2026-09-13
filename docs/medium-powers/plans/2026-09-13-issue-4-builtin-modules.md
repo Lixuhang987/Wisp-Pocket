@@ -2,7 +2,7 @@
 
 规格以 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 为准。基点为 `codex/issue-3-state-ownership-main-20260913` 的 `72787e2`；工作区为 `.worktrees/issue-4-builtin-modules`。本计划按已授权规格执行，不增加采集来源或自主修复能力。
 
-当前状态（2026-09-13）：CH1–CH5、AU1、AU2 已完整 [归档](../../archive.md)。`b22c542` 的 EPIPE 修复已实机确认三进程退出干净；随后发现正常退出未保存取消 Run，本轮已修复并通过检查、打包及产物核验，待新包实机复验。AU3、HOST1 在 [manual-qa](../../manual-qa.md)，Issue #4 尚未完成。
+当前状态（2026-09-13）：CH1–CH5、AU1–AU3 已完整 [归档](../../archive.md)。后台激活、EPIPE 和正常退出取消落盘均已修复并实机复验；HOST1 的宿主工具与全局清理仍在 [manual-qa](../../manual-qa.md)。
 
 既有验证：初始重构日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`，既有审核发现已闭合。后台激活阶段的 Web 检查见 `.cache/issue-4-activation-web.log`，Swift test/build/package 见 `.cache/issue-4-activation-final-{swift,build,package}.log`；这些记录不代替下述退出修复的检查与实机复验。
 
@@ -64,8 +64,8 @@ Swift Host 显式组合 `HandAgentHostAutomation` 的两个业务模块，通过
 
 ## 待完成的实机验证
 
-- 使用本轮取消落盘修复新包，确认 Run 确实在途后立即正常退出，核对 `cancelled` 记录、原进度和未执行的后续动作，再重启经 history 读回；记录进程和端口，快捷键通过 `osascript` 发送。
-- AU3 的失败、显式修复、重跑与禁用取消已有实机证据；退出取消须复验下述缺陷。HOST1 的其他宿主能力和完整清理仍待验收，新包也须确认 Host/Electron/Node 全部结束且无错误框或僵尸。
+- AU3 已在 1381718 新包完成紧凑退出取消与重启 history：Run 7410F4B8-E149-44A1-9BCC-572A52B75EDF 为 cancelled，保留两步且无 Repair Request；Host/Electron/Node 全部结束，CUA 确认后续 Apply 未执行。过程见 QA 归档。
+- HOST1 的其他宿主能力和完整清理仍待验收；最后恢复开关与原实例，移除本次隔离业务数据和原始桌面证据。
 - 区分产品缺陷、系统权限、环境和测试工具限制；未执行项不得标通过。发现本规格阻断问题先修复再复验。
 - 根据实机结果同步相关中文文档与可核验证据，通过项按 QA 归档流程处理；如需修复代码，再完成对应检查与独立审核并提交。
 
@@ -95,4 +95,4 @@ Swift Host 显式组合 `HandAgentHostAutomation` 的两个业务模块，通过
 
 检查：目标回归、Web、Swift test/build/package 均 exit 0，日志 `.cache/issue-4-cancel-shutdown-{green,web,swift,build,package}.log` 均为 success；签名与新包资源已核验。本轮独立文档审核同步退出合约、测试边界与 QA，新缺陷从 bugs 移出、AU3 原完整条目恢复为待实机复验。
 
-TODO：本地提交 → 新包原紧凑退出复验与重启 history → 继续 AU3/HOST1 并逐项记录与归档。七项已完成验收保持归档，本轮尚未取得 AU3 退出取消通过证据。
+TODO：继续 HOST1 宿主工具与全局清理，逐项归档并完成最终文档核对。退出取消已通过，重启 history 核对了旧失败文件不变、成功图片一致与两种取消状态，证据见 .cache/issue-4-qa/AU3-final-history-verdict.json。

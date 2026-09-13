@@ -66,13 +66,11 @@
 ## 内置 Context History 与 Automation（Issue #4）
 
 - **状态**：内置实现、后台激活、退出管道与取消落盘修复已完成，已通过的条目逐项归档；下列项目继续待验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
-- **已完成项与证据**：CH1–CH5、AU1、AU2 已完整归档，见 [归档](./archive.md)。本文只保留 AU3、HOST1；修复与部分验收进展见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
-- **剩余边界**：AU3 的失败、显式修复、重跑与禁用取消已实际验证；退出遗留 `running` 的修复已通过自动化检查，仍需新包实机复验与重启 history 读回。CH3 已验证文件权限拒绝和采集失败，macOS TCC 拒绝仍未通过撤销现有授权实测。无窗口宿主自激活未记为通过。
+- **已完成项与证据**：CH1–CH5、AU1–AU3 已完整归档，见 [归档](./archive.md)。本文只保留 HOST1；修复与部分验收进展见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
+- **剩余边界**：AU3 已完成退出取消、三进程清理及重启 history 复验。HOST1 继续验证宿主工具和完整清理；macOS TCC 拒绝未通过撤销现有授权实测，无窗口宿主自激活未记为通过。
 
-- [ ] **AU3 失败与显式修复**：失败保留进度、原因和证据；修复数据应用不改写失败 Run，只有真实重跑才产生新成功记录。
 - [ ] **HOST1 宿主能力与清理**：验证保留的宿主读取/操作、可消费图片和明确参数失败；核对产物/进程，恢复配置并清理本次测试资源。
-- **退出管道复验**：b22c542 包的正常退出与运行中退出均已确认 Host/Electron/Node 全部结束、无 EPIPE 残余；这是进程清理证据，AU3 取消落盘仍待本轮新包复验。
-- **退出取消待复验**：本轮目标回归、Web、Swift test/build/package 及签名/资源核验均通过，记录见实施计划。实际在途 Run 正常退出后应保存 `cancelled`，保留原进度与取消原因/位置/证据，不执行后续动作或新增 Repair Request；重启 history 可读，同时确认三进程退出干净。AU3、HOST1 均未标为通过。
+
 
 ## Issue #3 前后端状态所有权收敛
 
