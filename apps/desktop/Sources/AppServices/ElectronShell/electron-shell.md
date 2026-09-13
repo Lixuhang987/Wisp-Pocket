@@ -4,7 +4,8 @@
 
 ## 职责
 
-- 启动 Electron 子进程；`HANDAGENT_ELECTRON_BINARY` 只在指向有效可执行路径或显式为 `/usr/bin/env` 时覆盖 Electron binary，失效的旧路径会被忽略并从 Electron 子进程环境中移除；`HANDAGENT_ELECTRON_MAIN` 可覆盖 main entry。未显式覆盖 main entry 时，packaged app 优先使用 `Contents/Resources/ElectronShell/dist/main/main.js`；开发态回退为 `pnpm --filter handagent-electron-shell exec electron <repo-root>/apps/electron-shell/dist/main/main.js`。相对 `HANDAGENT_ELECTRON_MAIN` 会先按 repo root 解析为绝对路径，避免 pnpm filter 把 Electron 工作目录切到 package 后重复拼接 `apps/electron-shell`。
+- 启动 Electron 子进程；`HANDAGENT_ELECTRON_BINARY` 指向的路径存在或显式为 `/usr/bin/env` 时覆盖 Electron binary，失效的旧路径会被忽略并从 Electron 子进程环境中移除；`HANDAGENT_ELECTRON_MAIN` 可覆盖 main entry。相对 main 会先按 repo root 解析为绝对路径，避免 pnpm filter 切换目录后重复拼接 `apps/electron-shell`。
+- main 与 runtime 独立选择：未覆盖 main 时优先使用包内 `Contents/Resources/ElectronShell/dist/main/main.js`，包内文件不存在才回退 checkout 构建产物。没有有效 binary 覆盖且能定位 repo root 时，始终从该目录通过 `pnpm --filter handagent-electron-shell exec electron <main>` 使用 workspace runtime；未覆盖 main、包内 main 存在且无法定位 repo root 时才回退全局 `electron`。本包不是自包含发行包，依赖边界见 [开发说明](../../../../../docs/dev.md#打包边界)，Electron 侧所有权见 [Electron UI Shell](../../../../electron-shell/electron-shell.md)。
 - Swift 启动 Electron 时通过 `HANDAGENT_INITIAL_THEME` 传入当前真实 host theme JSON，字段与 `theme.changed` payload 相同：`{ preference, resolved }`。该值必须来自 `AppearanceThemeService.currentTheme`，不能固定写成 dark 或 light 后再依赖运行时同步纠偏。
 - Swift 启动 Electron 时把子进程 stdin 指向 `/dev/null`，避免 Electron CLI 在 pipe stdin 未 EOF 时阻塞加载 main entry；`ElectronShellCommand` 通过 `HANDAGENT_ELECTRON_COMMAND_SOCKET` 指向的本地 Unix domain socket 发送。
 - Electron -> Swift 的 `ElectronShellEvent` 通过 stdout newline-delimited JSON 回传。

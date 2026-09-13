@@ -48,6 +48,7 @@
 ## 打包边界
 
 - `package-app.sh` 会构建 React、Electron 和 Swift release，并签名 app bundle。
+- 当前产物包含 Electron main，但不包含 Electron runtime。在已安装依赖的 checkout 内打开包时，Swift 从 workspace 启动 Electron 并使用包内 main；因此仍要求 `pnpm` 可用。无法定位 checkout 且使用默认包内 main 时仍依赖全局 `electron`，不属于自包含发行包。binary/main 覆盖与查找顺序由 [Swift ElectronShell 桥](../apps/desktop/Sources/AppServices/ElectronShell/electron-shell.md) 定义。
 - Swift 可执行产物是 `HandAgentDesktop` 和 Chrome Native Messaging helper；`HandAgentHostAutomation` 为主程序链接的内部 target，不产生独立 Context History、Automation 或原子 Plugin 可执行程序。
 - 默认 ad-hoc 签名使用稳定 designated requirement，减少重建后 TCC 身份漂移。
 - 正式签名通过 `HANDAGENT_PACKAGE_CODESIGN_IDENTITY` 配置；bundle id 或 requirement 变化时同步设置 `HANDAGENT_PACKAGE_CODESIGN_REQUIREMENT`。

@@ -210,6 +210,60 @@ final class AppServicesTests: XCTestCase {
     }
 
     @MainActor
+    func testPackagedLaunchUsesWorkspaceElectronWithoutGlobalElectron() async throws {
+        let repoRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let packageURL = repoRoot.appendingPathComponent("apps/electron-shell", isDirectory: true)
+        let bundleURL = repoRoot.appendingPathComponent("dist/Wisp Pocket.app", isDirectory: true)
+        let resourcesURL = bundleURL.appendingPathComponent("Contents/Resources", isDirectory: true)
+        let bundledMain = resourcesURL.appendingPathComponent("ElectronShell/dist/main/main.js")
+        let binURL = repoRoot.appendingPathComponent("bin", isDirectory: true)
+        let recordURL = repoRoot.appendingPathComponent("launch.txt")
+        for directory in [packageURL, bundledMain.deletingLastPathComponent(), binURL] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: repoRoot) }
+        for file in [repoRoot.appendingPathComponent("Package.swift"), packageURL.appendingPathComponent("package.json"), bundledMain] {
+            try Data().write(to: file)
+        }
+        let pnpmURL = binURL.appendingPathComponent("pnpm")
+        try """
+        #!/bin/sh
+        [ . -ef "$HANDAGENT_REPO_ROOT" ] || exit 64
+        printf '%s\\n' "$HANDAGENT_REPO_ROOT" "$@" > "$HANDAGENT_TEST_LAUNCH_RECORD"
+        printf '%s\\n' '{"channel":"electron_shell","type":"electron.ready","timestamp":"2026-09-14T00:00:00.000Z"}'
+        /bin/sleep 1
+        """.write(to: pnpmURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pnpmURL.path)
+
+        let configuration = AppServices.defaultElectronShellLaunchConfiguration(
+            environment: ["PATH": binURL.path, "HANDAGENT_TEST_LAUNCH_RECORD": recordURL.path],
+            currentDirectoryURL: URL(fileURLWithPath: "/", isDirectory: true),
+            bundleExecutableURL: bundleURL.appendingPathComponent("Contents/MacOS/HandAgentDesktop"),
+            bundleResourceURL: resourcesURL,
+            bundleURL: bundleURL
+        )
+        let shell = ElectronShellProcess(
+            launchPath: configuration.launchPath,
+            arguments: configuration.arguments,
+            environment: configuration.environment,
+            currentDirectoryURL: configuration.currentDirectoryURL
+        )
+        let ready = expectation(description: "packaged main starts with the workspace runtime")
+        shell.onEvent = { event in
+            if event == .electronReady(timestamp: "2026-09-14T00:00:00.000Z") { ready.fulfill() }
+        }
+        try shell.start()
+        defer { shell.stop() }
+        await fulfillment(of: [ready], timeout: 2)
+
+        let launch = try String(contentsOf: recordURL, encoding: .utf8)
+        XCTAssertEqual(launch.components(separatedBy: "\n"), [
+            repoRoot.path, "--filter", "handagent-electron-shell", "exec", "electron", bundledMain.path, "",
+        ])
+    }
+
+    @MainActor
     func testExplicitElectronBinaryPreservesOverride() throws {
         let configuration = AppServices.defaultElectronShellLaunchConfiguration(
             environment: [

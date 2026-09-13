@@ -4,6 +4,7 @@
 
 ## 直接子节点
 
+- [2026-09-14-packaged-electron-startup.md](./2026-09-14-packaged-electron-startup.md)：全功能 QA 发现的打包冷启动路径缺陷及回归边界。
 - [2026-09-14-pet-compact-hover.md](./2026-09-14-pet-compact-hover.md)：桌宠常态收紧、悬停统一滚动与点击回复的待确认实施计划。
 - [2026-09-13-issue-4-main-merge.md](./2026-09-13-issue-4-main-merge.md)：合入内置模块并保留 main 桌宠行为的合并决策与检查边界。
 - [2026-09-13-pet-floating-bubbles.md](./2026-09-13-pet-floating-bubbles.md)：紧凑独立气泡、右侧常驻对话与角色缩放的实施及验证边界。

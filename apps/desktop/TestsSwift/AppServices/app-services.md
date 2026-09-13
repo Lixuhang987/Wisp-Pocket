@@ -12,3 +12,7 @@
 - 当前目录的 `AppServicesTests.swift`、AgentTrigger 与窗口相关测试：生产服务组合、触发器来源和窗口生命周期。
 
 生产所有权见 [AppServices](../../Sources/AppServices/app-services.md)。内置功能配置的失败回滚与模块启停从 PlatformBridge 完整用例覆盖。
+
+## 验证边界
+
+包内 main 与 workspace runtime 的组合回归复用真实 `ElectronShellProcess` 与 stdout 事件解码；外部 pnpm/Electron 在系统边界替换，核对 main、runtime 参数与工作目录的组合。该用例不能证明真实 Electron、窗口、后端健康或预热，仍需 [manual-qa](../../../../docs/manual-qa.md) 实机验收。

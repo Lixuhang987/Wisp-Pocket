@@ -25,11 +25,24 @@
 
 从主 checkout 的 `main` 打包，使用可丢弃资料；真实模型与可控 fixture 的结论分别记录。已有桌宠、Thread 与触发器详细分项继续按下文逐项验收，本节补足当前产品的其他入口。
 
+- [ ] QA-START 启动与生命周期：完成下方[打包冷启动回归](#打包应用-electron-冷启动回归)，核对 bundle 来源、进程、菜单与服务健康；全局热键唤出/取消后焦点返回原应用，首次提交打开 ThreadWindow；关闭窗口后服务继续运行，正常退出清理子进程，重启可恢复历史。
 - [ ] QA-INPUT 主动输入：PromptPanel 纯文字、Append Prompt、文本选区和区域截图可确认提交；取消捕获不提交，输入附件与实际选区/图像一致；ThreadWindow 可查看历史内容并继续回复。
 - [ ] QA-SETTINGS 设置：模型 provider/API/model/base URL 保存与热加载、无效配置错误可见；主题同步 PromptPanel/Settings/ThreadWindow/桌宠，热键编辑与恢复正常；不输出模型密钥。
 - [ ] QA-TOOLS 工具与工作区：真实界面完成 Workspace 选择、文件读写、权限本次允许/拒绝/记住决定、工具详情展开；MCP 配置的启用与错误可见，测试仅使用本轮工作区和可丢弃工具。
 - [ ] QA-HOST 合并产物内置功能回归：按 [内置功能步骤](./human/builtin-features-qa.md) 验证开关、采集/查询、录制/保存/重跑及失败记录；关闭窗口继续，禁用停止，重启持久化，退出取消结果落盘。该项验证当前合并产物，不改写原功能分支九项归档结论。
 - [ ] QA-TRIGGER 触发执行：System Clock 到时只触发一次并保存 Thread；Chrome Bookmarks 当前 bridge 与 native host 可连通，扩展连接状态和文件夹更新可见，测试收藏触发正确提示词，重启后恢复连接。
+
+### 打包应用 Electron 冷启动回归
+
+- **状态**：2026-09-14 已修复，待合入 `main` 后重新打包实机验收；原 P1「打包应用无法找到已安装的 Electron，冷启动直接失败」从 `bugs.md` 移至本节。
+- **自动检查**：`AppServicesTests`、`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`（340 项）与 `bash ./scripts/swiftw build` 均通过。进程用例使用外部 pnpm/Electron 边界替身，只证明启动配置、真实 Process 与 ready 解码；实现及验证边界见 [修复计划](./medium-powers/plans/2026-09-14-packaged-electron-startup.md)。
+- **原失败证据**：主 checkout 的 `.cache/live-qa-20260914/` 中 `baseline.json`、`app.log`、`plain-launch-error.log`；源码 `ca1c02b`、macOS 15.5 arm64，正常打开包与直接运行 binary 均出现 `env: electron: No such file or directory` / status 127，4317 未监听。原失败实例已停止，后端未启动。
+- **回归步骤**：
+  1. 在没有全局 `electron`、已安装 `pnpm` 和 workspace 依赖的主 checkout 重新打包；不设置 `HANDAGENT_ELECTRON_BINARY` / `HANDAGENT_ELECTRON_MAIN`，正常打开 `dist/Wisp Pocket.app`，确认桌宠出现且没有启动失败弹窗。
+  2. 设置指向已不存在旧路径的 `HANDAGENT_ELECTRON_BINARY` 再次冷启动，确认仍使用 workspace Electron，子进程不再继承失效覆盖值。
+  3. 两次启动均核对实际 Electron main 来自当前 bundle，runtime 来自当前 checkout；确认 `agent_server.health available=true` 与 `thread_window.prepared` 后才可提交，首次 PromptPanel 提交能打开 ThreadWindow。
+  4. 继续完成 QA-START 的焦点、关闭窗口、正常退出清理与重启历史恢复，不把冷启动通过等同于完整生命周期通过。
+- **未验边界**：本次尚无修复后的实机结论；无法定位 checkout 时保留全局 runtime 路径，不据此宣称自包含发行包，详见 [打包边界](./dev.md#打包边界)。
 
 ### Issue #1 月见八千代桌宠与 Thread 轻量对话
 

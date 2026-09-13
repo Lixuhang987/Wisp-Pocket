@@ -26,6 +26,7 @@
 
 ## Supervisor 与构建
 
+- main entry 与 Electron runtime 的选择由 [Swift ElectronShell 桥](../desktop/Sources/AppServices/ElectronShell/electron-shell.md) 拥有；包内 main 不代表包内含 Electron runtime，依赖边界见 [开发说明](../../docs/dev.md#打包边界)。
 - supervisor 优先使用构建后的 agent-server entry；不可用时走 Node child fallback。两条路径必须保持 health、日志、退避重启和 shutdown 语义一致。
 - main/preload 修改后必须运行完整 build，确保 `.cts` preload 输出为 sandbox 可加载的 `.cjs`，并生成 ActivityWindow bundle。
 

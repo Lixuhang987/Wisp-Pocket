@@ -319,7 +319,7 @@ final class AppServices {
             )
         }
 
-        if explicitElectronMain == nil && bundledElectronMainPath != nil {
+        if explicitElectronMain == nil && bundledElectronMainPath != nil && repoRoot == nil {
             return ElectronShellLaunchConfiguration(
                 launchPath: "/usr/bin/env",
                 arguments: ["electron", electronMain],
