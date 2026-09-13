@@ -41,9 +41,60 @@
 - [x] 通过相关 19 项测试、TypeScript/Web、Swift test/build 与 Electron build；日志位于 `/tmp/pet-small-bubbles-20260913/`。
 - [x] 完成当前实现的打包，renderer、窗口控制器和共享布局产物逐一核对一致；记录见 `package-manifest.json`。
 - [x] 独立无上下文文档审核，已同步紧凑气泡、常驻交互、共享锚点与缩放偏好的模块合约，并更新 manual QA；原有待验项与进入任务前的修改均保留。
-- [ ] 只提交本次改动，保留进入本轮的原有 8 项未提交差异。
+- [x] 本轮实现与文档已提交为 `2d21c16`；进入本轮的原有 8 项未提交差异完整保留。
 - [ ] 使用当前包完成视觉、缩放、锚点和相关交互实机复验，逐项归档并提交。
 
 ## 验证边界
 
 JSDOM 不证明像素位置、透明穿透或系统焦点。原生验证使用可丢弃 Thread fixture 时必须明确记录，不代表真实模型理解能力。原 Issue #1 尚未完成的其他 QA 分项继续保留。
+
+## 暂停交接（2026-09-13）
+
+用户要求先整理现状再暂停。当前代码已实现并提交，最终实机验收未完成；本轮没有归档任何新增 QA 分项，不能据此宣称 Issue #1 完成。
+
+- 工作目录：`/Users/mu9/proj/handAgent/.worktrees/issue-1-pet-main-20260913`。
+- 分支：`codex/issue-1-pet-main-20260913`。主要提交：`fc5ce67` 为首版浮动历史，`b7a42ab` 为追加要求的计划，`2d21c16` 为紧凑气泡与角色独立缩放。
+- 已完成独立文档审核、19 项专项测试、仓库 TypeScript/Web、Swift test/build、Electron build、打包及源码产物一致性核对。原始 wrapper 日志只输出 `success`，专项红/绿日志保留完整结果。
+- 当前打包产物：该 worktree 的 `dist/Wisp Pocket.app`；包含进入任务前的已有修改。
+
+### 实机停止点
+
+只完成了可丢弃 Thread fixture 的常态展示观察，屏幕上的默认角色已缩小，右侧短回复、两个模型选项与输入框可见；尚未操作本版右键缩放，也未完成悬停前后对照。
+
+| 已观察表面 | 屏幕位置与尺寸（DIP，约值） |
+| --- | --- |
+| 最新回复气泡 | `(1048, 659.66, 232, 39.45)`，已随短内容收紧 |
+| 角色 | `(912, 727.34, 128, 138.66)` |
+| 回复框 | `(1048, 804, 280, 54)` |
+| 原生窗口 | `compact`，`(840, 530, 496, 336)` |
+
+外层 computed background 为透明、无公共阴影；透明间隙的真实点击穿透尚未验证，测试底板点击计数仍为 0。最新一次系统鼠标移动请求目标为 `(400, 400)`，紧接读取到 `(793.75, 617.855...)`；未复核事件队列处理后的坐标，后续应先确认实际光标位置，不能把这一现象认定为产品缺陷。
+
+### 证据与清理
+
+- 本轮证据目录：`/tmp/pet-small-bubbles-20260913/`。常态几何为 `compact.json`，桌面合成截图为 `compact-desktop.png`，产物核对为 `package-manifest.json`，检查日志为 `red.log`、`focused.log`、`electron-build.log`、`test-all.log`、`swift-test.log`、`swift-build.log`、`package.log`。
+- 暂停时 Swift App、Electron/后端、fixture 与原生测试底板均已退出；4317、4328、9237 无监听，清理证据为 `pause-cleanup.json`。未重新启动真实 App。
+- 本轮没有修改真实模型设置；`~/.spotAgent/settings.json` 的 `llm.api` 仍为 `responses`，SHA256 为 `3813c808035b5a8b10ef6dfb67448fdb9da02f80f0a3a029e88990128b33fb93`。
+- 临时 fixture 只提供本轮 UI 数据，没有向真实 Thread 数据库提交测试回复；用户历史保留。用户接管的浏览器空间 51 保留，不继续操作。
+- `/tmp` 中的辅助脚本和截图可能被系统清理；本文保留的提交、检查结论、几何和待验边界不依赖它们存在。
+
+### 未提交内容保护
+
+以下 8 项是进入本轮时已有的修改，不能混入本任务提交；快照位于证据目录的 `original-files.json`、`original-files/` 和 `pre-existing-changes.patch`。其中 renderer 指南的重连 snapshot 段落仍保留为未提交改动。
+
+- `apps/agent-server/tests/tests.md`
+- `apps/agent-server/tests/use-cases/pet-conversation.test.ts`
+- `apps/electron-shell/src/activity-window/activity-window.md`
+- `docs/medium-powers/plans/2026-09-13-desktop-pet.md`
+- `packages/core/src/protocol/protocol.md`
+- `packages/core/src/thread/Thread.ts`
+- `packages/core/src/thread/thread.md`
+- `packages/core/src/thread/types/ThreadServices.ts`
+
+主 checkout 的 `docs/TODO.md` 是用户已有修改，本轮未触碰。
+
+### 恢复顺序
+
+收到继续指令后，先核对 worktree、分支、上述未提交内容和当前打包产物，再按 [manual QA](../../manual-qa.md) 逐项验证：悬停锚点与独立历史；50%/100%/150% 缩放、重启恢复、对话尺寸与草稿隔离；滚动、焦点、透明点击及上缘布局。每项完成后用 `project-live-qa` 脚本归档、检查 diff 并立即提交。原 Issue #1 的链接、PDF 等其他待验项继续保留。
+
+临时环境可重用证据目录中的 `fixture.mjs`（4328）、`electron-debug.sh`（9237）、`position.json` 和 `inspect.mjs`。启动打包 App 时设置 `HANDAGENT_NODE_PATH=/opt/homebrew/bin/node`、`HANDAGENT_ELECTRON_BINARY` 指向该 wrapper、`HANDAGENT_PET_POSITION_PATH` 指向该位置文件、`HANDAGENT_PET_THREAD_WEBSOCKET_URL=ws://127.0.0.1:4328/api/thread`。快捷键必须用系统 `osascript`；原生拖动同样用 `osascript` + CoreGraphics，中文输入用 CUA `setValue`。
