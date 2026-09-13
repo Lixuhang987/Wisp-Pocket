@@ -7,6 +7,11 @@ export class JsonLineBridge {
   constructor(private readonly streams: { input: Readable; output: Writable }) {
     streams.input.setEncoding("utf8");
     streams.input.on("data", (chunk: string) => this.receive(chunk));
+    streams.output.on("error", (error: NodeJS.ErrnoException) => {
+      // Swift can close its pipe before the shutdown ack has been flushed.
+      // Keep that expected disconnect out of Electron's exception dialog.
+      if (error.code !== "EPIPE") throw error;
+    });
   }
 
   onLine(listener: (line: string) => void): () => void {
@@ -15,6 +20,7 @@ export class JsonLineBridge {
   }
 
   send(value: unknown): void {
+    if (!this.streams.output.writable) return;
     this.streams.output.write(`${JSON.stringify(value)}\n`);
   }
 

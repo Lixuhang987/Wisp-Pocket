@@ -65,11 +65,13 @@
 
 ## 内置 Context History 与 Automation（Issue #4）
 
-- **状态**：内置实现与后台激活修复已完成，已通过的条目逐项归档；下列项目继续待验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
-- **已完成项与证据**：见 [归档](./archive.md)，本文只保留待验收项目。后台激活修复证据见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
-- **剩余边界**：文件权限拒绝与采集失败已在 CH3 验证；macOS TCC 拒绝未通过撤销现有授权来实测。取消待 AU3 的禁用/退出真实停机验证。无窗口宿主自激活仍可能明确失败，未记为通过；其余子项继续逐项验收。
+- **状态**：内置实现、后台激活与退出管道修复已完成，已通过的条目逐项归档；下列项目继续待验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
+- **已完成项与证据**：CH1–CH5、AU1、AU2 已完整归档，见 [归档](./archive.md)。本文只保留 AU3、HOST1；修复与部分验收进展见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
+- **剩余边界**：AU3 的失败、显式修复、重跑与禁用取消已实际验证；退出取消那次在退出前先因 AX snapshot `cannot_complete` 失败，不能计作取消通过。CH3 已验证文件权限拒绝和采集失败，macOS TCC 拒绝仍未通过撤销现有授权实测。无窗口宿主自激活未记为通过。
 
 - [ ] **AU3 失败与显式修复**：失败保留进度、原因和证据；修复数据应用不改写失败 Run，只有真实重跑才产生新成功记录。
+- [ ] **HOST1 宿主能力与清理**：验证保留的宿主读取/操作、可消费图片和明确参数失败；核对产物/进程，恢复配置并清理本次测试资源。
+- **退出修复待复验**：stdout 读取端关闭时的 `EPIPE` 已在输出桥处理；真实子进程管道回归、Web、Swift test/build 及打包通过，新包签名与 Electron 资源身份已核验。仍须验证正常退出无 JavaScript 错误框，Host/Electron/Node 均结束且无僵尸；另补 AU3 的真实退出取消，当前两项均未通过。
 
 ## Issue #3 前后端状态所有权收敛
 

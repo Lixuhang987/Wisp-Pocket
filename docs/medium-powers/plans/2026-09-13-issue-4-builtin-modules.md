@@ -2,23 +2,15 @@
 
 规格以 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 为准。基点为 `codex/issue-3-state-ownership-main-20260913` 的 `72787e2`；工作区为 `.worktrees/issue-4-builtin-modules`。本计划按已授权规格执行，不增加采集来源或自主修复能力。
 
-当前状态（2026-09-13）：初始重构与后台激活修复已完成，并已独立核对规格、代码与文档。后台 Host 激活外部应用及可见 Settings 的自身激活已实机复验；实机验收逐项归档，剩余条目见 manual-qa；Issue #4 尚未完成。
+当前状态（2026-09-13）：初始重构与后台激活修复已完成，CH1–CH5、AU1、AU2 已完整 [归档](../../archive.md)。退出回执的 `EPIPE` 修复已实现并通过自动化回归、打包及产物核验，新产物实机退出尚待验证；AU3、HOST1 仍在 [manual-qa](../../manual-qa.md)，Issue #4 尚未完成。
 
-验证记录：初始重构日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`，既有审核发现已闭合。本次激活修复的 Web 检查见 `.cache/issue-4-activation-web.log`，Swift test/build/package 见 `.cache/issue-4-activation-final-{swift,build,package}.log`；四项均通过，由主 agent 执行，实机复验期间代码未再变化。
+既有验证：初始重构日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`，既有审核发现已闭合。后台激活阶段的 Web 检查见 `.cache/issue-4-activation-web.log`，Swift test/build/package 见 `.cache/issue-4-activation-final-{swift,build,package}.log`；这些记录不代替下述退出修复的检查与实机复验。
 
-产物均为本 worktree 的 `dist/Wisp Pocket.app`，使用 `--mock-llm`，系统能力与业务模块保持真实实现。旧实施提交 `8911eaf` 的主程序 SHA-256 为 `b3596abbecd8a2f8089c6154d90fae7845e7bd836078ef246e176b469e72c503`；本次修复复验产物为 `b86c404631a0bb81b1a62ac0624e30770ac06c2a1b94eb9cb6a8b6c14cc95be7`，环境为 macOS 15.5 (24F74)。
+产物为本 worktree 的 `dist/Wisp Pocket.app`，使用 `--mock-llm`，系统能力与业务模块保持真实实现，环境为 macOS 15.5 (24F74)。退出修复新包通过 `codesign --verify --deep --strict`（exit 0）；bundle 内 `ElectronShell/dist/main/swiftBridge/jsonLineBridge.js` 与本地 dist 逐字节相同，确认包含 EPIPE 处理，SHA-256 为 `edcf5250ad107b88ed8e9668d2726bdd85056d5dc757f9963669b0c389425cab`。新包 Swift 主程序 SHA-256 为 `01fb70d79aa78a8e0f718c1e58e6731bff311bc0b266149f28f309233d0750b4`；核验记录为 `.cache/issue-4-qa/shutdown-fixed-artifact.json`，不能仅凭主程序哈希判断 Electron 资源版本。
 
-已有部分验收使用 `.cache/issue-4-qa/home` 隔离内置业务数据与受控 fixture；CH1 已在新 home-final-20260913 完整通过，过程见 [QA 归档](../../archive.md)。九项状态统一维护在 [manual-qa](../../manual-qa.md)，各轮产物、进程与清理证据分别记录；旧进程记录不表示当前运行状态。
+## 已落地边界
 
-已有 CH1 原始记录位于 `.cache/issue-4-qa/` 下的 `provider-hellos.jsonl`、`ch1-restart.json` 与 `CH1-evidence.jsonl`。这些记录只支持已注明的部分步骤，不能代表九项完整验收。
-
-## 目录与现有链路
-
-Swift Host 直接组合 `HandAgentHostAutomation` 的 Context History / Automation，原 Plugin manifest、安装、进程托管与 RPC 已移除。当前模块所有权从 [根架构](../../../handAgent.md) 进入；业务数据路径与默认关闭配置保持下述接口边界。
-
-## 明确接口
-
-Swift Host 通过固定的 `HostAutomationCapabilities` 共享 macOS 实现，`BuiltinFeatures` 显式组合两个模块；不建立模块注册表、能力发现或新运行协议。接口、Dynamic Tool 图片格式、callId 与声明刷新合约见 [平台桥](../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
+Swift Host 显式组合 `HandAgentHostAutomation` 的两个业务模块，通过固定 `HostAutomationCapabilities` 共享 macOS 实现；原 Plugin manifest、安装、进程托管与 RPC 已移除。所有权从 [根架构](../../../handAgent.md) 进入；接口、Dynamic Tool 图片格式、callId 与声明刷新合约见 [平台桥](../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
 
 两个开关默认关闭，由 [宿主设置](../../../apps/desktop/Sources/AppServices/AgentSettings/agent-settings.md) 原子保存；写入失败保留原有效选择。业务生命周期和持久化边界见 [Host Automation](../../../apps/host-automation/host-automation.md)。
 
@@ -78,10 +70,8 @@ Swift Host 通过固定的 `HostAutomationCapabilities` 共享 macOS 实现，`B
 
 ## 待完成的实机验证
 
-- 使用上述修复产物，继续 manual-qa 保留的未完成条目；记录二进制、进程和权限环境，快捷键通过 `osascript` 发送。测试数据与用户现有业务记录隔离，配置与临时应用状态在验证后恢复。
-- 实际启用采集，切换受控 App/window 并等待 30/60 秒；通过真实工具通路读回磁盘活动、AX、缩略图、原图并核验内容。
-- 关闭设置与会话窗口仍产生新样本；禁用与完全退出后不再写入，重启遵守保存的开关并可读旧记录。
-- 在受控、可撤销的桌面窗口录制操作，保存 Trace / Policy，重启后执行并检查实际界面结果；失败与修复数据按上述状态验证。清理测试录制、任务和进程。
+- 使用已核验的新包复验正常退出无错误框、Host/Electron/Node 均结束且无僵尸；记录进程和端口，快捷键通过 `osascript` 发送。
+- AU3 的失败、显式修复、重跑与禁用取消已有实机证据；退出取消那次先发生 AX snapshot `cannot_complete`，需重新确认执行确实在途后退出并核对可信取消结果。HOST1 的其他宿主能力和完整清理仍待验收。
 - 区分产品缺陷、系统权限、环境和测试工具限制；未执行项不得标通过。发现本规格阻断问题先修复再复验。
 - 根据实机结果同步相关中文文档与可核验证据，通过项按 QA 归档流程处理；如需修复代码，再完成对应检查与独立审核并提交。
 
@@ -93,16 +83,17 @@ Swift Host 通过固定的 `HostAutomationCapabilities` 共享 macOS 实现，`B
 - **实现边界**：宿主自身使用 `NSApplication`；外部目标的 AppKit 请求被拒绝时，检查已有 Accessibility 授权并设置 `AXFrontmost`。稳定前台、权限、目标有效性与取消合约见 [平台桥](../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)，不以请求返回成功代替实际切换。
 - **外部应用复验**：`resumed-activation-green2` 分别确认 Host `isActive:false` 后调用真实 `app_activate`；TextEdit 的 PID 54458 / window 19565、fixture 的 PID 27058 / window 24269 均成功，`app_frontmost` 的 PID 与窗口 owner 正确。证据为 `.cache/issue-4-qa/responses/resumed-activation-green2-*` 和 `activation-external-evidence.jsonl`。
 - **可见窗口复验**：Settings 已可见且 Host 在后台时，`resumed-settings-visible-activate-host` 成功，随后激活 fixture、再切回 Host 也成功；最终 Host PID 51805 / 设置窗口 24546。CUA 观察到设置工具页两个开关 on、最近采样 17:42:09，以及 fixture 的 QA Input / Apply / Ready，记录在 `.cache/issue-4-qa/activation-ui-evidence.jsonl`。
-- **失败与未测边界**：不存在的 `local.handagent.issue4.missing` 返回 `not_found`，证据为 `activation-boundary-evidence.jsonl`。权限拒绝未通过撤销用户 TCC 来实测；取消仍待 AU3 禁用/退出的真实停机验证。无窗口 Host 自激活仍可能明确失败，未声称该场景已修复或通过。
+- **失败与未测边界**：不存在的 `local.handagent.issue4.missing` 返回 `not_found`，证据为 `activation-boundary-evidence.jsonl`。macOS TCC 拒绝仍未实测；取消的最新进度见 manual-qa。无窗口 Host 自激活仍可能明确失败，未声称该场景已修复或通过。
 - **证据有效性与状态**：`resumed-activation-green` 的 Host 实际在前台，未满足用例前提，不计作产品失败；有效复验以上述 `green2` 为准。核心缺陷已从 bugs 移除，HOST1 原完整条目恢复到 manual-qa；HOST1 仍待完整验收，其余条目的最新状态以 manual-qa / archive 为准。
-
 
 ## 实机发现：退出期间回执管道关闭
 
-触发：用户正常退出 Swift Host，Electron 处理既有 shutdown command 时向已经关闭的 stdout 读取端发送 ack。预期：停止 supervisor 并退出 Electron，不因回执传输失败进入异常模态框；连接正常时 NDJSON 内容保持原合约。
+触发：用户正常退出 Swift Host，Electron 向已关闭的 stdout 读取端发送 shutdown ack，弹出 `Uncaught Exception: Error: write EPIPE`；Swift 已结束，Electron 错误框与 Node 僵尸残留。实机记录为 `.cache/issue-4-qa/shutdown-evidence.jsonl`、`shutdown-dialog-evidence.jsonl`，缺陷记录提交为 `7e74cfe`；故障复现包的 Swift 主程序 SHA-256 为 `b86c404631a0bb81b1a62ac0624e30770ac06c2a1b94eb9cb6a8b6c14cc95be7`。预期正常完成进程清理，连接正常时 NDJSON 内容不变。
 
 复用链路：`ElectronBackedAppServer.stop → shutdown → ElectronShellRuntime.handleCommand → ack → JsonLineBridge.send → stdout`。不新增协议字段、托管进程或业务状态；输出流的终止必须作为传输边界处理，不能打断 shutdown 清理。
 
-用例级回归先在 Electron `tests/use-cases/` 构造真实 Node 子进程与可关闭的输出 socket，调用真实 command parser、runtime 和 bridge，仅替换 Electron 窗口/退出及 supervisor 系统边界；读取端正常时验证 ack，读取端关闭时验证进程正常结束且停止 supervisor，不产生未处理 EPIPE。再检查其他输出错误的定位边界，避免把未预期错误伪装成成功。
+`host-shutdown.test.ts` 使用真实 Node 子进程 stdout 管道和真实 parser/runtime/bridge；旧实现关闭读取端后退出码为 1 并报 EPIPE，尽管 stop/quit 回调已调用。修复后正常管道与闭管道用例均正常退出，非 EPIPE 的 EIO 仍失败；回调记录不证明真实 Electron/supervisor 已完成清理。修复只处理预期异步 EPIPE 并跳过不可写输出，协议及 shutdown 顺序不变。
 
-TODO：建立并运行红用例 → 最小修复输出生命周期 → 用例及仓库 Web/Swift test/build/package 检查 → 独立文档审核 → 本地提交 → 原构建退出链路实机复验并继续 AU3/HOST1。用户已授权发现 bug 后按流程修复，沿用本 worktree 和既有分层基线。
+检查：Web、Swift test/build/package 已通过，日志为 `.cache/issue-4-shutdown-{web,swift,build,package}.log`；旧实现红用例见 `.cache/issue-4-shutdown-red.log`。本轮独立文档审核同步更新了传输合约、测试证据边界与 manual-qa；新包签名及资源身份已核验，实机退出仍待验证，不记作 AU3/HOST1 通过。
+
+TODO：本地提交 → 新产物退出链路实机复验 → 继续 AU3/HOST1 并逐项记录与归档。沿用本 worktree，复验和清理结果以新证据为准。
