@@ -24,11 +24,12 @@
 
 - **严重级别**：P3。
 - **发现日期**：2026-06-24。
-- **复现边界**：Settings -> 触发器 -> Chrome Bookmarks 二级页，新增自动化时空标题保存会显示 `标题不能为空`；随后点击取消或收起表单。
+- **复现边界**：Settings -> 触发器 -> Chrome Bookmarks 二级页，新增自动化时先选择文件夹，空标题保存会显示 `标题不能为空`；随后点击取消。重新展开，不选文件夹保存会显示 `至少选择一个收藏夹文件夹`，随后点击收起。
 - **实际结果**：新增表单已收起，但详情页底部仍残留红色错误。
 - **期望结果**：取消或收起新增表单后清除本次表单校验错误。
 - **根因边界**：`AgentTriggerSettingsViewModel.saveErrorMessage` 由空标题保存设置；取消按钮和 `isAdding` 收起逻辑只重置局部表单，没有清空 view model 的错误状态。
 - **基线结果**：发现时 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均返回 `success`。
+- **当前复现（2026-09-14）**：主 checkout `main` 的 `2920af8`，macOS 15.5 arm64，使用包含 `984a04b` 生产代码的 `dist/Wisp Pocket.app`；三项检查已通过。Computer Use 确认两条关闭路径均隐藏输入与保存按钮，但上述红色错误仍可见，列表仍为“暂无自动化”。宿主 PID `38290`、Electron `38303`、agent-server `38321` 均来自本轮主 checkout；正常退出后进程结束、4317 释放。操作与产物哈希见 `.cache/live-qa-20260914/trigger-form-repro.json`；尚未修复。
 
 ### Chrome Bookmarks bridge endpoint 与实际监听端口不一致
 
