@@ -9,3 +9,4 @@
 - [2026-09-13-stitch-skills.md](./2026-09-13-stitch-skills.md)：评估 Stitch 技能库时阅读，涵盖设计规范、界面生成、代码转换与多页构建循环。
 - [2026-09-13-ai-product-discovery.md](./2026-09-13-ai-product-discovery.md)：评估 AI 辅助产品发现时阅读，说明风险优先级、研究方法与证据边界。
 - [ai-product-workflow.md](./ai-product-workflow.md)：跨项目复用的人机协作建议模板，包含决策关口、AI 自主范围、实验记录与起步步骤。
+- [2026-09-14-product-context-skills.md](./2026-09-14-product-context-skills.md)：补齐当前产品说明与界面素材时阅读，核查 Design OS、Stitch 和本机技能的沉淀及维护边界。
