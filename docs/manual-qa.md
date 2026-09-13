@@ -18,6 +18,7 @@
 - **自动化入口**：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`pnpm --filter handagent-electron-shell build`；后端 `pet-conversation`、renderer `pet-interaction` 和原生边界 `pet-window` 用例不能替代本节实机验收。
 - **材料与记录**：使用可丢弃的文本、PNG/JPEG/WebP 图片、可访问的公共网页链接与有可复制正文的 PDF；记录源应用、实际松手区域、Thread 身份、可见结果和必要系统证据。需要真实模型理解的项目使用有效 provider；可控 fixture 的结果单独注明。
 - **本轮基线（2026-09-13）**：在用户指定分支的现有 worktree 验证，TypeScript/Web、Swift test/build 与打包均通过；源码为 `0194a22` 加开始时已有的 8 个未提交文件，差异快照和本轮日志保存在 `/tmp/issue1-live-qa-20260913-1030/`。使用默认 `dist/Wisp Pocket.app`、真实模型设置和独立桌宠位置文件；外置 `/tmp` 包缺少可解析的 `zod`，不作为本轮正常启动环境。
+- **模型环境对照（2026-09-13）**：当前 provider 的 `responses` 路径出现空流或 `unexpected EOF`；同一 provider/model 的 `chat` 路径通过真实请求返回 `QA_OK`。后续测试临时将 `llm.api` 改为 `chat`，仅修改该字段，结束后恢复原始设置。对照结果见本轮 `evidence/chat-provider-probe.json`，设置变化与恢复依据见 `evidence/model-config-change.json`。
 
 - [ ] 角色图集与主题：观察空闲、处理、等待、失败和移动状态，角色不闪透明空帧；亮暗主题文字可读，启用减少动态效果后动画停止。
 
