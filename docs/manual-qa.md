@@ -26,6 +26,7 @@
 从主 checkout 的 `main` 打包，使用可丢弃资料；真实模型与可控 fixture 的结论分别记录。已有桌宠、Thread 与触发器详细分项继续按下文逐项验收，本节补足当前产品的其他入口。
 
 - [ ] QA-INPUT 主动输入：PromptPanel 纯文字、Append Prompt、文本选区和区域截图可确认提交；取消捕获不提交，输入附件与实际选区/图像一致；ThreadWindow 可查看历史内容并继续回复。
+- **QA-INPUT 本轮记录（2026-09-14）**：当前包的既有 `test` Append Prompt 经 Tab 追加，真实模型返回 `QA_APPEND_OK`，同一 Thread 继续回复返回 `QA_FOLLOWUP_OK`；UI 与 SQLite 的 `skill` / text 及两轮消息一致。截图热键确实启动系统圈选器，Escape 后无面板、无新增 Thread 或更新时间变化。文本选区未配置热键，已请求临时配置确认但尚未更改；自动化拖动两次落在 TextEdit 选区，窗口捕获与 Quick Look 可用，准确圈选和图片提交仍待验，不记产品缺陷。证据见 `.cache/live-qa-20260914/input-partial.json`；未提交的图片草稿、预览与新测试文稿窗口已关闭，原设置未变，App/后端保留供后续 QA。
 - [ ] QA-SETTINGS 设置：模型 provider/API/model/base URL 保存与热加载、无效配置错误可见；主题同步 PromptPanel/Settings/ThreadWindow/桌宠，热键编辑与恢复正常；不输出模型密钥。
 - [ ] QA-TOOLS 工具与工作区：真实界面完成 Workspace 选择、文件读写、权限本次允许/拒绝/记住决定、工具详情展开；MCP 配置的启用与错误可见，测试仅使用本轮工作区和可丢弃工具。
 - [ ] QA-HOST 合并产物内置功能回归：按 [内置功能步骤](./human/builtin-features-qa.md) 验证开关、采集/查询、录制/保存/重跑及失败记录；关闭窗口继续，禁用停止，重启持久化，退出取消结果落盘。该项验证当前合并产物，不改写原功能分支九项归档结论。
