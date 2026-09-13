@@ -24,6 +24,10 @@ _Avoid_: Chat Window、Conversation Window、PromptPanel
 Wisp Pocket 的常驻轻量交互界面，以月见八千代形象接收主动拖入、展示 Thread 并承接回复。
 _Avoid_: Wisp（指代桌宠时）、StatusBubble、ActivityWindow（指代用户可见界面时）
 
+**桌宠对话区**:
+桌宠中呈现当前 Thread 气泡、建议选项和回复框的交互区域；回复框专指其中编辑并发送文字的输入区域。
+_Avoid_: 对话框（混指整个对话区与回复框时）、ThreadWindow
+
 ## 产品命名
 
 **Wisp Pocket**:
