@@ -47,11 +47,11 @@
 
 ### Electron 正常退出后的宿主清理回归
 
-- **状态**：2026-09-14 退出调度修复已在独立 worktree 实现，待合入 `main` 后重新打包实机复验；原 P2「从 Electron 正常退出后 Swift Host 挂起」从 `bugs.md` 移至本节。
+- **状态**：2026-09-14 退出调度修复 `984a04b` 已合入 `main`，主 checkout 三项检查与正式模型模式打包通过，待实机复验；原 P2「从 Electron 正常退出后 Swift Host 挂起」从 `bugs.md` 移至本节。
 - **自动检查**：隔离 XCTest 子进程使用真实 AppKit 与生产退出链路，旧实现两次超时，延迟到主 run loop 后正常退出。`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`（341 项）与 `bash ./scripts/swiftw build` 全部通过；在途 Automation 用例继续核对取消落盘先于退出答复，分工见 [修复计划](./medium-powers/plans/2026-09-14-electron-host-exit.md)。
 - **原失败证据**：主 checkout 的 `.cache/live-qa-20260914/fixed-launch-error.log` 与 `host-exit.sample.txt`。`627e91b` 产物从前台 ThreadWindow 收到 `Command+Q` 后，Electron / agent-server 已退出、4317 已释放，Swift Host 持续残留；该测试宿主已停止。
 - **回归步骤**：重新打包后完整执行 QA-START，分别验证前台 ThreadWindow 的 `Command+Q` 与 Swift Host 原生退出入口；以实际进程结束和端口释放为准，再启动并恢复同一 Thread 历史。启用 Automation 的在途取消与落盘按 QA-HOST 复验，关闭窗口继续运行的行为保持不变。
-- **未验边界**：本次没有修复后包的实机通过结论；真实 AppKit 子进程测试不证明 Electron / agent-server 打包运行、真实窗口或完整重启流程。
+- **未验边界**：本次没有修复后包的实机通过结论；另一 worktree `pet-compact-hover-20260914` 的 App 占用 4317，未停止或操作该实例。待环境可用后复验，不将其运行状态计入本轮结论。真实 AppKit 子进程测试不证明 Electron / agent-server 打包运行、真实窗口或完整重启流程。
 
 ### Issue #1 月见八千代桌宠与 Thread 轻量对话
 

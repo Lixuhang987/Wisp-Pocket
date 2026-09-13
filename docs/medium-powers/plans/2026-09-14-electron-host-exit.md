@@ -33,9 +33,10 @@
 - [x] 依据检查点确认失败边界在退出调度；只改变 `AppServices` 的生产退出调度后测试通过，移除临时诊断日志。
 - [x] 定向回归、TypeScript/Web、Swift test（341 项）与 Swift build 全部通过；更新相关模块文档与 manual QA。
 - [x] 不继承上下文的独立子 agent 审核计划、代码和逐级目录指南，补齐调度与测试边界；已将修复从 bugs 移至待实机复验。
-- [ ] 主 agent 确认独立审核结论后提交。
-- [ ] 合回主分支重新打包，验证前台 Electron 退出、Swift 主动退出、重启与历史恢复；逐项记录 QA 证据。
+- [x] 主 agent 确认独立审核结论，提交 `984a04b` 并快进合入主分支。
+- [x] 主 checkout 的 TypeScript/Web、Swift test/build 与正式模型模式打包全部通过。
+- [ ] 验证前台 Electron 退出、Swift 主动退出、重启与历史恢复；逐项记录 QA 证据。
 
 ## 验证边界
 
-新用例证明真实 AppKit 可完成生产退出链路，既有 Automation 用例证明取消结果落盘先于退出答复；两者不替代修复后打包产物的实机验收。当前修复尚未合入 `main`，也未实测修复后包，待验步骤见 [manual-qa.md](../../manual-qa.md#electron-正常退出后的宿主清理回归)。
+新用例证明真实 AppKit 可完成生产退出链路，既有 Automation 用例证明取消结果落盘先于退出答复；两者不替代修复后打包产物的实机验收。修复已合入 `main` 并打包，尚未启动修复后包；另一 worktree 的 App 正在占用 4317，保持其运行不动，待环境可用再按 [manual-qa.md](../../manual-qa.md#electron-正常退出后的宿主清理回归) 复验。产物与检查记录见主 checkout `.cache/live-qa-20260914/exit-fix-checks.json`。
