@@ -14,7 +14,7 @@
 - 规格：[移除通用 Plugin 框架并完成实机验证](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)。
 - 基点：`codex/issue-3-state-ownership-main-20260913` / `72787e2`；[实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
 - 实现、审核发现的修复与独立文档复核已完成；最终三项检查、打包及签名验证均已通过，记录见实施计划。规格仍缺实机验收。
-- [ ] 等获准暂时退出占用 4317 的旧实例后，启动本次构建，逐项完成 [manual-qa](./manual-qa.md) 中九项验收；当前 app / fixture 尚未启动。
+- [ ] 已恢复本次构建的实机验收，继续逐项补齐 [manual-qa](./manual-qa.md) 中九项证据；CH1 的部分步骤已有观察结果，九项均未完整通过。
 - [ ] 依据后续实机证据归档通过项或记录真实阻塞/缺陷，同步相关文档并提交验收记录；不得把未执行项或 Issue #4 标为完成。
 
 ## Wisp Pocket 桌宠交互

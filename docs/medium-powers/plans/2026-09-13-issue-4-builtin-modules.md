@@ -2,13 +2,15 @@
 
 规格以 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 为准。基点为 `codex/issue-3-state-ownership-main-20260913` 的 `72787e2`；工作区为 `.worktrees/issue-4-builtin-modules`。本计划按已授权规格执行，不增加采集来源或自主修复能力。
 
-当前状态（2026-09-13）：独立 worktree、CodeGraph 与分层基线、内置实现及审核发现的修复均已完成；独立文档审核已与当前代码同步。实机尚未执行，Issue #4 未完成。
+当前状态（2026-09-13）：独立 worktree、CodeGraph 与分层基线、内置实现及审核发现的修复均已完成；独立文档审核已与当前代码同步。实机验收已开始，九项尚无完整归档通过，Issue #4 未完成。
 
 验证记录：最后 Bridge 修复后的完整 Web 检查、版本保护后的完整 Swift test/build，以及最终打包均已通过，日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`。末次版本上界与发送失败回归分别见 `.cache/issue-4-version-green.log`、`.cache/issue-4-send-failure-green.log`；standards/spec 最终复核发现均已闭合。
 
-最终产物为 `dist/Wisp Pocket.app`，使用 `--mock-llm` 避免外部模型依赖，系统能力与业务模块均保持真实实现；`codesign --verify --deep --strict` 已通过。主程序 SHA-256 为 `b3596abbecd8a2f8089c6154d90fae7845e7bd836078ef246e176b469e72c503`。该产物尚未启动。
+最终产物为 `dist/Wisp Pocket.app`，使用 `--mock-llm` 避免外部模型依赖，系统能力与业务模块均保持真实实现；`codesign --verify --deep --strict` 已通过。主程序 SHA-256 为 `b3596abbecd8a2f8089c6154d90fae7845e7bd836078ef246e176b469e72c503`。该产物已用于 CH1 的部分实机步骤。
 
-实机因旧实例占用 4317、等待临时退出授权而阻塞；进程证据与九项待验收状态统一维护在 [manual-qa](../../manual-qa.md)，本任务尚未启动 app 或 fixture。
+用户已明确恢复实机验收。CH1 已有证据、尚未完成的在途调用验证及其余八项状态统一维护在 [manual-qa](../../manual-qa.md)；测试数据使用 `.cache/issue-4-qa/home` 隔离 home，受控窗口由本次 fixture 提供。宿主激活失败仍待核实原因，进程与清理状态以每次验证证据为准。
+
+已有 CH1 原始记录位于 `.cache/issue-4-qa/` 下的 `provider-hellos.jsonl`、`ch1-restart.json` 与 `CH1-evidence.jsonl`。这些记录只支持已注明的部分步骤，不能代表九项完整验收。
 
 ## 目录与现有链路
 
@@ -86,7 +88,7 @@
 
 ## 待完成的实机验证
 
-- 从本 worktree 构建并启动 Wisp Pocket，记录二进制、进程和权限环境；测试数据与用户现有业务记录隔离，配置与临时应用状态在验证后恢复。
+- 继续使用本 worktree 的同一构建，记录二进制、进程和权限环境；快捷键通过 `osascript` 发送。测试数据与用户现有业务记录隔离，配置与临时应用状态在验证后恢复。
 - 实际启用采集，切换受控 App/window 并等待 30/60 秒；通过真实工具通路读回磁盘活动、AX、缩略图、原图并核验内容。
 - 关闭设置与会话窗口仍产生新样本；禁用与完全退出后不再写入，重启遵守保存的开关并可读旧记录。
 - 在受控、可撤销的桌面窗口录制操作，保存 Trace / Policy，重启后执行并检查实际界面结果；失败与修复数据按上述状态验证。清理测试录制、任务和进程。

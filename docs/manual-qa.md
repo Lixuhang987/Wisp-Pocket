@@ -65,8 +65,9 @@
 
 ## 内置 Context History 与 Automation（Issue #4）
 
-- **状态**：内置实现与 Provider 用例已接入；以下全部待实机，自动化通过不能代替验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，逐项操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
-- **实机阻塞（2026-09-13）**：旧 `/tmp/issue1-live/app/Wisp Pocket.app`（PID 34930）仍在运行，其 node（PID 34956）监听 `127.0.0.1:4317`；已请求允许暂时退出，尚未收到答复。本任务的 app / fixture 均未启动，九项均未执行，没有本规格的 QA 通过记录。
+- **状态**：内置实现与 Provider 用例已接入；以下九项均待完成实机验收，尚无完整归档通过项。自动化通过不能代替验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，逐项操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
+- **已有实机证据（2026-09-13）**：使用本 worktree 的最终产物与隔离数据 home，已观察到 CH1 的两个开关默认关闭；启用后配置均为 `true`，真实 Provider 工具数由 9 增至 21；正常退出并重启后配置仍为 `true`，Provider 仍声明 21 个工具。产物身份与原始证据见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
+- **尚缺证据**：CH1 的声明刷新与在途调用重叠尚未完成；先前试验在刷新前即因 `app_activate` 返回 macOS 拒绝而结束，原因仍在核实，不能据此判产品缺陷或验收通过。CH2–CH5、AU1–AU3、HOST1 均保留待验收。
 - [ ] **CH1 默认与持久化**：确认两个开关默认关闭，启用后立即声明对应工具，重启遵守保存选择，声明刷新保留在途调用。
 - [ ] **CH2 变化与周期采样**：实际切换 app/window 并持续停留，核对变化样本、30 秒周期样本、60 秒截图及目标关联。
 - [ ] **CH3 查询与证据可读**：经真实工具读取索引、批量 AX 详情、缩略图和原图，核对内容、时间和标识；损坏/缺失证据与权限失败可定位。
