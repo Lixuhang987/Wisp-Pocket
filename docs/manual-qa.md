@@ -65,11 +65,10 @@
 
 ## 内置 Context History 与 Automation（Issue #4）
 
-- **状态**：内置实现与后台激活修复已完成，CH1 已完整实机通过并归档；以下八项继续待验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
-- **已完成**：CH1 在全新隔离 home 验证默认关闭、启用与重启持久化，并在约 233 秒的成功 Automation 调用期间刷新声明；完整证据见 [归档](./archive.md)。后台激活修复证据见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
+- **状态**：内置实现与后台激活修复已完成，已通过的条目逐项归档；下列项目继续待验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
+- **已完成项与证据**：见 [归档](./archive.md)，本文只保留待验收项目。后台激活修复证据见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
 - **剩余边界**：权限拒绝未通过撤销用户现有 TCC 来实测；取消待 AU3 的禁用/退出真实停机验证。无窗口宿主自激活仍可能明确失败，未记为通过；其余子项继续逐项验收。
 
-- [ ] **CH2 变化与周期采样**：实际切换 app/window 并持续停留，核对变化样本、30 秒周期样本、60 秒截图及目标关联。
 - [ ] **CH3 查询与证据可读**：经真实工具读取索引、批量 AX 详情、缩略图和原图，核对内容、时间和标识；损坏/缺失证据与权限失败可定位。
 - [ ] **CH4 窗口关闭**：关闭 Settings 与 ThreadWindow 后持续采集，经重新打开后的真实工具读到关闭期间记录。
 - [ ] **CH5 停机与重启**：禁用后和完全退出后均无新写入；重启遵守配置并能读取旧活动、AX 与图片。

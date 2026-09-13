@@ -2,7 +2,7 @@
 
 规格以 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 为准。基点为 `codex/issue-3-state-ownership-main-20260913` 的 `72787e2`；工作区为 `.worktrees/issue-4-builtin-modules`。本计划按已授权规格执行，不增加采集来源或自主修复能力。
 
-当前状态（2026-09-13）：初始重构与后台激活修复已完成，并已独立核对规格、代码与文档。后台 Host 激活外部应用及可见 Settings 的自身激活已实机复验；HOST1 完整条目已恢复；CH1 已完整实机通过并归档，其余八项待验收，Issue #4 未完成。
+当前状态（2026-09-13）：初始重构与后台激活修复已完成，并已独立核对规格、代码与文档。后台 Host 激活外部应用及可见 Settings 的自身激活已实机复验；实机验收逐项归档，剩余条目见 manual-qa；Issue #4 尚未完成。
 
 验证记录：初始重构日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`，既有审核发现已闭合。本次激活修复的 Web 检查见 `.cache/issue-4-activation-web.log`，Swift test/build/package 见 `.cache/issue-4-activation-final-{swift,build,package}.log`；四项均通过，由主 agent 执行，实机复验期间代码未再变化。
 
@@ -78,7 +78,7 @@ Swift Host 通过固定的 `HostAutomationCapabilities` 共享 macOS 实现，`B
 
 ## 待完成的实机验证
 
-- 使用上述修复产物，继续 CH2–CH5、AU1–AU3 与 HOST1；记录二进制、进程和权限环境，快捷键通过 `osascript` 发送。测试数据与用户现有业务记录隔离，配置与临时应用状态在验证后恢复。
+- 使用上述修复产物，继续 manual-qa 保留的未完成条目；记录二进制、进程和权限环境，快捷键通过 `osascript` 发送。测试数据与用户现有业务记录隔离，配置与临时应用状态在验证后恢复。
 - 实际启用采集，切换受控 App/window 并等待 30/60 秒；通过真实工具通路读回磁盘活动、AX、缩略图、原图并核验内容。
 - 关闭设置与会话窗口仍产生新样本；禁用与完全退出后不再写入，重启遵守保存的开关并可读旧记录。
 - 在受控、可撤销的桌面窗口录制操作，保存 Trace / Policy，重启后执行并检查实际界面结果；失败与修复数据按上述状态验证。清理测试录制、任务和进程。
@@ -94,4 +94,4 @@ Swift Host 通过固定的 `HostAutomationCapabilities` 共享 macOS 实现，`B
 - **外部应用复验**：`resumed-activation-green2` 分别确认 Host `isActive:false` 后调用真实 `app_activate`；TextEdit 的 PID 54458 / window 19565、fixture 的 PID 27058 / window 24269 均成功，`app_frontmost` 的 PID 与窗口 owner 正确。证据为 `.cache/issue-4-qa/responses/resumed-activation-green2-*` 和 `activation-external-evidence.jsonl`。
 - **可见窗口复验**：Settings 已可见且 Host 在后台时，`resumed-settings-visible-activate-host` 成功，随后激活 fixture、再切回 Host 也成功；最终 Host PID 51805 / 设置窗口 24546。CUA 观察到设置工具页两个开关 on、最近采样 17:42:09，以及 fixture 的 QA Input / Apply / Ready，记录在 `.cache/issue-4-qa/activation-ui-evidence.jsonl`。
 - **失败与未测边界**：不存在的 `local.handagent.issue4.missing` 返回 `not_found`，证据为 `activation-boundary-evidence.jsonl`。权限拒绝未通过撤销用户 TCC 来实测；取消仍待 AU3 禁用/退出的真实停机验证。无窗口 Host 自激活仍可能明确失败，未声称该场景已修复或通过。
-- **证据有效性与状态**：`resumed-activation-green` 的 Host 实际在前台，未满足用例前提，不计作产品失败；有效复验以上述 `green2` 为准。核心缺陷已从 bugs 移除，HOST1 原完整条目恢复到 manual-qa；HOST1 仍待完整验收；CH1 已单独归档，其余七项继续待验收。
+- **证据有效性与状态**：`resumed-activation-green` 的 Host 实际在前台，未满足用例前提，不计作产品失败；有效复验以上述 `green2` 为准。核心缺陷已从 bugs 移除，HOST1 原完整条目恢复到 manual-qa；HOST1 仍待完整验收，其余条目的最新状态以 manual-qa / archive 为准。
