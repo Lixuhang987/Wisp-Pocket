@@ -207,3 +207,15 @@
 - **验证过程**：Computer Use 操作 Chrome Bookmarks 的已选文件夹/空标题保存后取消、未选文件夹保存后收起；再操作 System Clock 的空标题保存后取消与收起。失败时均显示正确原因，关闭后字段和红色错误一起消失，重新展开不带旧错误并恢复字段默认值。
 - **证据**：AX 与截图逐步确认表单/错误出现和移除；已有 System Clock Instance 始终保留，`instances.json` 前后 SHA256 均为 `ab49203cb1ed9dc49b8fa9fa5c55a8c109751d0d5c8d6862dac5358c7361b9e8`。产物、进程和检查记录见 `.cache/live-qa-20260914/trigger-form-fixed.json`；Host SHA256 为 `a13166b21bb03c1065fefbaefdfc90928123a50122d8c4de33eb1098a89dab0e`。
 - **清理与结论**：从 Settings 正常退出后 Host、Electron、agent-server 全部结束，4317 释放。本表单回归通过；Chrome 扩展连接与完整生命周期仍按各自条目验收。
+
+
+- [ ] QA-START 启动与生命周期：默认冷启动显示桌宠，按本机热键配置唤出 PromptPanel / 历史；Escape 恢复原应用焦点，首次提交与模型回复可见；关闭 ThreadWindow 后后端继续运行，重新打开恢复历史。从前台 ThreadWindow 和 Swift Host 分别正常退出，确认宿主、Electron、agent-server 全部结束且 4317 释放；重启后历史与设置保留。退出修复及前置观察见下方两项，完整流程尚待复验。
+
+### QA-START 当前主分支生命周期
+
+- **验证日期**：2026-09-14，清理检查时间为 06:30:44 +08:00。
+- **验证环境**：macOS 15.5 arm64；主 checkout `main` / `eb111d6`，`dist/Wisp Pocket.app`，Host SHA256 `a13166b21bb03c1065fefbaefdfc90928123a50122d8c4de33eb1098a89dab0e`。TypeScript/Web、隔离 home 的 Swift test、Swift build、正式模型模式打包与签名检查通过。真实 `responses` provider `http://127.0.0.1:8090/v1`、`gpt-5.5`，未输出密钥。
+- **验证过程**：无全局 Electron 的默认冷启动显示桌宠；原生 `Command+Shift+Space` 唤出 PromptPanel，Escape 从 Host 返回原 iTerm2 PID 1606。提交 `Reply with exactly QA_LIFECYCLE_OK. Do not call any tools.`，ThreadWindow 与 SQLite 均出现回复 `QA_LIFECYCLE_OK`。`Command+W` 关闭 ThreadWindow 后同一后端继续监听，桌宠保留结果；PromptPanel 内按本机历史热键 `Command+H` 打开历史列表，显式选中测试 Thread 后恢复两条消息，不宣称自动恢复选中项。
+- **退出与重启**：从前台 Electron 按 `Command+Q`，Host 63123、Electron 63140、后端 63166 及两层启动子进程全部结束，4317 释放。再携带指向不存在路径的 `HANDAGENT_ELECTRON_BINARY` 冷启动，仍使用当前 checkout runtime 与当前 bundle main；历史可恢复，新提交返回 `QA_STALE_START_OK`。Settings 保留模型与 base URL；从前台 Swift Settings 按 `Command+Q`，Host 72433、Electron 72442、后端 72459 及启动子进程全部结束，4317 再次释放。
+- **证据**：主 checkout `.cache/live-qa-20260914/lifecycle.json` 与 `lifecycle-{default,stale}-{stdout,stderr}.log`；真实 Computer Use AX / 截图、原生快捷键、进程与 SQLite 检查。Thread `thread-898fd56c-4dfc-4365-8d70-af460f334259` / `thread-cbc2d54c-2e10-4dcc-bfff-35391e45a77d` 保留为 QA fixture；两次启动前后设置 SHA256 均为 `3813c808035b5a8b10ef6dfb67448fdb9da02f80f0a3a029e88990128b33fb93`。
+- **结论**：QA-START 通过，退出挂起未复现；本轮 App 与后端已停止。`agent_server.health` / `thread_window.prepared` 内部事件未直接捕获，启动事件时序仍留在冷启动分项；在途 Automation 退出取消与落盘仍由 QA-HOST 验证。

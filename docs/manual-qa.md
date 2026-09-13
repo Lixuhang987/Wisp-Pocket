@@ -25,7 +25,6 @@
 
 从主 checkout 的 `main` 打包，使用可丢弃资料；真实模型与可控 fixture 的结论分别记录。已有桌宠、Thread 与触发器详细分项继续按下文逐项验收，本节补足当前产品的其他入口。
 
-- [ ] QA-START 启动与生命周期：默认冷启动显示桌宠，按本机热键配置唤出 PromptPanel / 历史；Escape 恢复原应用焦点，首次提交与模型回复可见；关闭 ThreadWindow 后后端继续运行，重新打开恢复历史。从前台 ThreadWindow 和 Swift Host 分别正常退出，确认宿主、Electron、agent-server 全部结束且 4317 释放；重启后历史与设置保留。退出修复及前置观察见下方两项，完整流程尚待复验。
 - [ ] QA-INPUT 主动输入：PromptPanel 纯文字、Append Prompt、文本选区和区域截图可确认提交；取消捕获不提交，输入附件与实际选区/图像一致；ThreadWindow 可查看历史内容并继续回复。
 - [ ] QA-SETTINGS 设置：模型 provider/API/model/base URL 保存与热加载、无效配置错误可见；主题同步 PromptPanel/Settings/ThreadWindow/桌宠，热键编辑与恢复正常；不输出模型密钥。
 - [ ] QA-TOOLS 工具与工作区：真实界面完成 Workspace 选择、文件读写、权限本次允许/拒绝/记住决定、工具详情展开；MCP 配置的启用与错误可见，测试仅使用本轮工作区和可丢弃工具。
