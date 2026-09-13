@@ -94,9 +94,23 @@ final class MacPlatformProvider: PlatformProvider, HostAutomationCapabilities {
 
     private func activateRunningApplication(_ app: NSRunningApplication) async throws {
         try Task.checkCancellation()
-        guard !app.isTerminated,
-              app.isActive || app.activate(options: [.activateAllWindows]) else {
-            throw PlatformBridgeError(code: "action_failed", message: "macOS refused to activate the running app")
+        guard !app.isTerminated else {
+            throw PlatformBridgeError(code: "action_failed", message: "The target app terminated before activation")
+        }
+        if !app.isActive, app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            NSApp.activate(ignoringOtherApps: true)
+        } else if !app.isActive && !app.activate(options: [.activateAllWindows]) {
+            guard MacPlatformAccessibilityPermission.isTrusted() else {
+                throw MacPlatformAccessibilityPermission.deniedError()
+            }
+            let element = AXUIElementCreateApplication(app.processIdentifier)
+            let result = AXUIElementSetAttributeValue(element, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+            guard result == .success else {
+                throw PlatformBridgeError(
+                    code: "action_failed",
+                    message: "Cannot activate the background app through Accessibility: \(result.readableName)"
+                )
+            }
         }
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(2))

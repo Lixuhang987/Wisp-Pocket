@@ -13,9 +13,8 @@
 
 - 规格：[移除通用 Plugin 框架并完成实机验证](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)。
 - 基点：`codex/issue-3-state-ownership-main-20260913` / `72787e2`；[实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
-- 初始重构、既有审核修复与文档复核已完成，对应三项检查、打包及签名验证均已通过。实机发现 [后台 Swift Host 激活缺陷](./bugs.md)，后续验收已暂停；九项均未完整通过。
-- [ ] 按实施计划中的后台激活用例修复缺陷，保留权限、目标有效性与取消边界；从同一真实 Provider 入口复验前台状态，完成相应检查，恢复 HOST1 完整验收条目并经独立文档审核后提交。
-- [ ] 继续逐项补齐 [manual-qa](./manual-qa.md) 中九项证据并按 QA 流程更新、提交；CH1 已观察步骤不等于整项通过，未执行项或 Issue #4 不得标为完成。
+- 初始重构与后台激活修复已完成；后台 Host 激活外部应用及可见 Settings 的自身激活已实机复验，相关检查与独立文档审核完成，证据见实施计划。HOST1 完整条目已恢复，九项均未完整通过。
+- [ ] 从全新隔离数据 home 完整验收 CH1，再逐项完成 [manual-qa](./manual-qa.md) 的其余用例并按 QA 流程更新、提交；保留权限拒绝、取消及其他未执行子项，部分证据不代表整项或 Issue #4 完成。
 
 ## Wisp Pocket 桌宠交互
 

@@ -24,7 +24,7 @@ enum MacHostDynamicTools {
             S.spec(namespace, "clipboard_read", "Read clipboard text; no automatic context capture.", S.object()),
             S.spec(namespace, "app_list", "List running macOS applications with bundleId and pid.", S.object()),
             S.spec(namespace, "app_frontmost", "Read the frontmost app and its own visible window, including timestamp and identifiers.", S.object()),
-            S.spec(namespace, "app_activate", "Activate an already running app by bundleId (default frontmost). Fails if absent or activation is refused.", S.object(["bundleId": S.string])),
+            S.spec(namespace, "app_activate", "Activate an already running app by bundleId (default frontmost), waiting for stable frontmost status. Background activation may require Accessibility permission. Missing targets, permission and activation failures return errors.", S.object(["bundleId": S.string])),
             S.spec(namespace, "window_list", "List visible windows with id, title, appName and ownerPid.", S.object()),
             S.spec(namespace, "screen_capture", "Capture a display (default), window or region. Returns PNG inputImage plus dimensions/target metadata. displayId (alias screenId) is a positive display identifier string; unknown ids fail. Window needs windowId; region is in display pixels with x/y >= 0 and width/height > 0 and must fit within that display. Invalid targets, permission and capture failures are errors.", S.object(["target": screenTarget])),
             S.spec(namespace, "ocr_read", "Recognize text from supplied base64 image. Does not capture the screen. Invalid images fail.", S.object(["imageBase64": S.string, "language": S.string], required: ["imageBase64"])),
