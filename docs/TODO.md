@@ -14,7 +14,7 @@
 目标为验证当前已实现功能；尚未确认的新设计仍按各自待办推进。本轮从主 checkout 的 `main` 打包与操作，证据保存在 `.cache/live-qa-20260914/`。
 
 - [x] 核对主分支、现有修改、产品文档与手工验收范围；保留用户已有研究文档和截图。
-- [ ] 完成 TypeScript/Web、Swift test/build 基线，并打包确认实际启动来源。
+- [x] 完成 TypeScript/Web、Swift test/build 基线与正式模型模式打包；产物为主 checkout 的 `dist/Wisp Pocket.app`，签名标识为 `com.yourname.HandAgentDesktop`。
 - [ ] 逐项执行 `manual-qa.md` 中功能验收及本轮补充回归；每项立即记录证据并提交。
 - [ ] 发现缺陷后停止该轮实机测试，记录 UI、调用链、进程和持久化证据。
 - [ ] 修复前从主 checkout 运行 `scripts/create-worktree.sh`，确认独立 CodeGraph 索引；跑分层基线后阅读目标目录文档链与代码。
