@@ -109,9 +109,9 @@
 | 正常退出取消 | 7410F4B8-E149-44A1-9BCC-572A52B75EDF | cancelled，保留 2 步，无新增修复请求 |
 
 - **退出证据**：单一辅助进程确认磁盘 running/两步完成后立即 osascript Command-Q，2.088 秒内 Host 95304、Electron 95308、Node 95367 全部结束。取消记录为 failureStage=steps、failedStepIndex=2、failureReason=automation run cancelled、evidence.cancelled=true；文件 SHA-256 f0a48ab84e25d759a0da7a03b188898b215aa8a76a8b096787125f0c40c64b0c，重启后不变。CUA 确认输入为 au3-cancel-persist reached，Saved 仍保留上次结果，等待后的 Apply 未执行。退出令工具连接关闭、辅助 HTTP 调用报 500；取消结论来自可信磁盘终态及重启后的实际 Provider history。
-- **修复与检查**：实测发现的 EPIPE 与退出未保存取消状态分别经 b22c542、1381718 修复，均完成红/绿回归、完整 Web、Swift test/build/package、签名核验和独立文档审核。较早的 AX cannot_complete 轮次不计为取消通过；旧包留下的 running 记录保留原证据，不作为本轮成功结果。
-- **证据位置**：.cache/issue-4-qa/AU3-final-history-verdict.json、AU3-{apply,run_repair,run_patch,cancel-disable}-verdict.json、au3-cancel-persist-{pending,verdict}.json、AU3-final-evidence.jsonl、cancel-shutdown-fixed-artifact.json。原始桌面响应和整屏图片在 HOST1 清理阶段移除，保留本脱敏记录与汇总。
-- **结论**：通过。全局配置恢复、受控窗口和数据清理继续随 HOST1 完成。
+- **修复与检查**：实测发现的 EPIPE 与退出未保存取消状态分别经 b22c542、1381718 修复，均完成红/绿回归、完整 Web、Swift test/build/package、签名核验和独立文档审核。较早的 AX cannot_complete 轮次不计为取消通过；旧包遗留 running 的缺陷文本与文件哈希见历史提交 40719ac，原始文件已随 HOST1 清理，不作为本轮成功结果。
+- **证据位置**：.cache/issue-4-qa/AU3-final-history-verdict.json、AU3-{apply,run_repair,run_patch,cancel-disable}-verdict.json、au3-cancel-persist-{pending,verdict}.json、cancel-shutdown-fixed-artifact.json。原始桌面响应、整屏图片及 AU3-final-evidence.jsonl 已随 HOST1 清理，保留本脱敏记录与上述汇总。
+- **结论**：通过。全局配置恢复、受控窗口和数据清理结果见后续 HOST1 归档。
 
 
 - [ ] **HOST1 宿主能力与清理**：验证保留的宿主读取/操作、可消费图片和明确参数失败；核对产物/进程，恢复配置并清理本次测试资源。
@@ -121,7 +121,7 @@
 - **验证日期**：2026-09-13。
 - **验证环境**：macOS 15.5 (24F74)，本 worktree 的最终签名包（代码提交 1381718）；真实 Dynamic Tool Provider 与 macOS 能力，LLM 为 mock。Swift 主程序 SHA-256 ee8652922c8291e0a1f6e1dd2e38a81b5143a4f8ca7d9d6193311c9a12e516fb；包内 Electron bridge SHA-256 edcf5250ad107b88ed8e9668d2726bdd85056d5dc757f9963669b0c389425cab，与当前构建资源一致。
 - **验证过程**：通过 app_list、app_activate、app_frontmost、window_list 核对 fixture PID 76018 / window 24874 及其所有者；经 app/window/element 三种 AX 入口读取并定位 QA Input 与 Apply。实际 click、set_value、type_text 与 hotkey 操作后由 CUA 核对界面。读取剪贴板只检查返回结构，未改写或展示内容。
-- **输入证据**：set_value 得到 HOST1 set_value 中文 Ω 🙂 café；键盘输入得到 HOST1 输入 Ω 🙂 café 2026。Command+Left / Command+Shift+Right 选择整行，Option+Shift+Left 替换单词，Control+A 移到开头，Shift+keycode:123 替换末字符，字符串与数组键值均成功。最终 CUA 和持久 fixture 状态为 Saved: >prefix 🙂-中文。Command-A 在该无 Edit 菜单的 fixture 中经工具和 osascript 均无选择效果，该初轮未用于判定工具失败；后续使用 CUA 已确认的原生编辑快捷键完成验证。
+- **输入证据**：set_value 得到 HOST1 set_value 中文 Ω 🙂 café；键盘输入得到 HOST1 输入 Ω 🙂 café 2026。Command+Left / Command+Shift+Right 选择整行，Option+Shift+Left 替换单词，Control+A 移到开头，Shift+keycode:123 替换末字符，字符串与数组键值均成功。最终 CUA 与 Provider AX 读取结果均为 Saved: >prefix 🙂-中文；fixture 磁盘文件未单独复核，已随清理移除。Command-A 在该无 Edit 菜单的 fixture 中经工具和 osascript 均无选择效果，该初轮未用于判定工具失败；后续使用 CUA 已确认的原生编辑快捷键完成验证。
 - **图片与 OCR 证据**：screen_capture(window) 返回可消费的 PNG inputImage，真实尺寸 820×548 与元数据一致，SHA-256 508e94b369f339639a7780ba6557c08e9d0afee43a3c9f26b902658be3e4972f。实际打开图片确认窗口标题、输入和 Saved 内容与 CUA 一致。ocr_read 只接收该图片，在 en-US 下识别 Wisp Pocket、Apply、Saved 等 8 行内容；未将此结果表述为中文 OCR 验收。
 - **失败边界证据**：14 个非法调用分别覆盖 App 标识类型/不存在、截图目标类型/显示器标识/不存在/区域坐标、非法图片、AX 目标类型、重复 elementId 字段、缺失 value，以及未知/仅 modifier/歧义/越界快捷键，均 success=false 并携带 invalid_argument 或 not_found。AX 深度 7 按既有约定截断至 6，子节点最多 25；此行为与已有解析用例一致。系统沿用已有辅助功能和屏幕录制授权，未撤销 macOS TCC 授权来实测拒绝；无窗口 Host 自激活仍未记为通过。
 - **产物与进程证据**：签名通过，包内没有五个旧 Plugin 可执行入口，运行时没有对应 Plugin 进程。最终任务进程为 Host 96542、Electron 96543、Node 96553，业务由 Swift Host 运行；无 Automation event tap。SwiftPM 当前仅保留桌面 App 与 Chrome Bookmarks Native Host 两个可执行产品。

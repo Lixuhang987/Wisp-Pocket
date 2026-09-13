@@ -64,28 +64,28 @@ Swift Host 显式组合 `HandAgentHostAutomation` 的两个业务模块，通过
 
 ## 实机验收与清理结果
 
-- AU3 已在 1381718 新包完成紧凑退出取消与重启 history：Run 7410F4B8-E149-44A1-9BCC-572A52B75EDF 为 cancelled，保留两步且无 Repair Request；Host/Electron/Node 全部结束，CUA 确认后续 Apply 未执行。过程见 QA 归档。
-- HOST1 已验证原生读取/动作、Unicode/快捷键、可消费截图、英文 OCR 与 14 个明确参数失败；双开关恢复 off，声明退至 9 个原生工具，本次全部进程/监听结束，原 issue1 实例已按原配置恢复。
+- AU3 已在 1381718 新包完成紧凑退出取消与重启 history：Run 7410F4B8-E149-44A1-9BCC-572A52B75EDF 为 cancelled，保留两步且无 Repair Request；Host/Electron/Node 全部结束，CUA 确认后续 Apply 未执行。归档提交为 `ceb020a`，现存汇总为 `.cache/issue-4-qa/AU3-final-history-verdict.json` 和 `au3-cancel-persist-verdict.json`。
+- HOST1 已验证原生读取/动作、Unicode/快捷键、可消费截图、英文 OCR 与 14 个明确参数失败；最终文本由 CUA 与 Provider AX 核对，未单独复核 fixture 磁盘文件。双开关恢复 off，声明退至 9 个原生工具，本次全部进程/监听结束，原 issue1 实例已按原配置恢复，归档提交为 `77f9929`。
 - macOS TCC 拒绝未通过撤销现有授权实测，无窗口 Host 自激活未记为通过；这些边界保留在归档，未混同为产品成功。
-- 两个隔离业务 home、原始响应/整屏图、token 和临时 fixture 已移除；保留最终构建、脱敏文本/哈希及两张 fixture 图片。清理汇总见 .cache/issue-4-qa/HOST1-cleanup-verdict.json。
+- 两个隔离业务 home、原始响应/整屏图、token 和临时 fixture 已移除；保留最终构建、脱敏文本/哈希及 `AU2-policy-fixture.png`、`HOST1-window.png`。清理与最终进程/文件复核见 `.cache/issue-4-qa/HOST1-cleanup-verdict.json`、`FINAL-workspace-verification.json`；恢复实例见 `HOST1-old-instance-restored.json`。
 
 ## 后台激活修复与证据边界
 
-后台 Host 经真实 Provider 激活外部 TextEdit、fixture 与已有 Settings 窗口已复验；有效外部激活记录为 `resumed-activation-green2`，核对了 Host 起初在后台以及返回 PID/window 与实际前台一致。证据保留在 `.cache/issue-4-qa/activation-{external,ui,boundary}-evidence.jsonl` 和 `responses/resumed-activation-green2-*`；当前激活合约见 [平台桥](../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
+后台 Host 经真实 Provider 激活外部 TextEdit、fixture 与已有 Settings 窗口已复验；有效外部激活记录为 `resumed-activation-green2`，核对了 Host 起初在后台以及返回 PID/window 与实际前台一致。阶段性判定见 `b22c542` 中的本计划，原始响应与实机日志已清理；最终宿主验收见 `77f9929` 的 [归档](../../archive.md) 与现存 `.cache/issue-4-qa/HOST1-archive.md`。当前激活合约见 [平台桥](../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
 
 不存在目标的 `not_found` 已验证；macOS TCC 拒绝仍未实测，无窗口 Host 自激活未记为通过。`resumed-activation-green` 未满足后台前提，不能计作产品失败。HOST1 的验证范围与最终结果见 QA 归档。
 
 ## 实机发现：退出期间回执管道关闭
 
-旧缺陷为 Swift 退出关闭 stdout 读取端，Electron 的 shutdown ack 触发 `EPIPE` 错误框并残留进程，记录提交为 `7e74cfe`；证据为 `.cache/issue-4-qa/shutdown-evidence.jsonl`、`shutdown-dialog-evidence.jsonl`。修复仅处理预期异步 EPIPE 并跳过不可写输出，协议及 shutdown 顺序不变。
+旧缺陷为 Swift 退出关闭 stdout 读取端，Electron 的 shutdown ack 触发 `EPIPE` 错误框并残留进程；脱敏缺陷记录见 `7e74cfe` 中的 `docs/bugs.md`，原始实机日志已清理。修复仅处理预期异步 EPIPE 并跳过不可写输出，协议及 shutdown 顺序不变。
 
 `host-shutdown.test.ts` 使用真实 Node stdout 管道与 parser/runtime/bridge，覆盖正常读取端、闭管道和非 EPIPE 的 EIO；回调记录不证明真实 Electron/supervisor 清理。红用例及检查日志为 `.cache/issue-4-shutdown-{red,web,swift,build,package}.log`。
 
-`b22c542` 签名包已实机确认正常退出和运行中退出均无 EPIPE 残余，Host/Electron/Node 全部结束；产物身份见 `.cache/issue-4-qa/shutdown-fixed-artifact.json`，运行中退出证据见 `au3-exit-fixed-verdict.json`。这一结论只证明进程清理，不能代替下述 Run 取消落盘验收。
+`b22c542` 签名包已实机确认正常退出和运行中退出均无 EPIPE 残余，Host/Electron/Node 全部结束；产物身份见 `.cache/issue-4-qa/shutdown-fixed-artifact.json`，当时的进程结果见 `40719ac` 的缺陷记录。Run 取消落盘的最终通过依据为 `ceb020a` 的归档与现存 `AU3-final-history-verdict.json`。
 
 ## 实机发现：退出前未等待 Automation 取消持久化
 
-用例：真实 Provider 启动已完成两步且仍在 waitFor 的 Run，用户正常 Command-Q。1.521 秒紧凑复现中三进程退出，但 Run `42907AFB-0358-44BC-BC68-40B30C55D110` 仍为 `running`，CUA 确认输入标记且未 Apply；证据见 `.cache/issue-4-qa/au3-exit-fixed-{pending,verdict}.json`，缺陷记录提交为 `40719ac`。
+用例：真实 Provider 启动已完成两步且仍在 waitFor 的 Run，用户正常 Command-Q。1.521 秒紧凑复现中三进程退出，但 Run `42907AFB-0358-44BC-BC68-40B30C55D110` 仍为 `running`，CUA 确认输入标记且未 Apply；脱敏复现与原文件哈希见 `40719ac` 中的 `docs/bugs.md`，原始文件已随 HOST1 清理。
 
 已核验链路为 AppDelegate → AppCoordinator.shutdown → BuiltinFeatures → AutomationModule → AutomationRuntime/AutomationStore → AppKit 退出答复。旧生产代码的入口回归唯一失败是提前返回 `terminateNow`，耗时 0.317 秒；释放系统动作后取消与保存均通过，定位为退出答复过早。红用例见 `.cache/issue-4-cancel-shutdown-red.log`。
 
