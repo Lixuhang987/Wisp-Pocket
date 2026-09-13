@@ -20,8 +20,8 @@
 - `AppCoordinator.init` 保存依赖后会调用 `bootstrap()`；不要在外部重复手动调用。
 - `bootstrap()` 会安装外观回调并启动外观监听、设置 PromptPanel 回调、注册热键和应用内快捷键、安装 app-server health 回调，并启动 Electron shell health 链路。AgentTrigger runtime reload 由 `AppServices.init` 负责。
 - 子模块回调统一在 `bootstrap()` 阶段注入闭包；外观系统回调只转给 `AppearanceThemeService.systemAppearanceDidChange()`，其他闭包内只允许 `send(.xxx)` 或打开 PromptPanel。
-- 应用退出由 `WispPocketApplicationDelegate` 接收 macOS termination 回调并调用 `shutdown()`；不要绕过 Coordinator 直接 stop Electron shell。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一 AppDelegate shutdown 链路。
-- 内置模块由 bootstrap 启动，并在 `shutdown()` 中先取消采集、Automation 操作和录制监听，再关闭外部连接。Settings / ThreadWindow 关闭与 agent-server 暂时不可用不触发内置模块停机；业务生命周期见 [AppServices](../AppServices/app-services.md)。
+- 应用退出由 `WispPocketApplicationDelegate` 接收 macOS termination 回调并等待异步 `shutdown()`；AppKit 延迟答复与去重由 [应用入口](../../desktop.md) 持有。Electron ThreadWindow 为前台时的 `Command+Q` 可能先让 Electron clean exit，Coordinator 通过 `AppServerManaging.onHostTerminationRequest` 调用宿主 `terminateApplication`，再回到同一退出链路。
+- 内置模块由 bootstrap 启动；`shutdown()` 先通过 [BuiltinFeatures](../AppServices/PlatformBridge/platform-bridge.md) 停止采集、操作和录制监听，并等待 Automation 完成取消处理与 Run 终态写入，再关闭外部连接。Settings / ThreadWindow 关闭与 agent-server 暂时不可用不触发内置模块停机。
 - 测试模式走 `AppServices.testing()` 注入 nop 替身，跳过窗口/进程/激活策略副作用。
 - 窗口生命周期由 lifecycle 控制器闭环：Electron ThreadWindow 由 `ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 管理，`SettingsLifecycle` 管 Settings；Coordinator 不持有 AppKit 对象。
 - 应用内快捷键（如 `showThreadWindow` ⌘L 唤起 ThreadWindow）使用 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)` 在 `setupHotkey()` 中注册，仅当 handAgent 持有焦点时生效。不走 `HotkeyRegistering` 协议和 Carbon Events 全局通道。配置 UI 复用 `KeyboardShortcuts.Recorder`，监听通过 `KeyboardShortcuts.Shortcut(event:)` 比对。`shutdown()` 中 `NSEvent.removeMonitor` 清理。

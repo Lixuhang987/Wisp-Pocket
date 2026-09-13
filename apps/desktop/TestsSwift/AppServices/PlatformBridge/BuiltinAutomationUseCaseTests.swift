@@ -273,7 +273,7 @@ final class BuiltinAutomationUseCaseTests: XCTestCase {
 }
 
 @MainActor
-private final class AutomationUseCaseFixture {
+final class AutomationUseCaseFixture {
     let home: URL
     let host: AutomationUseCaseHost
     let liveRecorder: AutomationUseCaseLiveRecorder
@@ -353,7 +353,7 @@ private enum AutomationUseCaseError: LocalizedError {
 }
 
 @MainActor
-private final class AutomationUseCaseHost: HostAutomationCapabilities, PlatformProvider {
+final class AutomationUseCaseHost: HostAutomationCapabilities, PlatformProvider {
     var value = ""
     var rejectedValue: String?
     var activatedBundleIds: [String] = []
@@ -398,11 +398,12 @@ private final class AutomationUseCaseHost: HostAutomationCapabilities, PlatformP
 }
 
 @MainActor
-private final class AutomationUseCaseLiveRecorder: AutomationLiveEventRecording {
+final class AutomationUseCaseLiveRecorder: AutomationLiveEventRecording {
     var recordingIds: Set<String> = []
     var stoppedIds: [String] = []
     var startError: Error?
     var events: [[String: Any]] = []
+    var onStop: (() -> Void)?
     func start(recordingId: String) throws {
         if let startError { throw startError }
         recordingIds.insert(recordingId)
@@ -410,6 +411,7 @@ private final class AutomationUseCaseLiveRecorder: AutomationLiveEventRecording 
     func stop(recordingId: String) throws -> [[String: Any]] {
         recordingIds.remove(recordingId)
         stoppedIds.append(recordingId)
+        onStop?()
         return events
     }
 }

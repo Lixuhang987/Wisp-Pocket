@@ -25,6 +25,11 @@ public final class AutomationModule {
         recorder.stopAll()
     }
 
+    public func stopAndWait() async {
+        stop()
+        _ = await operation?.value
+    }
+
     public func handle(tool: String, arguments: Any?) async -> DynamicToolResult {
         guard isEnabled else { return .text("automation is disabled", success: false) }
         guard !isBusy else { return .text("automation is busy; wait for the current operation", success: false) }

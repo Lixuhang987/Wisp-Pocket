@@ -15,6 +15,7 @@
 - 生产组合点 [AppServices](../app-services.md) 创建同一个 `MacPlatformProvider`，原生 Tool 与两个模块直接复用它。`HostAutomationCapabilities` 只表达固定系统边界，不做能力发现、安装或进程托管。
 - 两个模块默认关闭。启用选择由 [BuiltinFeatureSettingsStore](../AgentSettings/agent-settings.md) 持久化；写入成功才应用选择并发布新的工具声明。
 - Context History 采集与 Automation 操作由应用生命周期管理。关闭窗口继续；禁用或退出取消任务并清理监听，已保存历史与 Policy 保留。
+- 正常退出由 [Coordinator](../../Coordinator/coordinator.md) 等待 `BuiltinFeatures.stopAndWait()`：先撤下业务声明、配置回调并停止模块，再等待 Automation 在途操作收尾。同步 `stop()` 只发出取消，不代表 Run 已保存；等待与持久化边界见 [业务源码指南](../../../../host-automation/Sources/sources.md)。
 - Thread 中断只停止推理与旧 Turn 投影；现有 Dynamic Tool 协议没有远程 cancel，不会自动停止 Host 步骤。需要停止 Automation 宿主任务时禁用功能或退出应用，Thread 等待上限见 [core Thread](../../../../../packages/core/src/thread/thread.md)。
 - 原生 `host_macos` 工具始终声明；业务 namespace 只在对应模块启用时声明。禁用后的调用返回失败，不把旧 Thread 中仍保留的声明当作启用授权。
 - Automation event tap 只在请求 `captureUserEvents=true` 时创建，多个 Recording Session 共享监听源；最后一个会话停止或模块停机后释放。实时事件的证据时间合约见 [业务源码指南](../../../../host-automation/Sources/sources.md)。

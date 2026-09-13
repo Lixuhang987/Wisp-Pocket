@@ -66,8 +66,8 @@ final class AppCoordinator {
         agentServerHealth.start()
     }
 
-    func shutdown() {
-        services.builtinFeatures?.stop()
+    func shutdown() async {
+        await services.builtinFeatures?.stopAndWait()
         if let showThreadWindowMonitor {
             NSEvent.removeMonitor(showThreadWindowMonitor)
         }

@@ -57,6 +57,7 @@
 1. 用至少完成一步后失败的受控 Policy，以及单独的条件/断言失败用例，确认响应失败，Run 保留进度、失败阶段、原因与已有证据。
 2. 核对待处理 Repair Request；默认不产生成功 fallback。用 `repair_apply` 提交明确修复分支，核对版本及 applied 状态，重复应用或旧版本输入明确失败；已有 `apply_patch` 入口保持可读可用。
 3. 确认应用修复没有把旧失败 Run 改成成功，再实际重跑，检查新 Run 与真实窗口结果。禁用期间的执行应取消并保留可信状态。
+4. 单独创建退出取消用例：让流程先填写可见标记，再等待不会出现的控件，最后安排可辨认的 Apply 动作；确认磁盘仍为 `running` 且已完成步骤与 UI 一致后，立即正常 Command-Q。核对 Host/Electron/Node 均结束、Apply 未执行，同一 Run 已保存为 `cancelled`，保留原进度、取消原因/位置/证据且没有新增 Repair Request；重启后经 `automation.history` 再读回。退出前已经失败或强制杀进程不能作为本项通过证据。
 
 Thread 中断只停止推理与旧 Turn 投影，现有协议不会远程取消 Host 步骤；取消宿主执行使用 Automation 开关或完全退出应用。长操作默认等 Provider 返回，不能把超过 15 秒就报错视为正常。
 

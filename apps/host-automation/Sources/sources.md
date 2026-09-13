@@ -18,7 +18,8 @@ Context History 和 Automation 的可变业务状态由 `MainActor` 隔离。两
 - Automation 串行处理工具调用，Recording Session 跨调用保留；`record_event` 记录已经发生的动作，不执行动作。启用 `captureUserEvents` 才启动用户事件监听。
 - 实时事件保留事件时间，使用 `evidenceTiming=recording_stop`、`evidenceCapturedAt` 标明证据时间，并以 `evidenceRef=finalEvidence` 引用 Trace 顶层停止时画面/AX，避免每个事件复制大图片。显式 `record_event` 继续保留独立前后证据。
 - Automation 工具返回图片时保留原 JSON 嵌套位置，以 `imageContentIndex` 指向同一响应的 `contentItems`；相同图片只返回一次。业务持久化与工具返回格式分开，消费端见 [Provider adapters](../../../packages/core/src/adapters/providers/providers.md)。
-- 禁用 Automation 会取消当前操作并清理录制。已取消的执行留下 `cancelled` Run，下一次操作等待当前系统调用完成；保存的 Policy 继续存在。
+- 禁用 Automation 使用同步 `stop()`：拒绝后续调用、请求取消并清理录制。取消是协作式的，当前系统调用返回前仍保留 busy；保存的 Policy 继续存在。
+- 正常退出经 [平台桥](../../desktop/Sources/AppServices/PlatformBridge/platform-bridge.md) 等待 `stopAndWait()`，直到在途操作完成既有取消处理与 `cancelled` Run 持久化，保留进度和取消原因且不生成 Repair Request。此合约不包含强制杀进程后的恢复，也不修补以前遗留的 `running` 记录。
 - Run 在步骤完成后保存进度，失败先保存 Run 再保存 Repair Request。候选修复和已应用修复都不改变失败 Run，只有下一次执行和断言完成才产生 `completed` Run。
 - 修复应用先验证来源版本和可表示的下一版本，再写 Patch / Policy；版本上界失败必须保留原 Policy、失败 Run 与 pending Repair Request，不能溢出崩溃或留下已应用状态。
 - 工具参数的公开声明位于 [BuiltinFeatureToolSpecs.swift](../../desktop/Sources/AppServices/PlatformBridge/BuiltinFeatureToolSpecs.swift)，变更业务输入、图片关联或失败语义时同步声明和 Provider 用例测试。

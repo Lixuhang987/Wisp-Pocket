@@ -25,6 +25,7 @@
 - `~/.spotAgent/settings.json` 的模型、Tool 和主题偏好由 Settings 写入；主题由 Swift 解析后同步给 Electron/React。
 - Append Prompt manifest 位于 `~/.spotAgent/actions`。Context History 与 Automation 使用独立的 `~/.spotAgent/builtin-features.json` 启用配置，由 [AppServices](./Sources/AppServices/app-services.md) 直接组合。
 - 两个内置功能默认关闭；启用后跟随 Swift Host 应用存续，关闭 Settings 或 ThreadWindow 不停止它们。完全退出时取消任务与监听，历史和 Policy 继续保存在业务目录。
+- 正常退出先向 AppKit 返回 `terminateLater`，等待 Coordinator 的异步清理完成后再答复一次，确保在途 Automation 的取消结果有机会落盘。重复退出请求共用同一次清理；`applicationWillTerminate` 不能作为异步持久化的等待点。
 
 ## 验证
 

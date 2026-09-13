@@ -13,6 +13,7 @@
 
 ## 验证边界
 
+- `AutomationUseCaseFixture` 只在测试 target 内共享给 [应用退出用例](../../tests-swift.md)，复用真实 Provider、业务模块和 Store；放开的可见性不形成生产接口，系统动作和录制监听仍是受控边界。
 - 在上述用例中生成或解码图片不代表实机截屏已通过；系统替身发出的事件也不证明操作过真实窗口。
 - 修改录制证据时区分事件时间与停止录制时采样，避免测试把两者当成同一时刻。
 - 真实权限、窗口生命周期、录制及执行结果从 [manual-qa](../../../../../docs/manual-qa.md) 验收；生产合约见 [PlatformBridge](../../../Sources/AppServices/PlatformBridge/platform-bridge.md)。

@@ -36,6 +36,11 @@ final class BuiltinFeatures {
         onToolsChanged?()
     }
 
+    func stopAndWait() async {
+        stop()
+        await automation.stopAndWait()
+    }
+
     func handle(namespace: String, tool: String, arguments: Any?) async -> DynamicToolResult? {
         guard isStarted else { return nil }
         switch namespace {
