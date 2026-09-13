@@ -21,6 +21,17 @@
 
 ## 待验收项
 
+### 全功能补充回归（2026-09-14）
+
+从主 checkout 的 `main` 打包，使用可丢弃资料；真实模型与可控 fixture 的结论分别记录。已有桌宠、Thread 与触发器详细分项继续按下文逐项验收，本节补足当前产品的其他入口。
+
+- [ ] QA-START 启动与生命周期：核对 bundle 来源、进程、菜单与服务健康；全局热键唤出/取消后焦点返回原应用，首次提交打开 ThreadWindow；关闭窗口后服务继续运行，正常退出清理子进程，重启可恢复历史。
+- [ ] QA-INPUT 主动输入：PromptPanel 纯文字、Append Prompt、文本选区和区域截图可确认提交；取消捕获不提交，输入附件与实际选区/图像一致；ThreadWindow 可查看历史内容并继续回复。
+- [ ] QA-SETTINGS 设置：模型 provider/API/model/base URL 保存与热加载、无效配置错误可见；主题同步 PromptPanel/Settings/ThreadWindow/桌宠，热键编辑与恢复正常；不输出模型密钥。
+- [ ] QA-TOOLS 工具与工作区：真实界面完成 Workspace 选择、文件读写、权限本次允许/拒绝/记住决定、工具详情展开；MCP 配置的启用与错误可见，测试仅使用本轮工作区和可丢弃工具。
+- [ ] QA-HOST 合并产物内置功能回归：按 [内置功能步骤](./human/builtin-features-qa.md) 验证开关、采集/查询、录制/保存/重跑及失败记录；关闭窗口继续，禁用停止，重启持久化，退出取消结果落盘。该项验证当前合并产物，不改写原功能分支九项归档结论。
+- [ ] QA-TRIGGER 触发执行：System Clock 到时只触发一次并保存 Thread；Chrome Bookmarks 当前 bridge 与 native host 可连通，扩展连接状态和文件夹更新可见，测试收藏触发正确提示词，重启后恢复连接。
+
 ### Issue #1 月见八千代桌宠与 Thread 轻量对话
 
 - **状态**：已实现；以下实机分项均待验收。
