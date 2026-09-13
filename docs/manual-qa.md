@@ -20,7 +20,7 @@
 - **本轮基线（2026-09-13）**：在用户指定分支的现有 worktree 验证，TypeScript/Web、Swift test/build 与打包均通过；源码为 `0194a22` 加开始时已有的 8 个未提交文件，差异快照和本轮日志保存在 `/tmp/issue1-live-qa-20260913-1030/`。使用默认 `dist/Wisp Pocket.app`、真实模型设置和独立桌宠位置文件；外置 `/tmp` 包缺少可解析的 `zod`，不作为本轮正常启动环境。
 - **模型环境对照（2026-09-13）**：当前 provider 的 `responses` 路径出现空流或 `unexpected EOF`；同一 provider/model 的 `chat` 路径通过真实请求返回 `QA_OK`。图片测试临时将 `llm.api` 改为 `chat`；本轮结束时已恢复原始 `responses` 设置，原始文件 SHA256 一致，密钥备份已删除。对照结果见本轮 `evidence/chat-provider-probe.json`，设置变化与恢复依据见 `evidence/model-config-change.json`。
 - **本轮结束（2026-09-13）**：启动/首次文字、移动/位置恢复、文本与图片两区域拖入已归档；用户确认的悬停视觉问题随后已实现修复，复验列在下方。链接及后续分项仍待验。App/后端与 4317 已停止，测试文稿和 Finder 窗口已关闭；浏览器空间 51 已由用户接管而保留。清理证据见本轮 `evidence/qa-paused-cleanup.json`。
-- **浮动气泡调整（2026-09-13）**：[调整计划](./medium-powers/plans/2026-09-13-pet-floating-bubbles.md)对应的 renderer/window 相关 16 项用例、仓库提交前检查与打包已通过，日志在 `/tmp/pet-floating-bubbles-20260913/`；原生视觉复验待完成。修复前对照证据位于 `/tmp/issue1-live-qa-20260913-1030/evidence/`：`hover-before-collapsed.jpg`、`image-history-bottom.png` 与 `hover-before-geometry.json`。
+- **浮动气泡调整（2026-09-13）**：首版 `fc5ce67` 的相关 16 项用例、仓库提交前检查与打包通过；初次原生观察后，用户追加统一小气泡、左侧角色、常驻选项/回复和角色独立缩放要求，继续按[调整计划](./medium-powers/plans/2026-09-13-pet-floating-bubbles.md)实施，暂不归档首版视觉。首版过程证据在 `/tmp/pet-floating-bubbles-20260913/`，对应 App 与临时 fixture 已停止；续改证据使用 `/tmp/pet-small-bubbles-20260913/`。
 
 - [ ] 角色图集与主题：观察空闲、处理、等待、失败和移动状态，角色不闪透明空帧；亮暗主题文字可读，启用减少动态效果后动画停止。
 
