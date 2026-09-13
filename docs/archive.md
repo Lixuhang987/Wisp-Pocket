@@ -112,3 +112,20 @@
 - **修复与检查**：实测发现的 EPIPE 与退出未保存取消状态分别经 b22c542、1381718 修复，均完成红/绿回归、完整 Web、Swift test/build/package、签名核验和独立文档审核。较早的 AX cannot_complete 轮次不计为取消通过；旧包留下的 running 记录保留原证据，不作为本轮成功结果。
 - **证据位置**：.cache/issue-4-qa/AU3-final-history-verdict.json、AU3-{apply,run_repair,run_patch,cancel-disable}-verdict.json、au3-cancel-persist-{pending,verdict}.json、AU3-final-evidence.jsonl、cancel-shutdown-fixed-artifact.json。原始桌面响应和整屏图片在 HOST1 清理阶段移除，保留本脱敏记录与汇总。
 - **结论**：通过。全局配置恢复、受控窗口和数据清理继续随 HOST1 完成。
+
+
+- [ ] **HOST1 宿主能力与清理**：验证保留的宿主读取/操作、可消费图片和明确参数失败；核对产物/进程，恢复配置并清理本次测试资源。
+
+### HOST1：原生宿主工具、产物与清理
+
+- **验证日期**：2026-09-13。
+- **验证环境**：macOS 15.5 (24F74)，本 worktree 的最终签名包（代码提交 1381718）；真实 Dynamic Tool Provider 与 macOS 能力，LLM 为 mock。Swift 主程序 SHA-256 ee8652922c8291e0a1f6e1dd2e38a81b5143a4f8ca7d9d6193311c9a12e516fb；包内 Electron bridge SHA-256 edcf5250ad107b88ed8e9668d2726bdd85056d5dc757f9963669b0c389425cab，与当前构建资源一致。
+- **验证过程**：通过 app_list、app_activate、app_frontmost、window_list 核对 fixture PID 76018 / window 24874 及其所有者；经 app/window/element 三种 AX 入口读取并定位 QA Input 与 Apply。实际 click、set_value、type_text 与 hotkey 操作后由 CUA 核对界面。读取剪贴板只检查返回结构，未改写或展示内容。
+- **输入证据**：set_value 得到 HOST1 set_value 中文 Ω 🙂 café；键盘输入得到 HOST1 输入 Ω 🙂 café 2026。Command+Left / Command+Shift+Right 选择整行，Option+Shift+Left 替换单词，Control+A 移到开头，Shift+keycode:123 替换末字符，字符串与数组键值均成功。最终 CUA 和持久 fixture 状态为 Saved: >prefix 🙂-中文。Command-A 在该无 Edit 菜单的 fixture 中经工具和 osascript 均无选择效果，该初轮未用于判定工具失败；后续使用 CUA 已确认的原生编辑快捷键完成验证。
+- **图片与 OCR 证据**：screen_capture(window) 返回可消费的 PNG inputImage，真实尺寸 820×548 与元数据一致，SHA-256 508e94b369f339639a7780ba6557c08e9d0afee43a3c9f26b902658be3e4972f。实际打开图片确认窗口标题、输入和 Saved 内容与 CUA 一致。ocr_read 只接收该图片，在 en-US 下识别 Wisp Pocket、Apply、Saved 等 8 行内容；未将此结果表述为中文 OCR 验收。
+- **失败边界证据**：14 个非法调用分别覆盖 App 标识类型/不存在、截图目标类型/显示器标识/不存在/区域坐标、非法图片、AX 目标类型、重复 elementId 字段、缺失 value，以及未知/仅 modifier/歧义/越界快捷键，均 success=false 并携带 invalid_argument 或 not_found。AX 深度 7 按既有约定截断至 6，子节点最多 25；此行为与已有解析用例一致。系统沿用已有辅助功能和屏幕录制授权，未撤销 macOS TCC 授权来实测拒绝；无窗口 Host 自激活仍未记为通过。
+- **产物与进程证据**：签名通过，包内没有五个旧 Plugin 可执行入口，运行时没有对应 Plugin 进程。最终任务进程为 Host 96542、Electron 96543、Node 96553，业务由 Swift Host 运行；无 Automation event tap。SwiftPM 当前仅保留桌面 App 与 Chrome Bookmarks Native Host 两个可执行产品。
+- **配置与停止证据**：CUA 将 Context History/Automation 均恢复 off，配置文件两项均 false，声明退至 9 个原生工具；两项旧调用均明确 disabled，event tap 为 0。正常 osascript Command-Q 后 Host/Electron/Node 均消失，无 EPIPE/僵尸残余；fixture 经路径核对后停止。此时 4317/43294 均空闲。
+- **清理与恢复证据**：移除旧/当前两个隔离业务 home、原始 Provider 响应、整屏图片、日志、token、fixture bundle 和临时脚本，共 1569 个文件 / 385514942 字节。保留脱敏汇总与两张已查看的 fixture 图片，保留最终构建；清理没有操作真实用户业务目录。随后使用原有 /tmp/issue1-live/launch.sh 恢复 /tmp/issue1-live/app/Wisp Pocket.app，核对 Host PID 7775、4317 listener PID 7780；原启动配置文件未修改。4317 此时属于恢复的旧实例。
+- **证据位置**：.cache/issue-4-qa/HOST1-{setvalue,keyboard,image,invalid,ui,clipboard,process,restored,stopped,cleanup}-verdict.json、HOST1-old-instance-restored.json、HOST1-window.png、FINAL-QA-SUMMARY.json；AU2-policy-fixture.png 为保留的先前脱敏图片。原始桌面证据已按本项清理，已提交归档的文本和哈希保留。
+- **结论**：通过。CH1–CH5、AU1–AU3、HOST1 九项已逐项验收归档；已说明的权限与无窗口激活边界不计作通过场景。全部代码检查、打包、签名和独立文档审核已完成，修改仅在本地分支提交。

@@ -63,15 +63,6 @@
   5. 去掉 `TAVILY_API_KEY` 后重启，确认 `web_search` 返回明确缺 key 错误且 App 不崩溃。
   6. 请求抓取 localhost、127.0.0.1 或私网地址，确认 `fetch_page` 拒绝。
 
-## 内置 Context History 与 Automation（Issue #4）
-
-- **状态**：内置实现、后台激活、退出管道与取消落盘修复已完成，已通过的条目逐项归档；下列项目继续待验收。规格见 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，操作与证据要求见 [人工步骤](./human/builtin-features-qa.md)。
-- **已完成项与证据**：CH1–CH5、AU1–AU3 已完整归档，见 [归档](./archive.md)。本文只保留 HOST1；修复与部分验收进展见 [实施计划](./medium-powers/plans/2026-09-13-issue-4-builtin-modules.md)。
-- **剩余边界**：AU3 已完成退出取消、三进程清理及重启 history 复验。HOST1 继续验证宿主工具和完整清理；macOS TCC 拒绝未通过撤销现有授权实测，无窗口宿主自激活未记为通过。
-
-- [ ] **HOST1 宿主能力与清理**：验证保留的宿主读取/操作、可消费图片和明确参数失败；核对产物/进程，恢复配置并清理本次测试资源。
-
-
 ## Issue #3 前后端状态所有权收敛
 
 - **状态**：前端职责拆分与后端保留核查已完成，尚未进行桌面实机回归；自动化与提交前检查结果见 [规格入口](./issue-3-design.md)。构建、store 测试与静态组件渲染不计作以下验收。

@@ -2,7 +2,7 @@
 
 规格以 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 为准。基点为 `codex/issue-3-state-ownership-main-20260913` 的 `72787e2`；工作区为 `.worktrees/issue-4-builtin-modules`。本计划按已授权规格执行，不增加采集来源或自主修复能力。
 
-当前状态（2026-09-13）：CH1–CH5、AU1–AU3 已完整 [归档](../../archive.md)。后台激活、EPIPE 和正常退出取消落盘均已修复并实机复验；HOST1 的宿主工具与全局清理仍在 [manual-qa](../../manual-qa.md)。
+当前状态（2026-09-13）：CH1–CH5、AU1–AU3、HOST1 九项实机验收已逐项 [归档](../../archive.md)，Issue #4 已完成。后台激活、EPIPE 和正常退出取消落盘均已修复、检查并实机复验；本次测试资源已清理，原 issue1 实例已恢复。
 
 既有验证：初始重构日志为 `.cache/issue-4-{web,swift,build,package}-verified.log`，既有审核发现已闭合。后台激活阶段的 Web 检查见 `.cache/issue-4-activation-web.log`，Swift test/build/package 见 `.cache/issue-4-activation-final-{swift,build,package}.log`；这些记录不代替下述退出修复的检查与实机复验。
 
@@ -62,18 +62,18 @@ Swift Host 显式组合 `HandAgentHostAutomation` 的两个业务模块，通过
 - Provider 发送函数同步抛错时，在 reject 前清理该调用的 pending 和 timer；以相同 callId 重试应能重新发送并收到成功响应，不能因第一次发送失败留下占位而拒绝重试。
 - `Thread.interrupt` 自有 `settleWithin(..., 3000)` 上限并停止旧 Turn 投影，不无限等待 Tool Promise；它不会远程取消 Host 步骤，现有协议没有 cancel 消息。用户禁用 Automation 或退出应用才取消宿主任务，此边界同步到平台桥、Thread 与 QA 文档。
 
-## 待完成的实机验证
+## 实机验收与清理结果
 
 - AU3 已在 1381718 新包完成紧凑退出取消与重启 history：Run 7410F4B8-E149-44A1-9BCC-572A52B75EDF 为 cancelled，保留两步且无 Repair Request；Host/Electron/Node 全部结束，CUA 确认后续 Apply 未执行。过程见 QA 归档。
-- HOST1 的其他宿主能力和完整清理仍待验收；最后恢复开关与原实例，移除本次隔离业务数据和原始桌面证据。
-- 区分产品缺陷、系统权限、环境和测试工具限制；未执行项不得标通过。发现本规格阻断问题先修复再复验。
-- 根据实机结果同步相关中文文档与可核验证据，通过项按 QA 归档流程处理；如需修复代码，再完成对应检查与独立审核并提交。
+- HOST1 已验证原生读取/动作、Unicode/快捷键、可消费截图、英文 OCR 与 14 个明确参数失败；双开关恢复 off，声明退至 9 个原生工具，本次全部进程/监听结束，原 issue1 实例已按原配置恢复。
+- macOS TCC 拒绝未通过撤销现有授权实测，无窗口 Host 自激活未记为通过；这些边界保留在归档，未混同为产品成功。
+- 两个隔离业务 home、原始响应/整屏图、token 和临时 fixture 已移除；保留最终构建、脱敏文本/哈希及两张 fixture 图片。清理汇总见 .cache/issue-4-qa/HOST1-cleanup-verdict.json。
 
 ## 后台激活修复与证据边界
 
 后台 Host 经真实 Provider 激活外部 TextEdit、fixture 与已有 Settings 窗口已复验；有效外部激活记录为 `resumed-activation-green2`，核对了 Host 起初在后台以及返回 PID/window 与实际前台一致。证据保留在 `.cache/issue-4-qa/activation-{external,ui,boundary}-evidence.jsonl` 和 `responses/resumed-activation-green2-*`；当前激活合约见 [平台桥](../../../apps/desktop/Sources/AppServices/PlatformBridge/platform-bridge.md)。
 
-不存在目标的 `not_found` 已验证；macOS TCC 拒绝仍未实测，无窗口 Host 自激活未记为通过。`resumed-activation-green` 未满足后台前提，不能计作产品失败。HOST1 的完整状态继续以 manual-qa 为准。
+不存在目标的 `not_found` 已验证；macOS TCC 拒绝仍未实测，无窗口 Host 自激活未记为通过。`resumed-activation-green` 未满足后台前提，不能计作产品失败。HOST1 的验证范围与最终结果见 QA 归档。
 
 ## 实机发现：退出期间回执管道关闭
 
@@ -93,6 +93,6 @@ Swift Host 显式组合 `HandAgentHostAutomation` 的两个业务模块，通过
 
 已实现：Automation 保留禁用时的同步 `stop`，新增等待在途操作结束的 `stopAndWait`；BuiltinFeatures/AppCoordinator 的正常退出路径等待完成，AppDelegate 使用 `terminateLater` 并在清理完成后答复一次。沿用既有取消与持久化格式，不修补旧 `running` 记录，强制杀进程不在正常退出保证内。
 
-检查：目标回归、Web、Swift test/build/package 均 exit 0，日志 `.cache/issue-4-cancel-shutdown-{green,web,swift,build,package}.log` 均为 success；签名与新包资源已核验。本轮独立文档审核同步退出合约、测试边界与 QA，新缺陷从 bugs 移出、AU3 原完整条目恢复为待实机复验。
+检查：目标回归、Web、Swift test/build/package 均 exit 0，日志 .cache/issue-4-cancel-shutdown-{green,web,swift,build,package}.log 均为 success；签名与新包资源已核验。独立文档审核已同步退出合约和测试边界，两项退出缺陷均已实机复验归档。
 
-TODO：继续 HOST1 宿主工具与全局清理，逐项归档并完成最终文档核对。退出取消已通过，重启 history 核对了旧失败文件不变、成功图片一致与两种取消状态，证据见 .cache/issue-4-qa/AU3-final-history-verdict.json。
+收尾完成：退出取消和重启 history 核对旧失败文件不变、成功图片一致与两种取消状态；HOST1 完成宿主工具、配置恢复、进程/数据清理和旧实例恢复。脱敏总览见 .cache/issue-4-qa/FINAL-QA-SUMMARY.json，详细证据以 QA 归档为准。
