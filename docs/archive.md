@@ -219,3 +219,20 @@
 - **退出与重启**：从前台 Electron 按 `Command+Q`，Host 63123、Electron 63140、后端 63166 及两层启动子进程全部结束，4317 释放。再携带指向不存在路径的 `HANDAGENT_ELECTRON_BINARY` 冷启动，仍使用当前 checkout runtime 与当前 bundle main；历史可恢复，新提交返回 `QA_STALE_START_OK`。Settings 保留模型与 base URL；从前台 Swift Settings 按 `Command+Q`，Host 72433、Electron 72442、后端 72459 及启动子进程全部结束，4317 再次释放。
 - **证据**：主 checkout `.cache/live-qa-20260914/lifecycle.json` 与 `lifecycle-{default,stale}-{stdout,stderr}.log`；真实 Computer Use AX / 截图、原生快捷键、进程与 SQLite 检查。Thread `thread-898fd56c-4dfc-4365-8d70-af460f334259` / `thread-cbc2d54c-2e10-4dcc-bfff-35391e45a77d` 保留为 QA fixture；两次启动前后设置 SHA256 均为 `3813c808035b5a8b10ef6dfb67448fdb9da02f80f0a3a029e88990128b33fb93`。
 - **结论**：QA-START 通过，退出挂起未复现；本轮 App 与后端已停止。`agent_server.health` / `thread_window.prepared` 内部事件未直接捕获，启动事件时序仍留在冷启动分项；在途 Automation 退出取消与落盘仍由 QA-HOST 验证。
+
+
+### Electron 正常退出后的宿主清理回归
+
+- **状态**：2026-09-14 退出调度修复 `984a04b` 已合入 `main`，主 checkout 三项检查与正式模型模式打包通过，待实机复验；原 P2「从 Electron 正常退出后 Swift Host 挂起」从 `bugs.md` 移至本节。
+- **自动检查**：隔离 XCTest 子进程使用真实 AppKit 与生产退出链路，旧实现两次超时，延迟到主 run loop 后正常退出。`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`（341 项）与 `bash ./scripts/swiftw build` 全部通过；在途 Automation 用例继续核对取消落盘先于退出答复，分工见 [修复计划](./medium-powers/plans/2026-09-14-electron-host-exit.md)。
+- **原失败证据**：主 checkout 的 `.cache/live-qa-20260914/fixed-launch-error.log` 与 `host-exit.sample.txt`。`627e91b` 产物从前台 ThreadWindow 收到 `Command+Q` 后，Electron / agent-server 已退出、4317 已释放，Swift Host 持续残留；该测试宿主已停止。
+- **回归步骤**：重新打包后完整执行 QA-START，分别验证前台 ThreadWindow 的 `Command+Q` 与 Swift Host 原生退出入口；以实际进程结束和端口释放为准，再启动并恢复同一 Thread 历史。启用 Automation 的在途取消与落盘按 QA-HOST 复验，关闭窗口继续运行的行为保持不变。
+- **未验边界**：本次没有修复后包的实机通过结论；另一 worktree `pet-compact-hover-20260914` 的 App 占用 4317，未停止或操作该实例。待环境可用后复验，不将其运行状态计入本轮结论。真实 AppKit 子进程测试不证明 Electron / agent-server 打包运行、真实窗口或完整重启流程。
+
+### Electron 与 Swift Host 正常退出复验
+
+- **验证日期**：2026-09-14，06:30:44 +08:00 完成清理核对。
+- **验证环境**：macOS 15.5 arm64，主 checkout `main` / `eb111d6` 的正式模型模式包，Host SHA256 `a13166b21bb03c1065fefbaefdfc90928123a50122d8c4de33eb1098a89dab0e`；TypeScript/Web、隔离 home Swift test、Swift build、打包与签名检查通过。
+- **验证过程**：真实 Responses 回复后从前台 ThreadWindow 按原生 `Command+Q`，确认 Host、pnpm、Electron CLI、Electron、agent-server 全部退出且 4317 释放；重新启动并显式选择原 Thread，两条消息恢复。再完成一轮真实回复，从前台 Swift Settings 按 `Command+Q`，全部进程与端口再次清理。此前 `Command+W` 只关窗口，同一后端继续运行。
+- **证据**：`.cache/live-qa-20260914/lifecycle.json` 中两轮 PID、UI、设置 hash 和持久 Thread 记录；默认轮询 305ms 后与重启轮询 101ms 后全部进程已结束，不把该轮询耗时宣称为精确退出性能。两轮 Host PID 分别为 63123、72433。
+- **结论**：正常退出与重启回归通过，原宿主挂起未再出现；不再存在另一 worktree 占用端口的阻塞。本项没有启用在途 Automation，其取消与落盘继续留在 QA-HOST，未据此新增通过结论。

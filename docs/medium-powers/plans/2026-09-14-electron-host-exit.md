@@ -35,8 +35,10 @@
 - [x] 不继承上下文的独立子 agent 审核计划、代码和逐级目录指南，补齐调度与测试边界；已将修复从 bugs 移至待实机复验。
 - [x] 主 agent 确认独立审核结论，提交 `984a04b` 并快进合入主分支。
 - [x] 主 checkout 的 TypeScript/Web、Swift test/build 与正式模型模式打包全部通过。
-- [ ] 验证前台 Electron 退出、Swift 主动退出、重启与历史恢复；逐项记录 QA 证据。
+- [x] 主分支打包产物已验证前台 Electron 退出、Swift 主动退出、关闭窗口继续运行、重启与历史恢复；证据已归档。
 
 ## 验证边界
 
-新用例证明真实 AppKit 可完成生产退出链路，既有 Automation 用例证明取消结果落盘先于退出答复；两者不替代修复后打包产物的实机验收。修复已合入 `main` 并打包，尚未启动修复后包；另一 worktree 的 App 正在占用 4317，保持其运行不动，待环境可用再按 [manual-qa.md](../../manual-qa.md#electron-正常退出后的宿主清理回归) 复验。产物与检查记录见主 checkout `.cache/live-qa-20260914/exit-fix-checks.json`。
+2026-09-14 主 checkout 的正式模型模式包已完成正常退出与完整生命周期复验，原宿主挂起未再出现；两轮 Host、Electron、agent-server 均结束，4317 释放，重启后可恢复测试 Thread。实机记录见 [QA 归档](../../archive.md)，脱敏证据为主 checkout `.cache/live-qa-20260914/lifecycle.json`；早期自动检查保留在 `exit-fix-checks.json`。
+
+本轮实机没有启用在途 Automation。既有自动化用例证明取消落盘先于退出答复，但当前合并产物的真实 Automation 退出取消仍按 [manual-qa.md](../../manual-qa.md) 的 QA-HOST 验证；正常退出通过不扩展为该项通过。
