@@ -97,3 +97,13 @@ Swift Host 显式组合 `HandAgentHostAutomation` 的两个业务模块，通过
 检查：Web、Swift test/build/package 已通过，日志为 `.cache/issue-4-shutdown-{web,swift,build,package}.log`；旧实现红用例见 `.cache/issue-4-shutdown-red.log`。本轮独立文档审核同步更新了传输合约、测试证据边界与 manual-qa；新包签名及资源身份已核验，实机退出仍待验证，不记作 AU3/HOST1 通过。
 
 TODO：本地提交 → 新产物退出链路实机复验 → 继续 AU3/HOST1 并逐项记录与归档。沿用本 worktree，复验和清理结果以新证据为准。
+
+## 实机发现：退出前未等待 Automation 取消持久化
+
+用例：真实 Provider 启动已完成两步且仍在 waitFor 的 Run，用户正常 Command-Q。应先取消操作并保存 cancelled Run（原进度、失败位置、取消证据，无 Repair Request），再允许 AppKit 退出。1.521 秒紧凑复现已确认三进程退出但磁盘保持 running；证据见 .cache/issue-4-qa/au3-exit-fixed-verdict.json，本轮先记录缺陷并暂停验收。
+
+待验证链路为 AppDelegate → AppCoordinator.shutdown → BuiltinFeatures → AutomationModule → AutomationRuntime/AutomationStore → AppKit 退出答复。先在 HandAgentAppTests 从实际 termination 入口加入回归，经真实 Provider/业务模块创建运行，用临时存储核对退出答复时的 Run。仅替换不可控的系统动作、窗口/进程与 AppKit 退出答复；待处理的系统动作可控释放，以区分 cancel 请求与持久化完成。
+
+修复接口计划：Automation 保留禁用时的同步 stop，增加等待已取消操作结束的 stopAndWait；BuiltinFeatures/AppCoordinator 的正常退出路径等待完成，AppDelegate 使用 terminateLater 并在清理完成后答复，重复退出请求不重复清理。运行中断不增加新的协议、业务数据或启动时修补。已有 cancelled 数据结构与存储格式不变；不修改旧失败 Run，不把强制杀进程纳入正常退出保证。
+
+TODO：入口回归先红 → 核验失败边界 → 最小生命周期修复 → Web/Swift test/build/package → 独立文档审核与本地提交 → 原紧凑退出复验和重启 history → 恢复 AU3/HOST1 逐项归档。
