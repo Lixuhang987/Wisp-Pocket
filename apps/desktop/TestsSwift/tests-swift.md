@@ -16,5 +16,5 @@ Swift 测试与生产模块所有权对齐。入口使用 `bash ./scripts/swiftw
 
 - 内置功能以 Dynamic Tool Provider 为主要用例入口，复用真实业务模块和存储；系统替身通过不能证明真实 AX、截图或事件 tap 可用。
 - Automation 退出用例复用 PlatformBridge 的真实 Provider、业务模块与临时存储，挂起系统动作后发起 termination；动作返回前不得答复 AppKit，返回后核对同一 Run 的取消状态、进度和失败位置，并从新建 Store 读回。此用例的系统动作、录制监听与 AppKit 答复使用可控边界，只证明清理与落盘顺序。
-- AppKit 退出用例在隔离 XCTest 子进程运行真实 `NSApplication`，只将 Electron 可执行程序替换为短命 shell；复用真实 Process 回调、server、Coordinator、生产 `terminateApplication` 与 delegate/reply，核对从 Task 发出请求、清理完成和进程正常退出，超时回收测试子进程。它不替代打包 Electron、agent-server、窗口与在途 Automation 的实机验收。
-- 窗口与激活策略测试用 `AppServices.testing(...)` 隔离系统副作用；实机结果在 [manual-qa](../../../docs/manual-qa.md) 单独维护。
+- AppKit 退出用例在隔离 XCTest 子进程运行真实 `NSApplication`，将 Electron 可执行程序替换为短命 shell，并为 AgentTrigger runtime 注入空 registry 与临时 Store；复用真实 Process 回调、server、Coordinator、生产 `terminateApplication` 与 delegate/reply，核对从 Task 发出请求、清理完成和进程正常退出，超时回收测试子进程。空 registry 只隔离无关的触发器来源；该用例不替代打包 Electron、agent-server、窗口与在途 Automation 的实机验收。
+- 窗口与激活策略测试用 `AppServices.testing(...)` 替换相应系统边界；AgentTrigger 的 home 隔离另见 [AppServices 测试](./AppServices/app-services.md)。实机结果在 [manual-qa](../../../docs/manual-qa.md) 单独维护。

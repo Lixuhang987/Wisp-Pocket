@@ -55,11 +55,13 @@ final class HandAgentAppTests: XCTestCase {
         application.setActivationPolicy(.prohibited)
         let shell = ElectronShellProcess(launchPath: "/bin/sh", arguments: ["-c", "exit 0"], environment: [:])
         let server = ElectronBackedAppServer(shell: shell)
+        let triggerStore = AgentTriggerStore(homeDirectoryURL: home)
         let coordinator = AppCoordinator(services: AppServices(
             appServer: server,
             threadWindowCommandClient: server,
             settingsStore: AgentSettingsStore(homeDirectoryURL: home),
-            agentTriggerStore: AgentTriggerStore(homeDirectoryURL: home),
+            agentTriggerStore: triggerStore,
+            agentTriggerRuntime: AgentTriggerRuntime(registry: AgentTriggerRegistry(factories: []), store: triggerStore),
             appearanceChangeObserver: NopAppearanceChangeObserver(),
             actionManifestStore: ActionManifestStore(actionsDirectoryURL: home.appendingPathComponent("actions")),
             hotkeyRegistrar: NopHotkeyRegistrar(),

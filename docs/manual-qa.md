@@ -151,6 +151,8 @@
 
 - **状态**：已实现，待实机 QA。
 - **自动化验证**：`bash ./scripts/swiftw test --filter AgentTriggerStoreTests`、`bash ./scripts/swiftw test --filter AgentTriggerSettingsViewModelTests`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`bash ./scripts/test.sh`。
+- **Chrome bridge 核对（2026-09-14）**：真实 runtime、Provider、Network listener 与 HTTP 在临时 home 连续 20 轮 reload 通过；每轮按磁盘 `bridge.json` 的 host/port/token 请求 hello 和文件夹快照，并读回落盘结果。三项最终检查通过，Swift suite 在已确认 Foundation home 重定向的临时环境执行 342 项；结果与测试隔离见 [核对计划](./medium-powers/plans/2026-09-14-chrome-bridge-verification.md)。本轮只改测试，历史 Chrome P1 仍留在 [bugs.md](./bugs.md)，未新增实机通过结论。
+- **实机补验边界**：环境可用后从主 checkout 打包并启动，确认当前 App 是 bridge 发现文件的写入者；经产品 native host 发送 hello / folderTreeSnapshot，核对 Settings 连接状态、文件夹选择与保存，再实际收藏并验证提示词及 Thread，重启后复验连接。当前单进程 HTTP 结果不证明这些步骤，也不证明多个 App 实例并行时发现文件正确。
 - **验收步骤**：
   1. 备份并删除 `~/.spotAgent/agent-triggers/`，启动桌面 App，确认 Settings -> 触发器一级页直接显示 `Chrome Bookmarks` 与 `System Clock`。
   2. 进入 Chrome Bookmarks 二级页，确认顶部 name / description、空态、新增自动化和返回一级可用。

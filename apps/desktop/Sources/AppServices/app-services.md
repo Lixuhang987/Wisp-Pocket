@@ -16,7 +16,7 @@
 
 ## 组合边界
 
-- `AppServices.defaultRuntime` 是生产组合点；`AppServices.testing` 提供无窗口、无进程副作用的替身。
+- `AppServices.defaultRuntime` 是生产组合点；`AppServices.testing` 提供窗口和进程替身，AgentTrigger 的 Store 与 Provider home 仍须分别隔离，见 [测试边界](../../TestsSwift/AppServices/app-services.md)。
 - 启动支持文件必须在 AgentTrigger reload 前准备，确保内置 Package 和 Native Messaging manifest 可见。
 - Electron UI Shell health、ThreadWindow command、桌宠显示、Swift thread client 与 Dynamic Tool Provider 使用同一组显式服务，不通过全局单例互找。
 - `defaultRuntime` 创建同一个 `MacPlatformProvider`，供原生 Dynamic Tool、Context History 与 Automation 直接共享。两个业务模块来自 [Host Automation](../../../host-automation/host-automation.md)，`BuiltinFeatures` 持有它们与明确的启用配置。

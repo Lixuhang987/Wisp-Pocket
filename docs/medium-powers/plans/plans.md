@@ -4,6 +4,7 @@
 
 ## 直接子节点
 
+- [2026-09-14-chrome-bridge-verification.md](./2026-09-14-chrome-bridge-verification.md)：历史端口错配的当前代码核对与退出测试隔离。
 - [2026-09-14-electron-host-exit.md](./2026-09-14-electron-host-exit.md)：全功能 QA 发现的 Electron clean exit 后 Swift 宿主退出卡死。
 - [2026-09-14-packaged-electron-startup.md](./2026-09-14-packaged-electron-startup.md)：全功能 QA 发现的打包冷启动路径缺陷及回归边界。
 - [2026-09-14-pet-compact-hover.md](./2026-09-14-pet-compact-hover.md)：桌宠常态收紧、悬停统一滚动与点击回复的待确认实施计划。

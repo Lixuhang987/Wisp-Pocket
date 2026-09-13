@@ -38,4 +38,5 @@
 - **实际结果**：native host 返回 `{"ok":false,"error":"Could not connect to the server."}`，Settings 显示扩展连接不可用，`folders.json` 未生成。
 - **期望结果**：`bridge.json` 指向当前 Swift bridge 正在监听的端口和 token；hello / folderTreeSnapshot 转发成功，Settings 表单可选择收藏夹并保存自动化。
 - **关键证据**：发现时 `bridge.json` 写入端口 `53317`，但 HandAgentDesktop 进程只监听旧端口 `53288`；旧端口携带当前 token 返回 `401`，新端口连接失败。
-- **根因边界**：问题在 Swift `AgentTriggerRuntime` / `ChromeBookmarksAgentTriggerProvider` / `ChromeBookmarksExtensionBridgeServer` 的 provider lifecycle 或 endpoint 写入；Settings UI 和 native host 只是读取磁盘 endpoint 后展示或转发。
+- **排查边界**：历史证据指向 Swift `AgentTriggerRuntime` / `ChromeBookmarksAgentTriggerProvider` / `ChromeBookmarksExtensionBridgeServer` 的 provider lifecycle 或 endpoint 写入，具体失配点仍待当前打包 App 实机定位；Settings UI 和 native host 读取磁盘 endpoint 后展示或转发。
+- **当前核对（2026-09-14）**：临时 home 中，真实 runtime、Provider 与 HTTP 连续 20 次 reload 均按磁盘 endpoint 完成认证请求及快照落盘，未复现旧端口错配。本轮没有生产修复，单进程结果不覆盖打包 App、native host、Settings 或共享发现文件的其他进程；保留本项，按 [manual-qa](./manual-qa.md#agenttrigger-设置二级菜单与默认-package) 实机定位。

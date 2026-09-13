@@ -30,6 +30,18 @@
 
 `swiftw` 默认复用主 checkout 的 SwiftPM 依赖缓存，并为每个 worktree 隔离 Swift/Clang module cache。只有明确需要时才设置 `HANDAGENT_SWIFTPM_CACHE_DIR` 或 `HANDAGENT_SWIFT_MODULE_CACHE_DIR`。
 
+### Swift 测试隔离
+
+完整 Swift suite 仍有使用默认 AgentTrigger factory 的装配用例。与实机 App 并行运行时，在临时 home 执行测试，避免覆盖运行中 App 的 Chrome bridge 发现文件；先确认 Foundation 实际解析出的 home 与临时目录一致：
+
+```sh
+qa_home="$(mktemp -d /tmp/handagent-swift-home.XXXXXX)"
+env CFFIXED_USER_HOME="$qa_home" HOME="$qa_home" bash ./scripts/swiftw -e 'import Foundation; print(FileManager.default.homeDirectoryForCurrentUser.path)'
+env CFFIXED_USER_HOME="$qa_home" HOME="$qa_home" bash ./scripts/swiftw test
+```
+
+这只是测试进程的隔离入口；新增用例仍应按 [AppServices 测试边界](../apps/desktop/TestsSwift/AppServices/app-services.md) 显式注入 Store 与 runtime。`HANDAGENT_HOST_DATA_HOME` 的范围见下文，它不覆盖 AgentTrigger。
+
 ## 排障顺序
 
 - 无法启动：先检查完整 Xcode、`xcode-select` 和 Electron/ThreadWindow build 输出。
