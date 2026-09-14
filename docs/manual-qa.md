@@ -39,6 +39,7 @@
 - **修复前证据**：主 checkout `.cache/live-qa-20260914/background-selection-repro.json`，`main / 52bc459` 包在 macOS 15.5 arm64 连续两次后台创建抢选，第二次报 `QA_SELECTION_FAILED`；返回 A 后草稿恢复。该最小 WebSocket 复现不等于完整 AgentTrigger 实测。
 
 - [ ] **PromptPanel 明确目标**：分别在隐藏预热、已经可见、关闭后重建的 ThreadWindow 中提交唯一标记的首轮输入，确认打开的是本次 Swift 创建的目标、读取到其历史并可继续回复。在同一可见窗口中返回 A，原草稿仍保留；重建窗口按既有页面重建规则清空草稿。
+- **PromptPanel 工具边界（2026-09-14）**：原生快捷键已打开主包面板，Host PID 26306 和后端正常；Computer Use 按主包完整路径两次超时，按 bundle ID 报多包歧义，按应用名误启动旧 worktree 包。误启动实例已停止，没有向面板输入或提交。已请求允许按主包 PID 使用原生 AX 操作，未获确认前保留本项；错误包的 status 127 不记为当前产品缺陷。主包设置 hash 未变，证据见 `.cache/live-qa-20260914/selection-fixed-promptpanel-tool.json`。
 - [ ] **窗口与桌宠边界**：PromptPanel 打开历史时先隐藏面板且不恢复旧应用焦点；普通历史入口和无目标 focus 只打开或聚焦现有窗口。后台创建 B 后桌宠仍按创建时间选择最新 Thread，A 的后续进度不抢回桌宠；ThreadWindow 的选择独立保持。
 
 ### 打包应用 Electron 冷启动回归
