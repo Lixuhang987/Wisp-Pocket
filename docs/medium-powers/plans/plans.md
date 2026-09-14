@@ -4,6 +4,7 @@
 
 ## 直接子节点
 
+- [2026-09-14-thread-window-selection.md](./2026-09-14-thread-window-selection.md)：后台创建不抢选与 Swift 明确目标 Thread 的窗口交付回归。
 - [2026-09-14-agenttrigger-form-errors.md](./2026-09-14-agenttrigger-form-errors.md)：AgentTrigger 新增表单校验错误的取消、收起与重新展开回归。
 - [2026-09-14-chrome-bridge-verification.md](./2026-09-14-chrome-bridge-verification.md)：历史端口错配的当前代码核对与退出测试隔离。
 - [2026-09-14-electron-host-exit.md](./2026-09-14-electron-host-exit.md)：全功能 QA 发现的 Electron clean exit 后 Swift 宿主退出卡死。

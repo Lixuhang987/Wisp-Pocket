@@ -8,7 +8,7 @@ preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`�
 
 | 文件 | 职责 |
 |------|------|
-| `threadWindowPreload.cts` | 向 ThreadWindow main world 注入 `/api/thread` URL、`availableSkills`、host theme、theme change subscription、pending initial prompt 队列和临时 receiver |
+| `threadWindowPreload.cts` | 向 ThreadWindow main world 注入 `/api/thread` URL、`availableSkills`、host theme、theme subscription，以及首轮输入和目标 Thread 打开的临时 receiver |
 | `activityWindowPreload.cts` | 向桌宠 main world 注入 Thread URL、host theme、theme subscription 与受控窗口 IPC |
 
 ## ThreadWindow preload
@@ -16,7 +16,8 @@ preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`�
 - 通过 `contextBridge.executeInMainWorld()` 写入 `window.handAgentThreadWindowConfig.threadWebSocketURL`、`window.handAgentThreadWindowConfig.availableSkills` 和 `window.handAgentTheme`。
 - preload 自身持续监听 `handagent:theme-changed`，只接受已校验的 `HostTheme` payload，并保存 latest theme；`handAgentSubscribeThemeChange(handler)` 订阅时会先回放 latest theme，再接收后续变化，不暴露原始 `ipcRenderer`。
 - 初始化 `window.handAgentPendingInitialPrompts`，并在 React receiver 尚未安装时提供临时 `window.handAgentReceiveInitialPrompt(payload)`。
-- 如果 React 已经安装正式 receiver，preload 必须保留它，不覆盖。
+- `window.handAgentReceiveThreadOpen(threadId)` 只接收明确目标 Thread ID；React 尚未安装 receiver 时按序写入 `window.handAgentPendingThreadOpens`。交付来自 [窗口控制器](../main/windows/windows.md)，消费与选择由 [Web App](../../../thread-window-web/src/src.md) 拥有，不在 preload 解析 Thread 消息。
+- 两种入口都保留已有待交付数组和正式 receiver；React 安装时消费缓冲，旧 receiver 的清理不能移除后安装的 receiver。
 - `availableSkills` 只接受 `actionId/title/prompt/description?` 这组只读字段；preload 负责从 `--handagent-available-skills=...` 参数解码并做最小校验，renderer 不得直接拿到 Node 文件系统或宿主 skill 源目录访问能力。
 - `handAgentElectron` 只暴露轻量 feature marker，不提供 Electron 或 Node 能力。
 

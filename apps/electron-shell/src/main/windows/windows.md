@@ -6,7 +6,7 @@
 
 | 文件 | 职责 |
 |------|------|
-| `threadWindowPrewarmer.ts` | 全局唯一 ThreadWindow `BrowserWindow` 的 hidden prewarm、initial prompt 注入、show/focus、close 状态、host theme 下发与只读 `availableSkills` 注入 |
+| `threadWindowPrewarmer.ts` | 全局唯一 ThreadWindow `BrowserWindow` 的 hidden prewarm、首轮输入与目标 Thread 交付、show/focus、close 状态、host theme 下发与只读 `availableSkills` 注入 |
 | `activityWindowController.ts` | 桌宠 ActivityWindow 的非激活展示、布局、拖动、透明命中、host theme 下发和 renderer crash 回调 |
 | `petPositionStore.ts` | 角色右下角屏幕坐标的原子保存与恢复；文件路径由 main 注入 |
 
@@ -16,8 +16,9 @@
 - 新建 ThreadWindow 时，prewarmer 还会通过 preload `additionalArguments` 传入当前 `availableSkills`；这些技能由宿主读取本地 skill manifest 后提供给 renderer，不让 renderer 直接访问宿主目录。
 - `prepare()` 必须等待 `did-finish-load` 或 `loadURL` promise 成功后才把 `prepared` 置 true；加载失败或窗口关闭必须 reject。
 - `openInitialPrompt()` 会先确保 prepared，再通过 `executeJavaScript("window.handAgentReceiveInitialPrompt(...)")` 注入 initial prompt，最后才 show/focus。
-- initial prompt JSON 注入前会把 `<` 转义为 `\u003c`，避免脚本上下文中出现 HTML 结束标签风险。
-- `focus()` 只有窗口存在且已经 visible 时才返回 true；不可用时 runtime 不再请求 Swift 打开 PromptPanel。
+- `openThread(threadId)` 对隐藏、可见和重建窗口都先确保 prepared，再通过 [preload 窄桥](../../preload/preload.md) 交付目标，最后 show/focus。注入失败或交付期间窗口已关闭、替换时，command 返回失败；旧窗口的异步结果不能打开替代窗口。
+- 两种 JSON 注入前都把 `<` 转义为 `\u003c`。成功回执只证明 renderer 已接收或缓冲请求且窗口已 show/focus，不代表 React 已完成选择渲染或收到后端 snapshot。
+- `focus()` 只有窗口存在且已经 visible 时才返回 true；无目标且不可用时 runtime 调用 `openHistory()` 打开窗口，不请求 Swift 打开 PromptPanel，也不改变 React 当前选择。
 - `closed` 事件要回传 `wasPrepared` 和 `wasVisible`，让 runtime 区分 hidden prewarm 失败和用户可见窗口关闭。
 - controller 保存当前 host theme；进程启动时的初值来自 Electron main 解析后的 `HANDAGENT_INITIAL_THEME`，新建窗口时通过 preload `additionalArguments` 传入该 theme。窗口已创建但尚未 prepared 时收到 `theme.changed`，必须在 prepared 后补发一次当前 theme，避免 renderer 初始参数停留在旧主题。
 

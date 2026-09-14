@@ -1,11 +1,12 @@
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HistorySidebar } from "./components/HistorySidebar.tsx";
 import { ThreadWorkspacePane } from "./components/ThreadWorkspacePane.tsx";
 import { openHistoryThread } from "./history/openHistoryThread.ts";
 import {
   getThreadWebSocketURL,
   installInitialPromptReceiver,
+  installThreadOpenReceiver,
 } from "./native/nativeConfig.ts";
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "./native/themeConfig.ts";
 import {
@@ -30,9 +31,22 @@ function id(prefix: string) {
 export function App() {
   const clientRef = useRef<ThreadSocketClient | null>(null);
   const inputControllerRef = useRef<ThreadInputController | null>(null);
+  const pendingSelectionCommandsRef = useRef(new Set<string>());
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [deleteTargetThreadId, setDeleteTargetThreadId] = useState<string | null>(null);
   const sidebarLayout = useSidebarLayout();
+
+  const handleOpenThread = useCallback((threadId: string) => {
+    openHistoryThread(threadId, {
+      ensureThreadState: (nextThreadId) => {
+        createThreadWindowStore.getState().ensureThreadState(nextThreadId);
+      },
+      setActiveThreadId,
+      resumeThread: (nextThreadId) => {
+        clientRef.current?.resumeThread(nextThreadId);
+      },
+    });
+  }, []);
 
   useEffect(() => {
     applyThemeToDocument(getInitialTheme());
@@ -42,6 +56,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const pendingSelectionCommands = pendingSelectionCommandsRef.current;
     const socket = new ThreadSocketClient({
       url: getThreadWebSocketURL(),
       onConnectionState: (connectionState) => createThreadWindowStore.getState().setConnectionState(connectionState),
@@ -52,8 +67,11 @@ export function App() {
       getState: createThreadWindowStore.getState,
       client: socket,
       onNotification: (notification) => {
-        if (notification.type === "thread.started") {
-          setActiveThreadId(notification.threadId);
+        if ((notification.type === "thread.started" || notification.type === "thread.error") && notification.commandId) {
+          const shouldSelect = pendingSelectionCommands.delete(notification.commandId);
+          if (notification.type === "thread.started" && shouldSelect) {
+            setActiveThreadId(notification.threadId);
+          }
         }
       },
     });
@@ -61,11 +79,21 @@ export function App() {
     inputControllerRef.current = inputs;
     socket.connect();
     const disposeInitialPromptReceiver = installInitialPromptReceiver((payload) => {
-      inputs.startInitialPrompt(payload);
+      const wasPending = pendingSelectionCommands.has(payload.clientRequestId);
+      pendingSelectionCommands.add(payload.clientRequestId);
+      try {
+        inputs.startInitialPrompt(payload);
+      } catch (error) {
+        if (!wasPending) pendingSelectionCommands.delete(payload.clientRequestId);
+        throw error;
+      }
     });
+    const disposeThreadOpenReceiver = installThreadOpenReceiver(handleOpenThread);
 
     return () => {
       disposeInitialPromptReceiver();
+      disposeThreadOpenReceiver();
+      pendingSelectionCommands.clear();
       socket.disconnect();
       if (clientRef.current === socket) {
         clientRef.current = null;
@@ -74,21 +102,22 @@ export function App() {
         inputControllerRef.current = null;
       }
     };
-  }, []);
+  }, [handleOpenThread]);
 
 
   const handleNewThread = () => {
+    const client = clientRef.current;
+    if (!client) return;
     const commandId = id('start');
     const timestamp = now();
 
-    // 发送创建空白 thread 的命令
-    clientRef.current?.sendRaw(
-      encodeThreadStart({
-        commandId,
-        timestamp,
-        workspaceId: null,  // 默认 workspace
-      })
-    );
+    pendingSelectionCommandsRef.current.add(commandId);
+    try {
+      client.sendRaw(encodeThreadStart({ commandId, timestamp, workspaceId: null }));
+    } catch (error) {
+      pendingSelectionCommandsRef.current.delete(commandId);
+      throw error;
+    }
   };
 
   return (
@@ -99,17 +128,7 @@ export function App() {
       {sidebarLayout.isSidebarVisible ? (
         <HistorySidebar
           activeThreadId={activeThreadId}
-          onOpenThread={(threadId) => {
-            openHistoryThread(threadId, {
-              ensureThreadState: (nextThreadId) => {
-                createThreadWindowStore.getState().ensureThreadState(nextThreadId);
-              },
-              setActiveThreadId,
-              resumeThread: (nextThreadId) => {
-                clientRef.current?.resumeThread(nextThreadId);
-              },
-            });
-          }}
+          onOpenThread={handleOpenThread}
           onDeleteThread={(threadId) => {
             setDeleteTargetThreadId(threadId);
           }}

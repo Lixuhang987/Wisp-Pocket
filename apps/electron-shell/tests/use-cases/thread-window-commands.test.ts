@@ -1,6 +1,145 @@
 import { EventEmitter } from "node:events";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
+import { ElectronShellRuntime } from "../../src/main/electronShellRuntime.js";
+import { parseCommand, type ElectronToSwiftEvent } from "../../src/main/protocol/electronShellProtocol.js";
 import { ThreadWindowPrewarmer } from "../../src/main/windows/threadWindowPrewarmer.js";
+
+describe("Swift targeted ThreadWindow focus", () => {
+  it.each(["hidden", "visible", "recreated"])("delivers the selected Thread before showing a %s window", async (state) => {
+    const windows = [new FakeBrowserWindow(), new FakeBrowserWindow()];
+    let nextWindow = 0;
+    const prewarmer = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
+      preloadPath: "/preload.cjs", availableSkills: [],
+      createWindow: () => windows[nextWindow++],
+    });
+    const prepared = prewarmer.prepare();
+    windows[0].webContents.emit("did-finish-load");
+    await prepared;
+    if (state !== "hidden") await prewarmer.openHistory();
+    if (state === "recreated") windows[0].emit("closed");
+
+    const targetWindow = windows[state === "recreated" ? 1 : 0];
+    const previousShowCount = targetWindow.showCount;
+    const received: string[] = [];
+    targetWindow.webContents.executeJavaScript = async (source) => {
+      targetWindow.executedJavaScript.push(source);
+      runInNewContext(source, { window: { handAgentReceiveThreadOpen: (threadId: string) => {
+        expect(targetWindow.showCount).toBe(previousShowCount);
+        received.push(threadId);
+      } } });
+    };
+    const { runtime, events } = createRuntime(prewarmer);
+    const threadId = "thread-</script>\"\\\n-target";
+    const opening = runtime.handleCommand(parseCommand(JSON.stringify({
+      channel: "electron_shell", type: "thread_window.focus", commandId: "focus-target", threadId,
+    })));
+    if (state === "recreated") targetWindow.webContents.emit("did-finish-load");
+    await opening;
+
+    expect(received).toEqual([threadId]);
+    expect(targetWindow.executedJavaScript[0]).not.toContain("</script>");
+    expect(targetWindow.showCount).toBe(previousShowCount + 1);
+    expect(targetWindow.focusCount).toBe(previousShowCount + 1);
+    expect(targetWindow.loadCount).toBe(1);
+    expect(events).toEqual([{
+      channel: "electron_shell", type: "command.ack", commandId: "focus-target", ok: true,
+    }]);
+  });
+
+  it("reports failed renderer delivery without showing or acknowledging success", async () => {
+    const window = new FakeBrowserWindow();
+    const prewarmer = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
+      preloadPath: "/preload.cjs", availableSkills: [], createWindow: () => window,
+    });
+    window.webContents.executeJavaScript = async () => { throw new Error("renderer delivery failed"); };
+    const { runtime, events } = createRuntime(prewarmer);
+    const opening = runtime.handleCommand(parseCommand(JSON.stringify({
+      channel: "electron_shell", type: "thread_window.focus", commandId: "focus-failed", threadId: "thread-a",
+    })));
+    window.webContents.emit("did-finish-load");
+    await opening;
+
+    expect(events).toEqual([{
+      channel: "electron_shell", type: "command.ack", commandId: "focus-failed", ok: false,
+      error: "renderer delivery failed",
+    }]);
+    expect(window.showCount).toBe(0);
+    expect(window.focusCount).toBe(0);
+  });
+
+  it("keeps a replacement window independent when the target closes during delivery", async () => {
+    const first = new FakeBrowserWindow();
+    const second = new FakeBrowserWindow();
+    const windows = [first, second];
+    const injected = createDeferred<void>();
+    first.webContents.executeJavaScript = async (source) => {
+      first.executedJavaScript.push(source);
+      await injected.promise;
+    };
+    const prewarmer = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
+      preloadPath: "/preload.cjs", availableSkills: [], createWindow: () => windows.shift()!,
+    });
+    const { runtime, events } = createRuntime(prewarmer);
+    const opening = runtime.handleCommand(parseCommand(JSON.stringify({
+      channel: "electron_shell", type: "thread_window.focus", commandId: "focus-closed", threadId: "thread-a",
+    })));
+    first.webContents.emit("did-finish-load");
+    await flushMicrotasks();
+    expect(first.executedJavaScript[0]).toContain("handAgentReceiveThreadOpen");
+    expect(events).toEqual([]);
+    first.emit("closed");
+    const history = prewarmer.openHistory();
+    second.webContents.emit("did-finish-load");
+    await history;
+    injected.resolve();
+    await opening;
+
+    expect(events).toMatchObject([{
+      type: "command.ack", commandId: "focus-closed", ok: false,
+    }]);
+    expect(first.showCount).toBe(0);
+    expect(second.showCount).toBe(1);
+    expect(second.executedJavaScript).toEqual([]);
+  });
+
+  it.each([undefined, null])("preserves window-only focus when threadId is %s", async (threadId) => {
+    const window = new FakeBrowserWindow();
+    const prewarmer = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
+      preloadPath: "/preload.cjs", availableSkills: [], createWindow: () => window,
+    });
+    const { runtime, events } = createRuntime(prewarmer);
+    const command = parseCommand(JSON.stringify({
+      channel: "electron_shell", type: "thread_window.focus", commandId: "focus-window", threadId,
+    }));
+    const opening = runtime.handleCommand(command);
+    window.webContents.emit("did-finish-load");
+    await opening;
+    await runtime.handleCommand(command);
+
+    expect(window.executedJavaScript).toEqual([]);
+    expect(window.showCount).toBe(1);
+    expect(window.focusCount).toBe(2);
+    expect(events).toEqual(Array(2).fill({
+      channel: "electron_shell", type: "command.ack", commandId: "focus-window", ok: true,
+    }));
+  });
+});
+
+function createRuntime(prewarmer: ThreadWindowPrewarmer) {
+  const events: ElectronToSwiftEvent[] = [];
+  const runtime = new ElectronShellRuntime({
+    prewarmer,
+    activityWindow: { show: async () => {}, updateTheme: async () => {} },
+    send: (event) => events.push(event), now: () => "2026-09-14T04:00:00.000Z",
+    stopSupervisor: () => {}, quit: () => {},
+  });
+  return { runtime, events };
+}
 
 describe("ThreadWindowPrewarmer", () => {
   it("creates a hidden browser window and waits for load", async () => {

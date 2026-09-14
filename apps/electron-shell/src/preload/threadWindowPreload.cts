@@ -22,6 +22,8 @@ declare global {
     handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
     handAgentPendingInitialPrompts?: unknown[];
     handAgentReceiveInitialPrompt?: (payload: unknown) => void;
+    handAgentPendingThreadOpens?: string[];
+    handAgentReceiveThreadOpen?: (threadId: string) => void;
   }
 }
 
@@ -58,6 +60,14 @@ contextBridge.executeInMainWorld({
     if (typeof window.handAgentReceiveInitialPrompt !== "function") {
       window.handAgentReceiveInitialPrompt = (payload: unknown) => {
         window.handAgentPendingInitialPrompts?.push(payload);
+      };
+    }
+    window.handAgentPendingThreadOpens = Array.isArray(window.handAgentPendingThreadOpens)
+      ? window.handAgentPendingThreadOpens
+      : [];
+    if (typeof window.handAgentReceiveThreadOpen !== "function") {
+      window.handAgentReceiveThreadOpen = (threadId: string) => {
+        window.handAgentPendingThreadOpens?.push(threadId);
       };
     }
   },

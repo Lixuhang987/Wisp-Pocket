@@ -17,6 +17,7 @@ type InitialPromptCommand = Extract<
 type ThreadWindowHost = {
   prepare(): Promise<void>;
   openInitialPrompt(payload: InitialPromptCommand["payload"]): Promise<void>;
+  openThread(threadId: string): Promise<void>;
   openHistory(): Promise<void>;
   focus(): boolean;
   updateTheme(theme: HostTheme): Promise<void>;
@@ -77,13 +78,17 @@ export class ElectronShellRuntime {
       case "thread_window.open_history":
         await this.runCommand(command, () => this.options.prewarmer.openHistory());
         return;
-      case "thread_window.focus":
-        if (this.options.prewarmer.focus()) {
+      case "thread_window.focus": {
+        const threadId = command.threadId;
+        if (threadId) {
+          await this.runCommand(command, () => this.options.prewarmer.openThread(threadId));
+        } else if (this.options.prewarmer.focus()) {
           this.ack(command, true);
         } else {
           await this.runCommand(command, () => this.options.prewarmer.openHistory());
         }
         return;
+      }
       case "activity_window.show":
         await this.runCommand(command, () => this.options.activityWindow.show());
         return;

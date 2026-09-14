@@ -202,6 +202,7 @@ function createHarness(options: { focusResult?: boolean; prepareError?: Error } 
       }
     }),
     openInitialPrompt: vi.fn(async () => {}),
+    openThread: vi.fn(async () => {}),
     openHistory: vi.fn(async () => {}),
     focus: vi.fn(() => options.focusResult ?? true),
     updateTheme: vi.fn(async () => {}),

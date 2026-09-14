@@ -6,7 +6,7 @@
 
 - 分支从 `main` 的 `a919901` 创建，包含 #2 的 `ad9336d`；本轮评估基于实际 Thread 所有权实现。
 - 保留 store 公共入口，分别归属事实投影、输入交接和界面偏好；首轮关联只登记一处，输入控制器承接首轮创建/加载/提交顺序。职责见 [store](../../../apps/thread-window-web/src/store/store.md) 与 [thread](../../../apps/thread-window-web/src/thread/thread.md)。
-- 当前 Composer 立即提交，等待执行由后端持久队列承担，socket FIFO 仅处理连接就绪前的传输。草稿与组件状态维持既有保存范围；ThreadWindow 后台新建 Thread 改变选中的既有缺陷另记。
+- 当前 Composer 立即提交，等待执行由后端持久队列承担，socket FIFO 仅处理连接就绪前的传输。草稿与组件状态维持既有保存范围；后台创建抢选在本次 Issue #3 原实施中未处理，随后由 [2026-09-14 独立计划](./2026-09-14-thread-window-selection.md) 修复，不改写原实施范围。
 - 原 Issue #3 实施阶段后端不改代码：Router / Publisher 的连接隔离与 Persistence 的输入转换、增量、恢复和句柄管理均有实际职责；保留理由见 [规格入口](../../issue-3-design.md)。
 - 提交前验证发现两项 Swift 测试混淆了 PromptPanel 隐藏与后续窗口回执的观察阶段；main 同样复现，仅校正测试断言，Swift 生产行为保持不变。
 

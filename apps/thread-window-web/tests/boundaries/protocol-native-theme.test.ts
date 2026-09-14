@@ -10,6 +10,7 @@ import {
 import {
   getAvailableSkills,
   installInitialPromptReceiver,
+  installThreadOpenReceiver,
 } from "../../src/native/nativeConfig.ts";
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "../../src/native/themeConfig.ts";
 
@@ -283,6 +284,35 @@ describe("native config boundaries", () => {
       { actionId: "review/code", title: "Review", prompt: "Review this code" },
     ]);
     expect(skills).not.toBe(original);
+  });
+
+  it("delivers queued and live Thread opens once and releases the receiver on cleanup", () => {
+    window.handAgentPendingThreadOpens = ["thread-a", "thread-b"];
+    const received: string[] = [];
+    const dispose = installThreadOpenReceiver((threadId) => received.push(threadId));
+    window.handAgentReceiveThreadOpen?.("thread-c");
+
+    expect(received).toEqual(["thread-a", "thread-b", "thread-c"]);
+    expect(window.handAgentPendingThreadOpens).toEqual([]);
+    dispose();
+    expect(window.handAgentReceiveThreadOpen).toBeUndefined();
+
+    const replacement = vi.fn();
+    const disposeReplacement = installThreadOpenReceiver(replacement);
+    expect(replacement).not.toHaveBeenCalled();
+    disposeReplacement();
+  });
+
+  it("keeps the current Thread open receiver when an older installation is disposed", () => {
+    const disposeFirst = installThreadOpenReceiver(vi.fn());
+    const current = vi.fn();
+    const disposeCurrent = installThreadOpenReceiver(current);
+    disposeFirst();
+    window.handAgentReceiveThreadOpen?.("thread-current");
+
+    expect(current).toHaveBeenCalledExactlyOnceWith("thread-current");
+    disposeCurrent();
+    expect(window.handAgentReceiveThreadOpen).toBeUndefined();
   });
 
   it("falls back to system/light when preload did not provide a theme", () => {

@@ -6,7 +6,7 @@
 
 - `App.tsx`：连接 socket、store 与当前展示 Thread 的根编排。
 - `components/`：历史侧栏、消息、Composer 和请求面板。
-- `native/`：读取 preload 注入的配置、主题与 fallback initial prompt。
+- `native/`：读取 preload 配置和主题，接收 fallback initial prompt 与明确目标 Thread 的打开请求。
 - `protocol/`：core 协议的 Web encode 与类型守卫。
 - [store/store.md](./store/store.md)：事实投影、首轮关联、偏好与公共 store factory。
 - `styles/`：Tailwind 入口与共享生成主题；普通 CSS 变量也供桌宠直接消费。
@@ -17,7 +17,7 @@
 ## 状态所有权
 
 - store factory 为每个界面创建独立 UI 投影，持有 `threadsById`、历史、请求、Workspace 列表、连接状态和窗口错误；后端 Thread 是权威真源。
-- 当前右侧展示的 `activeThreadId` 属于 `App` 本地状态，不进入 store，也不通知 server。
+- 当前右侧展示的 `activeThreadId` 与待确认选择记录由 `App` 拥有，不进入 store；选择记录按创建 commandId 关联，既有首轮 payload 仍只登记在 store。
 - socket client 只负责收发、传输缓冲和协议回调；输入控制器统一首轮关联及 ThreadWindow Composer 提交，状态修改经 store 公共 action。
 - Permission/Workspace request 按 Thread 保存；snapshot 恢复请求，`request.resolved`、Turn 终态或 Thread error 清理失效展示。两端回执只由服务端仲裁一次。
 - Composer 草稿由 ThreadWorkspacePane 按 Thread 保存在内存，切换保留、提交清空、页面重建丢失；连接就绪时提交立即发给后端。`user.message.recorded` 才确认持久接收并显示 pending，对应 `turn.started` 清除该标记。
@@ -33,8 +33,9 @@
 ## 协议约束
 
 - 本次 renderer 存续期内按 notificationId 忽略重复通知；assistant delta 追加到稳定 item identity。去重不提供断线通知重放保证。
-- store 处理 `thread.started` 时更新缓存与输入关联；App 仍在原有通知回调中切换选中项，后台创建导致切换的既有问题见 [bugs](../../../docs/bugs.md)。
-- 打开历史先确保本地 state，再发送 resume 等待 snapshot。
+- store 处理所有 `thread.started` 的事实投影和输入关联；App 只对本窗口主动新建或 fallback 首轮登记的 commandId 一次性选中目标。外部、缺失 commandId 或已消费的创建回执只更新投影；对应错误、发送失败或组件卸载清理待确认的选择。
+- 点击历史与宿主明确打开目标共用 `openHistoryThread`：先确保本地 state、设置选中项，再发送 resume 等待 snapshot。两者不创建 Thread 或重发首轮输入。
+- 宿主通过 [Electron preload](../../electron-shell/src/preload/preload.md) 的 `handAgentReceiveThreadOpen(threadId)` 交付目标；React 安装 receiver 时按序消费并清空早到请求，卸载只移除本次 receiver。该缓冲只跨 preload 与 React 初始化，不保存消息或执行队列。
 - 组件通过 props、store action 或根 callback 发起行为，不直接操作 WebSocket。
 - 图片与 PDF 使用互斥的 base64/blobId Input Item；live 与 snapshot 都按规范化附件渲染。Blob 读取服务见 [agent-server server](../../agent-server/src/server/server.md)。
 - 建议回复与自由输入共用 UserInput；用户回复或新 Turn 会清除旧 assistant 等待展示，不引入专用建议回执。

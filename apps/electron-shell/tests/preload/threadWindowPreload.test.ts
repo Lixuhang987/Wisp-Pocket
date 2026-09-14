@@ -31,6 +31,8 @@ type ThreadWindowGlobals = {
   handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
   handAgentPendingInitialPrompts?: unknown[];
   handAgentReceiveInitialPrompt?: (payload: unknown) => void;
+  handAgentPendingThreadOpens?: string[];
+  handAgentReceiveThreadOpen?: (threadId: string) => void;
 };
 
 describe("threadWindowPreload", () => {
@@ -59,12 +61,15 @@ describe("threadWindowPreload", () => {
 
     script.func(...script.args);
     mainWorld.handAgentReceiveInitialPrompt?.({ clientRequestId: "prompt-1" });
+    mainWorld.handAgentReceiveThreadOpen?.("thread-1");
+    mainWorld.handAgentReceiveThreadOpen?.("thread-2");
 
     expect(mainWorld.handAgentThreadWindowConfig?.threadWebSocketURL).toBe(
       "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1",
     );
     expect(mainWorld.handAgentTheme).toEqual({ preference: "system", resolved: "light" });
     expect(mainWorld.handAgentPendingInitialPrompts).toEqual([{ clientRequestId: "prompt-1" }]);
+    expect(mainWorld.handAgentPendingThreadOpens).toEqual(["thread-1", "thread-2"]);
     expect(contextBridge.exposeInMainWorld).toHaveBeenCalledWith("handAgentElectron", {
       phase: "phase-0",
     });
@@ -93,6 +98,28 @@ describe("threadWindowPreload", () => {
 
     expect(mainWorld.handAgentPendingInitialPrompts).toBe(pending);
     expect(receiver).toHaveBeenCalledWith({ clientRequestId: "prompt-2" });
+  });
+
+  it("preserves an existing main-world Thread open receiver and its pending requests", () => {
+    const contextBridge = { executeInMainWorld: vi.fn(), exposeInMainWorld: vi.fn() };
+    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => nodeRequire(preloadPath));
+    const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
+    const receiver = vi.fn();
+    const pending = ["thread-early"];
+    const mainWorld: ThreadWindowGlobals = {
+      handAgentReceiveThreadOpen: receiver,
+      handAgentPendingThreadOpens: pending,
+    };
+    (globalThis as { window?: ThreadWindowGlobals }).window = mainWorld;
+
+    script.func(...script.args);
+    mainWorld.handAgentReceiveThreadOpen?.("thread-live");
+
+    expect(mainWorld.handAgentPendingThreadOpens).toBe(pending);
+    expect(receiver).toHaveBeenCalledExactlyOnceWith("thread-live");
+    expect(contextBridge.exposeInMainWorld.mock.calls.map(([name]) => name)).toEqual([
+      "handAgentSubscribeThemeChange", "handAgentElectron",
+    ]);
   });
 
   it("reads the initial theme from preload arguments", async () => {

@@ -12,17 +12,6 @@
 
 ## 当前 bug
 
-### ThreadWindow 被后台新建 Thread 切换选中项
-
-- **严重级别**：P2。
-- **发现日期**：2026-09-13 静态确认；2026-09-14 当前主分支包实机连续复现两次。
-- **复现步骤**：在 ThreadWindow 查看 A 并留下 `QA_SELECTION_DRAFT_A`；独立 WebSocket 客户端向真实 `/api/thread` 只发送 `thread.start`，不发送宿主打开窗口命令或模型输入。
-- **实际结果**：新建 B 出现在列表并抢走选中项，正文变成“等待输入”，Composer 为空；点击 A 后原消息与草稿恢复。再次后台创建仍复现。
-- **期望结果**：外部创建通知只更新可见列表与事实投影，不擅自切换当前 Thread。用户在本窗口主动新建、点击历史或宿主明确打开目标 Thread 的流程仍可选中相应目标；桌宠按创建时间选最新 Thread 的独立规则不变。
-- **证据**：主 checkout `.cache/live-qa-20260914/background-selection-repro.json`，`main` / `52bc459` 当前包、macOS 15.5 arm64。创建者与独立观察连接收到同一 `thread.started`，其 `commandId` 不属于 ThreadWindow；Computer Use AX / 截图确认两次选中项变化，SQLite 保留 A 和两个空白 B。第二轮 UI 断言报 `QA_SELECTION_FAILED`。
-- **调用链边界**：独立客户端 start → 真实后端创建并广播 → Web 接收外部 started → 当前显示切换。既有静态记录指向 `App` 无条件调用 `setActiveThreadId`；修复前仍需用集成测试隔离 Web 通知处理、宿主回调与 store 默认选择。该最小复现不等同于完整 AgentTrigger 实测。
-- **基线与清理**：TypeScript/Web、隔离 home Swift test、Swift build、正式模式打包与签名检查通过。记录后正常退出 Host/Electron/后端，4317 释放；测试 Thread 保留用于回归。
-
 ### Chrome Bookmarks bridge endpoint 与实际监听端口不一致
 
 - **严重级别**：P1。

@@ -14,12 +14,13 @@
 - 当前 command 只有 `thread_window.open_initial_prompt`、`thread_window.open_history`、`thread_window.focus`、`activity_window.show`、`theme.changed`、`shutdown`。
 - `thread_window.prepare` 不存在；hidden ThreadWindow 预热由 Electron main 在 agent-server ready 后主动执行。
 - `thread_window.open_initial_prompt.payload` 只接受 `clientRequestId`、`userInput`。`userInput.items` 必须非空，item 类型只允许 `text`、`image`、`skill`、`text_selection`；image MIME 限定 `image/png`、`image/jpeg`、`image/webp`。
+- `thread_window.focus.threadId` 是既有可选 `string | null` 字段：非空 ID 表示向 renderer 明确交付目标 Thread，再打开或聚焦窗口；缺失、null 或空字符串仅执行窗口级 focus/openHistory。Swift 提交入口见 [ElectronShell 合约](../../../../desktop/Sources/AppServices/ElectronShell/electron-shell.md)，交付时序见 [windows](../windows/windows.md)。
 
 ## Event 边界
 
 - Electron -> Swift event 只通过 `encodeEvent()` 输出 JSON line；字段名必须与 Swift `ElectronShellEvent` decoder 对齐。
 - `thread_window.prepared` 和 `thread_window.prepare_failed` 是事件，不是 command ack。
-- `command.ack` 只确认某个 Swift command 是否执行；它不代表 `/api/thread` 或 `/api/activity` 内部状态变化。
+- `command.ack` 只确认某个 Swift command 是否执行。目标 Thread 的交付失败或窗口在交付时被替换须回 `ok: false`；成功只证明 renderer 接收或缓冲目标并完成 show/focus，不代表 Thread 已加载、React 已渲染或 `/api/thread` 状态变化。
 - 桌宠交互走 renderer 的 Thread 连接与原生窗口 IPC；Swift 仍通过全局热键、选区/截图入口或显式失败处理打开 PromptPanel。
 
 ## 修改约束

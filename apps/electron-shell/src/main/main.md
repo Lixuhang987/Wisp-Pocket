@@ -21,6 +21,7 @@
 
 - `main.ts` 是组合根：读取 env、创建 `JsonLineBridge`、`AgentServerSupervisor`、`ThreadWindowPrewarmer`、`ActivityWindowController`，在 `app.whenReady()` 后应用 macOS regular activation policy 并显示 Dock 图标，再把进程和窗口对象交给 `ElectronShellRuntime`。`HANDAGENT_INITIAL_THEME` 只作为启动期初值，必须经过 `initialHostTheme.ts` 校验后传给 window controllers。
 - `ElectronShellRuntime` 不直接 import Electron API；它只依赖窗口、event output 和 supervisor 生命周期接口，负责 command ack、health gate、host theme fan-out 和预热重入。
+- `thread_window.focus` 携带非空目标 ID 时，runtime 必须交给 prewarmer 的目标打开入口，即使窗口已经可见；无目标时才沿窗口级 focus/openHistory 路径。交付与回执边界见 [protocol](./protocol/protocol.md)。
 - `petWindowIpc.ts` 只接受当前桌宠 `webContents`。拖动坐标由 main 读取系统光标；renderer 只上报本地 DOM 命中矩形及显式窗口意图。桥接合约见 [preload](../preload/preload.md)。
 - 桌宠位置默认写入 `~/.spotAgent/pet-position.json`，路径由 main 注入。`HANDAGENT_PET_POSITION_PATH` 与 `HANDAGENT_PET_THREAD_WEBSOCKET_URL` 用于隔离原生 QA；URL 仍限 loopback `/api/thread`，由 preload 确保开启交互式请求。
 

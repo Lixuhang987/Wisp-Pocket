@@ -26,10 +26,11 @@
 - 窗口生命周期由 lifecycle 控制器闭环：Electron ThreadWindow 由 `ElectronThreadWindowLifecycle` 通过 `ThreadWindowCommanding` 管理，`SettingsLifecycle` 管 Settings；Coordinator 不持有 AppKit 对象。
 - 应用内快捷键（如 `showThreadWindow` ⌘L 唤起 ThreadWindow）使用 `NSEvent.addLocalMonitorForEvents(matching: .keyUp)` 在 `setupHotkey()` 中注册，仅当 handAgent 持有焦点时生效。不走 `HotkeyRegistering` 协议和 Carbon Events 全局通道。配置 UI 复用 `KeyboardShortcuts.Recorder`，监听通过 `KeyboardShortcuts.Shortcut(event:)` 比对。`shutdown()` 中 `NSEvent.removeMonitor` 清理。
 - Electron ThreadWindow 打开成功以 `command.ack ok` 为准；Swift 宿主不再把 Electron ThreadWindow 计入自身 Dock / Cmd+Tab 可见性。ThreadWindow 的 Dock / app switcher 入口属于 Electron app；Swift 宿主的持久 `.regular` 状态只由 Settings 窗口决定，PromptPanel 隐藏后按 Settings 状态回落。
-- 历史入口语义：`openHistory` 聚焦全局 Electron ThreadWindow 并刷新左侧历史，不打开独立窗口；若此时 PromptPanel 仍可见，Coordinator 必须先执行 `hide(restoringFocus: false)` 再把控制权交给 Electron，避免首次 show/focus 时被 PromptPanel 的失焦恢复抢回旧前台应用。右侧当前展示哪个 thread 由 React `App` 本地 state 编排。
+- 历史入口语义：`openHistory` 只打开或聚焦全局 Electron ThreadWindow；列表投影与右侧当前选择由 React 管理。若此时 PromptPanel 仍可见，Coordinator 必须先执行 `hide(restoringFocus: false)` 再把控制权交给 Electron，避免首次 show/focus 时被 PromptPanel 的失焦恢复抢回旧前台应用。
 - PromptPanel show/toggle 只负责显示原生输入面板和刷新 action 定义，不触发 ThreadWindow prepare。ThreadWindow 预热由 Electron main 在 agent-server ready 后主动完成。
 - PromptPanel 与 ThreadWindow handoff 语义：无论是提交首轮 prompt，还是 PromptPanel 仍可见时触发 `openHistory`，都必须先用 `hide(restoringFocus: false)` 隐藏 PromptPanel，不恢复唤起前的前台应用。提交首轮 prompt 的生产路径先由 Swift `/api/thread` client 创建 thread 并提交首轮 `UserInput`，拿到 `thread.started.threadId` 后再发送 `thread_window.focus(threadId)` 给 Electron main；`openHistory` 仍发送 `thread_window.open_history`。这样 Electron `BrowserWindow.show()/focus()` 后不会被 PromptPanel 的焦点恢复逻辑推到后台。
-- 上一条是明确的防回归红线，不是实现细节建议：这个 bug 已多次出现。今后只要修改 `showThreadWindow` 快捷键、`openHistory`、PromptPanel hide/focus restore、ThreadWindow open/focus ack 任一环节，就必须同时保留自动化顺序断言，并重跑 manual QA 里的“首次 PromptPanel -> ThreadWindow 历史入口 handoff”。
+- 带目标 focus 的交付与回执边界见 [ElectronShell](../AppServices/ElectronShell/electron-shell.md)；目标必须传到 React，后台 `thread.started` 广播本身不代表用户选择。
+- PromptPanel handoff 是明确的防回归红线，不是实现细节建议：这个 bug 已多次出现。今后只要修改 `showThreadWindow` 快捷键、`openHistory`、PromptPanel hide/focus restore、ThreadWindow open/focus ack 任一环节，就必须同时保留自动化顺序断言，并重跑 manual QA 里的“首次 PromptPanel -> ThreadWindow 历史入口 handoff”。
 - Settings 打开时会创建模型、外观、工具、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel；工具页接收同一个 `BuiltinFeatures`。Coordinator 只负责注入，配置写入由对应 Store 负责。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
 - `AppCoordinator` 在 app-server available 后通过 `ActivityWindowCommanding.showActivityWindow()` 显示桌宠。桌宠交互与 Thread 投影由 Electron renderer 处理，首次文字输入仍走 PromptPanel；Coordinator 不解析 Activity 状态。

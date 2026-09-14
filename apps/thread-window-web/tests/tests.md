@@ -4,16 +4,18 @@
 
 ## 直接子节点
 
-- `use-cases/`：通过真实 store、输入控制器与 socket 验证首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期。
+- `use-cases/`：通过真实 App、store、输入控制器与 socket 验证选择、首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期。
 - `boundaries/`：协议 guard、preload 配置和主题边界。
 - 目录根测试：组件、布局、滚动、持久化和 design token 的局部回归。
 
 ## 约束
 
 - 主流程优先写 use-case test，避免只断言组件内部实现。
+- Thread 选择回归用 JSDOM 挂载真实 App，仅隔离 WebSocket、布局和 preload 边界；观察正文、结构化草稿、选中行和实际提交目标。后台广播、本窗口创建与原生目标打开必须分别验证，store 单测不能证明 App 本地选择行为。
 - 协议 fixture 从 core DTO 语义出发，不复制另一套消息模型。
 - 覆盖 live/snapshot 的图片/PDF Blob 引用、建议回复、输入 pending、`request.resolved` 与同一请求去重；两界面共用 store 合约，不能恢复 renderer 自有执行队列。
 - Vitest 同时收集 `.test.ts` 与 `.test.tsx`，避免消息组件用例被遗漏。
 - 涉及真实 Electron 窗口、焦点或视口避让的行为保留到 manual QA。
 - 首轮创建验证状态/UI 回调先于 resume 与首轮提交；Composer 同时观察忙碌/等待回复时的实际发送、服务端确认后的 pending 投影与跨 Thread 隔离，不测试内部集合或文件布局。
-- 偏好 round-trip 只证明展开集合保存；草稿的切换、提交和页面重建行为保留人工 QA，不能用静态组件渲染代替实机验收。
+- 原生目标打开须覆盖 React 安装前的请求、resume 的传输缓冲及 receiver 清理；[Electron 测试](../../electron-shell/tests/tests.md) 负责 command 的目标交付、preload 缓冲与回执，双方合起来仍不证明 macOS 焦点。
+- 偏好 round-trip 只证明展开集合保存；JSDOM 交互覆盖选择、草稿切换与提交，页面重建和原生窗口行为仍需人工 QA，静态组件渲染不代替实机验收。

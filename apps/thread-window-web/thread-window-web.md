@@ -13,14 +13,14 @@
 
 - ThreadWindow 持有 `/api/thread?acceptServerRequests=1` 长连接；[桌宠](../electron-shell/electron-shell.md)复用本包客户端与投影，各界面共享后端 Thread 身份及历史。
 - Swift 只提交 PromptPanel / AgentTrigger 首轮输入；Electron main 只管理窗口。两者都不 mirror React 的 Thread 状态。
-- preload 只注入 WebSocket URL、只读 Append Prompt 候选、主题与 initial-prompt fallback。React 不接触 Dynamic Tool spec。
+- [preload](../electron-shell/src/preload/preload.md) 只注入 WebSocket URL、只读 Append Prompt 候选、主题、initial-prompt fallback 与明确目标 Thread 的打开请求。React 不接触 Dynamic Tool spec。
 - 非主动断开后只进入 disconnected 状态；当前不重连、不恢复订阅、不自动拉取 snapshot。
 - 主题由宿主解析，React 只应用 resolved theme；设计 token 来源是 `design/tokens.json`。
 
 ## 协议边界
 
 - 类型真相在 [core protocol](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)；Web 侧只做 encode、guard 和 UI 投影。
-- `thread.resume` 是用户打开历史 Thread 的加载入口，不是断线恢复。
+- `thread.resume` 是点击历史或宿主明确打开目标 Thread 的加载入口，不是断线恢复；选择规则由 [App](./src/src.md) 拥有。
 - permission/workspace 请求必须以 `ClientResponse` 回覆；不要转成普通 `op.submit`。
 - 两端可同时显示同一请求，由 core 消耗首次有效回执；`request.resolved` 和 snapshot 同步请求状态。建议按钮则发送普通 UserInput。
 - Composer 在执行中照常提交，由后端持久队列接收；消息中的 pending 表示已保存待处理，前端不再持有执行队列。

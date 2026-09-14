@@ -132,6 +132,21 @@ export class ThreadWindowPrewarmer {
     this.showAndFocus(window);
   }
 
+  async openThread(threadId: string): Promise<void> {
+    await this.prepare();
+    const window = this.window;
+    if (!window || !this.prepared) {
+      throw new Error("thread window is not prepared");
+    }
+
+    const serialized = JSON.stringify(threadId).replace(/</g, "\\u003c");
+    await window.webContents.executeJavaScript(`window.handAgentReceiveThreadOpen(${serialized});`);
+    if (this.window !== window || !this.prepared) {
+      throw new Error("thread window changed before target thread was shown");
+    }
+    this.showAndFocus(window);
+  }
+
   focus(): boolean {
     if (!this.window || !this.visible) {
       return false;

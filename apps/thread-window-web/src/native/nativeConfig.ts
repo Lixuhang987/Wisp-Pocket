@@ -11,6 +11,8 @@ declare global {
     };
     handAgentReceiveInitialPrompt?: (payload: InitialPromptPayload) => void;
     handAgentPendingInitialPrompts?: InitialPromptPayload[];
+    handAgentReceiveThreadOpen?: (threadId: string) => void;
+    handAgentPendingThreadOpens?: string[];
   }
 }
 
@@ -46,6 +48,21 @@ export function installInitialPromptReceiver(handler: (payload: InitialPromptPay
   return () => {
     if (window.handAgentReceiveInitialPrompt === handler) {
       delete window.handAgentReceiveInitialPrompt;
+    }
+  };
+}
+
+export function installThreadOpenReceiver(handler: (threadId: string) => void): () => void {
+  window.handAgentReceiveThreadOpen = handler;
+  const pending = window.handAgentPendingThreadOpens ?? [];
+  window.handAgentPendingThreadOpens = [];
+  for (const threadId of pending) {
+    handler(threadId);
+  }
+
+  return () => {
+    if (window.handAgentReceiveThreadOpen === handler) {
+      delete window.handAgentReceiveThreadOpen;
     }
   };
 }
