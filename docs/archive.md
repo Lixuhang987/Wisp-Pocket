@@ -271,3 +271,14 @@
 - **验证过程**：未选中 Thread 时，独立客户端只发 `thread.start`，新行出现而正文仍提示选择历史。再打开 A（`thread-decf7fc2-7412-4a27-a505-75f2ce089d26`），保留文字及 `test` Append Prompt 草稿，连续两次由独立客户端创建空白 Thread；每次 Computer Use AX 与截图均确认 A 的高亮、正文及两类草稿不变。点击原 Composer 的发送后，A 显示 `QA_SELECTION_FIXED_A_20260914`，草稿清空。
 - **证据**：`.cache/live-qa-20260914/selection-fixed-background.json`、三份 `selection-fixed-*-receipts.json` 与 `selection-fixed-background-db.json`；每次第二观察连接收到同一 started，SQLite 的 skill/text 和 assistant 标记仅写入 A。原生 Page Down 后目视确认最新回复。
 - **结论**：通过。仅证明后台创建通知边界，不代替完整 AgentTrigger 或桌宠规则验收。探针连接已关闭，测试 Thread 保留；App/后端继续运行，模型设置未变。
+
+
+- [ ] **本窗口创建与历史**：点击“新建对话”后正确选中新 Thread；期间穿插后台创建，再从历史返回 A，原草稿仍在。fallback 首轮与占位沿下方 Issue #3 既有分项验收。
+
+### ThreadWindow 主动新建与历史返回
+
+- **验证日期**：2026-09-14。
+- **验证环境**：主 checkout main、macOS 15.5 arm64，运行 `013779c` 源码打包的 `Wisp Pocket.app`，含修复 `229d728`；真实 agent-server，前述三项检查与打包验证通过。
+- **验证过程**：A 保留 `QA_HISTORY_DRAFT_A_20260914` 与 `test` Append Prompt。点击窗口“新建对话”，新 Thread `thread-e8f3cbfd-df7b-4dd5-b018-f62af0b6a36d` 在列表选中，正文等待输入、Composer 为空；独立观察连接记录对应 started。再由独立客户端创建 `thread-050cb357-afdb-48af-baa2-fd9f50df4b21`，新行出现但原选择不变。点击 A，Computer Use AX 与截图确认旧正文、文字和 Append Prompt 草稿全部恢复。
+- **证据**：`.cache/live-qa-20260914/selection-fixed-local.json`、`selection-fixed-local-created.json` 和 `selection-fixed-local-interleaved-receipts.json`。
+- **结论**：通过。fallback 首轮与占位不在本次结论内，继续保留 Issue #3 分项。观察连接已关闭；测试 Thread 和 A 草稿保留，App/后端继续运行，未改设置。
