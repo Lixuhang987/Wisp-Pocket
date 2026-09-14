@@ -293,3 +293,14 @@
 - **验证过程**：经 Computer Use 在 ThreadWindow 新建 A、B，交错提交 `QA_TWO_THREADS_A1/B1/A2/B2_20260914` 四个标记。分别返回历史，AX 和截图确认每个 Thread 仅显示自己的两轮输入与真实回复，运行状态结束后发送控件恢复空闲。
 - **证据**：`.cache/live-qa-20260914/two-threads-db.json`。A 为 `thread-64c4ecd2-d3cc-4c51-abdd-4c5c247891df`，B 为 `thread-73f59162-6454-4bb6-ac6f-3682fefc6c87`；各有 user/assistant/user/assistant 四条消息、两次 turn.started、两次 turn.completed 和 24 条 assistant.delta，事件 threadId 全部匹配所属历史。
 - **结论**：通过。测试 Thread 保留，原选择回归 A 的草稿未提交；主包/后端继续运行，设置未修改。
+
+
+- [ ] **草稿隔离与提交**：在 Thread A、B 分别编辑含文本和 Input Item 的草稿，来回切换确认各自保留；分别提交后只清空本 Thread 的草稿，运行中也立即提交，服务端保存后显示待处理。
+
+### Thread 草稿隔离与运行中提交
+
+- **验证日期**：2026-09-14。
+- **验证环境**：主 checkout main、macOS 15.5 arm64，`013779c` 正式模式包、真实模型/agent-server/SQLite；三项基线及打包检查通过。
+- **验证过程**：在测试 A、B 分别通过 `/test` 与原生 Tab 插入 Append Prompt，再编辑不同文字。B→A→B→A 的 Computer Use AX 均保留各自的文字和可移除 Skill。提交 A 的长回复输入后立即追加唯一标记，AX 记录追加消息下的“待处理”、停止按钮及空 Composer。返回 B 时其两类草稿仍完整；提交 B 后只清空 B。最终两端 AX 均显示各自回复、空 Composer，无待处理或停止控件。
+- **证据**：`.cache/live-qa-20260914/drafts-and-pending-ui.json` 和 `drafts-and-pending-db.json`；A/B 的结构化输入均保存 skill+text。A 的 sequence 为首轮开始 39、追加输入以 pending=true 保存 41、首轮完成 1362、追加轮开始 1364、追加轮完成 1379，未中断或提前执行。
+- **结论**：通过。仅覆盖本条草稿与运行中追加，不代替等待普通回复、重启 pending 或跨界面队列分项。测试草稿已提交，历史保留，原选择回归 A 草稿未改；App/后端继续运行，设置未改。
