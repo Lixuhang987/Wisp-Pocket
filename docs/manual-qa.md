@@ -34,7 +34,7 @@
 
 ### ThreadWindow 后台创建与主动选择隔离
 
-- **状态**：2026-09-14 已在独立 worktree 实现并通过自动化检查，待带回 main、重新打包和实机回归；本组没有实机通过结论，也未归档。
+- **状态**：2026-09-14 修复 `229d728` 已合入 main；主 checkout 的 TypeScript/Web、隔离 home Swift test、Swift build、正式模式打包、签名与包内 Web/Electron 文件一致性检查均通过。本组仍待实机回归，没有通过结论，也未归档。
 - **自动化边界**：真实 Web App 的选择、草稿、提交目标、首轮关联、重复/失败创建回执的一次性消费和早到原生请求，以及 Electron parser/runtime/prewarmer 的目标交付和失败回执均已覆盖；TypeScript/Web、隔离 home Swift test、Swift build 与 Electron build 通过，结果见 [修复计划](./medium-powers/plans/2026-09-14-thread-window-selection.md)。JSDOM 和 Electron 替身不证明原生焦点或打包环境。
 - **修复前证据**：主 checkout `.cache/live-qa-20260914/background-selection-repro.json`，`main / 52bc459` 包在 macOS 15.5 arm64 连续两次后台创建抢选，第二次报 `QA_SELECTION_FAILED`；返回 A 后草稿恢复。该最小 WebSocket 复现不等于完整 AgentTrigger 实测。
 - [ ] **后台不抢选**：打开有历史的 A，保留文字和 Append Prompt 草稿；独立客户端仅发送 `thread.start` 创建 B，再重复一次。新 Thread 进入列表，A 的选中行、正文、草稿及后续提交目标保持不变；无选中项时后台创建也不自动打开正文。

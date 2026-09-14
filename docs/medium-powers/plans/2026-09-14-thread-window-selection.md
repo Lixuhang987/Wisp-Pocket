@@ -43,14 +43,16 @@ App 只保存待确认的选择 commandId 集合，不保存另一份首轮输�
 - [x] 实现最小选择意图过滤和既有目标 ID 交付，复跑回归测试。
 - [x] 执行 TypeScript/Web、隔离 home Swift test、Swift build 及 Electron build，更新 owning 文档与 manual QA。
 - [x] 分发不继承上下文的独立文档审核，确认计划、代码、目录指南、链接与 QA 一致。
-- [ ] 主 agent 复核审核结论并提交。
-- [ ] 带回 main，重新检查与打包，从 Computer Use 重跑后台复现和 PromptPanel / 历史 handoff；逐项归档提交。
+- [x] 主 agent 复核审核结论并提交为 `229d728`。
+- [x] 带回 main，重新完成三项检查、正式模式打包、签名和包内 Web/Electron 文件一致性检查。
+- [ ] 从 Computer Use 重跑后台复现和 PromptPanel / 历史 handoff；逐项归档提交。
 
 ## 自动化结果（2026-09-14）
 
 - 旧实现下新增 Web App 10 项、native 边界 2 项均失败，实际信号为 A 失去 `aria-current`、草稿展示变空或原生目标未交付；Electron 目标交付/失败与 preload 共 6 项出现预期失败。
 - 实现后 Web 定向两文件共 24 项通过，Electron 全套 114 项通过。最终 `bash ./scripts/test.sh`、隔离 home 的 `bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 和 `pnpm --filter handagent-electron-shell build` 均 exit 0；Swift 和后端生产代码未改动。
 - 检查日志位于本 worktree `.cache/thread-selection-web-tests.log`、`thread-selection-swift-tests.log`、`thread-selection-swift-build.log`、`thread-selection-electron-build.log`；前三项仅保留 `success` 状态，不能当作逐项实机证据。
+- main 的复验与打包记录位于主 checkout `.cache/live-qa-20260914/selection-fixed-*.log`；正式包仍使用既有真实模型设置，未启用 mock。打包通过不代表本节原生回归已通过。
 - 独立文档审核已覆盖计划、全部代码与测试变更、目录父链及跨端合约；17 个变更 Markdown 的 96 个本地链接、7 个锚点和冲突检查通过。Chrome P1 保留原文，manual QA 新增四项均待打包实机，未改归档。
 
 ## 验证边界
