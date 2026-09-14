@@ -260,3 +260,14 @@
 - **验证过程**：完整执行默认和失效 binary 覆盖两次启动的 PromptPanel、真实回复、关窗后台运行、历史恢复与两种前台原生退出入口。
 - **证据**：`.cache/live-qa-20260914/lifecycle.json` 以及本文件 QA-START、正常退出复验记录；设置 hash 不变，全部进程结束且 4317 释放。
 - **结论**：生命周期衔接通过；历史由显式选择恢复，未宣称自动恢复选中项；Automation 在途取消另验。
+
+
+- [ ] **后台不抢选**：打开有历史的 A，保留文字和 Append Prompt 草稿；独立客户端仅发送 `thread.start` 创建 B，再重复一次。新 Thread 进入列表，A 的选中行、正文、草稿及后续提交目标保持不变；无选中项时后台创建也不自动打开正文。
+
+### ThreadWindow 后台创建选择隔离
+
+- **验证日期**：2026-09-14。
+- **验证环境**：macOS 15.5 arm64，主 checkout `main / 013779c`，包含修复 `229d728` 的正式模式 `dist/Wisp Pocket.app`；真实 agent-server、模型和 SQLite。TypeScript/Web、隔离 home Swift test、Swift build、打包、签名与产物一致性检查均通过。
+- **验证过程**：未选中 Thread 时，独立客户端只发 `thread.start`，新行出现而正文仍提示选择历史。再打开 A（`thread-decf7fc2-7412-4a27-a505-75f2ce089d26`），保留文字及 `test` Append Prompt 草稿，连续两次由独立客户端创建空白 Thread；每次 Computer Use AX 与截图均确认 A 的高亮、正文及两类草稿不变。点击原 Composer 的发送后，A 显示 `QA_SELECTION_FIXED_A_20260914`，草稿清空。
+- **证据**：`.cache/live-qa-20260914/selection-fixed-background.json`、三份 `selection-fixed-*-receipts.json` 与 `selection-fixed-background-db.json`；每次第二观察连接收到同一 started，SQLite 的 skill/text 和 assistant 标记仅写入 A。原生 Page Down 后目视确认最新回复。
+- **结论**：通过。仅证明后台创建通知边界，不代替完整 AgentTrigger 或桌宠规则验收。探针连接已关闭，测试 Thread 保留；App/后端继续运行，模型设置未变。
