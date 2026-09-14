@@ -304,3 +304,14 @@
 - **验证过程**：在测试 A、B 分别通过 `/test` 与原生 Tab 插入 Append Prompt，再编辑不同文字。B→A→B→A 的 Computer Use AX 均保留各自的文字和可移除 Skill。提交 A 的长回复输入后立即追加唯一标记，AX 记录追加消息下的“待处理”、停止按钮及空 Composer。返回 B 时其两类草稿仍完整；提交 B 后只清空 B。最终两端 AX 均显示各自回复、空 Composer，无待处理或停止控件。
 - **证据**：`.cache/live-qa-20260914/drafts-and-pending-ui.json` 和 `drafts-and-pending-db.json`；A/B 的结构化输入均保存 skill+text。A 的 sequence 为首轮开始 39、追加输入以 pending=true 保存 41、首轮完成 1362、追加轮开始 1364、追加轮完成 1379，未中断或提前执行。
 - **结论**：通过。仅覆盖本条草稿与运行中追加，不代替等待普通回复、重启 pending 或跨界面队列分项。测试草稿已提交，历史保留，原选择回归 A 草稿未改；App/后端继续运行，设置未改。
+
+
+- [ ] **页面重建与偏好**：调整 Workspace 分组展开，编辑草稿并展开消息或工具详情后重载 Web 页面；草稿与组件临时展开恢复初始状态，Workspace 分组展开保留，搜索词清空。
+
+### ThreadWindow 页面重建与界面偏好
+
+- **验证日期**：2026-09-14。
+- **验证环境**：主 checkout main、macOS 15.5 arm64，`013779c` 正式模式包与真实后端；三项基线和打包检查通过。
+- **验证过程**：在独立测试 Thread 中展开 use_tools 详情、展开 `qa-workspace` 分组，保留 `QA_RELOAD_UNSENT_DRAFT_20260914` 草稿并设置搜索词。Computer Use 截图与 AX 记录全部前置状态；确认 Electron 为原生前台后以 Command+R 重载。搜索词清空、当前选择恢复为空，而 Workspace 分组仍显示展开的“暂无对话”。显式返回测试历史，草稿为空、两个工具详情均为收起状态，已保存的历史与回复仍存在。
+- **证据**：`.cache/live-qa-20260914/page-reload-state.json`；SQLite 没有未提交草稿标记，模型设置 SHA256 仍为 `3813c808035b5a8b10ef6dfb67448fdb9da02f80f0a3a029e88990128b33fb93`。
+- **结论**：通过。工作区分组已恢复测试前折叠状态；页面重载按规则清除了本 renderer 的测试草稿。工具请求以拒绝结果结束，没有读取文件，本条不提供权限操作验收结论。App/后端和测试历史保留。
