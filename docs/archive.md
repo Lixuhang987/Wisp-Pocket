@@ -282,3 +282,14 @@
 - **验证过程**：A 保留 `QA_HISTORY_DRAFT_A_20260914` 与 `test` Append Prompt。点击窗口“新建对话”，新 Thread `thread-e8f3cbfd-df7b-4dd5-b018-f62af0b6a36d` 在列表选中，正文等待输入、Composer 为空；独立观察连接记录对应 started。再由独立客户端创建 `thread-050cb357-afdb-48af-baa2-fd9f50df4b21`，新行出现但原选择不变。点击 A，Computer Use AX 与截图确认旧正文、文字和 Append Prompt 草稿全部恢复。
 - **证据**：`.cache/live-qa-20260914/selection-fixed-local.json`、`selection-fixed-local-created.json` 和 `selection-fixed-local-interleaved-receipts.json`。
 - **结论**：通过。fallback 首轮与占位不在本次结论内，继续保留 Issue #3 分项。观察连接已关闭；测试 Thread 和 A 草稿保留，App/后端继续运行，未改设置。
+
+
+- [ ] 启动 agent-server，创建两个 Thread；分别连续提交两轮输入，确认历史和流式通知不串线。
+
+### 两个 Thread 的两轮消息与流式隔离
+
+- **验证日期**：2026-09-14。
+- **验证环境**：主 checkout main、macOS 15.5 arm64，`013779c` 正式模式包，Host 26306、Electron 26323、真实 agent-server 26344 与模型；三项基线及打包检查已通过。
+- **验证过程**：经 Computer Use 在 ThreadWindow 新建 A、B，交错提交 `QA_TWO_THREADS_A1/B1/A2/B2_20260914` 四个标记。分别返回历史，AX 和截图确认每个 Thread 仅显示自己的两轮输入与真实回复，运行状态结束后发送控件恢复空闲。
+- **证据**：`.cache/live-qa-20260914/two-threads-db.json`。A 为 `thread-64c4ecd2-d3cc-4c51-abdd-4c5c247891df`，B 为 `thread-73f59162-6454-4bb6-ac6f-3682fefc6c87`；各有 user/assistant/user/assistant 四条消息、两次 turn.started、两次 turn.completed 和 24 条 assistant.delta，事件 threadId 全部匹配所属历史。
+- **结论**：通过。测试 Thread 保留，原选择回归 A 的草稿未提交；主包/后端继续运行，设置未修改。
