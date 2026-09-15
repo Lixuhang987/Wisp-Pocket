@@ -20,9 +20,10 @@ export function registerPetWindowIpc(ipcMain: IpcMain, controller: ActivityWindo
     ipcMain.on(channel, listener);
   };
   register("pet-window:set-layout", (...args) => {
-    if (args.length !== 1) return;
-    const [mode] = args;
-    if (mode === "pet" || mode === "compact" || mode === "expanded") controller.setLayout(mode);
+    if (args.length < 1 || args.length > 2) return;
+    const [mode, contentHeight] = args;
+    if (contentHeight !== undefined && (typeof contentHeight !== "number" || !Number.isFinite(contentHeight) || contentHeight < 0 || contentHeight > 16_384)) return;
+    if (mode === "pet" || mode === "compact" || mode === "expanded") controller.setLayout(mode, contentHeight);
   });
   register("pet-window:set-interactive-regions", (...args) => {
     if (args.length === 1 && isRegions(args[0])) controller.setInteractiveRegions(args[0]);

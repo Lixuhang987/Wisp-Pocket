@@ -11,7 +11,7 @@ declare global {
     handAgentTheme?: HostTheme;
     handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
     handAgentPet?: {
-      setLayout(mode: "pet" | "compact" | "expanded"): void;
+      setLayout(mode: "pet" | "compact" | "expanded", contentHeight?: number): void;
       setInteractiveRegions(rectangles: Array<{ x: number; y: number; width: number; height: number }>): void;
       beginMove(): void;
       move(): void;
@@ -52,8 +52,9 @@ contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (them
 });
 
 contextBridge.exposeInMainWorld("handAgentPet", {
-  setLayout(mode: "pet" | "compact" | "expanded"): void {
-    ipcRenderer.send("pet-window:set-layout", mode);
+  setLayout(mode: "pet" | "compact" | "expanded", contentHeight?: number): void {
+    if (contentHeight === undefined) ipcRenderer.send("pet-window:set-layout", mode);
+    else ipcRenderer.send("pet-window:set-layout", mode, contentHeight);
   },
   setInteractiveRegions(rectangles: Array<{ x: number; y: number; width: number; height: number }>): void {
     ipcRenderer.send("pet-window:set-interactive-regions", rectangles);

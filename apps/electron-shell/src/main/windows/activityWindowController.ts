@@ -45,6 +45,7 @@ export class ActivityWindowController {
   private bounds: Rectangle | null = null;
   private position: PetPosition | null = null;
   private layout: PetLayout = "pet";
+  private contentHeight: number = layoutSizes.pet.height;
   private interactiveRegions: Rectangle[] = [];
   private mouseIgnored: boolean | null = null;
   private moveOrigin: { cursor: Point; position: PetPosition } | null = null;
@@ -77,9 +78,11 @@ export class ActivityWindowController {
     return this.window?.webContents ?? null;
   }
 
-  setLayout(layout: PetLayout): void {
-    if (!this.window || !this.position || this.layout === layout) return;
+  setLayout(layout: PetLayout, contentHeight: number = layoutSizes[layout].height): void {
+    const height = layout === "compact" ? Math.max(layoutSizes.pet.height, Math.min(contentHeight, layoutSizes.expanded.height)) : layoutSizes[layout].height;
+    if (!this.window || !this.position || this.layout === layout && this.contentHeight === height) return;
     this.layout = layout;
+    this.contentHeight = height;
     const oldPosition = this.position;
     this.place(this.position, this.workAreaForPosition(this.position));
     if (!samePosition(oldPosition, this.position)) this.savePosition();
@@ -137,7 +140,7 @@ export class ActivityWindowController {
     if (this.options.threadWebSocketURL) {
       additionalArguments.push(`--handagent-pet-thread-websocket-url=${encodeURIComponent(this.options.threadWebSocketURL)}`);
     }
-    const bounds = boundsFor(this.position, this.layout, this.workAreaForPosition(this.position));
+    const bounds = boundsFor(this.position, this.layout, this.workAreaForPosition(this.position), this.contentHeight);
     const window = this.options.createWindow({
       ...bounds,
       show: false,
@@ -170,6 +173,7 @@ export class ActivityWindowController {
       this.window = null;
       this.bounds = null;
       this.layout = "pet";
+      this.contentHeight = layoutSizes.pet.height;
       this.interactiveRegions = [];
       this.moveOrigin = null;
       this.mouseIgnored = null;
@@ -220,7 +224,7 @@ export class ActivityWindowController {
   private place(position: PetPosition, workArea: Rectangle): void {
     if (!this.window) return;
     const previousBounds = this.bounds;
-    this.window.setBounds(boundsFor(position, this.layout, workArea));
+    this.window.setBounds(boundsFor(position, this.layout, workArea, this.contentHeight));
     this.bounds = this.window.getBounds();
     this.position = { right: this.bounds.x + Math.min(petWindowLayout.character.right, this.bounds.width), bottom: this.bounds.y + this.bounds.height };
     if (previousBounds) {
@@ -252,13 +256,13 @@ export class ActivityWindowController {
   }
 }
 
-function boundsFor(position: PetPosition, layout: PetLayout, workArea: Rectangle): Rectangle {
+function boundsFor(position: PetPosition, layout: PetLayout, workArea: Rectangle, contentHeight: number): Rectangle {
   const width = Math.min(layoutSizes[layout].width, workArea.width);
-  // 悬停只使用锚点上方的空间，不能为了容纳历史把已有气泡和角色推走。
-  const availableHeight = layout === "expanded"
-    ? Math.max(layoutSizes.compact.height, position.bottom - workArea.y)
+  // 常态与悬停都只使用锚点上方的空间，不能为了内容推走回复框和角色。
+  const availableHeight = layout !== "pet"
+    ? Math.max(layoutSizes.pet.height, position.bottom - workArea.y)
     : workArea.height;
-  const height = Math.min(layoutSizes[layout].height, workArea.height, availableHeight);
+  const height = Math.min(contentHeight, workArea.height, availableHeight);
   return {
     x: Math.round(Math.min(Math.max(position.right - Math.min(petWindowLayout.character.right, width), workArea.x), workArea.x + workArea.width - width)),
     y: Math.round(Math.min(Math.max(position.bottom - height, workArea.y), workArea.y + workArea.height - height)),

@@ -33,7 +33,7 @@
 - PromptPanel handoff 是明确的防回归红线，不是实现细节建议：这个 bug 已多次出现。今后只要修改 `showThreadWindow` 快捷键、`openHistory`、PromptPanel hide/focus restore、ThreadWindow open/focus ack 任一环节，就必须同时保留自动化顺序断言，并重跑 manual QA 里的“首次 PromptPanel -> ThreadWindow 历史入口 handoff”。
 - Settings 打开时会创建模型、外观、工具、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel；工具页接收同一个 `BuiltinFeatures`。Coordinator 只负责注入，配置写入由对应 Store 负责。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
-- `AppCoordinator` 在 app-server available 后通过 `ActivityWindowCommanding.showActivityWindow()` 显示桌宠。桌宠交互与 Thread 投影由 Electron renderer 处理，首次文字输入仍走 PromptPanel；Coordinator 不解析 Activity 状态。
+- `AppCoordinator` 在 app-server available 后通过 `ActivityWindowCommanding.showActivityWindow()` 显示桌宠。桌宠的首次文字、后续交互与 Thread 投影由 [Electron renderer](../../../electron-shell/src/activity-window/activity-window.md) 自行处理；PromptPanel 继续使用 Swift 首轮入口，Coordinator 不解析桌宠 Thread 或 Activity 状态。
 - `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving` 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。
 
 ## 当前 Action 列表

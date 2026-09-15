@@ -6,6 +6,8 @@
 
 ## Issue #1 桌宠原始验收记录
 
+下列“首次纯文字仍通过 PromptPanel、无空白回复入口”为当时行为，已由 Issue #5 的点击首轮输入替代；原始验收过程保留，当前复验以 [manual-qa](./manual-qa.md) 为准。
+
 - [ ] 启动与首次文字：首次启动只有月见八千代角色，默认位于主屏工作区右下角；已有历史不自动弹出，首次纯文字仍通过 PromptPanel，桌宠不新增空白输入入口。
   - 2026-09-13 验证进度：Computer Use 已观察到仅角色；CGWindow 显示主屏 1440×932、角色窗口 `(1224, 700, 192, 208)`，位于工作区右下角。测试包 `/tmp/issue1-live/app/Wisp Pocket.app`，临时后端数据 `/tmp/issue1-live/data`。Computer Use 读取无普通窗口的 Swift 宿主持续超时，快捷键尚无可确认的窗口变化；主线程采样处于正常事件等待，暂不判为产品缺陷。本项保持待验，等待补齐首次文字与有历史重启证据。
   - 2026-09-13 续验：默认打包路径正常启动，Computer Use 的窗口树只有月见八千代按钮，图片可见；真实 SQLite 原有 83 个 Thread，启动未弹出历史。已配置快捷键确为 ⌘⇧Space；从文本编辑发送后仍无 PromptPanel，读取无普通窗口的宿主超时，已请求真实键盘对照，尚不能判定产品缺陷。首次文字与无既有位置文件的默认位置仍待补证；系统证据见本轮 `evidence/windows-default-startup.txt`、`windows-after-shortcut.txt` 和 `logs/desktop-default.log`。
@@ -315,3 +317,14 @@
 - **验证过程**：在独立测试 Thread 中展开 use_tools 详情、展开 `qa-workspace` 分组，保留 `QA_RELOAD_UNSENT_DRAFT_20260914` 草稿并设置搜索词。Computer Use 截图与 AX 记录全部前置状态；确认 Electron 为原生前台后以 Command+R 重载。搜索词清空、当前选择恢复为空，而 Workspace 分组仍显示展开的“暂无对话”。显式返回测试历史，草稿为空、两个工具详情均为收起状态，已保存的历史与回复仍存在。
 - **证据**：`.cache/live-qa-20260914/page-reload-state.json`；SQLite 没有未提交草稿标记，模型设置 SHA256 仍为 `3813c808035b5a8b10ef6dfb67448fdb9da02f80f0a3a029e88990128b33fb93`。
 - **结论**：通过。工作区分组已恢复测试前折叠状态；页面重载按规则清除了本 renderer 的测试草稿。工具请求以拒绝结果结束，没有读取文件，本条不提供权限操作验收结论。App/后端和测试历史保留。
+
+
+- [ ] 常态紧凑布局：对话列约 210px 宽、回复框约 44px 高；分别观察零、一、多项及长建议，零选项不留占位，全部选项从回复框向上自然排列。比较各状态的回复框与角色锚点；顶部空间不足时裁剪上方内容。
+
+### Issue #5 常态紧凑布局
+
+- **验证日期**：2026-09-14。
+- **验证环境**：分支 `codex/pet-compact-hover-20260914` 的当前 `dist/Wisp Pocket.app`，mock LLM + 本地 WebSocket 夹具；屏幕 1440×932，可用区域顶部 y=34。Electron 包内 25 个文件与当前 worktree 构建一致。
+- **验证过程**：通过 Computer Use 观察零、一、四个有效选项。对话列均为 210px、回复框为 44px；零选项没有预留建议区域，最新气泡与回复框相隔 8px。四个选项均显示，长选项自然换行，窗口从 208px 增高至 383px，回复框始终位于屏幕 y=814。再以独立位置文件把角色底部置于 y=320；常态和悬停窗口均裁剪至 286px 高，角色与回复框的位置不变，回复框 y=268，悬停仍可滚动读取上方内容。
+- **证据**：本轮 Computer Use 截图和 `.worktrees/pet-compact-hover-20260914/.cache/pet-compact-hover/` 下的 `05-no-suggestions.json`、`06-one-suggestion.json`、`07-four-suggestions.json`、`17-edge-compact.json`、`18-edge-expanded.json`、`19-edge-scrolled.json`、`package-consistency.json`、`native-verification-summary.json`；实施与其他部分验证见[本轮计划](./medium-powers/plans/2026-09-14-pet-compact-hover.md)。
+- **结论**：本条常态紧凑布局通过。此结论不覆盖中文输入法、多屏/四角移动、真实系统透明穿透或真实模型理解，相关完整验收项继续保留。App、Electron、agent-server、夹具与底板均已停止，4317/4328/9237 端口已释放。

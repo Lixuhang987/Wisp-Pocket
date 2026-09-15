@@ -25,9 +25,10 @@ preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`�
 
 - 通过 `contextBridge.executeInMainWorld()` 写入 `window.handAgentActivityWindowConfig.threadWebSocketURL` 和 `window.handAgentTheme`。桌宠直接连接 `/api/thread?acceptServerRequests=1`，与 ThreadWindow 共用会话和交互式请求协议。
 - preload 自身持续监听 `handagent:theme-changed`，只接受已校验的 `HostTheme` payload，并保存 latest theme；`handAgentSubscribeThemeChange(handler)` 订阅时会先回放 latest theme，再接收后续变化，不暴露原始 `ipcRenderer`。
-- `handAgentPet` 只暴露 `setLayout("pet" | "compact" | "expanded")`、`setInteractiveRegions(rectangles)` 和无参数的 `beginMove` / `move` / `endMove`。矩形使用当前 renderer viewport 的本地坐标；布局、角色大小、DOM 尺寸或滚动变化后重新上报，可见气泡与滚动视口裁剪规则由 [renderer](../activity-window/activity-window.md)维护。
+- `handAgentPet` 只暴露 `setLayout(mode, contentHeight?)`、`setInteractiveRegions(rectangles)` 和无参数的 `beginMove` / `move` / `endMove`。`mode` 为 `pet`、`compact` 或 `expanded`；可选高度是 renderer 测得的常态内容需求，由 main 按角色最小高度、展开上限及工作区裁剪。
+- 矩形使用当前 renderer viewport 的本地坐标；布局、角色大小、DOM 尺寸或滚动变化后重新上报。气泡、建议与请求共用上方浏览视口的裁剪规则，由 [renderer](../activity-window/activity-window.md)维护；回复框与角色单独命中。
 - 角色大小偏好仅保存在 renderer，并以实际命中矩形反映给 main；桥接不增加整体窗口或页面缩放能力。
-- main 校验 sender 是当前桌宠 `webContents`，并校验布局、有限矩形和参数数量；拖动始终由 main 读取系统光标，不接受 renderer 提交屏幕坐标。窗口侧合约见 [windows](../main/windows/windows.md)。
+- main 校验 sender 是当前桌宠 `webContents`，并校验布局、有限且有界的内容高度、有限矩形和参数数量；拖动始终由 main 读取系统光标，不接受 renderer 提交屏幕坐标。窗口侧合约见 [windows](../main/windows/windows.md)。
 - 隔离原生 QA 可由 main 的 additional arguments 覆盖 loopback Thread endpoint；preload 限定 `ws:`、loopback host、`/api/thread`，并确保 `acceptServerRequests=1`。
 
 ## 修改约束

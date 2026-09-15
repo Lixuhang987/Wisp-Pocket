@@ -1,6 +1,6 @@
 # Issue #1 桌宠实施记录
 
-规格以 [Wisp Pocket #1](https://github.com/Lixuhang987/Wisp-Pocket/issues/1) 为准；当前实现合约已收敛到 owning 模块文档，本记录只保留实施状态与待验证边界。
+基础规格以 [Wisp Pocket #1](https://github.com/Lixuhang987/Wisp-Pocket/issues/1) 为准；首次文字、常态布局、悬停与显隐约束由 [Issue #5](./2026-09-14-pet-compact-hover.md)更新。当前实现合约已收敛到 owning 模块文档，本记录只保留实施状态与待验证边界。
 
 ## 已完成范围
 

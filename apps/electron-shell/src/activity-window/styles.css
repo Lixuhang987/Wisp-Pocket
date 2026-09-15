@@ -29,7 +29,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 .pet-sprite { position: absolute; right: 0; bottom: 0; display: block; transform-origin: bottom right; background-repeat: no-repeat; pointer-events: none; }
 .pet-character.is-drop-target { background: var(--ha-color-accent-subtle); outline: 2px solid var(--pet-accent); outline-offset: -2px; }
 .pet-conversation {
-  position: absolute; top: 8px; right: 8px; bottom: 8px; left: var(--pet-conversation-left);
+  position: absolute; top: var(--pet-inset); bottom: var(--pet-inset); left: var(--pet-conversation-left); width: var(--pet-conversation-width);
   display: flex; flex-direction: column; justify-content: flex-end; gap: var(--ha-spacing-xs);
 }
 .pet-message, .pet-suggestions button, .pet-reply, .pet-request, .pet-size-control {
@@ -41,40 +41,36 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 .pet-message[data-author="user"], .pet-reply { background: var(--pet-user); border-radius: var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-xs) var(--ha-radius-lg); }
 .pet-message[data-author="user"] { margin-left: auto; }
 .pet-message p, .pet-request p { margin: 0; white-space: pre-wrap; }
-.pet-current-bubble { position: relative; display: flex; flex-shrink: 0; align-self: flex-start; gap: var(--ha-spacing-xs); }
-.pet-message-body { min-width: 0; }
-.pet-status { display: block; margin-bottom: var(--ha-spacing-xxs); color: var(--pet-muted); font-size: var(--ha-typography-caption-size); }
-.is-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.pet-hide { flex-shrink: 0; width: 16px; height: 21px; padding: 0; border: 0; background: transparent; color: var(--pet-muted); cursor: pointer; opacity: 0; }
-.pet-current-bubble:hover .pet-hide, .pet-hide:focus-visible { opacity: 1; }
-.pet-hide:hover { color: var(--pet-ink); }
-.pet-conversation.is-drop-target .pet-current-bubble { outline: 2px solid var(--pet-accent); outline-offset: -2px; }
-.pet-latest { max-height: 6.6em; overflow: hidden; margin: 0; font-size: var(--ha-typography-caption-size); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pet-conversation.is-expanded .pet-latest { overflow-y: auto; }
-.pet-history, .pet-current-suggestions, .pet-latest { overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--pet-border) transparent; }
+.pet-status { display: block; color: var(--pet-muted); font-size: var(--ha-typography-caption-size); }
+.pet-conversation.is-drop-target .pet-reply { outline: 2px solid var(--pet-accent); outline-offset: -2px; }
+.pet-latest { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pet-conversation:not(.is-expanded) .pet-latest { max-height: 4.95em; overflow: hidden; }
 .pet-history {
-  flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--ha-spacing-xs);
-  overflow-y: auto; padding: var(--ha-spacing-xxs) 2px;
+  flex: 0 1 auto; min-height: 0; overflow: hidden;
+  overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--pet-border) transparent;
 }
-.pet-history > * { flex-shrink: 0; }
-.pet-history > :first-child { margin-top: auto; }
+.pet-history.is-expanded { flex: 1; overflow-y: auto; }
+.pet-history-content { display: flex; flex-direction: column; gap: var(--ha-spacing-xs); }
+.pet-history.is-expanded .pet-history-content { min-height: 100%; }
+.pet-history-content > * { flex-shrink: 0; }
+.pet-history-content > :first-child { margin-top: auto; }
 .pet-message small { display: block; margin-top: var(--ha-spacing-xxs); color: var(--pet-muted); font-size: var(--ha-typography-caption-size); }
 .pet-message img { display: block; max-width: 100%; max-height: 160px; border-radius: var(--ha-radius-md); }
 .pet-attachment { display: block; font-size: var(--ha-typography-caption-size); }
-.pet-controls { flex-shrink: 0; display: flex; flex-direction: column; gap: var(--ha-spacing-xs); min-height: 132px; }
 .pet-suggestions { display: flex; flex-direction: column; gap: var(--ha-spacing-xs); margin-top: var(--ha-spacing-xs); }
-.pet-current-suggestions { align-items: flex-start; max-height: 112px; overflow-y: auto; margin: 0; padding: 1px 2px; }
-.pet-suggestions button { flex-shrink: 0; max-width: 100%; color: var(--pet-accent); text-align: left; cursor: pointer; }
+.pet-current-suggestions { align-items: flex-start; margin: 0; }
+.pet-suggestions button { flex-shrink: 0; max-width: 100%; color: var(--pet-accent); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .pet-suggestions button:hover, .pet-request button:hover { border-color: var(--pet-accent); }
-.pet-reply { display: flex; gap: var(--ha-spacing-xs); align-items: flex-end; margin-top: auto; }
-.pet-reply textarea { flex: 1; width: 100%; min-width: 0; resize: none; height: 36px; padding: 0; border: 0; color: var(--pet-ink); background: transparent; font-size: var(--ha-typography-caption-size); line-height: 1.4; }
+.pet-reply { flex-shrink: 0; display: flex; gap: var(--ha-spacing-xs); align-items: center; height: var(--pet-reply-height); padding: var(--ha-spacing-xxs) var(--ha-spacing-xs); }
+.pet-reply textarea { flex: 1; width: 100%; min-width: 0; resize: none; height: 100%; padding: 0; border: 0; color: var(--pet-ink); background: transparent; font-size: var(--ha-typography-caption-size); line-height: 1.4; }
 .pet-reply textarea::placeholder { color: var(--pet-muted); }
 .pet-reply > button { flex-shrink: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; color: var(--ha-color-on-accent); background: var(--pet-accent); font-size: var(--ha-typography-title-size); line-height: 1; cursor: pointer; }
 .pet-reply > button:disabled { opacity: .4; cursor: default; }
 .pet-drop-label { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); padding: var(--ha-spacing-xxs) var(--ha-spacing-sm); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-pill); background: var(--pet-surface); color: var(--pet-accent); box-shadow: var(--pet-shadow); white-space: nowrap; font-size: var(--ha-typography-caption-size); pointer-events: none; }
-.pet-current-bubble > .pet-drop-label { top: -30px; bottom: auto; }
-.pet-error { color: var(--ha-color-error); font-size: var(--ha-typography-caption-size); line-height: 1.5; max-height: 80px; overflow-y: auto; }
-.pet-request pre { max-height: 100px; overflow: auto; white-space: pre-wrap; font-size: var(--ha-typography-caption-size); }
+.pet-conversation > .pet-drop-label { bottom: calc(var(--pet-reply-height) + var(--ha-spacing-xs)); }
+.pet-error { color: var(--ha-color-error); font-size: var(--ha-typography-caption-size); line-height: 1.5; }
+.pet-conversation:not(.is-expanded) .pet-error { max-height: 4.5em; overflow: hidden; }
+.pet-request pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--ha-typography-caption-size); }
 .pet-request__actions { display: flex; gap: var(--ha-spacing-xs); margin-top: var(--ha-spacing-xs); }
 .pet-request button { padding: var(--ha-spacing-xxs) var(--ha-spacing-xs); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-md); color: var(--pet-accent); background: var(--pet-surface); text-align: left; cursor: pointer; font-size: var(--ha-typography-caption-size); }
 .pet-size-control { position: absolute; left: 8px; width: 192px; display: flex; flex-direction: column; gap: var(--ha-spacing-xs); z-index: 1; }

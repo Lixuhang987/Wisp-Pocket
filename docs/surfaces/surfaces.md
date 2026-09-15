@@ -7,7 +7,7 @@
 | Surface | 用户任务 | 文档 |
 | --- | --- | --- |
 | PromptPanel | 随手组织请求、确认资料并发起任务 | [prompt-panel.md](./prompt-panel.md) |
-| 桌宠 | 拖入资料、查看当前回复并轻量接续 | [desktop-pet.md](./desktop-pet.md) |
+| 桌宠 | 点击输入或拖入资料、查看当前回复并轻量接续 | [desktop-pet.md](./desktop-pet.md) |
 | ThreadWindow | 查看完整过程、继续任务、处理请求和找回历史 | [thread-window.md](./thread-window.md) |
 | Settings | 配置模型、能力、触发规则与个人偏好 | [settings.md](./settings.md) |
 
@@ -22,9 +22,9 @@
 
 ## 状态记录方法
 
-2026-09-15 以提交 `ad9e731` 的代码及现有文档为基线。按 new-work 的“确认既有事实 → 识别 surface 任务 → 继承既有视觉世界 → 写 brief”记录，保留 THESIS、OWN-WORLD、STORY、FIRST VIEWPORT、FORM、FINISH 六块，明确这是现状描述，不是新设计审批。
+初始记录以提交 `ad9e731` 的代码及现有文档为基线；2026-09-15 合入 `codex/pet-compact-hover-20260914` 的 `f54d09f` 后更新桌宠记录，点击输入、常态收紧与悬停统一滚动属于当前实现。按 new-work 的“确认既有事实 → 识别 surface 任务 → 继承既有视觉世界 → 写 brief”记录，保留 THESIS、OWN-WORLD、STORY、FIRST VIEWPORT、FORM、FINISH 六块，明确这是现状描述，不是新设计审批。
 
-本轮没有实现或替换界面，因此不运行概念抽签、不虚构 seed key 或已批准 comp，也不启动构建与视觉 finish review。各 brief 的模式只在各自文档记录；共同产品事实与 token 不复制进去。
+初始文档整理没有实现或替换界面，因此未进行概念抽签或视觉 finish review；本次合并只更新已实现的桌宠现状，构建检查与实机验收各自记录，不新增 seed key 或已批准 comp。各 brief 的模式只在各自文档记录；共同产品事实与 token 不复制进去。
 
 证据分为代码支持、既有实机记录和待验证三层：本轮核对入口代码、主要布局和模块约定，未启动 App 或新增截图，不宣称完成视觉验收。仓库内未找到当前界面的完整截图基线；现有角色图集不是界面截图。[manual-qa.md](../manual-qa.md) 中各项结论只在原记录范围内有效。
 
