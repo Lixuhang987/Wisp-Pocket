@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [PRODUCT.md](./PRODUCT.md)：整个 Wisp Pocket 的共享产品背景；产品与界面设计前读取，涵盖目的、使用场景、能力边界及待确认事项。
+- [surfaces/surfaces.md](./surfaces/surfaces.md)：按用户任务拆分的界面现状与 brief；进入具体界面设计前读取。
 - [issue-2-plan.md](./issue-2-plan.md)：后端所有权重构的已完成实施记录。
 - [issue-3-design.md](./issue-3-design.md)：状态所有权规格入口、后端保留理由与最终验证状态。
 - [backend-state-ownership.md](./backend-state-ownership.md)：后端状态唯一所有权 DAG。

@@ -24,7 +24,7 @@
 - `apps/apps.md`：应用入口、UI、宿主适配与本地服务索引。
 - `packages/packages.md`：跨平台核心与 Thread 持久化索引。
 - `examples/examples.md`：可复制到 `~/.spotAgent/` 的 Append Prompt / MCP 配置示例。
-- `docs/docs.md`：开发说明、待办、QA、spec / plan 与设计资料入口。
+- `docs/docs.md`：整体产品背景、开发说明、待办、QA、spec / plan 与设计资料入口；产品与界面设计先从此处读取共享产品文档。
 - `codex/`：本地 code agent 的参考项目（权限系统 / tool 系统 / UI 流式展示 / 子 agent 系统等可借鉴）。
 
 ## 文档维护约定

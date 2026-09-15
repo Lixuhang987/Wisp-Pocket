@@ -103,6 +103,8 @@
 
 ## 文档卫生回归
 
+- **整体产品与 surface 记录（2026-09-15）**：新增 [PRODUCT.md](./PRODUCT.md) 与 [surface 索引](./surfaces/surfaces.md)，记录四个主要界面和 Settings 九个子页；产品文档集中维护，界面现状与待实施方案分开。已核对 55 个本地链接、四份 brief 的六块结构和 `git diff --check`；同次纯文档任务的 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 全部通过。未修改应用代码，未进行新一轮实机/视觉验收。
+- **本次文档待核验**：从 `AGENTS.md → docs/docs.md` 进入产品文档与 surface 索引，确认四个界面的任务边界易于理解；对照现行 App 核验布局记录，尤其确认桌宠待实施方案未被误记为当前行为。产品人群细分、成功指标与导航调整仍保留待决。
 - **范围**：`AGENTS.md`、`CONTEXT-MAP.md`、三个 `CONTEXT.md`、`handAgent.md`、`README.md`、`DESIGN.md`、各级目录指南与 `docs/*.md`。
 - **验收步骤**：
   1. 按 `AGENTS.md -> CONTEXT-MAP.md -> 相关 CONTEXT.md -> handAgent.md -> apps/packages/docs` 阅读，确认每级索引只列直接子节点。
