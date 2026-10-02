@@ -24,7 +24,12 @@
 - [ ] 后续实现任务从主 checkout 通过 `scripts/create-worktree.sh` 创建 worktree，确认 CodeGraph 索引并运行分层基线，再阅读目标目录文档链、修改代码。
 - [ ] 验证实现，更新 owning 文档及 manual QA，安排不继承上下文的独立子 agent 审核 spec / 代码 / 文档，完成三项提交前检查并提交。
 
-## 多桌宠 A「口袋对话」本地规格（2026-10-02）
+## 多桌宠 A「口袋对话」规格（2026-10-02）
+
+已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)，标记 `ready-for-agent`；尚未实现。共享读取 / 输入合约与 Issue #6 一致。
+
+- [x] 用户授权发布；按当前确认规格内嵌数据 / 交互 / 验收与九项决定，创建 Issue 并标记 ready-for-agent。
+- [x] Issue 正文与发布稿一致，ready-for-agent 标签及 34 条故事 / 28 项自动化 / 7 项实机验收回读通过；文档链接 / diff 与 TypeScript/Web、Swift test/build 均通过，manual QA 已更新，发布记录随本轮提交。
 
 - [x] 实现前澄清核查：读取 spec / surface / glossary / 新输入 ADR，并由独立只读子 agent 核对窗口、请求与队列事实；纯文档任务无需 worktree。
 - [x] 用户回答九项澄清；同步[实现前决定](./medium-powers/specs/multi-pet-pocket-dialogue/implementation-questions.md)、统一共享输入 / 文件边界，移除归档、旧数据迁移与额外验收要求。

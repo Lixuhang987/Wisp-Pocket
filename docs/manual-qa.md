@@ -14,13 +14,14 @@
 - **提交检查**：TypeScript/Web、Swift test/build 三项检查均通过；Issue 正文与发布稿一致，6 个新增本地文档链接有效。本轮仅修改文档，不新增产品行为或实机通过结论。
 - **后续验收**：实现后按 Issue 验证首次工具可见、免确认读取、原路径变更/失效、图片实际进入模型及采集失败时旧历史可查；原生拖入和真实模型理解另做实机 QA，回归未修改的 PromptPanel / ThreadWindow。
 
-## 多桌宠本地规格文档交付（2026-10-02）
+## 多桌宠规格文档交付（2026-10-02）
 
-- **状态**：仅完成 [A「口袋对话」本地 spec](./medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)，未实现多宠能力、未发布 Issue。本项记录文档交付，不计为产品实机验收通过。
+- **状态**：[A「口袋对话」spec](./medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md) 已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)，标记 ready-for-agent，未实现多宠能力。本项记录文档交付，不计为产品实机验收通过。
 - **最终范围**：自由创建 N 宠同屏，每宠角色提示 / 静态自定义图片 / rootPath，Pet 直接替代 Workspace；文件根可重复、Thread 按 petId 区分，不做跨宠转交。file.read 默认开放、任意路径、免 Permission；原文件路径交付，不预读或复制用户资料。写入仍受 Thread 快照文件根与 Permission 限制。
 - **交互边界**：点击唤出并聚焦、常态最新消息、hover 当前 Thread 全部历史、移出收起且保留焦点 / 草稿。隐藏宠的有效 Permission 请求使它重新显示到桌面而不抢焦点；同宠其他 Thread 由用户显式选择，不增加特殊提醒或自动切选。
 - **范围删减**：不做宠物归档、旧 API 兼容或旧开发数据迁移；不接收桌宠截图 / 剪贴板图片，删除额外键盘 / VoiceOver 设计与验收条款。应用重启后的排队消息处理单列 TODO。
 - **决策核对**：[实现前九项决定](./medium-powers/specs/multi-pet-pocket-dialogue/implementation-questions.md)已由用户回答，统一 [ADR 0004](./adr/0004-context-history-default-tools.md)、PRODUCT 与 spec；仅文档修改，尚未执行数据重建。
+- **规格发布**：Issue 正文内嵌完整数据 / 交互 / 验收与确认决定，引用 Issue #6 的共享后端规则；正文与发布稿一致，ready-for-agent 标签、34 条故事 / 28 项自动化 / 7 项实机验收回读通过；本轮链接 / diff 与 TypeScript/Web、Swift test/build 三项检查均通过。
 - **后续验收**：按当前 34 条用户故事、T01–T28 自动化场景和 M01–M07 实机场景补证据；现有单宠 QA 不能作为多宠通过证明。
 - **本轮验证**：本轮规格链接 / 编号 / 范围 / diff 与 TypeScript/Web、Swift test/build 三项检查均通过；仅修改文档，不新增产品实机通过结论。
 
