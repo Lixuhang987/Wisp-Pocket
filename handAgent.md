@@ -33,6 +33,9 @@ flowchart TD
 
 ## 跨层合约
 
+- **单后端，多个独立前端**是产品设计边界：领域业务事实、Thread 执行、请求仲裁与持久化由同一个后端拥有；桌宠、PromptPanel、ThreadWindow 等前端各自通过后端协议接入。前端之间不依赖对方转发业务输入，也不依赖对方的 store、当前选择、草稿、窗口显示与连接来完成自身任务。
+- 前端各自拥有界面、导航、草稿和订阅生命周期。打开、关闭、切换或重建一个前端不等于切换其他前端的选择或结束后端 Thread；观察同一 Thread 时同步的是后端事实，回执仍由后端仲裁。
+- 共享协议有变更时，各消费者需同步 DTO、编码 / 守卫及必要调用参数，但这不自动扩大为其他前端的交互重设计，也不要求多个前端一起启用。用户确认的功能范围与提交前检查分别决定改动和验证边界。
 - 初始上下文只来自用户主动提交的 Input Item。未主动交付的屏幕、剪贴板、文件和 App 状态由 Tool 按需读取。
 - `/api/thread` 承载 `ThreadCommand`、`ThreadNotification`、`ServerRequest` 与 `ClientResponse`。ThreadWindow 和桌宠分别连接并共享后端 Thread；Swift 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`。
 - `/api/activity` 只发送 Agent Activity，不承载 Thread 消息或历史。
@@ -41,6 +44,8 @@ flowchart TD
 - 拖入以 `UserInput.mode: "inspect"` 授权读取本次资料；执行建议须等后续明确用户消息。图片/PDF 先保存 Blob 副本，再读取；输入队列由 core Thread 持久化协调。
 - 建议按钮发送普通 UserInput；Permission/Workspace 保持 ClientResponse。core 请求表只接受一次有效回执，`request.resolved` 同步清理两端展示。
 - `thread.snapshot` 是既有 Thread 的状态入口。ThreadWindow 当前不做断线恢复；桌宠重连后重新列出 Thread，并恢复按创建时间选中的 Thread。
+
+当前 Swift 提交可用性仍包含 hidden ThreadWindow prepared 门槛，属于已有启动耦合，见 [Swift 宿主](./apps/desktop/desktop.md)；不能据此把前端互相依赖定义成产品契约，也不能将“独立前端”的设计原则写成该耦合已经消除。多桌宠 spec 只承担本轮明确要求的能力，不以其他前端体验改造为验收前提。
 
 ## 状态源
 

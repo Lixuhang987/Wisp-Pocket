@@ -11,6 +11,9 @@
 
 ## 多桌宠 A「口袋对话」本地规格（2026-10-02）
 
+- [x] 本轮范围收敛先核对 spec、surface 与根架构；仅修文档，无需 worktree，保留其他任务的未提交修改。
+- [x] 清理本次不做的显示方式、消息阅读状态及其他前端设计 / 验收，补充单后端与独立前端的架构边界。
+- [x] 故事与验收编号、文档链接和 diff 检查通过；TypeScript/Web、Swift test/build 三项提交前检查通过，manual QA 已更新，仅本轮文档随任务提交。
 - [x] 本轮修订先核对 surface、所属目录文档及 renderer：点击唤出并聚焦、常态最新消息、hover 全部当前 Thread 历史已写明且已实现；纯文档修订无需 worktree。
 - [x] 删除 spec 与验收中新增的固定消息展开状态，补充 surface 的现有交互保留基线及上级阅读路由。
 - [x] 核对文档链接与一致性，TypeScript/Web、Swift test/build 三项提交前检查通过，manual QA 已记录规格修正；仅本轮文档修改随任务提交。
