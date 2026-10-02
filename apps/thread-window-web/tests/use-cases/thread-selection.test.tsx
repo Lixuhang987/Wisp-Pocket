@@ -35,7 +35,7 @@ function started(threadId: string, preview: string, commandId?: string): ThreadN
     type: "thread.started", threadId,
     notificationId: `started-${++notificationSequence}`, timestamp,
     ...(commandId ? { commandId } : {}),
-    payload: { preview },
+    payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview },
   };
 }
 
@@ -43,7 +43,7 @@ function receiveSnapshot(socket: FakeWebSocket, threadId: string, text: string):
   socket.receive({
     type: "thread.snapshot", threadId,
     notificationId: `snapshot-${++notificationSequence}`, timestamp,
-    payload: { status: "idle", messages: [{
+    payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  status: "idle", messages: [{
       id: `message-${threadId}`, role: "assistant", text, status: "completed",
       createdAt: timestamp, updatedAt: timestamp,
     }] },
@@ -54,6 +54,8 @@ function mountApp() {
   const view = render(<App />);
   const socket = FakeWebSocket.instances.at(-1)!;
   socket.open();
+  socket.receive({type:"pet.listed",notificationId:`pets-${++notificationSequence}`,timestamp,payload:{pets:[{id:"pet-default",name:"Default",description:"",rolePrompt:"Help",revision:1,imageRef:{type:"builtin",id:"yachiyo"},rootPath:"/tmp/pet",isDefault:true,createdAt:timestamp,updatedAt:timestamp}]}});
+  act(() => { if(!createThreadWindowStore.getState().expandedPetIds.has("pet-default")) createThreadWindowStore.getState().togglePetExpanded("pet-default"); });
   return { ...view, socket };
 }
 
@@ -61,13 +63,13 @@ function threadRow(preview: string): HTMLElement {
   return screen.getByText(preview).closest<HTMLElement>('[role="button"]')!;
 }
 
-function workspace() { return within(screen.getByRole("region", { name: "Thread workspace" })); }
-function composer() { return workspace().getByRole<HTMLTextAreaElement>("textbox"); }
+function pet() { return within(screen.getByRole("region", { name: "Thread pet" })); }
+function composer() { return pet().getByRole<HTMLTextAreaElement>("textbox"); }
 
 function openThreadA(socket: FakeWebSocket): void {
   socket.receive({
     type: "thread.listed", notificationId: `list-${++notificationSequence}`, timestamp,
-    payload: { threads: [{
+    payload: { threads: [{petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", status:"idle",
       id: "thread-a", preview: "Thread A", messageCount: 1, createdAt: timestamp, updatedAt: timestamp,
     }] },
   });
@@ -107,17 +109,17 @@ describe("ThreadWindow selection intent", () => {
     fireEvent.change(composer(), { target: { value: "/review" } });
     fireEvent.keyDown(composer(), { key: "Tab" });
     fireEvent.change(composer(), { target: { value: "Draft A" } });
-    expect(workspace().getByRole("button", { name: /^移除 .*Review$/ })).toBeTruthy();
+    expect(pet().getByRole("button", { name: /^移除 .*Review$/ })).toBeTruthy();
 
     socket.receive(started("thread-b", "Background B", commandId));
 
     expect(threadRow("Thread A").getAttribute("aria-current")).toBe("page");
     expect(threadRow("Background B").getAttribute("aria-current")).toBeNull();
-    expect(workspace().getByText("History A")).toBeTruthy();
+    expect(pet().getByText("History A")).toBeTruthy();
     expect(composer().value).toBe("Draft A");
-    expect(workspace().getByRole("button", { name: /^移除 .*Review$/ })).toBeTruthy();
+    expect(pet().getByRole("button", { name: /^移除 .*Review$/ })).toBeTruthy();
 
-    fireEvent.click(workspace().getByTitle("发送"));
+    fireEvent.click(pet().getByTitle("发送"));
     expect(socket.commands().filter((command) => command.type === "op.submit")).toMatchObject([{
       threadId: "thread-a", payload: { op: { type: "user_input", payload: { items: [
         { type: "skill", ...reviewSkill }, { type: "text", text: "Draft A" },
@@ -126,16 +128,16 @@ describe("ThreadWindow selection intent", () => {
     expect(composer().value).toBe("");
   });
 
-  it("lists a background Thread while keeping the empty workspace until the user opens it", () => {
+  it("lists a background Thread while keeping the empty pet until the user opens it", () => {
     const { socket } = mountApp();
     socket.receive(started("thread-b", "Background B", "background-client"));
 
-    expect(workspace().getByText("选择历史或创建新对话")).toBeTruthy();
+    expect(pet().getByText("选择历史或创建新对话")).toBeTruthy();
     expect(threadRow("Background B").getAttribute("aria-current")).toBeNull();
     fireEvent.click(threadRow("Background B"));
     receiveSnapshot(socket, "thread-b", "History B");
     expect(threadRow("Background B").getAttribute("aria-current")).toBe("page");
-    expect(workspace().getByText("History B")).toBeTruthy();
+    expect(pet().getByText("History B")).toBeTruthy();
     expect(socket.commands().filter((command) => command.type === "thread.resume")).toMatchObject([
       { threadId: "thread-b" },
     ]);
@@ -157,7 +159,7 @@ describe("ThreadWindow selection intent", () => {
     socket.receive(ownReply);
     expect(threadRow("Thread A").getAttribute("aria-current")).toBe("page");
     expect(composer().value).toBe("Draft A");
-    expect(workspace().getByText("History A")).toBeTruthy();
+    expect(pet().getByText("History A")).toBeTruthy();
   });
 
   it.each(["blank", "initial-prompt"])("clears a failed %s creation intent while allowing a new local creation", (kind) => {
@@ -168,7 +170,7 @@ describe("ThreadWindow selection intent", () => {
       commandId = startBlankThread(socket);
     } else {
       commandId = "failed-prompt";
-      act(() => window.handAgentReceiveInitialPrompt!({
+      act(() => window.handAgentReceiveInitialPrompt!({petId: "pet-default",
         clientRequestId: commandId, userInput: { items: [{ type: "text", id: "input", text: "hello" }] },
       }));
     }
@@ -176,7 +178,7 @@ describe("ThreadWindow selection intent", () => {
       type: "thread.error", notificationId: "creation-error", commandId, timestamp,
       payload: { message: "Thread creation failed" },
     });
-    expect(workspace().getByText("Thread creation failed")).toBeTruthy();
+    expect(pet().getByText("Thread creation failed")).toBeTruthy();
     socket.receive(started("thread-failed", "Late failed Thread", commandId));
     expect(threadRow("Thread A").getAttribute("aria-current")).toBe("page");
 
@@ -186,7 +188,7 @@ describe("ThreadWindow selection intent", () => {
   });
 
   it("selects the fallback initial-prompt Thread and sends its original payload only once", () => {
-    const prompt: InitialPromptPayload = {
+    const prompt: InitialPromptPayload = {petId: "pet-default",
       clientRequestId: "fallback-prompt", userInput: { items: [
         { type: "text", id: "input", text: "Fallback input" },
         { type: "text_selection", id: "selection", text: "Selected context" },
@@ -200,7 +202,7 @@ describe("ThreadWindow selection intent", () => {
     receiveSnapshot(socket, "thread-prompt", "Fallback reply");
 
     expect(threadRow("Fallback Thread").getAttribute("aria-current")).toBe("page");
-    expect(workspace().getByText("Fallback reply")).toBeTruthy();
+    expect(pet().getByText("Fallback reply")).toBeTruthy();
     expect(socket.commands().filter((command) => ["thread.start", "thread.resume", "op.submit"].includes(command.type))).toMatchObject([
       { type: "thread.start", commandId: prompt.clientRequestId },
       { type: "thread.resume", threadId: "thread-prompt" },
@@ -219,11 +221,11 @@ describe("ThreadWindow selection intent", () => {
     expect(window.handAgentReceiveThreadOpen).toBeTypeOf("function");
 
     act(() => window.handAgentReceiveThreadOpen!("thread-native"));
-    expect(workspace().getByText("等待输入")).toBeTruthy();
+    expect(pet().getByText("等待输入")).toBeTruthy();
     receiveSnapshot(socket, "thread-native", "Native target reply");
-    expect(workspace().getByText("Native target reply")).toBeTruthy();
+    expect(pet().getByText("Native target reply")).toBeTruthy();
     fireEvent.change(composer(), { target: { value: "Follow up native target" } });
-    fireEvent.click(workspace().getByTitle("发送"));
+    fireEvent.click(pet().getByTitle("发送"));
     expect(socket.commands().filter((command) => command.type === "thread.resume")).toMatchObject([
       { threadId: "thread-a" }, { threadId: "thread-native" },
     ]);
@@ -234,21 +236,21 @@ describe("ThreadWindow selection intent", () => {
 
     fireEvent.click(threadRow("Thread A"));
     expect(composer().value).toBe("Draft A");
-    expect(workspace().getByText("History A")).toBeTruthy();
+    expect(pet().getByText("History A")).toBeTruthy();
   });
 
   it("delivers an early native target after mount and queues its resume until the socket opens", () => {
     window.handAgentPendingThreadOpens = ["thread-native"];
     render(<App />);
     const socket = FakeWebSocket.instances.at(-1)!;
-    expect(workspace().getByText("等待输入")).toBeTruthy();
+    expect(pet().getByText("等待输入")).toBeTruthy();
     expect(socket.sent).toEqual([]);
     socket.open();
     receiveSnapshot(socket, "thread-native", "Early native reply");
 
-    expect(workspace().getByText("Early native reply")).toBeTruthy();
+    expect(pet().getByText("Early native reply")).toBeTruthy();
     expect(socket.commands().map((command) => command.type)).toEqual([
-      "thread.resume", "workspace.list", "thread.list",
+      "thread.resume", "pet.list", "thread.list",
     ]);
     expect(window.handAgentPendingThreadOpens).toEqual([]);
   });
@@ -263,7 +265,7 @@ describe("ThreadWindow selection intent", () => {
 
     const second = mountApp();
     second.socket.receive(started("thread-late", "Late old renderer Thread", commandId));
-    expect(workspace().getByText("选择历史或创建新对话")).toBeTruthy();
+    expect(pet().getByText("选择历史或创建新对话")).toBeTruthy();
     expect(threadRow("Late old renderer Thread").getAttribute("aria-current")).toBeNull();
   });
 });

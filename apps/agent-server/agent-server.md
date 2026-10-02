@@ -20,18 +20,18 @@
 
 ## 组合边界
 
-- `startDefaultServer` 创建设置、LLM、Workspace、Permission、Blob、MCP、Tool registry、ThreadStore、ThreadRegistry 和三条 socket 通道。
+- `startDefaultServer` 创建设置、LLM、PetRegistry、Permission、Blob、MCP、Tool registry、ThreadStore、ThreadRegistry 和三条 socket 通道。
 - ThreadRegistry / Thread 是运行中及空闲 Thread 的唯一 owner；公开输入经 `op.submit`，UI 回执经连接资格检查后交给所属 Thread 的待答请求。
 - 本包注入协议翻译与持久化适配，由 core Thread 决定何时翻译、保存和发布运行结果；UI 不直接看到 runtime event。
 - Dynamic Tool spec 可随 Thread 持久化，实际调用按 `clientId` 转发给在线 Provider。
-- 主动拖入先保存 Input Item 与 Blob 副本，再经读取 adapter 取得正文；建议等待与执行阶段由 core 区分，接口与恢复边界见 `src/`。
+- 所有入口提交普通 UserInput；桌宠文件仅交付原路径文本，模型按需调用默认 file.read。PromptPanel 图片仍使用 Blob 副本与多模态链路。
 
 ## 本地数据
 
 - `~/.spotAgent/settings.json`：模型与 Tool 设置。
-- `~/.spotAgent/threads.sqlite`：Thread rollout。
+- `~/.spotAgent/threads.sqlite`：Pet 配置、受管图片引用与 Thread rollout。
 - `~/.spotAgent/mcp.json`：全局 MCP 配置。
-- Workspace、Permission、Blob 与日志路径由对应 src 子模块文档说明。
+- Pet 文件根、Permission、Blob 与日志路径由对应 src 子模块文档说明。
 
 ## 验证
 

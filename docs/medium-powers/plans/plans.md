@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [2026-10-02-pets-default-reading.md](./2026-10-02-pets-default-reading.md)：Issue #6/#7 合并实施与不可修改 Pet 文件根决定。
+
 - [2026-09-14-thread-window-selection.md](./2026-09-14-thread-window-selection.md)：后台创建不抢选与 Swift 明确目标 Thread 的窗口交付回归。
 - [2026-09-14-agenttrigger-form-errors.md](./2026-09-14-agenttrigger-form-errors.md)：AgentTrigger 新增表单校验错误的取消、收起与重新展开回归。
 - [2026-09-14-chrome-bridge-verification.md](./2026-09-14-chrome-bridge-verification.md)：历史端口错配的当前代码核对与退出测试隔离。

@@ -1,3 +1,4 @@
+import type { PetSnapshot } from "../../pet/Pet.ts";
 import type { ConversationMessage } from "../../conversation/types/ConversationMessage.ts";
 import type { ServerRequest } from "./ServerRequest.ts";
 
@@ -26,17 +27,17 @@ export type ThreadListEntry = {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
-  workspaceId?: string | null;
-};
-
-export type WorkspaceAskCandidate = {
-  id: string;
-  name: string;
-  description: string;
-  isDefault: boolean;
+  petId: string;
+  petRevision: number;
+  rootPath: string;
+  status: RunStatus;
 };
 
 export type ThreadSnapshotPayload = {
+  petId: string;
+  petRevision: number;
+  rootPath: string;
+  petSnapshot: PetSnapshot;
   messages: ConversationMessage[];
   status: RunStatus;
   pendingRequests?: ServerRequest[];

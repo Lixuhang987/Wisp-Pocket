@@ -1,10 +1,10 @@
 # PlatformBridge 测试
 
-主要用例从 `DynamicToolProviderService` 的 hello 与 `tool_call_request` 进入真实内置模块、业务调度和临时持久化，再检查响应和重建后读回的数据。不可控的 macOS 权限、窗口、截图、事件或时间才使用替身。
+Automation 用例从 `DynamicToolProviderService` 进入真实模块；Context History 用例从宿主启动进入常驻采集、真实 Store 和重建读取，系统能力才使用替身。不可控的 macOS 权限、窗口、截图、事件或时间才使用替身。
 
 ## 直接文件
 
-- `BuiltinContextHistoryUseCaseTests.swift`：启用、变化/周期采样、分层查询、可解码图片、证据关联、重建读取、取消及可见失败。
+- `BuiltinContextHistoryUseCaseTests.swift`：常驻启动、变化/周期采样、分层查询、可解码图片、证据关联、重建读取、取消及可见失败。
 - `BuiltinAutomationUseCaseTests.swift`：跨调用录制、共享证据、Policy 重建执行、失败进度、修复重跑、参数/版本上界拒绝、禁用取消和配置失败回滚。
 - `MacAutomationLiveEventRecorderTests.swift`：多个会话共享事件源、启动失败、最后停止与释放、文本和快捷键事件。
 - `MacPlatformNativeAutomationTests.swift`：原生动作契约、应用/窗口关联、图片真实尺寸、Unicode 与快捷键编码、错误跨边界返回。

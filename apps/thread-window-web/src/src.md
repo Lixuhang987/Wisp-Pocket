@@ -16,11 +16,11 @@
 
 ## 状态所有权
 
-- store factory 为每个界面创建独立 UI 投影，持有 `threadsById`、历史、请求、Workspace 列表、连接状态和窗口错误；后端 Thread 是权威真源。
+- store factory 为每个界面创建独立 UI 投影，持有 `threadsById`、历史、请求、Pet 列表、连接状态和窗口错误；后端 Thread 是权威真源。
 - 当前右侧展示的 `activeThreadId` 与待确认选择记录由 `App` 拥有，不进入 store；选择记录按创建 commandId 关联，既有首轮 payload 仍只登记在 store。
 - socket client 只负责收发、传输缓冲和协议回调；输入控制器统一首轮关联及 ThreadWindow Composer 提交，状态修改经 store 公共 action。
-- Permission/Workspace request 按 Thread 保存；snapshot 恢复请求，`request.resolved`、Turn 终态或 Thread error 清理失效展示。两端回执只由服务端仲裁一次。
-- Composer 草稿由 ThreadWorkspacePane 按 Thread 保存在内存，切换保留、提交清空、页面重建丢失；连接就绪时提交立即发给后端。`user.message.recorded` 才确认持久接收并显示 pending，对应 `turn.started` 清除该标记。
+- Permission request 按 Thread 保存；snapshot 恢复请求，`request.resolved`、Turn 终态或 Thread error 清理失效展示。两端回执只由服务端仲裁一次。
+- Composer 草稿由 ThreadPetPane 按 Thread 保存在内存，切换保留、提交清空、页面重建丢失；连接就绪时提交立即发给后端。`user.message.recorded` 才确认持久接收并显示 pending，对应 `turn.started` 清除该标记。
 
 ## UI 约束
 

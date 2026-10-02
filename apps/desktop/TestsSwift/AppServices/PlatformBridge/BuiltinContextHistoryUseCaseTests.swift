@@ -9,18 +9,12 @@ import XCTest
 
 @MainActor
 final class BuiltinContextHistoryUseCaseTests: XCTestCase {
-    func testEnableCollectQueryAllEvidenceAndRebuildThroughProvider() async throws {
+    func testHostStartsCollectionAndSavedEvidenceSurvivesRebuild() async throws {
         let fixture = try HistoryUseCaseFixture()
         defer { fixture.cleanUp() }
         fixture.features.start()
-        XCTAssertFalse(fixture.module.isRunning)
-        XCTAssertTrue(try fixture.registeredHistoryTools().isEmpty)
-
-        fixture.settings.update { $0.contextHistoryEnabled = true }
         XCTAssertTrue(fixture.module.isRunning)
-        XCTAssertEqual(try fixture.registeredHistoryTools(), [
-            "activity_index", "sample_details", "thumbnails", "screenshot_original",
-        ])
+        XCTAssertFalse(fixture.settings.settings.automationEnabled)
         fixture.module.start()
         let start = fixture.start
         await fixture.module.sample(now: start)
@@ -55,9 +49,6 @@ final class BuiltinContextHistoryUseCaseTests: XCTestCase {
         XCTAssertNil(indexSamples[0]["axSummary"])
         XCTAssertNil(indexSamples[0]["imageBase64"])
         XCTAssertNil(indexSamples[0]["thumbnailBase64"])
-        let collection = try XCTUnwrap(index["collection"] as? [String: Any])
-        XCTAssertEqual(collection["isRunning"] as? Bool, true)
-        XCTAssertTrue(collection["lastErrorMessage"] is NSNull)
         let firstSample = try XCTUnwrap(persistedSamples.first)
         let detailsReply = try await fixture.request("sample_details", ["ids": [currentSample.id, firstSample.id]])
         XCTAssertTrue(detailsReply.success)
@@ -95,7 +86,6 @@ final class BuiltinContextHistoryUseCaseTests: XCTestCase {
         defer { reopened.features.stop() }
         reopened.features.start()
         XCTAssertTrue(reopened.module.isRunning)
-        XCTAssertTrue(reopened.settings.settings.contextHistoryEnabled)
         let reopenedOriginal = try await reopened.request("screenshot_original", ["id": screenshot.id])
         let reopenedMetadata = try XCTUnwrap(reopenedOriginal.json()["screenshot"] as? [String: Any])
         XCTAssertEqual(reopenedMetadata["timestamp"] as? String, originalMetadata["timestamp"] as? String)
@@ -105,19 +95,19 @@ final class BuiltinContextHistoryUseCaseTests: XCTestCase {
         XCTAssertEqual(try reopened.store.loadActivities(), persistedSamples)
     }
 
-    func testDisableAndShutdownCancelPendingSamplingBeforeAnyLateWrite() async throws {
+    func testShutdownCancelsPendingSamplingBeforeAnyLateWrite() async throws {
         let fixture = try HistoryUseCaseFixture()
         defer { fixture.cleanUp() }
         fixture.enable()
         fixture.host.holdAX = true
         let pending = Task { await fixture.module.sample(now: fixture.start) }
         await fixture.host.waitForAX()
-        fixture.settings.update { $0.contextHistoryEnabled = false }
+        fixture.features.stop()
         XCTAssertFalse(fixture.module.isRunning)
         XCTAssertTrue(try fixture.registeredHistoryTools().isEmpty)
 
         fixture.host.holdAX = false
-        fixture.settings.update { $0.contextHistoryEnabled = true }
+        fixture.features.start()
         await fixture.module.sample(now: fixture.start.addingTimeInterval(20))
         fixture.host.resumeAX()
         await pending.value
@@ -146,9 +136,9 @@ final class BuiltinContextHistoryUseCaseTests: XCTestCase {
         ])
         await fixture.module.sample(now: fixture.start)
         XCTAssertTrue(try fixture.store.loadActivities().isEmpty)
-        let reply = try await fixture.request("activity_index")
-        let collection = try XCTUnwrap(reply.json()["collection"] as? [String: Any])
-        let message = try XCTUnwrap(collection["lastErrorMessage"] as? String)
+        let message = try XCTUnwrap(fixture.module.lastErrorMessage)
+        let settingsViewModel = ToolSettingsViewModel(store: AgentSettingsStore(homeDirectoryURL: fixture.home), builtinFeatures: fixture.features)
+        XCTAssertTrue(settingsViewModel.contextHistoryStatus.contains("采集失败"))
         XCTAssertTrue(message.contains("accessibility"), message)
         XCTAssertTrue(message.contains("permission_denied"), message)
 
@@ -399,7 +389,6 @@ private final class HistoryUseCaseFixture {
 
     func enable() {
         features.start()
-        settings.update { $0.contextHistoryEnabled = true }
     }
 
     func cleanUp() {
@@ -420,28 +409,9 @@ private final class HistoryUseCaseFixture {
     }
 
     func request(_ tool: String, _ arguments: Any = [:]) async throws -> HistoryUseCaseReply {
-        callNumber += 1
-        let callID = "history-call-\(callNumber)"
-        let request: [String: Any] = [
-            "channel": "dynamic_tools", "type": "tool_call_request",
-            "payload": [
-                "clientId": "swift-host", "threadId": "history-thread", "turnId": "history-turn",
-                "callId": callID, "namespace": "context_history", "tool": tool, "arguments": arguments,
-            ],
-        ]
-        let data = try JSONSerialization.data(withJSONObject: request)
-        var response: String?
-        await provider.handleIncoming(raw: String(decoding: data, as: UTF8.self), send: { response = $0 })
-        let responseData = try XCTUnwrap(response?.data(using: .utf8))
-        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: responseData) as? [String: Any])
-        XCTAssertEqual(object["channel"] as? String, "dynamic_tools")
-        XCTAssertEqual(object["type"] as? String, "tool_call_response")
-        let payload = try XCTUnwrap(object["payload"] as? [String: Any])
-        XCTAssertEqual(payload["callId"] as? String, callID)
-        return HistoryUseCaseReply(
-            success: try XCTUnwrap(payload["success"] as? Bool),
-            items: try XCTUnwrap(payload["contentItems"] as? [[String: Any]])
-        )
+        let result = ContextHistoryToolRouter(store: store).handle(tool: tool, arguments: arguments)
+        return HistoryUseCaseReply(success: result.success, items: result.contentItems)
+
     }
 }
 

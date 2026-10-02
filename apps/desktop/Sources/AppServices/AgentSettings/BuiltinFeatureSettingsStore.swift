@@ -1,7 +1,6 @@
 import Foundation
 
 struct BuiltinFeatureSettings: Codable, Equatable {
-    var contextHistoryEnabled = false
     var automationEnabled = false
 }
 

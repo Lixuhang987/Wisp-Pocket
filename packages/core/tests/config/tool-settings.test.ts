@@ -39,28 +39,28 @@ describe("ToolSettings", () => {
       path,
       JSON.stringify({
         tools: {
-          allowlist: ["file.read", "workspace.list"],
+          allowlist: ["file.read", "test.list"],
           denylist: ["file.write"],
         },
       }),
     );
 
     expect(loadToolSettings(homeDir)).toEqual({
-      allowlist: ["file.read", "workspace.list"],
+      allowlist: ["file.read", "test.list"],
       denylist: ["file.write"],
     });
   });
 
   it("filterToolNames applies denylist before allowlist", () => {
     const result = filterToolNames(
-      ["file.read", "file.write", "workspace.list"],
-      { allowlist: ["file.read", "workspace.list"], denylist: ["workspace.list"] },
+      ["file.read", "file.write", "test.list"],
+      { allowlist: ["file.read", "test.list"], denylist: ["test.list"] },
     );
 
     expect(result.enabled).toEqual(["file.read"]);
     expect(result.disabled.map((d) => d.name).sort()).toEqual([
       "file.write",
-      "workspace.list",
+      "test.list",
     ]);
   });
 });

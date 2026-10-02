@@ -13,7 +13,7 @@
 ## 消息与图片
 
 - user image 的 Blob 引用在模型调用前通过传入的 BlobStore 展开，持久化格式与 Provider 输入格式保持分离。
-- Dynamic Tool 的 JSON envelope 含 `callId`、`success` 和 `contentItems`；图片转换保留 envelope 元数据与文本说明，把 `inputImage` 变成模型真正可消费的图片，不能只发送 base64 JSON 文本。
+- 普通 Tool 的 JSON envelope 含 `success` 和 `contentItems`，Dynamic Tool 另含 `callId`；图片转换保留 envelope 元数据与文本说明，把 `inputImage` 变成模型真正可消费的图片，不能只发送 base64 JSON 文本。
 - Responses / Anthropic 使用原生 Tool 图片内容。Chat 不支持相同形态，图片与工具名、toolCallId、原始说明放在本组全部 tool results 之后的 user 图片消息里，保持每个 assistant tool-call 与 tool-result 的配对顺序。
 - 多模态检测同时检查 user 输入与 Tool 返回。Completion 不支持图片，应在 Provider 请求前明确失败；能力降级不得静默丢掉工具证据。
 - 普通文本与 JSON Tool 结果保持原有表达。图片 URL 仅接受声明支持的 image data URL 或 HTTP(S)，错误必须可定位。
@@ -30,6 +30,6 @@
 
 ## 验证边界
 
-- 图片用例保留真实 DynamicToolAdapter、Runtime、Provider client 与 SDK，使用已知 Tool 响应和可控首轮模型决策，捕获最终网络请求，检查成功/失败状态、多个工具关联及解码后的像素。真实宿主响应由 desktop 的业务用例与实机验收补齐，入口见 [LLM 测试](../../../tests/llm/llm.md)。
+- 图片用例保留普通 Tool / DynamicToolAdapter、Runtime、Provider client 与 SDK，使用已知 Tool 响应和可控首轮模型决策，捕获最终网络请求，检查成功/失败状态、多个工具关联及解码后的像素。真实宿主响应由 desktop 的业务用例与实机验收补齐，入口见 [LLM 测试](../../../tests/llm/llm.md)。
 - `MockLLMClient` 的固定场景保存在 `mockLLMScenarios`，覆盖 UI/协议闭环；mock 回复不能证明真实模型服务接受图片。
 - 真实 API 验证与实机 Tool 证据分别记录；协议请求构造通过不等于远端模型已完成推理。

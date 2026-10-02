@@ -6,9 +6,9 @@
 
 - [llm/llm.md](./llm/llm.md)：模型适配、图片消费、能力检查与真实 API 集成。
 - `runtime/`：Turn、工具循环与中断用例。
-- `tools/`：Tool 注册、懒激活、Web 和 Workspace/file 能力。
+- `tools/`：Tool 注册、懒激活、Web 和 Pet 文件边界。
 - `protocol/`：消息族与字段边界。
-- `permission/`、`workspace/`：权限与 Workspace 规则。
+- `permission/`：权限规则与跨 Thread 决定。
 - `blob/`、`logging/`：持久化与日志适配。
 - `config/`、`selection/`：设置与选区归一化。
 - `mcp/`：MCP 配置与传输。

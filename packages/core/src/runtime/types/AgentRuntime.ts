@@ -66,7 +66,8 @@ export type AgentRuntimeRunOptions = {
   threadId?: string;
   turnId?: string;
   signal?: AbortSignal;
-  interactionMode?: "inspect" | "reply";
+  rootPath?: string;
+  rolePrompt?: string;
 };
 
 export type AgentRuntimeEventSink = (event: AgentRuntimeEvent) => void;

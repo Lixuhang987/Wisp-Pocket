@@ -1,16 +1,10 @@
-import type { WorkspaceRegistry } from "../workspace/types/Workspace.ts";
 import { filterToolNames, type ToolSettings } from "../config/ToolSettings.ts";
 import type { AgentTool } from "./types/AgentTool.ts";
 import { ToolRegistry } from "./ToolRegistry.ts";
-import { FileReadTool } from "./builtins/FileReadTool.ts";
 import { FileWriteTool } from "./builtins/FileWriteTool.ts";
-import { WorkspaceAskUserTool, type WorkspaceAskResolver } from "./builtins/WorkspaceAskUserTool.ts";
-import { WorkspaceListTool } from "./builtins/WorkspaceListTool.ts";
 
 export type RegisterBuiltinToolsOptions = {
   registry?: ToolRegistry;
-  workspaceRegistry?: WorkspaceRegistry;
-  workspaceAskResolver?: WorkspaceAskResolver;
   settings?: ToolSettings;
 };
 
@@ -25,42 +19,8 @@ export type BuiltinToolCandidatesResult = {
   disabled: { name: string; reason: string }[];
 };
 
-export function buildBuiltinToolCandidates(
-  options: Omit<RegisterBuiltinToolsOptions, "registry" | "settings">,
-): BuiltinToolCandidatesResult {
-  const candidates: AgentTool[] = [];
-  const disabled: { name: string; reason: string }[] = [];
-
-  if (options.workspaceRegistry) {
-    candidates.push(WorkspaceListTool.create(options.workspaceRegistry));
-    candidates.push(FileReadTool.create(options.workspaceRegistry));
-    candidates.push(FileWriteTool.create(options.workspaceRegistry));
-    if (options.workspaceAskResolver) {
-      candidates.push(
-        WorkspaceAskUserTool.create({
-          registry: options.workspaceRegistry,
-          askResolver: options.workspaceAskResolver,
-        }),
-      );
-    }
-  }
-
-  if (!options.workspaceRegistry) {
-    disabled.push(
-      { name: "workspace.list", reason: "workspace registry not provided" },
-      { name: "workspace.askUser", reason: "workspace registry not provided" },
-      { name: "file.read", reason: "workspace registry not provided" },
-      { name: "file.write", reason: "workspace registry not provided" },
-    );
-  }
-  if (options.workspaceRegistry && !options.workspaceAskResolver) {
-    disabled.push({
-      name: "workspace.askUser",
-      reason: "workspace ask resolver not provided",
-    });
-  }
-
-  return { candidates, disabled };
+export function buildBuiltinToolCandidates(): BuiltinToolCandidatesResult {
+  return { candidates: [FileWriteTool.create({})], disabled: [] };
 }
 
 export function registerBuiltinTools(
@@ -68,7 +28,7 @@ export function registerBuiltinTools(
 ): RegisterBuiltinToolsResult {
   const registry = options.registry ?? new ToolRegistry();
   const settings = options.settings ?? { allowlist: null, denylist: [] };
-  const { candidates, disabled } = buildBuiltinToolCandidates(options);
+  const { candidates, disabled } = buildBuiltinToolCandidates();
 
   const candidateNames = candidates.map((t) => t.name);
   const filtered = filterToolNames(candidateNames, settings);

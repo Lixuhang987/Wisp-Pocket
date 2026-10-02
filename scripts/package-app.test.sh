@@ -26,6 +26,9 @@ trap cleanup EXIT
 
 mkdir -p "$FAKE_BIN_DIR" "$BUILD_DIR" "$WEB_DIST_DIR" "$ELECTRON_SHELL_DIST_DIR/main" "$PACKAGE_ROOT_DIR"
 
+mkdir -p "$PACKAGE_ROOT_DIR/apps/electron-shell/src/activity-window/assets"
+cp "$ROOT_DIR/apps/electron-shell/src/activity-window/assets/yachiyo.webp" "$PACKAGE_ROOT_DIR/apps/electron-shell/src/activity-window/assets/yachiyo.webp"
+
 cat >"$WEB_DIST_DIR/index.html" <<'HTML'
 <!doctype html>
 <html>
@@ -118,6 +121,7 @@ test -x "$APP_DIR/Contents/Resources/HandAgentChromeBookmarksNativeHost"
 test -f "$MARKER_FILE"
 test -f "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 test -f "$ELECTRON_MAIN_FILE"
+cmp "$ROOT_DIR/apps/electron-shell/src/activity-window/assets/yachiyo.webp" "$APP_DIR/Contents/Resources/yachiyo.webp"
 grep -q '<string>Wisp Pocket</string>' "$APP_DIR/Contents/Info.plist"
 grep -q '<key>CFBundleDisplayName</key>' "$APP_DIR/Contents/Info.plist"
 grep -q '"llmMode":"mock"' "$MARKER_FILE"
@@ -151,6 +155,7 @@ test -x "$APP_DIR/Contents/Resources/HandAgentChromeBookmarksNativeHost"
 test ! -f "$MARKER_FILE"
 test -f "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 test -f "$ELECTRON_MAIN_FILE"
+cmp "$ROOT_DIR/apps/electron-shell/src/activity-window/assets/yachiyo.webp" "$APP_DIR/Contents/Resources/yachiyo.webp"
 grep -q '<string>Wisp Pocket</string>' "$APP_DIR/Contents/Info.plist"
 grep -q 'built web' "$APP_DIR/Contents/Resources/ThreadWindowWeb/index.html"
 grep -q 'built electron shell' "$ELECTRON_MAIN_FILE"

@@ -116,7 +116,8 @@ final class AppCoordinator {
     func makeAgentTriggerSettingsViewModel() -> AgentTriggerSettingsViewModel {
         AgentTriggerSettingsViewModel(
             store: services.agentTriggerStore,
-            runtime: services.agentTriggerRuntime
+            runtime: services.agentTriggerRuntime,
+            petClient: services.swiftThreadClient as? any PetManaging
         )
     }
 
@@ -270,7 +271,7 @@ final class AppCoordinator {
             appendPromptSettingsViewModel: makeAppendPromptSettingsViewModel(),
             mcpSettingsViewModel: makeMCPSettingsViewModel(),
             permissionRulesViewModel: makePermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(client: services.swiftThreadClient as? any PetManaging, visibility: activityWindowCommandClient),
             shortcutActions: actions,
             appTheme: services.appearanceThemeService.appTheme,
             onClosed: { [weak self] in self?.send(.settingsWindowClosed) }

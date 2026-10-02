@@ -124,6 +124,7 @@ cp "$BUILD_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 cp "$BUILD_DIR/$CHROME_BOOKMARKS_NATIVE_HOST_NAME" "$APP_DIR/Contents/Resources/$CHROME_BOOKMARKS_NATIVE_HOST_NAME"
 chmod +x "$APP_DIR/Contents/Resources/$CHROME_BOOKMARKS_NATIVE_HOST_NAME"
+cp "$ROOT_DIR/apps/electron-shell/src/activity-window/assets/yachiyo.webp" "$APP_DIR/Contents/Resources/yachiyo.webp"
 
 rm -rf "$APP_DIR/Contents/Resources/ThreadWindowWeb"
 mkdir -p "$APP_DIR/Contents/Resources/ThreadWindowWeb"

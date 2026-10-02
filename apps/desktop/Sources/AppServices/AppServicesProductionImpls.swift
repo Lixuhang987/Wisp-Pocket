@@ -47,7 +47,7 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
-        workspaceViewModel: WorkspaceSettingsViewModel,
+        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
@@ -60,7 +60,7 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
             appendPromptSettingsViewModel: appendPromptSettingsViewModel,
             mcpSettingsViewModel: mcpSettingsViewModel,
             permissionRulesViewModel: permissionRulesViewModel,
-            workspaceViewModel: workspaceViewModel,
+            petViewModel: petViewModel,
             shortcutActions: shortcutActions
         )
         let hosting = NSHostingController(
@@ -121,7 +121,7 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
                 appendPromptSettingsViewModel: presentation.appendPromptSettingsViewModel,
                 mcpSettingsViewModel: presentation.mcpSettingsViewModel,
                 permissionRulesViewModel: presentation.permissionRulesViewModel,
-                workspaceViewModel: presentation.workspaceViewModel,
+                petViewModel: presentation.petViewModel,
                 shortcutActions: presentation.shortcutActions
             )
             .environment(\.appTheme, appTheme)
@@ -166,7 +166,7 @@ private struct SettingsPresentation {
     let appendPromptSettingsViewModel: AppendPromptSettingsViewModel
     let mcpSettingsViewModel: MCPSettingsViewModel
     let permissionRulesViewModel: PermissionRulesViewModel
-    let workspaceViewModel: WorkspaceSettingsViewModel
+    let petViewModel: PetSettingsViewModel
     let shortcutActions: [ActionDefinition]
 }
 

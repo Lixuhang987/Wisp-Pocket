@@ -1,168 +1,172 @@
-import type { InputItem, ThreadNotification, ThreadListEntry } from "../../../thread-window-web/src/protocol/threadProtocol.ts";
-import { encodePermissionAnswer, encodeWorkspaceAnswer } from "../../../thread-window-web/src/protocol/threadProtocol.ts";
+import type { Pet } from "@handagent/core/pet/Pet.ts";
+import type { InputItem, ThreadNotification, ThreadListEntry, ThreadCommand } from "../../../thread-window-web/src/protocol/threadProtocol.ts";
+import { encodePermissionAnswer, encodeThreadDelete } from "../../../thread-window-web/src/protocol/threadProtocol.ts";
 import { makeThreadWindowStore } from "../../../thread-window-web/src/store/threadWindowStore.ts";
-import { pendingInitialMessage } from "../../../thread-window-web/src/store/inputHandoff.ts";
 import type { AssistantMessageItem } from "../../../thread-window-web/src/store/threadItems.ts";
 import { ThreadSocketClient } from "../../../thread-window-web/src/thread/threadSocketClient.ts";
 import { ThreadInputController } from "../../../thread-window-web/src/thread/threadInputController.ts";
 
 export type PetDropTarget = "pet" | "conversation";
 export type PetSnapshot = {
-  threadId: string | null;
-  bubbleVisible: boolean;
-  latestAssistant?: AssistantMessageItem;
-  connection: "disconnected" | "connecting" | "connected";
+  threadId: string | null; pet?: Pet; bubbleVisible: boolean; draft: string; error?: string;
+  latestAssistant?: AssistantMessageItem; connection: "disconnected" | "connecting" | "connected";
+  history: ThreadListEntry[]; nextCursor?: string | null; receiving: boolean;
 };
+type Submission = { id: string; threadId?: string; items: InputItem[]; key: string; navigation: number; draftKey?: string; resolve?: () => void; reject?: (error: Error) => void };
+type Preferences = { selectedThreadId?: string | null; drafts: Record<string, string>; visibility?: "visible" | "hidden"; submissions?: Array<Omit<Submission,"resolve"|"reject">> };
 
-/** A lightweight view of the same Thread store used by the full window. */
+/** One independent UI projection bound permanently to one Pet. */
 export class PetThreadController {
   readonly store = makeThreadWindowStore();
+  readonly petId: string;
   private readonly socket: ThreadSocketClient;
   private readonly inputs: ThreadInputController;
   private readonly listeners = new Set<() => void>();
-  private currentThread: { id: string; createdAt: string } | null = null;
+  private preferences: Preferences = { drafts: {} };
   private visibility: "startup" | "visible" | "hidden" = "startup";
-  private snapshot: PetSnapshot = { threadId: null, bubbleVisible: false, connection: "disconnected" };
+  private snapshot: PetSnapshot = { threadId: null, bubbleVisible: false, draft: "", connection: "disconnected", history: [], receiving: false };
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private closed = true;
-  private initialReply?: { id: string; threadId?: string; resolve(): void; reject(error: Error): void };
+  private error?: string;
+  private nextCursor?: string | null;
+  private readonly submissions = new Map<string, Submission>();
+  private readonly management = new Map<string, { resolve(value: ThreadNotification): void; reject(error: Error): void }>();
+  private restoring = true;
+  private navigation = 0;
+  private loadingMore = false;
 
-  constructor(options: Pick<ConstructorParameters<typeof ThreadSocketClient>[0], "url" | "WebSocketImpl">) {
-    this.socket = new ThreadSocketClient({
-      ...options,
-      onConnectionState: (state) => {
+  constructor(options: Pick<ConstructorParameters<typeof ThreadSocketClient>[0], "url" | "WebSocketImpl"> & { petId: string }) {
+    this.petId = options.petId;
+    try { const raw = localStorage.getItem(this.preferenceKey); if (raw) { const saved = JSON.parse(raw); if (saved && typeof saved.drafts === "object") this.preferences = saved; } } catch { this.error = "无法恢复本宠草稿。"; }
+    if (this.preferences.visibility) this.visibility = this.preferences.visibility;
+    for (const submission of this.preferences.submissions ?? []) if (submission.id && Array.isArray(submission.items)) this.submissions.set(submission.id,submission);
+    this.socket = new ThreadSocketClient({ ...options,
+      onConnectionState: state => {
         this.store.getState().setConnectionState(state);
-        if (state === "disconnected") this.finishInitialReply(new Error("连接已断开，这份输入尚未确认。"));
-        if (state === "disconnected" && !this.closed) {
-          clearTimeout(this.reconnectTimer);
-          this.reconnectTimer = setTimeout(() => this.socket.connect(), 1000);
+        if (state === "disconnected") {
+          for (const submission of this.submissions.values()) this.finish(submission, new Error("连接中断，尚未确认接收。重试会沿用原提交身份。"));
+          for (const request of this.management.values()) request.reject(new Error("连接已断开，请重新保存。"));
+          this.management.clear();
+          if (!this.closed) { clearTimeout(this.reconnectTimer); this.reconnectTimer = setTimeout(() => { this.restoring = true; this.socket.connect(); }, 1000); }
         }
       },
-      onNotification: (notification) => this.inputs.handleNotification(notification),
-      onRequest: (request) => this.store.getState().handleRequest(request),
-    });
-    this.inputs = new ThreadInputController({
-      getState: this.store.getState,
-      client: this.socket,
-      onNotification: (notification) => {
-        this.selectThread(notification);
-        this.receiveInitialReply(notification);
-        this.changed();
+      onNotification: notification => {
+        if (notification.type === "thread.listed" && this.loadingMore) {
+          const page = notification.payload;
+          notification = {...notification,payload:{...page,threads:[...this.history().filter(previous=>!page.threads.some(item=>item.id===previous.id)),...page.threads]}};
+          this.loadingMore = false;
+        }
+        this.inputs.handleNotification(notification);
       },
+      onRequest: request => { this.store.getState().handleRequest(request); if (this.ownsThread(request.threadId)) this.revealBubble(); },
+    });
+    this.inputs = new ThreadInputController({ getState: this.store.getState, client: this.socket,
+      onNotification: notification => { this.receive(notification); this.changed(); },
     });
     this.store.subscribe(() => this.changed());
+    this.changed();
   }
-
-  connect(): void { this.closed = false; this.socket.connect(); }
+  private get preferenceKey(): string { return `handagent.pet-ui.v1.${this.petId}`; }
+  connect(): void { this.restoring = true; this.closed = false; this.socket.connect(); }
   disconnect(): void { this.closed = true; clearTimeout(this.reconnectTimer); this.socket.disconnect(); }
   getSnapshot = (): PetSnapshot => this.snapshot;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
-
-  hideBubble(): void { this.visibility = "hidden"; this.changed(); }
-  revealBubble(): void { this.visibility = "visible"; this.changed(); }
-
-  drop(items: InputItem[], target: PetDropTarget, threadId = this.currentThread?.id): void {
-    this.requireConnection();
-    if (!items.length) return;
-    if (target === "pet") {
-      this.inputs.startInitialPrompt({ clientRequestId: crypto.randomUUID(), userInput: { items, mode: "inspect" } });
-    } else {
-      if (!threadId) throw new Error("当前没有可追加的对话，请把内容拖到角色上。");
-      this.socket.submitOp(threadId, { type: "user_input", opId: crypto.randomUUID(), timestamp: new Date().toISOString(), payload: { items, mode: "inspect" } });
-    }
-    this.changed();
+  hideBubble(): void { this.visibility = "hidden"; this.preferences.visibility = "hidden"; this.save(); this.changed(); }
+  revealBubble(): void { this.visibility = "visible"; this.preferences.visibility = "visible"; this.save(); this.changed(); }
+  setDraft(text: string, threadId = this.preferences.selectedThreadId): void { this.preferences.drafts[threadId ?? "new"] = text; this.save(); this.changed(); }
+  selectThread(threadId: string): void {
+    if (!this.ownsThread(threadId)) throw new Error("该对话不属于当前桌宠。");
+    this.navigation += 1;
+    this.preferences.selectedThreadId = threadId; this.save(); this.socket.resumeThread(threadId); this.changed();
   }
-
-  respond(text: string): Promise<void> | void {
-    this.requireConnection();
+  newTopic(): void { this.navigation += 1; this.preferences.selectedThreadId = null; this.save(); this.changed(); }
+  listMore(): void { if (this.nextCursor) { this.loadingMore = true; this.socket.listThreads(this.nextCursor); } }
+  deleteThread(threadId: string): void { this.requireConnection(); if (!this.ownsThread(threadId)) throw new Error("该对话不属于当前桌宠。"); this.socket.sendRaw(encodeThreadDelete({targetThreadId:threadId, commandId:crypto.randomUUID(),timestamp:new Date().toISOString()})); }
+  stop(): void { const threadId = this.preferences.selectedThreadId; if (threadId) this.socket.submitOp(threadId, {type:"interrupt",opId:crypto.randomUUID(),timestamp:new Date().toISOString(),payload:{reason:"user"}}); }
+  drop(items: InputItem[], target: PetDropTarget, threadId = this.preferences.selectedThreadId ?? undefined, id = crypto.randomUUID()): Promise<void> {
+    if (target === "conversation" && !threadId) throw new Error("当前没有可追加的对话，请把内容拖到角色上。");
+    return this.submit(items, target === "pet" ? undefined : threadId, id);
+  }
+  respond(text: string): Promise<void> | undefined {
     if (!text.trim()) return;
-    if (this.initialReply) throw new Error("正在接收首条输入，请稍候。");
-    const threadId = this.currentThread?.id;
-    const id = crypto.randomUUID();
-    const userInput = { items: [{ type: "text" as const, id: crypto.randomUUID(), text: text.trim() }] };
-    const thread = threadId ? this.store.getState().threadsById[threadId] : undefined;
-    const placeholderId = thread ? pendingInitialMessage(thread)?.id : undefined;
-    const hasRecordedInput = thread?.messages.some((message) => message.type === "user_message" && message.id !== placeholderId);
-    const accepted = hasRecordedInput ? undefined : new Promise<void>((resolve, reject) => {
-      this.initialReply = { id, threadId, resolve, reject };
+    const key = this.preferences.selectedThreadId ?? "new";
+    const originalDraft = this.preferences.drafts[key] ?? "";
+    const accepted = this.submit([{type:"text",id:crypto.randomUUID(),text:text.trim()}], this.preferences.selectedThreadId ?? undefined);
+    const submission = [...this.submissions.values()].find(s => s.resolve && s.items.length === 1 && s.items[0].type === "text" && s.items[0].text === text.trim());
+    if (submission && originalDraft.trim() === text.trim()) submission.draftKey = key;
+    return accepted.then(() => {
+      const target = submission?.draftKey;
+      if (target && this.preferences.drafts[target] === originalDraft) { delete this.preferences.drafts[target]; this.save(); this.changed(); }
     });
-    try {
-      if (threadId) this.socket.submitOp(threadId, { type: "user_input", opId: id, timestamp: new Date().toISOString(), payload: userInput });
-      else this.inputs.startInitialPrompt({ clientRequestId: id, userInput });
-    } catch (error) {
-      if (!accepted) throw error;
-      this.finishInitialReply(error instanceof Error ? error : new Error(String(error)));
-    }
-    return accepted;
   }
-
   answerPermission(requestId: string, decision: "allow" | "deny", scope: "once" | "always" = "once"): void {
+    this.requireConnection(); this.socket.sendRaw(encodePermissionAnswer({requestId,decision,scope,timestamp:new Date().toISOString()}));
+  }
+  command(type: "pet.image.import" | "pet.create" | "pet.update", payload: Record<string, unknown>, commandId = crypto.randomUUID()): Promise<ThreadNotification> {
+    this.requireConnection(); return new Promise((resolve,reject)=> { this.management.set(commandId,{resolve,reject}); this.socket.sendRaw(JSON.stringify({type,payload,commandId,timestamp:new Date().toISOString()})); });
+  }
+  private submit(items: InputItem[], threadId?: string, id = crypto.randomUUID()): Promise<void> {
     this.requireConnection();
-    this.socket.sendRaw(encodePermissionAnswer({ requestId, decision, scope, timestamp: new Date().toISOString() }));
+    if (threadId && !this.ownsThread(threadId)) throw new Error("该对话已经删除或不属于当前桌宠。");
+    const key = JSON.stringify([threadId ?? "new", items.map(({id: _id,...item})=>item)]);
+    let submission = [...this.submissions.values()].find(s=>s.key===key || !!threadId && s.threadId===threadId && JSON.stringify(s.items.map(({id:_id,...item})=>item))===JSON.stringify(items.map(({id:_id,...item})=>item)));
+    if (submission?.resolve) throw new Error("正在接收这份输入，请稍候。");
+    submission ??= {id,threadId,items,key,navigation:this.navigation}; this.submissions.set(submission.id, submission);
+    const current = submission;
+    const accepted = new Promise<void>((resolve,reject)=> { current.resolve=resolve; current.reject=reject; });
+    if (current.threadId) this.socket.submitOp(current.threadId,{type:"user_input",opId:current.id,timestamp:new Date().toISOString(),payload:{items:current.items}});
+    else this.inputs.startInitialPrompt({clientRequestId:current.id,petId:this.petId,userInput:{items:current.items}});
+    this.save(); this.changed(); return accepted;
   }
-
-  answerWorkspace(requestId: string, workspaceId?: string): void {
-    this.requireConnection();
-    this.socket.sendRaw(encodeWorkspaceAnswer({ requestId, workspaceId, cancelled: !workspaceId, timestamp: new Date().toISOString() }));
-  }
-
-  private requireConnection(): void {
-    if (this.store.getState().connectionState !== "connected") throw new Error("还没有连上服务，这份输入尚未提交。连接恢复后请再交给我。");
-  }
-
-  private receiveInitialReply(notification: ThreadNotification): void {
-    const reply = this.initialReply;
-    if (!reply) return;
-    if (notification.type === "thread.started" && notification.commandId === reply.id) reply.threadId = notification.threadId;
-    const messages = reply.threadId ? this.store.getState().threadsById[reply.threadId]?.messages : undefined;
-    if (messages?.some((message) => message.type === "user_message" && message.id === reply.id)) {
-      this.finishInitialReply();
-    } else if (notification.type === "thread.error" && (notification.commandId === reply.id || reply.threadId && notification.threadId === reply.threadId)) {
-      this.finishInitialReply(new Error(notification.payload.message));
-    } else if (notification.type === "thread.deleted" && notification.payload.targetThreadId === reply.threadId) {
-      this.finishInitialReply(new Error("对话已被删除，这份输入尚未确认。"));
-    }
-  }
-
-  private finishInitialReply(error?: Error): void {
-    const reply = this.initialReply;
-    this.initialReply = undefined;
-    if (error) reply?.reject(error);
-    else reply?.resolve();
-  }
-
-  private selectThread(notification: ThreadNotification): void {
+  private receive(notification: ThreadNotification): void {
+    const commandId = "commandId" in notification ? notification.commandId : undefined;
+    const request = commandId ? this.management.get(commandId) : undefined;
+    if (request && notification.type.startsWith("pet.")) { this.management.delete(commandId!); if (notification.type === "pet.error") request.reject(new Error(notification.payload.message)); else request.resolve(notification); }
     if (notification.type === "thread.started") {
-      const createdAt = notification.payload.createdAt ?? notification.timestamp;
-      if (!this.currentThread || createdAt >= this.currentThread.createdAt) {
-        this.currentThread = { id: notification.threadId, createdAt };
-        if (this.visibility === "startup") this.visibility = "visible";
+      const submission = notification.commandId ? this.submissions.get(notification.commandId) : undefined;
+      if (submission) {
+        submission.threadId = notification.threadId;
+        if (submission.navigation === this.navigation) { if (!this.preferences.selectedThreadId) { this.preferences.drafts[notification.threadId] = this.preferences.drafts.new ?? ""; delete this.preferences.drafts.new; if (submission.draftKey === "new") submission.draftKey = notification.threadId; } this.preferences.selectedThreadId = notification.threadId; this.save(); }
       }
     } else if (notification.type === "thread.listed") {
-      const latest = newest(notification.payload.threads);
-      const currentExists = notification.payload.threads.some((thread) => thread.id === this.currentThread?.id);
-      if (!currentExists || latest && (!this.currentThread || latest.createdAt > this.currentThread.createdAt)) this.currentThread = latest;
-      if (this.currentThread) this.socket.resumeThread(this.currentThread.id);
-    } else if (notification.type === "thread.deleted" && notification.payload.targetThreadId === this.currentThread?.id) {
-      this.currentThread = newest(this.store.getState().history);
-      if (this.currentThread) this.socket.resumeThread(this.currentThread.id);
+      this.nextCursor = notification.payload.nextCursor;
+      if (this.restoring) {
+        const history = notification.payload.threads.filter(t=>t.petId===this.petId);
+        const selected = this.preferences.selectedThreadId;
+        if (selected && !history.some(t=>t.id===selected)) {
+          // A selected item may live on another page; resume provides its authoritative existence.
+          if (notification.payload.nextCursor) this.socket.resumeThread(selected);
+          else { delete this.preferences.drafts[selected]; this.preferences.selectedThreadId = history[0]?.id ?? null; }
+        } else if (selected === undefined) this.preferences.selectedThreadId = history[0]?.id ?? null;
+        this.restoring = false; this.save(); if (this.preferences.selectedThreadId) this.socket.resumeThread(this.preferences.selectedThreadId);
+      }
+    } else if (notification.type === "thread.deleted" && notification.payload.status === "deleted") {
+      const id = notification.payload.targetThreadId; delete this.preferences.drafts[id];
+      if (this.preferences.selectedThreadId===id) { this.preferences.selectedThreadId=this.history()[0]?.id ?? null; if (this.preferences.selectedThreadId) this.socket.resumeThread(this.preferences.selectedThreadId); } this.save();
+    }
+    if (notification.type === "thread.error" && notification.threadId === this.preferences.selectedThreadId && "code" in notification.payload && notification.payload.code === "not_found") {
+      delete this.preferences.drafts[notification.threadId!];
+      this.preferences.selectedThreadId = this.history().find(thread => thread.id !== notification.threadId)?.id ?? null;
+      this.save();
+      if (this.preferences.selectedThreadId) this.socket.resumeThread(this.preferences.selectedThreadId);
+    }
+    for (const submission of this.submissions.values()) {
+      const messages = submission.threadId ? this.store.getState().threadsById[submission.threadId]?.messages : undefined;
+      if (messages?.some(item=>item.type === "user_message" && item.id === submission.id)) { this.finish(submission); this.submissions.delete(submission.id); this.save(); }
+      else if (notification.type === "thread.error" && (notification.commandId===submission.id || notification.threadId===submission.threadId)) this.finish(submission,new Error(notification.payload.message));
+      else if (notification.type === "thread.deleted" && notification.payload.targetThreadId===submission.threadId) this.finish(submission,new Error("目标对话已删除，输入没有改投其他对话。"));
     }
   }
-
+  private finish(submission: Submission, error?: Error): void { if (error) submission.reject?.(error); else submission.resolve?.(); submission.resolve=undefined;submission.reject=undefined; }
+  private history(): ThreadListEntry[] { return this.store.getState().history.filter(t=>t.petId===this.petId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)); }
+  private ownsThread(id: string): boolean { return this.history().some(t=>t.id===id) || this.store.getState().threadsById[id]?.petId===this.petId; }
+  private requireConnection(): void { if (this.store.getState().connectionState!=="connected") throw new Error("还没有连上服务，输入尚未提交。"); }
+  private save(): void { this.preferences.submissions = [...this.submissions.values()].map(({resolve:_resolve,reject:_reject,...submission})=>submission); try { localStorage.setItem(this.preferenceKey,JSON.stringify(this.preferences)); this.error=undefined; } catch { this.error="草稿保存失败，本次输入仍保留在窗口中。"; } }
   private changed(): void {
-    const state = this.store.getState();
-    const thread = this.currentThread ? state.threadsById[this.currentThread.id] : undefined;
-    const latestAssistant = thread?.messages.findLast((item): item is AssistantMessageItem => item.type === "assistant_message" && !!item.text.trim());
-    this.snapshot = {
-      threadId: this.currentThread?.id ?? null,
-      bubbleVisible: this.visibility === "visible",
-      latestAssistant,
-      connection: state.connectionState,
-    };
-    for (const listener of this.listeners) listener();
+    const state=this.store.getState(), threadId=this.preferences.selectedThreadId ?? null, thread=threadId ? state.threadsById[threadId] : undefined;
+    this.snapshot={threadId,pet:state.pets.find(p=>p.id===this.petId),bubbleVisible:this.visibility==="visible",draft:this.preferences.drafts[threadId??"new"]??"",error:this.error,
+      latestAssistant:thread?.messages.findLast((item):item is AssistantMessageItem=>item.type==="assistant_message"&&!!item.text.trim()),connection:state.connectionState,
+      history:this.history(),nextCursor:this.nextCursor,receiving:[...this.submissions.values()].some(s=>!!s.resolve)};
+    for(const listener of this.listeners) listener();
   }
-}
-
-function newest(threads: ThreadListEntry[]): { id: string; createdAt: string } | null {
-  return threads.reduce<ThreadListEntry | null>((latest, candidate) => !latest || candidate.createdAt > latest.createdAt ? candidate : latest, null);
 }

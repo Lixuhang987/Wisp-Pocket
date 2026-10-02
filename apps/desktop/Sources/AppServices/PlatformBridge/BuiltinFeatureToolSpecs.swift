@@ -24,25 +24,6 @@ enum DynamicToolSchema {
 
 enum BuiltinFeatureToolSpecs {
     private typealias S = DynamicToolSchema
-    static var contextHistory: [[String: Any]] {
-        let limit: [String: Any] = ["type": "integer", "minimum": 1, "maximum": 200, "default": 20]
-        let date: [String: Any] = ["oneOf": [["type": "string", "format": "date-time"], ["type": "number"]]]
-        return [
-            S.spec("context_history", "activity_index",
-                   "Read a lightweight activity index and collection status. Returns ids, timestamps, app/window and thumbnailId without AX trees or images. Collection errors are reported in collection.lastErrorMessage.",
-                   S.object(["limit": limit])),
-            S.spec("context_history", "sample_details",
-                   "Read AX and activity details for 1...200 sample ids. Missing ids or missing/corrupt evidence fail with an explicit error.",
-                   S.object(["ids": ["type": "array", "items": ["type": "string", "minLength": 1], "minItems": 1, "maxItems": 200]], required: ["ids"])),
-            S.spec("context_history", "thumbnails",
-                   "Read stored thumbnails, newest first, optionally within inclusive start/end (ISO8601 or epoch seconds). Returns JSON metadata with sampleId, dimensions and imageContentIndex followed by inputImage items. Missing/corrupt files fail.",
-                   S.object(["limit": limit, "start": date, "end": date])),
-            S.spec("context_history", "screenshot_original",
-                   "Read one stored original PNG by screenshot id. Returns screenshot metadata and an inputImage item. Unknown ids or missing/corrupt files fail.",
-                   S.object(["id": ["type": "string", "minLength": 1]], required: ["id"])),
-        ]
-    }
-
     private static var step: [String: Any] {
         S.object([
             "kind": ["type": "string", "enum": ["activateApp", "click", "setValue", "typeText", "hotkey", "waitFor"]],

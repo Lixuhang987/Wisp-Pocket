@@ -3,6 +3,7 @@ import Foundation
 struct ElectronInitialPromptPayload: Encodable, Equatable {
     let clientRequestId: String
     let userInput: PromptUserInput
+    var petId: String? = nil
 
     init(
         clientRequestId: String,
@@ -15,16 +16,18 @@ struct ElectronInitialPromptPayload: Encodable, Equatable {
     init(prompt: PromptSubmission, clientRequestId: String = UUID().uuidString) {
         self.clientRequestId = clientRequestId
         self.userInput = prompt.userInput
+        self.petId = prompt.targetPetId
     }
 
     private enum CodingKeys: String, CodingKey {
-        case clientRequestId, userInput
+        case clientRequestId, userInput, petId
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(clientRequestId, forKey: .clientRequestId)
         try container.encode(userInput, forKey: .userInput)
+        try container.encodeIfPresent(petId, forKey: .petId)
     }
 }
 
@@ -33,11 +36,12 @@ enum ElectronShellCommand: Encodable, Equatable {
     case openHistory(commandId: String)
     case focus(commandId: String, threadId: String?)
     case showActivityWindow(commandId: String)
+    case petVisibility(commandId: String, petId: String, visible: Bool)
     case themeChanged(commandId: String, theme: HostThemePayload)
     case shutdown(commandId: String)
 
     private enum CodingKeys: String, CodingKey {
-        case channel, type, commandId, payload, threadId, theme
+        case channel, type, commandId, payload, threadId, theme, petId
     }
 
     func encode(to encoder: Encoder) throws {
@@ -58,6 +62,10 @@ enum ElectronShellCommand: Encodable, Equatable {
         case .showActivityWindow(let commandId):
             try container.encode("activity_window.show", forKey: .type)
             try container.encode(commandId, forKey: .commandId)
+        case .petVisibility(let commandId, let petId, let visible):
+            try container.encode(visible ? "pet.show" : "pet.hide", forKey: .type)
+            try container.encode(commandId, forKey: .commandId)
+            try container.encode(petId, forKey: .petId)
         case .themeChanged(let commandId, let theme):
             try container.encode("theme.changed", forKey: .type)
             try container.encode(commandId, forKey: .commandId)

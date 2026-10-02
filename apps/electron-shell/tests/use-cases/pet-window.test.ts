@@ -47,10 +47,11 @@ describe("桌宠原生窗口用例", () => {
     expect(window.showInactiveCount).toBe(1);
     expect(window.focusedSurface).toBe("other-app");
     expect(harness.mainWorld.handAgentActivityWindowConfig).toEqual({
+      petId: "",
       threadWebSocketURL: "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1",
     });
     expect(Object.keys(bridge).sort()).toEqual([
-      "beginMove", "endMove", "move", "setInteractiveRegions", "setLayout",
+      "beginMove", "chooseFiles", "endMove", "getPathForFile", "hidePet", "move", "onReveal", "setInteractiveRegions", "setLayout", "setReceiving", "showPet",
     ]);
 
     bridge.setLayout("compact");
@@ -317,3 +318,23 @@ function withElectronMock(mock: unknown, run: () => void): void {
     ? mock : originalLoad(request, parent, isMain)) as typeof originalLoad;
   try { run(); } finally { module._load = originalLoad; }
 }
+
+it("按显示器关联和相对锚点恢复，布局变化保持位置比例，拔屏后仍可达", async () => {
+  let displayId = "left-display";
+  const screen = Object.assign(new FakeScreen({x:-1600,y:0,width:1600,height:1000}), {
+    getDisplayForPoint: () => ({id:displayId,workArea:screen.workArea}),
+    getWorkAreaForDisplay: (id:string) => id===displayId ? screen.workArea : undefined,
+  });
+  const first = await createHarness({screen});
+  const saved = JSON.parse(readFileSync(first.positionPath,"utf8"));
+  expect(saved.display).toMatchObject({id:"left-display",x:expect.any(Number),y:expect.any(Number)});
+  first.window.destroy();
+  screen.workArea={x:-2000,y:100,width:2000,height:1200};
+  const restored=await createHarness({screen,positionPath:first.positionPath});
+  expect(restored.window.bounds.x+200).toBe(Math.round(screen.workArea.x+saved.display.x*screen.workArea.width));
+  expect(restored.window.bounds.y+restored.window.bounds.height).toBe(Math.round(screen.workArea.y+saved.display.y*screen.workArea.height));
+  displayId="main-display";screen.workArea={x:0,y:0,width:1440,height:900};screen.emit("work-area-changed");
+  expect(restored.window.bounds.x).toBeGreaterThanOrEqual(0);expect(restored.window.bounds.y).toBeGreaterThanOrEqual(0);
+  expect(restored.window.bounds.x+restored.window.bounds.width).toBeLessThanOrEqual(1440);
+  expect(JSON.parse(readFileSync(first.positionPath,"utf8")).display.id).toBe("main-display");
+});

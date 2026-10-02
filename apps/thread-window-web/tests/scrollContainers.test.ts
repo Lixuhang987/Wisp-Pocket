@@ -7,7 +7,7 @@ import { App } from "../src/App.tsx";
 import { Composer } from "../src/components/Composer.tsx";
 import { HistorySidebar } from "../src/components/HistorySidebar.tsx";
 import { MessageList } from "../src/components/MessageList.tsx";
-import { ThreadWorkspacePane } from "../src/components/ThreadWorkspacePane.tsx";
+import { ThreadPetPane } from "../src/components/ThreadPetPane.tsx";
 import { createThreadWindowStore, type ThreadState } from "../src/store/threadWindowStore.ts";
 
 function threadState(threadId: string): ThreadState {
@@ -18,7 +18,6 @@ function threadState(threadId: string): ThreadState {
     messages: [],
     pendingInitialPrompt: null,
     permissionRequests: [],
-    workspaceRequests: [],
     errorMessage: null,
   };
 }
@@ -47,8 +46,8 @@ beforeEach(() => {
     threadsById: {},
     pendingInitialPrompts: {},
     processedNotificationIds: {},
-    workspaces: [],
-    expandedWorkspaceIds: new Set(),
+    pets: [],
+    expandedPetIds: new Set(),
     searchQuery: "",
   });
 });
@@ -116,7 +115,7 @@ describe("ThreadWindow scroll containers", () => {
     expect(composer).toContain("新的补充");
   });
 
-  it("renders the fixed workspace pane from a thread id without a tab strip", () => {
+  it("renders the fixed pet pane from a thread id without a tab strip", () => {
     createThreadWindowStore.setState({
       connectionState: "connected",
       threadsById: {
@@ -128,17 +127,16 @@ describe("ThreadWindow scroll containers", () => {
     });
 
     const html = render(
-      React.createElement(ThreadWorkspacePane, {
+      React.createElement(ThreadPetPane, {
         threadId: "thread-1",
         onSubmit: vi.fn(),
         onStop: vi.fn(),
         onAnswerPermission: vi.fn(),
-        onAnswerWorkspace: vi.fn(),
       }),
     );
 
     expect(html).toContain("cached delta");
-    expect(html).toContain('aria-label="Thread workspace"');
+    expect(html).toContain('aria-label="Thread pet"');
     expect(html).not.toContain("overflow-x-auto overflow-y-hidden");
   });
 

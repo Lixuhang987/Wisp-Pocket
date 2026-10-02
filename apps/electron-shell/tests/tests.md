@@ -6,7 +6,7 @@
 
 | 子节点 | 子文档 | 职责 |
 |------|------|------|
-| `use-cases/` | 无独立子文档 | `desktop-startup`、含目标 Thread 交付的 `thread-window-commands`、`pet-window` 与真实进程管道的 `host-shutdown` 用例 |
+| `use-cases/` | 无独立子文档 | `desktop-startup`、含目标 Thread 交付的 `thread-window-commands`、`pet-window`、`multi-pet-window` 与真实进程管道的 `host-shutdown` 用例 |
 | `activity-window/` | [activity-window/activity-window.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/activity-window/activity-window.md) | 桌宠 React 交互、Thread 消息呈现和拖入分流 |
 | `main/` | [main/main.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/main/main.md) | 初始主题和 macOS Dock 策略 |
 | `preload/` | [preload/preload.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/preload/preload.md) | preload 注入的 main-world globals 和 IPC bridge |

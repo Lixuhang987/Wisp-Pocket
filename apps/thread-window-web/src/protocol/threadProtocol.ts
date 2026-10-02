@@ -10,7 +10,6 @@ export type {
   ThreadAttachment,
   ThreadListEntry,
   ThreadSnapshotPayload,
-  WorkspaceAskCandidate,
 } from "@handagent/core/protocol/types/ThreadProtocolShared.ts";
 export type { ClientResponse } from "@handagent/core/protocol/types/ClientResponse.ts";
 export type { InputItem, RuntimeOp, UserInput } from "@handagent/core/protocol/types/Op.ts";
@@ -20,6 +19,7 @@ export type { ThreadNotification } from "@handagent/core/protocol/types/ThreadNo
 
 export type InitialPromptPayload = {
   clientRequestId: string;
+  petId?: string;
   userInput: UserInput;
 };
 
@@ -33,14 +33,14 @@ export type AvailableSkill = {
 export function encodeThreadStart(input: {
   commandId: string;
   timestamp: string;
-  workspaceId: string | null;
+  petId: string;
 }): string {
   const command: ThreadCommand = {
     type: "thread.start",
     commandId: input.commandId,
     timestamp: input.timestamp,
     payload: {
-      workspaceId: input.workspaceId,
+      petId: input.petId,
     },
   };
   return encode(command);
@@ -62,20 +62,24 @@ export function encodeThreadResume(input: {
 export function encodeThreadList(input: {
   commandId: string;
   timestamp: string;
+  petId?: string;
+  limit?: number;
+  cursor?: string;
 }): string {
   return encode({
     type: "thread.list",
+    ...(input.petId || input.limit || input.cursor ? { payload: { petId: input.petId, limit: input.limit, cursor: input.cursor } } : {}),
     commandId: input.commandId,
     timestamp: input.timestamp,
   });
 }
 
-export function encodeWorkspaceList(input: {
+export function encodePetList(input: {
   commandId: string;
   timestamp: string;
 }): string {
   return encode({
-    type: "workspace.list",
+    type: "pet.list",
     commandId: input.commandId,
     timestamp: input.timestamp,
   });
@@ -126,23 +130,6 @@ export function encodePermissionAnswer(input: {
       decision: input.decision,
       ...(input.scope ? { scope: input.scope } : {}),
       ...(input.reason ? { reason: input.reason } : {}),
-    },
-  });
-}
-
-export function encodeWorkspaceAnswer(input: {
-  requestId: string;
-  timestamp: string;
-  workspaceId?: string;
-  cancelled?: boolean;
-}): string {
-  return encode({
-    type: "workspace.answered",
-    requestId: input.requestId,
-    timestamp: input.timestamp,
-    payload: {
-      ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
-      ...(input.cancelled === undefined ? {} : { cancelled: input.cancelled }),
     },
   });
 }
@@ -229,12 +216,15 @@ export function isThreadNotification(value: unknown): value is ThreadNotificatio
         && isOptionalString(value.commandId)
         && typeof value.payload.targetThreadId === "string"
         && isThreadDeletedStatus(value.payload.status);
-    case "workspace.listed":
-      return hasNotificationBase(value)
-        && isRecord(value.payload)
-        && isOptionalString(value.commandId)
-        && Array.isArray(value.payload.workspaces)
-        && value.payload.workspaces.every(isWorkspaceListEntry);
+    case "pet.listed":
+      return hasNotificationBase(value) && isRecord(value.payload) && Array.isArray(value.payload.pets) && value.payload.pets.every(isPetListEntry);
+    case "pet.created":
+    case "pet.updated":
+      return hasNotificationBase(value) && isRecord(value.payload) && isPetListEntry(value.payload.pet);
+    case "pet.image.imported":
+      return hasNotificationBase(value) && isRecord(value.payload) && isRecord(value.payload.imageRef);
+    case "pet.error":
+      return hasNotificationBase(value) && isRecord(value.payload) && typeof value.payload.message === "string";
     case "request.resolved":
       return hasNotificationBase(value) && hasThreadId(value) && isRecord(value.payload) && typeof value.payload.requestId === "string";
     case "thread.error":
@@ -260,11 +250,6 @@ export function isServerRequest(value: unknown): value is ServerRequest {
         && typeof value.payload.toolName === "string"
         && typeof value.payload.toolCallId === "string"
         && isRecord(value.payload.arguments);
-    case "workspace.requested":
-      return hasServerRequestBase(value)
-        && isRecord(value.payload)
-        && typeof value.payload.prompt === "string"
-        && Array.isArray(value.payload.candidates);
     default:
       return false;
   }
@@ -375,7 +360,7 @@ function isOptionalReplies(value: unknown): boolean {
   return value === undefined || (Array.isArray(value) && value.length <= 4 && value.every((item) => typeof item === "string"));
 }
 
-function isWorkspaceListEntry(value: unknown): boolean {
+function isPetListEntry(value: unknown): boolean {
   return isRecord(value)
     && !Array.isArray(value)
     && typeof value.id === "string"

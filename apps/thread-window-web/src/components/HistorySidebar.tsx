@@ -2,9 +2,9 @@ import { Plus, Search } from 'lucide-react';
 import { useMemo } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { createThreadWindowStore } from '../store/threadWindowStore.ts';
-import { groupThreadsByWorkspace } from '../utils/groupThreads.ts';
+import { groupThreadsByPet } from '../utils/groupThreads.ts';
 import { ThreadItem } from './ThreadItem.tsx';
-import { WorkspaceGroup } from './WorkspaceGroup.tsx';
+import { PetGroup } from './PetGroup.tsx';
 
 interface HistorySidebarProps {
   activeThreadId: string | null;
@@ -20,15 +20,15 @@ export function HistorySidebar({
   onNewThread,
 }: HistorySidebarProps) {
   const history = createThreadWindowStore((state) => state.history);
-  const workspaces = createThreadWindowStore((state) => state.workspaces);
+  const pets = createThreadWindowStore((state) => state.pets);
   const searchQuery = createThreadWindowStore((state) => state.searchQuery);
-  const expandedWorkspaceIds = createThreadWindowStore((state) => state.expandedWorkspaceIds);
+  const expandedPetIds = createThreadWindowStore((state) => state.expandedPetIds);
   const setSearchQuery = createThreadWindowStore((state) => state.setSearchQuery);
-  const toggleWorkspaceExpanded = createThreadWindowStore((state) => state.toggleWorkspaceExpanded);
+  const togglePetExpanded = createThreadWindowStore((state) => state.togglePetExpanded);
 
   const grouped = useMemo(
-    () => groupThreadsByWorkspace(history, workspaces, searchQuery),
-    [history, workspaces, searchQuery]
+    () => groupThreadsByPet(history, pets, searchQuery),
+    [history, pets, searchQuery]
   );
 
   return (
@@ -54,45 +54,25 @@ export function HistorySidebar({
         />
       </div>
 
-      {/* Workspace 分组和默认分组 */}
+      {/* Pet 分组和默认分组 */}
       <Accordion.Root
         type="multiple"
-        value={Array.from(expandedWorkspaceIds)}
+        value={Array.from(expandedPetIds)}
         className="flex-1 min-h-0 space-y-xs overflow-y-auto overflow-x-hidden pr-1"
       >
-        {/* Workspace 分组 */}
-        {grouped.workspaceGroups.map((group) => (
-          <WorkspaceGroup
-            key={group.workspace.id}
-            workspace={group.workspace}
+        {/* Pet 分组 */}
+        {grouped.petGroups.map((group) => (
+          <PetGroup
+            key={group.pet.id}
+            pet={group.pet}
             threads={group.threads}
             activeThreadId={activeThreadId}
-            isExpanded={expandedWorkspaceIds.has(group.workspace.id)}
-            onToggle={() => toggleWorkspaceExpanded(group.workspace.id)}
+            isExpanded={expandedPetIds.has(group.pet.id)}
+            onToggle={() => togglePetExpanded(group.pet.id)}
             onOpenThread={onOpenThread}
             onDeleteThread={onDeleteThread}
           />
         ))}
-
-        {/* 默认分组 - 固定在底部 */}
-        {grouped.defaultGroup.length > 0 && (
-          <div className="mt-md border-t border-app-hairline pt-sm">
-            <h3 className="px-sm py-xs text-xs font-medium text-app-text-secondary">
-              默认对话
-            </h3>
-            <div className="flex flex-col gap-xs">
-              {grouped.defaultGroup.map((thread) => (
-                <ThreadItem
-                  key={thread.id}
-                  thread={thread}
-                  isActive={thread.id === activeThreadId}
-                  onOpen={() => onOpenThread(thread.id)}
-                  onDelete={() => onDeleteThread(thread.id)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
 
         {history.length === 0 && (
           <p className="rounded-lg border border-app-hairline bg-app-canvas/70 px-sm py-md text-sm leading-6 text-app-text-secondary">

@@ -22,7 +22,7 @@ final class SettingsLifecycleTests: XCTestCase {
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
@@ -50,7 +50,7 @@ final class SettingsLifecycleTests: XCTestCase {
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
@@ -63,7 +63,7 @@ final class SettingsLifecycleTests: XCTestCase {
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
@@ -89,7 +89,7 @@ final class SettingsLifecycleTests: XCTestCase {
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
@@ -116,7 +116,7 @@ final class SettingsLifecycleTests: XCTestCase {
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .light,
             onClosed: {}
@@ -141,7 +141,7 @@ private final class ThemeRefreshingSettingsWindowPresenter: SettingsWindowPresen
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
-        workspaceViewModel: WorkspaceSettingsViewModel,
+        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
@@ -153,7 +153,7 @@ private final class ThemeRefreshingSettingsWindowPresenter: SettingsWindowPresen
         _ = appendPromptSettingsViewModel
         _ = mcpSettingsViewModel
         _ = permissionRulesViewModel
-        _ = workspaceViewModel
+        _ = petViewModel
         _ = shortcutActions
         _ = onClose
         return window

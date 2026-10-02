@@ -1,11 +1,11 @@
-// apps/thread-window-web/src/components/WorkspaceGroup.tsx
+// apps/thread-window-web/src/components/PetGroup.tsx
 import * as Accordion from '@radix-ui/react-accordion';
 import { Folder, FolderOpen, MoreHorizontal, X } from 'lucide-react';
 import type { ThreadListEntry } from '../protocol/threadProtocol.ts';
 import { ThreadItem } from './ThreadItem.tsx';
 
-interface WorkspaceGroupProps {
-  workspace: { id: string; name: string; rootPath: string };
+interface PetGroupProps {
+  pet: { id: string; name: string; rootPath: string };
   threads: ThreadListEntry[];
   activeThreadId: string | null;
   isExpanded: boolean;
@@ -14,17 +14,17 @@ interface WorkspaceGroupProps {
   onDeleteThread: (threadId: string) => void;
 }
 
-export function WorkspaceGroup({
-  workspace,
+export function PetGroup({
+  pet,
   threads,
   activeThreadId,
   isExpanded,
   onToggle,
   onOpenThread,
   onDeleteThread,
-}: WorkspaceGroupProps) {
+}: PetGroupProps) {
   return (
-    <Accordion.Item value={workspace.id} className="mb-xs">
+    <Accordion.Item value={pet.id} className="mb-xs">
       <Accordion.Header>
         <Accordion.Trigger
           onClick={onToggle}
@@ -32,34 +32,9 @@ export function WorkspaceGroup({
         >
           <FolderIcon isExpanded={isExpanded} />
 
-          <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{pet.name}</span>
 
-          {/* 右侧操作按钮组 */}
-          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            {/* 更多选项按钮 */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // TODO: 实现更多选项菜单
-              }}
-              className="flex h-5 w-5 items-center justify-center rounded text-app-text-secondary hover:bg-app-surface-muted hover:text-app-text-primary"
-              aria-label="更多选项"
-            >
-              <MoreHorizontal size={12} />
-            </button>
-
-            {/* 删除按钮 */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // TODO: 实现删除 workspace
-              }}
-              className="flex h-5 w-5 items-center justify-center rounded text-app-text-secondary hover:bg-app-surface-muted hover:text-app-text-primary"
-              aria-label="删除工作区"
-            >
-              <X size={10} strokeWidth={1.5} />
-            </button>
-          </div>
+          <span className="text-app-text-muted">{pet.id.slice(-6)}</span>
         </Accordion.Trigger>
       </Accordion.Header>
       <Accordion.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">

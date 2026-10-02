@@ -1,5 +1,7 @@
-import { BrowserWindow, app, ipcMain, screen, utilityProcess } from "electron";
+import { BrowserWindow, app, dialog, ipcMain, screen, utilityProcess } from "electron";
 import { dirname, join, resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { PetWindowCollection } from "./windows/petWindowCollection.js";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { ElectronShellRuntime, errorMessage } from "./electronShellRuntime.js";
@@ -72,18 +74,21 @@ const prewarmer = new ThreadWindowPrewarmer({
   },
 });
 
-const activityWindow = new ActivityWindowController({
+const createPetWindow = (petId: string, index: number) => new ActivityWindowController({
+  petId, initialOffset: (index % 6) * 110,
   activityWindowHTMLPath,
   preloadPath: activityPreloadPath,
   threadWebSocketURL: process.env.HANDAGENT_PET_THREAD_WEBSOCKET_URL,
   initialTheme,
   positionStore: new PetPositionStore(
-    process.env.HANDAGENT_PET_POSITION_PATH ?? join(homedir(), ".spotAgent/pet-position.json"),
+    process.env.HANDAGENT_PET_POSITION_PATH ? `${process.env.HANDAGENT_PET_POSITION_PATH}.${petId}` : join(homedir(), ".spotAgent/pet-positions", `${petId}.json`),
     (error) => process.stderr.write(`[electron-shell] pet position: ${errorMessage(error)}\n`),
   ),
   createWindow: (options) => new BrowserWindow(options),
   screenProvider: {
     getPrimaryWorkArea: () => screen.getPrimaryDisplay().workArea,
+    getDisplayForPoint: point => { const display = screen.getDisplayNearestPoint(point); return {id:String(display.id),workArea:display.workArea}; },
+    getWorkAreaForDisplay: id => screen.getAllDisplays().find(display => String(display.id) === id)?.workArea,
     getWorkAreaForPoint: (point) => screen.getDisplayNearestPoint(point).workArea,
     getCursorScreenPoint: () => screen.getCursorScreenPoint(),
     subscribeWorkAreaChanges: (listener) => {
@@ -98,6 +103,7 @@ const activityWindow = new ActivityWindowController({
     },
   },
   onRendererCrashed: (reason) => {
+    void activityWindow.recover(petId).catch(error => process.stderr.write(`[electron-shell] pet recovery: ${errorMessage(error)}\n`));
     send({
       channel: "electron_shell",
       type: "renderer.crashed",
@@ -105,6 +111,17 @@ const activityWindow = new ActivityWindowController({
       reason,
     });
   },
+});
+
+const visibilityPath = join(homedir(), ".spotAgent/pet-visibility.json");
+const activityWindow = new PetWindowCollection({
+  url: process.env.HANDAGENT_PET_THREAD_WEBSOCKET_URL ?? "ws://127.0.0.1:4317/api/thread",
+  createController: createPetWindow,
+  preferences: {
+    load: () => { try { const value = JSON.parse(readFileSync(visibilityPath,"utf8")); return Object.fromEntries(Object.entries(value).filter(([,v])=>typeof v==="boolean")) as Record<string,boolean>; } catch { return {}; } },
+    save: value => { mkdirSync(dirname(visibilityPath),{recursive:true});writeFileSync(`${visibilityPath}.tmp`,JSON.stringify(value));renameSync(`${visibilityPath}.tmp`,visibilityPath); },
+  },
+  onError: error => process.stderr.write(`[electron-shell] pet windows: ${errorMessage(error)}\n`),
 });
 
 let hasStartedSupervisor = false;
@@ -161,6 +178,14 @@ const runtime = new ElectronShellRuntime({
 });
 
 registerPetWindowIpc(ipcMain, activityWindow);
+ipcMain.handle("pet-window:show-pet", async (event, petId: unknown) => {
+  if (!activityWindow.controllerForSender(event.sender) || typeof petId !== "string") throw new Error("Invalid pet window sender");
+  await activityWindow.showPet(petId);
+});
+ipcMain.handle("pet-window:choose-files", async event => {
+  if (!activityWindow.controllerForSender(event.sender)) throw new Error("Invalid pet window sender");
+  const result = await dialog.showOpenDialog({properties:["openFile","multiSelections"]});return result.canceled ? [] : result.filePaths;
+});
 
 async function handleCommandLine(line: string): Promise<void> {
   let command: SwiftToElectronCommand;
@@ -200,6 +225,7 @@ process.stdin.on("end", () => {
 
 app.on("before-quit", () => {
   commandSocketServer?.close();
+  activityWindow.stop();
   stopSupervisor();
 });
 

@@ -53,12 +53,14 @@ final class AgentTriggerSettingsViewTests: XCTestCase {
             chromeBookmarksFolderTreeStore: ChromeBookmarksFolderTreeStore(homeDirectoryURL: homeURL),
             packageConnectionStatusProvider: { _ in nil }
         )
+        viewModel.targetPetId = "pet-test"
         viewModel.selectPackage(id: "system-clock")
         XCTAssertTrue(viewModel.createInstanceForCurrentPackage(
             title: "Existing automation",
             config: ["scheduleAt": .stringList(["09:00"]), "timezone": .string("UTC")]
         ), file: file, line: line)
         let savedInstances = store.loadInstances()
+        viewModel.targetPetId = "pet-test"
         viewModel.selectPackage(id: packageId)
 
         let hosted = HostedAgentTriggerSettings(viewModel: viewModel)

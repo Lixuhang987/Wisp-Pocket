@@ -11,7 +11,7 @@ struct ToolSettingsView: View {
                 SettingsSection {
                     SettingsRow("Context History") {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("记录应用、窗口、辅助功能内容与屏幕图片。关闭窗口后继续，禁用或退出应用时停止。")
+                            Text("记录应用、窗口、辅助功能内容与屏幕图片。应用运行期间持续采集，关闭窗口后继续，退出应用时停止。历史与文件读取默认可用，无需逐次确认。")
                                 .font(theme.typography.captionFont)
                                 .foregroundStyle(theme.colors.textSecondary)
                             HStack {
@@ -20,9 +20,7 @@ struct ToolSettingsView: View {
                                     .foregroundStyle(theme.colors.textPrimary)
                                     .textSelection(.enabled)
                                 Spacer()
-                                Toggle("启用 Context History", isOn: $viewModel.contextHistoryEnabled)
-                                    .labelsHidden()
-                                    .toggleStyle(.switch)
+
                             }
                         }
                     }

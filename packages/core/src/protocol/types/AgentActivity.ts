@@ -7,7 +7,7 @@ export type AgentActivityStatus =
   | "completed"
   | "error";
 
-export type AgentActivityWaitingRequest = "permission" | "workspace";
+export type AgentActivityWaitingRequest = "permission";
 
 export type ActivitySnapshotEvent = {
   channel: "activity";

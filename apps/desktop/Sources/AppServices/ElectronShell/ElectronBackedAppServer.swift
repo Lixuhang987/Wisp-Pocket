@@ -109,6 +109,14 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
     }
 
     @discardableResult
+    func setPetVisible(petId: String, visible: Bool) throws -> String {
+        let commandId = UUID().uuidString
+        pendingActivityCommandKinds[commandId] = .petVisibility(petId: petId, visible: visible)
+        do { try shell.send(.petVisibility(commandId: commandId, petId: petId, visible: visible)) }
+        catch { pendingActivityCommandKinds.removeValue(forKey: commandId); throw error }
+        return commandId
+    }
+
     func showActivityWindow() throws -> String {
         let commandId = UUID().uuidString
         pendingActivityCommandKinds[commandId] = .show

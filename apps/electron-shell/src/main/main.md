@@ -19,11 +19,11 @@
 
 ## 运行时分层
 
-- `main.ts` 是组合根：读取 env、创建 `JsonLineBridge`、`AgentServerSupervisor`、`ThreadWindowPrewarmer`、`ActivityWindowController`，在 `app.whenReady()` 后应用 macOS regular activation policy 并显示 Dock 图标，再把进程和窗口对象交给 `ElectronShellRuntime`。`HANDAGENT_INITIAL_THEME` 只作为启动期初值，必须经过 `initialHostTheme.ts` 校验后传给 window controllers。
+- `main.ts` 是组合根：读取 env、创建 `JsonLineBridge`、`AgentServerSupervisor`、`ThreadWindowPrewarmer`、`PetWindowCollection`，在 `app.whenReady()` 后应用 macOS regular activation policy 并显示 Dock 图标，再把进程和窗口对象交给 `ElectronShellRuntime`。`HANDAGENT_INITIAL_THEME` 只作为启动期初值，必须经过 `initialHostTheme.ts` 校验后传给 window controllers。
 - `ElectronShellRuntime` 不直接 import Electron API；它只依赖窗口、event output 和 supervisor 生命周期接口，负责 command ack、health gate、host theme fan-out 和预热重入。
 - `thread_window.focus` 携带非空目标 ID 时，runtime 必须交给 prewarmer 的目标打开入口，即使窗口已经可见；无目标时才沿窗口级 focus/openHistory 路径。交付与回执边界见 [protocol](./protocol/protocol.md)。
-- `petWindowIpc.ts` 只接受当前桌宠 `webContents`，校验布局与可选内容高度；高度只是窗口布局建议，不包含消息。拖动坐标由 main 读取系统光标；renderer 上报本地 DOM 命中矩形及显式窗口意图。桥接合约见 [preload](../preload/preload.md)。
-- 桌宠位置默认写入 `~/.spotAgent/pet-position.json`，路径由 main 注入。`HANDAGENT_PET_POSITION_PATH` 与 `HANDAGENT_PET_THREAD_WEBSOCKET_URL` 用于隔离原生 QA；URL 仍限 loopback `/api/thread`，由 preload 确保开启交互式请求。
+- `petWindowIpc.ts` 从登记的 sender 解析所属宠窗，校验布局与可选内容高度；高度只是窗口布局建议，不包含消息。拖动坐标由 main 读取系统光标；renderer 上报本地 DOM 命中矩形及显式窗口意图。桥接合约见 [preload](../preload/preload.md)。
+- 桌宠位置按 petId 写入 `~/.spotAgent/pet-positions/<petId>.json`，路径由 main 注入。`HANDAGENT_PET_POSITION_PATH` 与 `HANDAGENT_PET_THREAD_WEBSOCKET_URL` 用于隔离原生 QA；URL 仍限 loopback `/api/thread`，由 preload 确保开启交互式请求。
 
 ## 状态机前提
 
@@ -31,7 +31,7 @@
 - `theme.changed` command 必须同时调用 ThreadWindow prewarmer 和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。启动期同样使用 Swift 传入的 `{ preference, resolved }`，不要在 Electron main 固定 dark/light 或自行解析系统外观。
 - ThreadWindow 预热时只把当前 host theme 与只读 `availableSkills` 传给 prewarmer；skills 由本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）读取。Dynamic Tool 的声明、调用与内置模块生命周期由 Swift Host 管理，Electron 不向 ThreadWindow preload 传递默认 dynamic tools。
 - `prewarmAfterServerReadyPromise` 用来合并并发预热；改动预热流程时必须保持只发一次对应的 prepared / prepare_failed 结果。
-- ThreadWindow 关闭后发送 `thread_window.closed`；如果窗口曾 prepared 且 agent-server 仍 available，runtime 会再次主动预热。桌宠保留同一 renderer 和当前 UI 状态。
+- ThreadWindow 关闭后发送 `thread_window.closed`；如果窗口曾 prepared 且 agent-server 仍 available，runtime 会再次主动预热。各可见宠独立保留 renderer；隐藏角色在接收确认后回收窗口。
 - 桌宠点击、输入焦点、滚动和 drop 由 renderer 正常接收；ThreadWindow 的 show/focus 仍走独立 command 生命周期。
 - `shutdown` command 要先 ack，再停止 supervisor 并退出 Electron；关闭 ThreadWindow 或 ActivityWindow 不能停止 agent-server。
 

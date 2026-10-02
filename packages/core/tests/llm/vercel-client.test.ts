@@ -313,7 +313,7 @@ describe("VercelClient adapters", () => {
 
   it("sanitizes tool names so they match OpenAI's ^[a-zA-Z0-9_-]+$ pattern", () => {
     expect(sanitizeToolName("file.read")).toBe("file_read");
-    expect(sanitizeToolName("workspace.list")).toBe("workspace_list");
+    expect(sanitizeToolName("context_history.activity_index")).toBe("context_history_activity_index");
     expect(sanitizeToolName("already_safe-name")).toBe("already_safe-name");
     expect(sanitizeToolName("space here.dot")).toBe("space_here_dot");
   });

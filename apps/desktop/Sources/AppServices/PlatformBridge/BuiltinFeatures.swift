@@ -17,8 +17,7 @@ final class BuiltinFeatures {
 
     var dynamicToolSpecs: [[String: Any]] {
         guard isStarted else { return [] }
-        return (settingsStore.settings.contextHistoryEnabled ? BuiltinFeatureToolSpecs.contextHistory : [])
-            + (settingsStore.settings.automationEnabled ? BuiltinFeatureToolSpecs.automation : [])
+        return settingsStore.settings.automationEnabled ? BuiltinFeatureToolSpecs.automation : []
     }
 
     func start() {
@@ -44,11 +43,6 @@ final class BuiltinFeatures {
     func handle(namespace: String, tool: String, arguments: Any?) async -> DynamicToolResult? {
         guard isStarted else { return nil }
         switch namespace {
-        case "context_history":
-            guard settingsStore.settings.contextHistoryEnabled else {
-                return .text("context_history is disabled", success: false)
-            }
-            return contextHistory.handle(tool: tool, arguments: arguments)
         case "automation":
             return await automation.handle(tool: tool, arguments: arguments)
         default:
@@ -58,8 +52,7 @@ final class BuiltinFeatures {
 
     private func applySettings() {
         guard isStarted else { return }
-        if settingsStore.settings.contextHistoryEnabled { contextHistory.start() }
-        else { contextHistory.stop() }
+        contextHistory.start()
         if settingsStore.settings.automationEnabled { automation.start() }
         else { automation.stop() }
         onToolsChanged?()

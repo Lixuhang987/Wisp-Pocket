@@ -73,7 +73,8 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmi
             userInput: PromptUserInput(items: [
                 .text(id: UUID().uuidString, text: renderedPrompt)
             ]),
-            summary: instance.title.isEmpty ? event.summary : instance.title
+            summary: instance.title.isEmpty ? event.summary : instance.title,
+            targetPetId: instance.targetPetId
         )
     }
 

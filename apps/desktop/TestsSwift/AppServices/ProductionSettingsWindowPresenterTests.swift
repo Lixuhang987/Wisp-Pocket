@@ -16,7 +16,7 @@ final class ProductionSettingsWindowPresenterTests: XCTestCase {
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .dark,
             onClose: {}
@@ -41,7 +41,7 @@ final class ProductionSettingsWindowPresenterTests: XCTestCase {
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
             mcpSettingsViewModel: MCPSettingsViewModel(),
             permissionRulesViewModel: PermissionRulesViewModel(),
-            workspaceViewModel: WorkspaceSettingsViewModel(),
+            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .light,
             onClose: {}

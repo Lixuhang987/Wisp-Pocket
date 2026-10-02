@@ -1,10 +1,10 @@
+import type { Pet } from "@handagent/core/pet/Pet.ts";
 import type {
   RunStatus,
   ServerRequest,
   ThreadListEntry,
   ThreadNotification,
   ThreadSnapshotPayload,
-  WorkspaceAskCandidate,
 } from "../protocol/threadProtocol.ts";
 import type {
   AssistantMessageItem,
@@ -18,21 +18,19 @@ export type PermissionRequestState = {
   toolName: string;
   toolCallId: string;
   argumentsJSON: string;
-};
-
-export type WorkspaceRequestState = {
-  id: string;
-  prompt: string;
-  candidates: WorkspaceAskCandidate[];
+  expiresAt?: number;
 };
 
 export type ThreadProjection = {
   threadId: string;
+  petId?: string;
+  petRevision?: number;
+  rootPath?: string;
+  petSnapshot?: ThreadSnapshotPayload["petSnapshot"];
   title: string | null;
   status: RunStatus;
   messages: ThreadItem[];
   permissionRequests: PermissionRequestState[];
-  workspaceRequests: WorkspaceRequestState[];
   errorMessage: string | null;
 };
 
@@ -41,7 +39,7 @@ export type ThreadWindowProjection = {
   history: ThreadListEntry[];
   threadsById: Record<string, ThreadProjection>;
   processedNotificationIds: Record<string, true>;
-  workspaces: Array<{ id: string; name: string; rootPath: string }>;
+  pets: Pet[];
 };
 
 export function emptyThreadProjection(threadId: string, title: string | null): ThreadProjection {
@@ -51,7 +49,6 @@ export function emptyThreadProjection(threadId: string, title: string | null): T
     status: "idle",
     messages: [],
     permissionRequests: [],
-    workspaceRequests: [],
     errorMessage: null,
   };
 }
@@ -74,6 +71,7 @@ export function projectNotification(
     case "thread.started":
       state.windowErrorMessage = null;
       upsertHistoryEntry(state, notification.threadId, {
+        ...notification.payload,
         preview: notification.payload.preview,
         createdAt: notification.payload.createdAt ?? notification.timestamp,
         updatedAt: notification.timestamp,
@@ -81,6 +79,10 @@ export function projectNotification(
       break;
     case "thread.snapshot": {
       const thread = state.threadsById[notification.threadId];
+      thread.petId = notification.payload.petId;
+      thread.petSnapshot = notification.payload.petSnapshot;
+      thread.petRevision = notification.payload.petSnapshot.revision;
+      thread.rootPath = notification.payload.rootPath;
       thread.status = notification.payload.status;
       thread.messages = notification.payload.messages.map(snapshotMessageToItem);
       clearThreadRequests(thread);
@@ -116,6 +118,7 @@ export function projectNotification(
     case "turn.started": {
       const thread = state.threadsById[notification.threadId];
       thread.status = "running";
+      upsertHistoryEntry(state, notification.threadId, {status:"running",updatedAt:notification.timestamp});
       thread.errorMessage = null;
       for (const message of thread.messages) {
         if (message.type === "assistant_message") message.awaitingReply = false;
@@ -173,27 +176,34 @@ export function projectNotification(
       const thread = state.threadsById[notification.threadId];
       thread.status = notification.payload.status === "completed" ? "idle" : notification.payload.status;
       clearThreadRequests(thread);
-      upsertHistoryEntry(state, notification.threadId, { updatedAt: notification.timestamp, messageCount: thread.messages.length });
+      upsertHistoryEntry(state, notification.threadId, { status:thread.status, updatedAt: notification.timestamp, messageCount: thread.messages.length });
       break;
     }
     case "thread.status.changed": {
       const thread = state.threadsById[notification.threadId];
       thread.status = notification.payload.value;
       if (thread.status !== "running") clearThreadRequests(thread);
-      upsertHistoryEntry(state, notification.threadId, { updatedAt: notification.timestamp, messageCount: thread.messages.length });
+      upsertHistoryEntry(state, notification.threadId, { status:thread.status, updatedAt: notification.timestamp, messageCount: thread.messages.length });
       break;
     }
     case "thread.listed":
       state.history = notification.payload.threads;
       break;
-    case "workspace.listed":
-      state.workspaces = notification.payload.workspaces;
+    case "pet.listed":
+      state.pets = notification.payload.pets;
+      break;
+    case "pet.created":
+    case "pet.updated":
+      state.windowErrorMessage = null;
+      state.pets = [...state.pets.filter(pet => pet.id !== notification.payload.pet.id), notification.payload.pet];
+      break;
+    case "pet.error":
+      state.windowErrorMessage = notification.payload.message;
       break;
     case "request.resolved": {
       const thread = state.threadsById[notification.threadId];
       if (thread) {
         thread.permissionRequests = thread.permissionRequests.filter((request) => request.id !== notification.payload.requestId);
-        thread.workspaceRequests = thread.workspaceRequests.filter((request) => request.id !== notification.payload.requestId);
       }
       break;
     }
@@ -222,12 +232,7 @@ export function projectRequest(thread: ThreadProjection, request: ServerRequest)
       toolName: request.payload.toolName,
       toolCallId: request.payload.toolCallId,
       argumentsJSON: JSON.stringify(request.payload.arguments),
-    });
-  } else if (!thread.workspaceRequests.some((item) => item.id === request.requestId)) {
-    thread.workspaceRequests.push({
-      id: request.requestId,
-      prompt: request.payload.prompt,
-      candidates: request.payload.candidates,
+      expiresAt: Date.parse(request.timestamp) + (request.payload.timeoutMs ?? 60_000),
     });
   }
 }
@@ -238,15 +243,8 @@ export function resolvePermissionRequest(state: ThreadWindowProjection, requestI
   }
 }
 
-export function resolveWorkspaceRequest(state: ThreadWindowProjection, requestId: string): void {
-  for (const thread of Object.values(state.threadsById)) {
-    thread.workspaceRequests = thread.workspaceRequests.filter((request) => request.id !== requestId);
-  }
-}
-
 function clearThreadRequests(thread: ThreadProjection): void {
   thread.permissionRequests = [];
-  thread.workspaceRequests = [];
 }
 
 function snapshotMessageToItem(message: ThreadSnapshotPayload["messages"][number]): ThreadItem {
@@ -294,7 +292,10 @@ function upsertHistoryEntry(
     createdAt,
     updatedAt,
     messageCount: update.messageCount ?? existing?.messageCount ?? 0,
-    workspaceId: Object.hasOwn(update, "workspaceId") ? update.workspaceId ?? null : existing?.workspaceId ?? null,
+    petId: update.petId ?? existing?.petId ?? state.threadsById[threadId]?.petId ?? "",
+    petRevision: update.petRevision ?? existing?.petRevision ?? 1,
+    rootPath: update.rootPath ?? existing?.rootPath ?? "",
+    status: update.status ?? existing?.status ?? "idle",
   };
   if (existingIndex >= 0) {
     state.history[existingIndex] = nextEntry;

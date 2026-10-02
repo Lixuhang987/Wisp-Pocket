@@ -15,16 +15,16 @@ import {
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "../../src/native/themeConfig.ts";
 
 describe("thread protocol helpers", () => {
-  it("encodes thread.start with workspace only", () => {
+  it("encodes thread.start with pet only", () => {
     expect(JSON.parse(encodeThreadStart({
       commandId: "cmd-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      workspaceId: null,
+      petId: "pet-default",
     }))).toEqual({
       type: "thread.start",
       commandId: "cmd-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      payload: { workspaceId: null },
+      payload: { petId: "pet-default" },
     });
   });
 
@@ -95,11 +95,11 @@ describe("thread protocol helpers", () => {
     })).toBe(true);
 
     expect(isServerRequest({
-      type: "workspace.requested",
+      type: "permission.requested",
       requestId: "thread-1:req-2",
       threadId: "thread-1",
       timestamp: "2026-06-06T00:00:05.000Z",
-      payload: { prompt: "Pick", candidates: [] },
+      payload: { toolName: "file.write", toolCallId: "write", arguments: {} },
     })).toBe(true);
   });
 
@@ -193,18 +193,18 @@ describe("thread protocol helpers", () => {
     })).toBe(false);
   });
 
-  it("guards workspace listed notifications", () => {
+  it("guards pet listed notifications", () => {
     const base = {
-      type: "workspace.listed",
-      notificationId: "n-workspaces",
-      commandId: "workspace-list-1",
+      type: "pet.listed",
+      notificationId: "n-pets",
+      commandId: "pet-list-1",
       timestamp: "2026-06-06T00:00:09.000Z",
     };
 
     expect(isThreadNotification({
       ...base,
       payload: {
-        workspaces: [{
+        pets: [{description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
           id: "docs",
           name: "Docs",
           rootPath: "/repo/docs",
@@ -215,7 +215,7 @@ describe("thread protocol helpers", () => {
     expect(isThreadNotification({
       ...base,
       payload: {
-        workspaces: [{
+        pets: [{description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
           id: "docs",
           name: "Docs",
           rootPath: 123,
@@ -256,7 +256,7 @@ describe("native config boundaries", () => {
   }
 
   it("flushes initial prompts queued before React installs the receiver", () => {
-    nativeWindow().handAgentPendingInitialPrompts = [{
+    nativeWindow().handAgentPendingInitialPrompts = [{petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],

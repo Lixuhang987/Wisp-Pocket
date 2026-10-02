@@ -28,6 +28,10 @@ final class AgentTriggerSettingsViewModel {
     private(set) var chromeBookmarkFolders: [ChromeBookmarkFolderOption] = []
     private(set) var saveErrorMessage: String?
     private(set) var selectedPackageId: String?
+    var targetPetId = ""
+    private(set) var pets: [PetEntry] = []
+    var deliveryErrorMessage: String? { store.deliveryErrorMessage }
+    @ObservationIgnored private let petClient: (any PetManaging)?
 
     @ObservationIgnored private let store: AgentTriggerStore
     @ObservationIgnored private let runtime: (any AgentTriggerRuntimeReloading)?
@@ -37,6 +41,7 @@ final class AgentTriggerSettingsViewModel {
     init(
         store: AgentTriggerStore = AgentTriggerStore(),
         runtime: (any AgentTriggerRuntimeReloading)? = nil,
+        petClient: (any PetManaging)? = nil,
         chromeBookmarksFolderTreeStore: ChromeBookmarksFolderTreeStore = ChromeBookmarksFolderTreeStore(),
         packageConnectionStatusProvider: @escaping (AgentTriggerPackageEntry) -> AgentTriggerPackageConnectionStatus? = {
             package in
@@ -50,9 +55,16 @@ final class AgentTriggerSettingsViewModel {
     ) {
         self.store = store
         self.runtime = runtime
+        self.petClient = petClient
         self.chromeBookmarksFolderTreeStore = chromeBookmarksFolderTreeStore
         self.packageConnectionStatusProvider = packageConnectionStatusProvider
         reload()
+    }
+
+    func reloadPets() async {
+        guard let petClient else { return }
+        do { pets = try await petClient.listPets() }
+        catch { saveErrorMessage = error.localizedDescription }
     }
 
     func reload() {
@@ -146,6 +158,8 @@ final class AgentTriggerSettingsViewModel {
             saveErrorMessage = "提示词不能为空"
             return false
         }
+        let selectedPet = targetPetId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selectedPet.isEmpty else { saveErrorMessage = "请选择目标桌宠"; return false }
         let instance = AgentTriggerInstance(
             id: UUID().uuidString,
             packageId: packageId,
@@ -154,7 +168,8 @@ final class AgentTriggerSettingsViewModel {
             config: config,
             promptTemplate: resolvedPromptTemplate,
             deliveryPolicy: manifest.defaultDeliveryPolicy,
-            notificationPolicy: manifest.defaultNotificationPolicy
+            notificationPolicy: manifest.defaultNotificationPolicy,
+            targetPetId: selectedPet
         )
         var nextInstances = store.loadInstances()
         nextInstances.append(instance)

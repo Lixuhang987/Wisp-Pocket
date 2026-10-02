@@ -29,7 +29,7 @@ describe("FilePermissionPolicy", () => {
   function requestFor(relativePath: string) {
     return {
       toolName: "file.write",
-      arguments: { workspaceId: "default", relativePath },
+      arguments: { relativePath },
       toolCallId: `tc-${relativePath}`,
     };
   }
@@ -38,7 +38,7 @@ describe("FilePermissionPolicy", () => {
     const policy = new FilePermissionPolicy({ filePath });
     const decision = await policy.check({
       toolName: "file.write",
-      arguments: { workspaceId: "default", relativePath: "x.md" },
+      arguments: { relativePath: "x.md" },
       toolCallId: "tc-1",
     });
     expect(decision).toBe("ask");
@@ -49,7 +49,7 @@ describe("FilePermissionPolicy", () => {
     const policy = new FilePermissionPolicy({ filePath });
     const req = {
       toolName: "file.write",
-      arguments: { workspaceId: "default", relativePath: "x.md" },
+      arguments: { relativePath: "x.md" },
       toolCallId: "tc-1",
     };
     await policy.remember(req, { decision: "allow", remember: "always" });
@@ -59,7 +59,7 @@ describe("FilePermissionPolicy", () => {
     expect(
       await fresh.check({
         ...req,
-        arguments: { relativePath: "different.md", workspaceId: "default" },
+        arguments: { relativePath: "different.md" },
       }),
     ).toBe("allow");
     expect(fresh.listPersistedRules()[0].toolName).toBe("file.write");
@@ -68,7 +68,7 @@ describe("FilePermissionPolicy", () => {
 
   it("does not reuse file tool allow rules for separate tool names with the same arguments", async () => {
     const policy = new FilePermissionPolicy({ filePath });
-    const args = { workspaceId: "default", relativePath: "x.md" };
+    const args = { relativePath: "x.md" };
     const otherToolName = "external" + ".writer";
     await policy.remember(
       {
@@ -92,7 +92,7 @@ describe("FilePermissionPolicy", () => {
     const policy = new FilePermissionPolicy({ filePath });
     const req = {
       toolName: "file.write",
-      arguments: { workspaceId: "default" },
+      arguments: { relativePath: "x.md" },
       toolCallId: "tc-1",
     };
     await policy.remember(req, { decision: "allow", remember: "once" });
@@ -103,7 +103,7 @@ describe("FilePermissionPolicy", () => {
     const policy = new FilePermissionPolicy({ filePath });
     const req = {
       toolName: "file.write",
-      arguments: { workspaceId: "default" },
+      arguments: { relativePath: "x.md" },
       toolCallId: "tc-1",
     };
     await policy.remember(req, { decision: "deny", remember: "always" });

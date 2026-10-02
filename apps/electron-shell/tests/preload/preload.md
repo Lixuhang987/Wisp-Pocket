@@ -7,7 +7,7 @@
 | 文件 | 覆盖对象 |
 |------|------|
 | `threadWindowPreload.test.ts` | ThreadWindow preload 的 `/api/thread` config、`availableSkills`、host theme，以及首轮输入和目标 Thread 的早到请求、既有 receiver 与待交付数组保留 |
-| `activityWindowPreload.test.ts` | 桌宠 preload 的 Thread endpoint、隔离 QA URL、host theme 与最小窗口能力边界 |
+| `activityWindowPreload.test.ts` | 桌宠 preload 的 固定 petId、Thread endpoint、隔离 QA URL、host theme 与最小窗口能力边界 |
 
 ## 测试前提
 

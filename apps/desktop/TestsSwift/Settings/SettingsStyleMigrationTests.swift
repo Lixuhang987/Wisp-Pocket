@@ -33,7 +33,7 @@ final class SettingsStyleMigrationTests: XCTestCase {
             "apps/desktop/Sources/Settings/MCPSettingsView.swift",
             "apps/desktop/Sources/Settings/PermissionRulesView.swift",
             "apps/desktop/Sources/Settings/ShortcutSettingsView.swift",
-            "apps/desktop/Sources/Settings/WorkspaceSettingsView.swift"
+            "apps/desktop/Sources/Settings/PetSettingsView.swift"
         ]
 
         for relativePath in requiredContainers {

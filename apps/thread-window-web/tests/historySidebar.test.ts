@@ -8,20 +8,20 @@ const timestamp = "2026-06-09T00:00:00.000Z";
 
 const mockState: Pick<
   ThreadWindowState,
-  "history" | "workspaces" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded" | "threadsById"
+  "history" | "pets" | "expandedPetIds" | "searchQuery" | "setSearchQuery" | "togglePetExpanded" | "threadsById"
 > = {
   history: [],
-  workspaces: [
-    {
-      id: "workspace-1",
-      name: "Project workspace",
+  pets: [
+    {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+      id: "pet-1",
+      name: "Project pet",
       rootPath: "/tmp/project",
     },
   ],
-  expandedWorkspaceIds: new Set(["workspace-1"]),
+  expandedPetIds: new Set(["pet-1"]),
   searchQuery: "",
   setSearchQuery: vi.fn(),
-  toggleWorkspaceExpanded: vi.fn(),
+  togglePetExpanded: vi.fn(),
   threadsById: {},
 };
 
@@ -34,21 +34,21 @@ const { HistorySidebar } = await import("../src/components/HistorySidebar.tsx");
 describe("HistorySidebar", () => {
   beforeEach(() => {
     mockState.history = [];
-    mockState.workspaces = [
-      {
-        id: "workspace-1",
-        name: "Project workspace",
+    mockState.pets = [
+      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+        id: "pet-1",
+        name: "Project pet",
         rootPath: "/tmp/project",
       },
     ];
-    mockState.expandedWorkspaceIds = new Set(["workspace-1"]);
+    mockState.expandedPetIds = new Set(["pet-1"]);
     mockState.searchQuery = "";
     mockState.setSearchQuery = vi.fn();
-    mockState.toggleWorkspaceExpanded = vi.fn();
+    mockState.togglePetExpanded = vi.fn();
     mockState.threadsById = {};
   });
 
-  it("provides Radix Accordion context for workspace groups", () => {
+  it("provides Radix Accordion context for pet groups", () => {
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
         activeThreadId: null,
@@ -58,23 +58,23 @@ describe("HistorySidebar", () => {
       }),
     );
 
-    expect(html).toContain("Project workspace");
+    expect(html).toContain("Project pet");
     // rootPath is no longer displayed for simplified UI
   });
 
-  it("renders workspace groups alphabetically before the default conversation group", () => {
-    mockState.workspaces = [
-      { id: "default", name: "default", rootPath: "/default" },
-      { id: "tmp", name: "tmp", rootPath: "/tmp" },
-      { id: "qa-workspace", name: "qa-workspace", rootPath: "/qa" },
-      { id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
+  it("renders pet groups alphabetically without merging identical roots", () => {
+    mockState.pets = [
+      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "default", name: "default", rootPath: "/default" },
+      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "tmp", name: "tmp", rootPath: "/tmp" },
+      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "qa-pet", name: "qa-pet", rootPath: "/qa" },
+      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
     ];
-    mockState.expandedWorkspaceIds = new Set(["tmp", "qa-workspace", "handagent-test"]);
+    mockState.expandedPetIds = new Set(["tmp", "qa-pet", "handagent-test"]);
     mockState.history = [
-      {
+      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-default",
         preview: "default conversation",
-        workspaceId: null,
+        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,
@@ -90,25 +90,23 @@ describe("HistorySidebar", () => {
       }),
     );
 
-    const workspaceDefaultIndex = html.indexOf("default");
+    const petDefaultIndex = html.indexOf("default");
     const handagentIndex = html.indexOf("handagent-test");
-    const qaIndex = html.indexOf("qa-workspace");
+    const qaIndex = html.indexOf("qa-pet");
     const tmpIndex = html.indexOf("tmp");
-    const defaultIndex = html.indexOf("默认对话");
 
-    expect(workspaceDefaultIndex).toBeGreaterThanOrEqual(0);
-    expect(handagentIndex).toBeGreaterThan(workspaceDefaultIndex);
+    expect(petDefaultIndex).toBeGreaterThanOrEqual(0);
+    expect(handagentIndex).toBeGreaterThan(petDefaultIndex);
     expect(qaIndex).toBeGreaterThan(handagentIndex);
     expect(tmpIndex).toBeGreaterThan(qaIndex);
-    expect(defaultIndex).toBeGreaterThan(tmpIndex);
   });
 
   it("marks the active thread without selected border or background styling", () => {
     mockState.history = [
-      {
+      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-default",
         preview: "default conversation",
-        workspaceId: null,
+        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,
@@ -133,16 +131,15 @@ describe("HistorySidebar", () => {
     expect(activeThreadRow).toContain("focus-visible:ring-4");
   });
 
-  it("renders the shared running thread indicator in workspace and default groups", () => {
+  it("renders the shared running thread indicator in pet and default groups", () => {
     mockState.threadsById = {
-      "thread-workspace": {
-        threadId: "thread-workspace",
+      "thread-pet": {
+        threadId: "thread-pet",
         title: null,
         status: "running",
         messages: [],
         pendingInitialPrompt: null,
         permissionRequests: [],
-        workspaceRequests: [],
         errorMessage: null,
       },
       "thread-default": {
@@ -152,23 +149,22 @@ describe("HistorySidebar", () => {
         messages: [],
         pendingInitialPrompt: null,
         permissionRequests: [],
-        workspaceRequests: [],
         errorMessage: null,
       },
     };
     mockState.history = [
-      {
-        id: "thread-workspace",
-        preview: "workspace conversation",
-        workspaceId: "workspace-1",
+      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
+        id: "thread-pet",
+        preview: "pet conversation",
+        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,
       },
-      {
+      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-default",
         preview: "default conversation",
-        workspaceId: null,
+        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,
@@ -188,19 +184,19 @@ describe("HistorySidebar", () => {
     expect(html).toContain("animate-ping");
   });
 
-  it("switches folder icon shapes between collapsed and expanded workspace states", () => {
+  it("switches folder icon shapes between collapsed and expanded pet states", () => {
     mockState.history = [
-      {
-        id: "thread-workspace",
-        preview: "workspace conversation",
-        workspaceId: "workspace-1",
+      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
+        id: "thread-pet",
+        preview: "pet conversation",
+        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,
       },
     ];
 
-    mockState.expandedWorkspaceIds = new Set(["workspace-1"]);
+    mockState.expandedPetIds = new Set(["pet-1"]);
     const expandedHtml = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
         activeThreadId: null,
@@ -210,7 +206,7 @@ describe("HistorySidebar", () => {
       }),
     );
 
-    mockState.expandedWorkspaceIds = new Set();
+    mockState.expandedPetIds = new Set();
     const collapsedHtml = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
         activeThreadId: null,

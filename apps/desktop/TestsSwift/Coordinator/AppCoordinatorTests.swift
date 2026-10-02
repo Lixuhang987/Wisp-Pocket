@@ -713,7 +713,7 @@ final class StubSettingsWindowPresenter: SettingsWindowPresenting {
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
-        workspaceViewModel: WorkspaceSettingsViewModel,
+        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
@@ -725,7 +725,7 @@ final class StubSettingsWindowPresenter: SettingsWindowPresenting {
         _ = appendPromptSettingsViewModel
         _ = mcpSettingsViewModel
         _ = permissionRulesViewModel
-        _ = workspaceViewModel
+        _ = petViewModel
         _ = appTheme
         _ = onClose
         lastShortcutActions = shortcutActions

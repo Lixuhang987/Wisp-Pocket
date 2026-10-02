@@ -10,7 +10,7 @@
 - [runtime/runtime.md](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md)：Turn、消息与 LLM/Tool 循环。
 - [llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md)：provider-neutral LLM 接口与适配。
 - [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md)：Tool、registry、builtin 与 Dynamic Tool adapter。
-- [workspace/workspace.md](/Users/mu9/proj/handAgent/packages/core/src/workspace/workspace.md)：Workspace registry 与文件边界。
+- [pet/pet.md](./pet/pet.md)：Pet 身份、角色配置与固定文件根。
 - [permission/permission.md](/Users/mu9/proj/handAgent/packages/core/src/permission/permission.md)：Permission policy 与记忆。
 - [conversation/conversation.md](/Users/mu9/proj/handAgent/packages/core/src/conversation/conversation.md)：UI conversation projection。
 - [blob/blob.md](/Users/mu9/proj/handAgent/packages/core/src/blob/blob.md)：大内容存储端口。
@@ -23,5 +23,5 @@
 
 - runtime 可依赖 LLM、Tool、Permission 和 Blob 端口；这些基础模块不反向依赖 runtime 编排。
 - protocol 只定义 DTO，不引用 UI、socket、数据库或 provider 实现。
-- Tool 通过 Workspace 与 Permission 端口获得边界，不直接读取宿主状态。
+- Tool 通过后端调用上下文取得所属 Pet 文件根，写入边界与 Permission 分别校验；模型不能传身份参数重绑定。
 - 具体组合、持久化和网络生命周期属于 apps/agent-server。

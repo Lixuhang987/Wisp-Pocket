@@ -21,7 +21,7 @@
 
 - 类型真相在 [core protocol](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md)；Web 侧只做 encode、guard 和 UI 投影。
 - `thread.resume` 是点击历史或宿主明确打开目标 Thread 的加载入口，不是断线恢复；选择规则由 [App](./src/src.md) 拥有。
-- permission/workspace 请求必须以 `ClientResponse` 回覆；不要转成普通 `op.submit`。
+- Permission 请求必须以 `ClientResponse` 回覆；不要转成普通 `op.submit`。
 - 两端可同时显示同一请求，由 core 消耗首次有效回执；`request.resolved` 和 snapshot 同步请求状态。建议按钮则发送普通 UserInput。
 - Composer 在执行中照常提交，由后端持久队列接收；消息中的 pending 表示已保存待处理，前端不再持有执行队列。
 - Stop 发送 Interrupt，不通过关闭 socket 表达中断。

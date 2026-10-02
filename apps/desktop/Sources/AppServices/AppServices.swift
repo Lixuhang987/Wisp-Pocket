@@ -13,7 +13,7 @@ protocol SettingsWindowPresenting {
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
-        workspaceViewModel: WorkspaceSettingsViewModel,
+        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
@@ -142,9 +142,14 @@ final class AppServices {
                 SystemClockAgentTriggerProviderFactory(),
             ]),
             store: agentTriggerStore,
-            submit: { [weak swiftThreadClient = resolvedSwiftThreadClient] prompt in
+            submit: { [weak swiftThreadClient = resolvedSwiftThreadClient, agentTriggerStore] prompt in
                 Task { @MainActor in
-                    _ = try? await swiftThreadClient?.submitInitialPrompt(prompt)
+                    do {
+                        guard let swiftThreadClient else { throw SwiftThreadClientError.startFailed("Thread 服务不可用") }
+                        _ = try await swiftThreadClient.submitInitialPrompt(prompt)
+                    } catch {
+                        agentTriggerStore.recordDeliveryFailure("目标桌宠 \(prompt.targetPetId ?? "未指定") 投递失败：\(error.localizedDescription)")
+                    }
                 }
             }
         )
@@ -422,7 +427,7 @@ final class NopSettingsWindowPresenter: SettingsWindowPresenting {
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
-        workspaceViewModel: WorkspaceSettingsViewModel,
+        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
@@ -434,7 +439,7 @@ final class NopSettingsWindowPresenter: SettingsWindowPresenting {
         _ = appendPromptSettingsViewModel
         _ = mcpSettingsViewModel
         _ = permissionRulesViewModel
-        _ = workspaceViewModel
+        _ = petViewModel
         _ = shortcutActions
         _ = appTheme
         _ = onClose

@@ -7,6 +7,31 @@ import XCTest
 
 @MainActor
 final class ContextHistoryTests: XCTestCase {
+    /// The Node reader consumes this exact store output; only absolute evidence paths are relocated by its fixture loader.
+    func testExportsSharedSwiftStoreFixture() throws {
+        let directory = ProcessInfo.processInfo.environment["HANDAGENT_HISTORY_FIXTURE_DIR"]
+            .map { URL(fileURLWithPath: $0, isDirectory: true) } ?? temporaryDirectory()
+        let exportsFixture = ProcessInfo.processInfo.environment["HANDAGENT_HISTORY_FIXTURE_DIR"] != nil
+        defer { if !exportsFixture { try? FileManager.default.removeItem(at: directory) } }
+        let store = ContextHistoryStore(directoryURL: directory)
+        let time = Date(timeIntervalSince1970: 1_700_000_000)
+        let sample = try store.recordActivity(
+            id: "swift-sample", timestamp: time,
+            app: ["bundleId": "test.context", "pid": "123"], window: ["id": "1", "title": "Context"],
+            axSummary: ["app": ["bundleId": "test.context", "pid": 123],
+                        "window": ["id": 1, "ownerPid": 123, "title": "Context"],
+                        "root": ["role": "AXWindow", "title": "Swift fixture evidence"]]
+        )
+        let original = try makeHistoryPNG(width: 4, height: 2)
+        _ = try store.recordScreenshot(id: "swift-screenshot", timestamp: time,
+            originalBase64: original.base64EncodedString(),
+            thumbnailBase64: makeHistoryPNG(width: 2, height: 1).base64EncodedString(),
+            width: 4, height: 2, sampleId: sample.id)
+        XCTAssertEqual(try store.loadActivities().first?.thumbnailId, "swift-screenshot")
+        XCTAssertEqual(try store.screenshotOriginal(id: "swift-screenshot").data, original)
+        XCTAssertEqual(try store.sampleDetails(ids: ["swift-sample"]).count, 1)
+    }
+
     func testExistingHistoryFormatRetainsIdentifiersTimesAndEvidence() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

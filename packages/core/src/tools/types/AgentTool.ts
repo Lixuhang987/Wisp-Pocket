@@ -4,6 +4,8 @@ export type AgentToolCallContext = {
   threadId?: string;
   turnId?: string;
   toolCallId?: string;
+  rootPath?: string;
+  signal?: AbortSignal;
 };
 
 export interface AgentTool<TInput = unknown, TOutput = unknown> {

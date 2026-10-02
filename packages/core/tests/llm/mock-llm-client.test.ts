@@ -10,11 +10,10 @@ class FakeFileWriteTool implements AgentTool {
   inputSchema = {
     type: "object",
     properties: {
-      workspaceId: { type: "string" },
       relativePath: { type: "string" },
       content: { type: "string" },
     },
-    required: ["workspaceId", "relativePath", "content"],
+    required: ["relativePath", "content"],
     additionalProperties: false,
   } as const;
 
@@ -36,10 +35,10 @@ describe("MockLLMClient", () => {
       "[mock:clipboard-read]",
       "[mock:file-write]",
       "[mock:file-read]",
-      "[mock:workspace-list]",
+      "[mock:history-index]",
       "[mock:path-escape]",
       "[mock:symlink-escape]",
-      "[mock:workspace-ask]",
+      "[mock:user-ask]",
       "[mock:permission-write]",
       "[mock:mcp-echo]",
       "[mock:mcp-filesystem-read]",
@@ -121,7 +120,6 @@ describe("MockLLMClient", () => {
           id: "mock-file-write-1",
           name: "file.write",
           arguments: {
-            workspaceId: "qa-workspace",
             relativePath: "hello.txt",
             content: "hello from MockLLMClient",
           },
@@ -135,8 +133,7 @@ describe("MockLLMClient", () => {
             id: "mock-file-write-1",
             name: "file.write",
             arguments: {
-              workspaceId: "qa-workspace",
-              relativePath: "hello.txt",
+                relativePath: "hello.txt",
               content: "hello from MockLLMClient",
             },
           },
@@ -159,7 +156,6 @@ describe("MockLLMClient", () => {
           id: "mock-file-write-1",
           name: "file.write",
           arguments: {
-            workspaceId: "qa-workspace",
             relativePath: "hello.txt",
             content: "hello from MockLLMClient",
           },
@@ -323,7 +319,7 @@ describe("MockLLMClient", () => {
         [
           { role: "user", content: "first turn [mock:assistant-ok]" },
           { role: "assistant", content: "Mock assistant response: main chain is reachable." },
-          { role: "user", content: "second turn [mock:workspace-ask]" },
+          { role: "user", content: "second turn [mock:user-ask]" },
         ],
         [],
       ),
@@ -331,11 +327,11 @@ describe("MockLLMClient", () => {
       message: { role: "assistant", content: "" },
       toolCalls: [
         {
-          id: "mock-workspace-ask-1",
-          name: "workspace.askUser",
+          id: "mock-user-ask-1",
+          name: "user.ask",
           arguments: {
-            prompt: "请选择 QA 要写入的 workspace",
-            candidateIds: ["qa-workspace", "tmp"],
+            message: "需要整理成什么格式？",
+            suggestedReplies: ["简短摘要", "详细说明"],
           },
         },
       ],
@@ -353,7 +349,6 @@ describe("MockLLMClient", () => {
 
     expect(tool.calls).toEqual([
       {
-        workspaceId: "qa-workspace",
         relativePath: "hello.txt",
         content: "hello from MockLLMClient",
       },

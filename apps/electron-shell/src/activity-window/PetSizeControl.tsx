@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 const storageKey = "handagent.pet-size";
 
-export function usePetSize(): [number, (size: number) => void] {
+export function usePetSize(petId: string): [number, (size: number) => void] {
+  const storageKey = `handagent.pet-size.${petId}`;
   const [size, setSize] = useState(() => {
     try {
       const saved = Number(localStorage.getItem(storageKey));

@@ -31,7 +31,7 @@
 - PromptPanel 与 ThreadWindow handoff 语义：无论是提交首轮 prompt，还是 PromptPanel 仍可见时触发 `openHistory`，都必须先用 `hide(restoringFocus: false)` 隐藏 PromptPanel，不恢复唤起前的前台应用。提交首轮 prompt 的生产路径先由 Swift `/api/thread` client 创建 thread 并提交首轮 `UserInput`，拿到 `thread.started.threadId` 后再发送 `thread_window.focus(threadId)` 给 Electron main；`openHistory` 仍发送 `thread_window.open_history`。这样 Electron `BrowserWindow.show()/focus()` 后不会被 PromptPanel 的焦点恢复逻辑推到后台。
 - 带目标 focus 的交付与回执边界见 [ElectronShell](../AppServices/ElectronShell/electron-shell.md)；目标必须传到 React，后台 `thread.started` 广播本身不代表用户选择。
 - PromptPanel handoff 是明确的防回归红线，不是实现细节建议：这个 bug 已多次出现。今后只要修改 `showThreadWindow` 快捷键、`openHistory`、PromptPanel hide/focus restore、ThreadWindow open/focus ack 任一环节，就必须同时保留自动化顺序断言，并重跑 manual QA 里的“首次 PromptPanel -> ThreadWindow 历史入口 handoff”。
-- Settings 打开时会创建模型、外观、工具、Append Prompt、MCP、权限、快捷键和 workspace 的 ViewModel；工具页接收同一个 `BuiltinFeatures`。Coordinator 只负责注入，配置写入由对应 Store 负责。
+- Settings 打开时会创建模型、外观、工具、Append Prompt、MCP、权限、快捷键和 Pet 的 ViewModel；工具页接收同一个 `BuiltinFeatures`。Coordinator 只负责注入，Pet 管理经共享 SwiftThreadClient 发送后端命令；其余配置写入由对应 Store 负责。
 - agent-server 健康状态独立：server 不可用时拒绝 `submitPrompt` 并保留面板草稿。
 - `AppCoordinator` 在 app-server available 后通过 `ActivityWindowCommanding.showActivityWindow()` 显示桌宠。桌宠的首次文字、后续交互与 Thread 投影由 [Electron renderer](../../../electron-shell/src/activity-window/activity-window.md) 自行处理；PromptPanel 继续使用 Swift 首轮入口，Coordinator 不解析桌宠 Thread 或 Activity 状态。
 - `AppCoordinator` 在 bootstrap 时启动 `AppearanceChangeObserving` 和 app-server health；macOS 外观变化时由 `AppearanceThemeService` 重新解析 `system` 并通过 `theme.changed` 下发给 Electron。

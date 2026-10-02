@@ -7,21 +7,19 @@ import { createThreadWindowStore } from "../store/threadWindowStore.ts";
 import { createEmptyComposerItems } from "./Composer.tsx";
 import { getAvailableSkills } from "../native/nativeConfig.ts";
 
-type ThreadWorkspacePaneProps = {
+type ThreadPetPaneProps = {
   threadId: string | null;
   onSubmit(threadId: string, input: UserInput): void;
   onStop(threadId: string): void;
   onAnswerPermission(requestId: string, decision: "allow" | "deny", scope: "once" | "always"): void;
-  onAnswerWorkspace(requestId: string, workspaceId: string | null): void;
 };
 
-export function ThreadWorkspacePane({
+export function ThreadPetPane({
   threadId,
   onSubmit,
   onStop,
   onAnswerPermission,
-  onAnswerWorkspace,
-}: ThreadWorkspacePaneProps) {
+}: ThreadPetPaneProps) {
   const defaultComposerItemsRef = useRef<Record<string, InputItem[]>>({});
   const [composerItemsByThread, setComposerItemsByThread] = useState<Record<string, InputItem[]>>({});
   const connectionState = createThreadWindowStore((s) => s.connectionState);
@@ -58,7 +56,7 @@ export function ThreadWorkspacePane({
   return (
     <section
       className="grid h-screen min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-app-canvas/80 text-app-text-primary shadow-product-inner"
-      aria-label="Thread workspace"
+      aria-label="Thread pet"
     >
       <div className="min-h-0 min-w-0 overflow-hidden" data-thread-window-error-slot="true">
         {windowErrorMessage ? (
@@ -81,9 +79,7 @@ export function ThreadWorkspacePane({
             />
             <RequestPanels
               permissionRequests={thread.permissionRequests}
-              workspaceRequests={thread.workspaceRequests}
               onAnswerPermission={onAnswerPermission}
-              onAnswerWorkspace={onAnswerWorkspace}
             />
           </div>
           <Composer

@@ -26,7 +26,7 @@ final class SettingsLifecycle {
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
         mcpSettingsViewModel: MCPSettingsViewModel,
         permissionRulesViewModel: PermissionRulesViewModel,
-        workspaceViewModel: WorkspaceSettingsViewModel,
+        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClosed: @escaping @MainActor () -> Void
@@ -47,7 +47,7 @@ final class SettingsLifecycle {
             appendPromptSettingsViewModel: appendPromptSettingsViewModel,
             mcpSettingsViewModel: mcpSettingsViewModel,
             permissionRulesViewModel: permissionRulesViewModel,
-            workspaceViewModel: workspaceViewModel,
+            petViewModel: petViewModel,
             shortcutActions: shortcutActions,
             appTheme: appTheme,
             onClose: { Task { @MainActor in onClosed() } }

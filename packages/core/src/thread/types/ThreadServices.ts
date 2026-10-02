@@ -8,9 +8,9 @@ import type { ConversationMessage } from "../../conversation/types/ConversationM
 import type { PersistedThread, ThreadAuditEvent, ThreadSummary } from "./ThreadHistory.ts";
 import type { ThreadTools } from "../ThreadTools.ts";
 
-export type CreateThreadInput = { preview?: string | null; workspaceId?: string | null; dynamicTools?: DynamicToolSpec[] };
+export type CreateThreadInput = { preview?: string | null; petId: string; commandId?: string; dynamicTools?: DynamicToolSpec[] };
 export interface ThreadStorage {
-  createThread(input?: CreateThreadInput): Promise<PersistedThread>;
+  createThread(input: CreateThreadInput): Promise<PersistedThread>;
   getThread(id: string): Promise<PersistedThread | null>;
   listThreads(): Promise<ThreadSummary[]>;
   deleteThread(id: string): Promise<void>;
@@ -39,10 +39,8 @@ export type ThreadServices = {
   publish: (message: ThreadNotification | ServerRequest) => void;
   createRuntime: (id: string, tools: ThreadTools) => ThreadRuntime;
   createTools: (dynamicTools: DynamicToolSpec[]) => ThreadTools;
-  prepareInput?: (input: UserInput, signal: AbortSignal) => Promise<PreparedInput>;
   now?: () => string;
   stopTimeoutMs?: number;
 };
 export type QueuedInput = { opId: string; payload: UserInput };
-export type PreparedInput = { messages: AgentMessage[]; error?: string };
 export type ActiveTurn = { id: string; input: QueuedInput; controller: AbortController; done: Promise<void>; sequence: number };

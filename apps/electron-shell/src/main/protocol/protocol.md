@@ -11,9 +11,9 @@
 ## Command 边界
 
 - 所有 Swift -> Electron command 必须是 `channel: "electron_shell"`，且必须带 string `commandId`。
-- 当前 command 只有 `thread_window.open_initial_prompt`、`thread_window.open_history`、`thread_window.focus`、`activity_window.show`、`theme.changed`、`shutdown`。
+- 当前 command 只有 `thread_window.open_initial_prompt`、`thread_window.open_history`、`thread_window.focus`、`activity_window.show`、`pet.show`、`pet.hide`、`theme.changed`、`shutdown`。
 - `thread_window.prepare` 不存在；hidden ThreadWindow 预热由 Electron main 在 agent-server ready 后主动执行。
-- `thread_window.open_initial_prompt.payload` 只接受 `clientRequestId`、`userInput`。`userInput.items` 必须非空，item 类型只允许 `text`、`image`、`skill`、`text_selection`；image MIME 限定 `image/png`、`image/jpeg`、`image/webp`。
+- `thread_window.open_initial_prompt.payload` 接受 `clientRequestId`、`userInput` 与可选 `petId`；缺省身份的既有 fallback 等待后端唯一默认宠，实际 `thread.start` 必须携带身份。`userInput.items` 必须非空，item 类型只允许 `text`、`image`、`skill`、`text_selection`；image MIME 限定 `image/png`、`image/jpeg`、`image/webp`。
 - `thread_window.focus.threadId` 是既有可选 `string | null` 字段：非空 ID 表示向 renderer 明确交付目标 Thread，再打开或聚焦窗口；缺失、null 或空字符串仅执行窗口级 focus/openHistory。Swift 提交入口见 [ElectronShell 合约](../../../../desktop/Sources/AppServices/ElectronShell/electron-shell.md)，交付时序见 [windows](../windows/windows.md)。
 
 ## Event 边界

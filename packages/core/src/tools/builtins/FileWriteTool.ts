@@ -3,31 +3,26 @@ import { randomBytes } from "node:crypto";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { defineTool } from "../defineTool.ts";
-import type { WorkspaceRegistry } from "../../workspace/types/Workspace.ts";
-import {
-  isNotFoundError,
-  normalizeWorkspaceRelativePath,
-  resolveWorkspace,
-  resolveWritePathWithinWorkspace,
-} from "./workspace-path.ts";
+import { isNotFoundError } from "../../utils/nodeErrors.ts";
+import { requirePetRoot, resolvePetWritePath } from "./pet-path.ts";
+
 
 const InputSchema = z.object({
-  workspaceId: z.string().describe("目标 workspace 的 id"),
-  relativePath: z.string().describe("相对 workspace rootPath 的路径，禁止使用绝对路径"),
+  relativePath: z.string().describe("相对当前 Pet rootPath 的路径，禁止使用绝对路径"),
   content: z.string(),
-});
+}).strict();
 
 export type FileWriteToolInput = z.infer<typeof InputSchema>;
-export type FileWriteToolOutput = { workspaceId: string; relativePath: string; bytesWritten: number };
+export type FileWriteToolOutput = { relativePath: string; bytesWritten: number };
 
 export const FILE_WRITE_MAX_BYTES = 10 * 1024 * 1024;
 
-export const FileWriteTool = defineTool<FileWriteToolInput, FileWriteToolOutput, WorkspaceRegistry>({
+export const FileWriteTool = defineTool<FileWriteToolInput, FileWriteToolOutput, Record<string, never>>({
   name: "file.write",
   description:
-    "写入指定 workspace 内的文本文件。调用前若不确定 workspace，先调 `workspace.list`，匹配模糊时调 `workspace.askUser`。",
+    "写入当前 Thread 所属 Pet 固定目录内的文本文件。仅接受相对路径，不能改变归属或越过文件根；按既有 Permission 审批。",
   inputSchema: InputSchema,
-  run: async (input, registry): Promise<FileWriteToolOutput> => {
+  run: async (input, _deps, context): Promise<FileWriteToolOutput> => {
     const bytesWritten = Buffer.byteLength(input.content, "utf8");
     if (bytesWritten > FILE_WRITE_MAX_BYTES) {
       throw new Error(
@@ -35,21 +30,18 @@ export const FileWriteTool = defineTool<FileWriteToolInput, FileWriteToolOutput,
       );
     }
 
-    const workspace = await resolveWorkspace(registry, input.workspaceId);
-    const absolutePath = await resolveWritePathWithinWorkspace(
-      workspace.rootPath,
-      input.relativePath,
-    );
-
-    await ensureTargetIsNotSymlink(absolutePath, input.relativePath);
-    await mkdir(dirname(absolutePath), { recursive: true });
-    await atomicWriteFile(absolutePath, input.content);
-
-    return {
-      workspaceId: workspace.id,
-      relativePath: await normalizeWorkspaceRelativePath(workspace.rootPath, absolutePath),
-      bytesWritten,
-    };
+    const rootPath = requirePetRoot(context.rootPath);
+    const absolutePath = await resolvePetWritePath(rootPath, input.relativePath);
+    return withTargetLock(absolutePath, async () => {
+      context.signal?.throwIfAborted();
+      await ensureTargetIsNotSymlink(absolutePath, input.relativePath);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      const checkedPath = await resolvePetWritePath(rootPath, input.relativePath);
+      if (checkedPath !== absolutePath) throw new Error("Write target changed while awaiting write");
+      context.signal?.throwIfAborted();
+      await atomicWriteFile(absolutePath, input.content, context.signal);
+      return { relativePath: input.relativePath, bytesWritten };
+    });
   },
 });
 
@@ -67,13 +59,27 @@ async function ensureTargetIsNotSymlink(absolutePath: string, relativePath: stri
   }
 }
 
-async function atomicWriteFile(absolutePath: string, content: string): Promise<void> {
+async function atomicWriteFile(absolutePath: string, content: string, signal?: AbortSignal): Promise<void> {
   const tempPath = `${absolutePath}.${randomBytes(8).toString("hex")}.tmp`;
   try {
     await writeFile(tempPath, content, { encoding: "utf8", flag: "wx" });
+    signal?.throwIfAborted();
+    await ensureTargetIsNotSymlink(absolutePath, absolutePath);
     await rename(tempPath, absolutePath);
   } catch (error) {
     await unlink(tempPath).catch(() => undefined);
     throw error;
   }
+}
+
+// Shared by all instances: different Pets sharing a real path share its write lock.
+const writes = new Map<string, Promise<void>>();
+async function withTargetLock<T>(path: string, write: () => Promise<T>): Promise<T> {
+  const previous = writes.get(path) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  writes.set(path, current);
+  await previous;
+  try { return await write(); }
+  finally { release(); if (writes.get(path) === current) writes.delete(path); }
 }

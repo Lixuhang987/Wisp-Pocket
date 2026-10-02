@@ -14,8 +14,8 @@
 - 在 `agent_server.health available=true` 与 `thread_window.prepared` 同时成立后，向 `AgentServerHealth` 暴露可提交状态。
 - 作为 `ThreadWindowCommanding` 实现，只接收 Coordinator 的 openInitialPrompt/openHistory/focus/themeChanged 意图；`theme.changed` 不参与 ThreadWindow 可用性 gate。启动初值由 `HANDAGENT_INITIAL_THEME` 提供，运行中变化仍由 `theme.changed` command 提供。
 - PromptPanel 经 Swift Thread client 提交后，既有 `focus(threadId:)` 将目标 ID 交给 Electron，再由 renderer 选择并 resume；Swift 不等待 snapshot 或持有当前选择。无目标 focus/openHistory 只操作窗口。字段与失败回执以 [Electron 协议](../../../../electron-shell/src/main/protocol/protocol.md) 为准，成功 ack 不表示目标内容已渲染。
-- 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`。
-- 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行原生工具，并直接分派到已启用的 Context History / Automation。业务模块生命周期归 [AppServices](../app-services.md)，不随 server health 或窗口关闭而停机。
+- 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`；Settings 用 `pet.show` / `pet.hide` 携带顶层 petId，经 commandId 回执控制窗口。
+- 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行原生工具，并直接分派到已启用的 Automation。业务模块生命周期归 [AppServices](../app-services.md)，不随 server health 或窗口关闭而停机。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
 - 桌宠的点击、拖入、回复与历史由 Electron renderer 处理；Swift 只负责显示窗口的 command，不接管桌宠交互。
 - `bash ./scripts/swiftw run HandAgentDesktop` 会先构建 `handagent-electron-shell`，确保开发态 `dist/main/main.js` 存在；不要依赖旧 worktree 残留产物。
@@ -45,7 +45,7 @@
 
 - 不持有 ThreadWindow thread 缓存、消息或历史状态。
 - 不解析 `/api/thread` 的 `ThreadNotification`。
-- 不消费完整 `/api/thread` 状态；AgentTrigger 命中由 SwiftThreadClient 直连，权限/工作区请求由 ThreadWindow 和桌宠的交互式连接呈现，core 仲裁唯一回执。
+- 不消费完整 `/api/thread` 状态；AgentTrigger 命中由 SwiftThreadClient 直连，权限请求由 ThreadWindow 和桌宠的交互式连接呈现，core 仲裁唯一回执。
 - 新增 host dynamic tool 时，先在 `MacHostDynamicTools` 与 `MacPlatformProvider` 同步 spec / method 映射。
 - 不承载 PromptPanel、Settings、Hotkey 或焦点恢复；这些仍由 Swift 宿主负责。
 

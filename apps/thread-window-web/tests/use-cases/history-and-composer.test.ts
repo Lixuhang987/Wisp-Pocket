@@ -15,7 +15,7 @@ describe("threadWindowStore", () => {
 
   it("creates thread state from a started notification and keeps pending initial prompt without active UI state", () => {
     const store = createThreadWindowStore;
-    store.getState().enqueueInitialPrompt({
+    store.getState().enqueueInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: { items: [{ type: "text", id: "text-1", text: "hello" }] },
     });
@@ -26,7 +26,7 @@ describe("threadWindowStore", () => {
       notificationId: "n1",
       commandId: "prompt-1",
       timestamp,
-      payload: { preview: "hello" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
     });
 
     expect(store.getState().threadsById["thread-1"].pendingInitialPrompt?.userInput.items[0].type).toBe("text");
@@ -50,7 +50,7 @@ describe("threadWindowStore", () => {
 
   it("merges snapshot without dropping pending initial user message", () => {
     const store = createThreadWindowStore;
-    store.getState().enqueueInitialPrompt({
+    store.getState().enqueueInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: { items: [{ type: "text", id: "text-1", text: "hello" }] },
     });
@@ -60,7 +60,7 @@ describe("threadWindowStore", () => {
       notificationId: "n1",
       commandId: "prompt-1",
       timestamp,
-      payload: { preview: "hello" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
     });
     store.getState().handleNotification({
       type: "thread.snapshot",
@@ -68,7 +68,7 @@ describe("threadWindowStore", () => {
       notificationId: "n2",
       commandId: "resume-1",
       timestamp,
-      payload: { messages: [], status: "running" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
     });
 
     expect(store.getState().threadsById["thread-1"].messages).toEqual([
@@ -92,7 +92,7 @@ describe("threadWindowStore", () => {
       threadId: "thread-1",
       notificationId: "snapshot-1",
       timestamp,
-      payload: {
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},
         status: "idle",
         messages: [{
           id: "msg-1",
@@ -140,7 +140,7 @@ describe("threadWindowStore", () => {
       notificationId: "started-1",
       commandId: "start-1",
       timestamp,
-      payload: { preview: null },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: null },
     });
     store.getState().handleNotification({
       type: "user.message.recorded",
@@ -154,10 +154,10 @@ describe("threadWindowStore", () => {
       },
     });
 
-    expect(store.getState().history[0]).toMatchObject({
+    expect(store.getState().history[0]).toMatchObject({petRevision:1, rootPath:"/tmp/pet", status:"idle",
       id: "thread-1",
       preview: "[mock:assistant-ok] live history",
-      workspaceId: null,
+      petId: "pet-default",
       messageCount: 1,
       updatedAt: "2026-06-06T00:00:01.000Z",
     });
@@ -172,7 +172,7 @@ describe("threadWindowStore", () => {
     });
 
     expect(store.getState().history).toHaveLength(1);
-    expect(store.getState().history[0]).toMatchObject({
+    expect(store.getState().history[0]).toMatchObject({petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", status:"idle",
       id: "thread-1",
       preview: "[mock:assistant-ok] live history",
       messageCount: 1,
@@ -227,7 +227,7 @@ describe("threadWindowStore", () => {
       threadId: "thread-1",
       notificationId: "snapshot-tools",
       timestamp,
-      payload: {
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},
         status: "running",
         messages: statuses.map((status) => ({
           id: `saved-${status}`,
@@ -312,7 +312,7 @@ describe("threadWindowStore", () => {
     const store = createThreadWindowStore;
     store.getState().handleNotification({
       type: "thread.snapshot", threadId: "thread-1", notificationId: "restored", timestamp,
-      payload: { status: "idle", messages: [
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  status: "idle", messages: [
         { id: "question", role: "assistant", text: "怎么处理？", suggestedReplies: ["整理摘要"], awaitingReply: true, status: "completed", createdAt: timestamp, updatedAt: timestamp },
         { id: "queued", role: "user", text: "补充", pending: true, status: "completed", createdAt: timestamp, updatedAt: timestamp },
       ] },
@@ -353,7 +353,7 @@ describe("threadWindowStore", () => {
   it("only removes history and thread state when delete status is deleted", () => {
     const store = createThreadWindowStore;
     store.setState({
-      history: [{
+      history: [{petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-1",
         preview: "hello",
         createdAt: timestamp,
@@ -386,51 +386,51 @@ describe("threadWindowStore", () => {
     expect(store.getState().threadsById["thread-1"]).toBeUndefined();
   });
 
-  it("stores workspaces from workspace.listed notifications", () => {
+  it("stores pets from pet.listed notifications", () => {
     const store = createThreadWindowStore;
 
     store.getState().handleNotification({
-      type: "workspace.listed",
-      notificationId: "n-workspaces",
-      commandId: "workspace-list-1",
+      type: "pet.listed",
+      notificationId: "n-pets",
+      commandId: "pet-list-1",
       timestamp,
       payload: {
-        workspaces: [
-          { id: "tmp", name: "tmp", rootPath: "/tmp" },
-          { id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
+        pets: [
+          {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "tmp", name: "tmp", rootPath: "/tmp" },
+          {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
         ],
       },
     });
 
-    expect(store.getState().workspaces.map((workspace) => workspace.name)).toEqual([
+    expect(store.getState().pets.map((pet) => pet.name)).toEqual([
       "tmp",
       "handagent-test",
     ]);
   });
 
-  it("toggles workspace expansion ids", () => {
+  it("toggles pet expansion ids", () => {
     const store = createThreadWindowStore;
 
-    expect(store.getState().expandedWorkspaceIds.has("default")).toBe(false);
+    expect(store.getState().expandedPetIds.has("default")).toBe(false);
 
-    store.getState().toggleWorkspaceExpanded("default");
-    expect(store.getState().expandedWorkspaceIds.has("default")).toBe(true);
+    store.getState().togglePetExpanded("default");
+    expect(store.getState().expandedPetIds.has("default")).toBe(true);
 
-    store.getState().toggleWorkspaceExpanded("default");
-    expect(store.getState().expandedWorkspaceIds.has("default")).toBe(false);
+    store.getState().togglePetExpanded("default");
+    expect(store.getState().expandedPetIds.has("default")).toBe(false);
   });
 
-  it("persists workspace expansion ids when they change", () => {
+  it("persists pet expansion ids when they change", () => {
     const setItem = vi.fn();
     vi.stubGlobal("window", { localStorage: { setItem } });
 
     const store = createThreadWindowStore;
-    store.getState().toggleWorkspaceExpanded("default");
+    store.getState().togglePetExpanded("default");
 
     expect(setItem).toHaveBeenCalledWith(
-      "handAgent.threadWindow.expandedWorkspaceIds",
+      "handAgent.threadWindow.expandedPetIds",
       JSON.stringify({
-        state: { expandedWorkspaceIds: ["default"] },
+        state: { expandedPetIds: ["default"] },
         version: 0,
       }),
     );
@@ -440,7 +440,7 @@ describe("threadWindowStore", () => {
 
   it("clears pending initial prompt and exposes window error when thread error has only commandId", () => {
     const store = createThreadWindowStore;
-    store.getState().enqueueInitialPrompt({
+    store.getState().enqueueInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
@@ -459,7 +459,7 @@ describe("threadWindowStore", () => {
     expect(store.getState().windowErrorMessage).toBe("failed before thread creation");
   });
 
-  it("stores permission and workspace requests by thread", () => {
+  it("stores permission requests by thread", () => {
     const store = createThreadWindowStore;
     store.getState().ensureThreadState("thread-1");
     store.getState().handleRequest({
@@ -469,16 +469,8 @@ describe("threadWindowStore", () => {
       timestamp,
       payload: { toolName: "file.write", toolCallId: "tool-1", arguments: { path: "a.txt" } },
     });
-    store.getState().handleRequest({
-      type: "workspace.requested",
-      requestId: "thread-1:req-2",
-      threadId: "thread-1",
-      timestamp,
-      payload: { prompt: "Pick", candidates: [] },
-    });
 
     expect(store.getState().threadsById["thread-1"].permissionRequests).toHaveLength(1);
-    expect(store.getState().threadsById["thread-1"].workspaceRequests).toHaveLength(1);
   });
 
   it.each([
@@ -487,7 +479,7 @@ describe("threadWindowStore", () => {
     ["failed", "failed"],
   ] as const)("projects a %s turn as %s and clears only that thread's requests", (turnStatus, visibleStatus) => {
     const store = createThreadWindowStore;
-    store.getState().enqueueInitialPrompt({
+    store.getState().enqueueInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: { items: [{ type: "text", id: "text-1", text: "hello" }] },
     });
@@ -497,7 +489,7 @@ describe("threadWindowStore", () => {
       notificationId: "thread-started",
       commandId: "prompt-1",
       timestamp,
-      payload: { preview: "hello" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
     });
     for (const threadId of ["thread-1", "thread-2"]) {
       store.getState().handleNotification({
@@ -513,14 +505,7 @@ describe("threadWindowStore", () => {
         requestId: `${threadId}:permission`,
         threadId,
         timestamp,
-        payload: { toolName: "workspace.askUser", toolCallId: "tool-1", arguments: { prompt: "Pick workspace" } },
-      });
-      store.getState().handleRequest({
-        type: "workspace.requested",
-        requestId: `${threadId}:workspace`,
-        threadId,
-        timestamp,
-        payload: { prompt: "Pick", candidates: [] },
+        payload: { toolName: "pet.askUser", toolCallId: "tool-1", arguments: { prompt: "Pick pet" } },
       });
     }
     const otherThread = store.getState().threadsById["thread-2"];
@@ -538,7 +523,6 @@ describe("threadWindowStore", () => {
       status: visibleStatus,
       pendingInitialPrompt: null,
       permissionRequests: [],
-      workspaceRequests: [],
     });
     expect(store.getState().threadsById["thread-2"]).toEqual(otherThread);
   });
@@ -551,14 +535,7 @@ describe("threadWindowStore", () => {
       requestId: "thread-1:req-1",
       threadId: "thread-1",
       timestamp,
-      payload: { toolName: "workspace.askUser", toolCallId: "tool-1", arguments: { prompt: "Pick workspace" } },
-    });
-    store.getState().handleRequest({
-      type: "workspace.requested",
-      requestId: "thread-1:req-2",
-      threadId: "thread-1",
-      timestamp,
-      payload: { prompt: "Pick", candidates: [] },
+      payload: { toolName: "pet.askUser", toolCallId: "tool-1", arguments: { prompt: "Pick pet" } },
     });
 
     store.getState().handleNotification({
@@ -572,7 +549,6 @@ describe("threadWindowStore", () => {
     expect(store.getState().threadsById["thread-1"]).toMatchObject({
       status,
       permissionRequests: [],
-      workspaceRequests: [],
     });
   });
 
@@ -586,18 +562,9 @@ describe("threadWindowStore", () => {
       timestamp,
       payload: { toolName: "file.write", toolCallId: "tool-1", arguments: { path: "a.txt" } },
     });
-    store.getState().handleRequest({
-      type: "workspace.requested",
-      requestId: "thread-1:req-2",
-      threadId: "thread-1",
-      timestamp,
-      payload: { prompt: "Pick", candidates: [] },
-    });
 
     store.getState().resolvePermissionRequest("thread-1:req-1");
-    store.getState().resolveWorkspaceRequest("thread-1:req-2");
 
     expect(store.getState().threadsById["thread-1"].permissionRequests).toEqual([]);
-    expect(store.getState().threadsById["thread-1"].workspaceRequests).toEqual([]);
   });
 });

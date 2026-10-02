@@ -42,7 +42,7 @@ function buildScoped(options?: {
   globalMcpServerIds?: string[];
   defaultTools?: AgentTool[];
 }): ThreadScopedToolRegistry {
-  const builtin = new ToolRegistry(options?.builtin ?? [fakeTool("workspace.list")]);
+  const builtin = new ToolRegistry(options?.builtin ?? [fakeTool("test.list")]);
   return new ThreadScopedToolRegistry({
     builtinRegistry: builtin,
     globalMcpServerIds: options?.globalMcpServerIds ?? [],
@@ -62,7 +62,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
   it("exposes configured default tools before and after use_tools activation", async () => {
     const scoped = buildScoped({
-      builtin: [fakeTool("workspace.list")],
+      builtin: [fakeTool("test.list")],
       defaultTools: [fakeTool("web_search"), fakeTool("fetch_page")],
     });
 
@@ -77,13 +77,13 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
       "web_search",
       "fetch_page",
-      "workspace.list",
+      "test.list",
     ]);
   });
 
   it("activate switches the registry to builtin + mcp tools without the meta-tool", async () => {
     const scoped = buildScoped({
-      builtin: [fakeTool("workspace.list"), fakeTool("file.read")],
+      builtin: [fakeTool("test.list"), fakeTool("file.read")],
       mcp: { srv: [fakeTool("mcp.srv.echo")] },
       globalMcpServerIds: ["srv"],
     });
@@ -91,7 +91,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     await scoped.activate("s1");
 
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
-      "workspace.list",
+      "test.list",
       "file.read",
       "mcp.srv.echo",
     ]);
@@ -162,7 +162,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
   it("removes the meta-tool from the next LLM request after activation", async () => {
     const toolNamesPerRequest: string[][] = [];
     const scoped = buildScoped({
-      builtin: [fakeTool("workspace.list")],
+      builtin: [fakeTool("test.list")],
     });
     await scoped.refreshForThread("s1");
 
@@ -200,8 +200,8 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     });
 
     expect(toolNamesPerRequest).toEqual([
-      ["use_tools"],
-      ["workspace.list"],
+      ["use_tools", "user.ask"],
+      ["test.list", "user.ask"],
     ]);
   });
 
@@ -239,7 +239,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
       async *stream(_messages: AgentMessage[], tools: AgentTool[]) {
         requestCount += 1;
         if (requestCount === 1) {
-          expect(tools.map((tool) => tool.name)).toEqual(["use_tools"]);
+          expect(tools.map((tool) => tool.name)).toEqual(["use_tools", "user.ask"]);
           yield {
             type: "tool_call" as const,
             toolCall: { id: "meta-1", name: META_TOOL_NAME, arguments: {} },
@@ -253,7 +253,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
         }
         if (requestCount === 2) {
           expect(tools.map((tool) => tool.name)).toEqual([
-            "host_macos.screen_capture",
+            "host_macos.screen_capture", "user.ask",
           ]);
           yield {
             type: "tool_call" as const,
@@ -327,13 +327,13 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
     expect(scoped.isActivated("s2")).toBe(false);
     expect(scoped.registryForThread("s2").list().map((t) => t.name)).toEqual(["use_tools"]);
     expect(scoped.registryForThread("s1").list().map((t) => t.name)).toEqual([
-      "workspace.list",
+      "test.list",
     ]);
   });
 
   it("does not activate a Thread only because MCP servers exist globally", async () => {
     const scoped = buildScoped({
-      builtin: [fakeTool("workspace.list")],
+      builtin: [fakeTool("test.list")],
       mcp: { srv: [fakeTool("mcp.srv.echo")] },
       globalMcpServerIds: ["srv"],
     });
@@ -357,7 +357,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
   it("does not rewrite one Thread registry when another Thread refreshes", async () => {
     const scoped = buildScoped({
-      builtin: [fakeTool("workspace.list"), fakeTool("file.read")],
+      builtin: [fakeTool("test.list"), fakeTool("file.read")],
     });
 
     await scoped.activate("s1");
@@ -367,7 +367,7 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
     expect(scoped.registryForThread("s2").list().map((t) => t.name)).toEqual(["use_tools"]);
     expect(s1Registry.list().map((t) => t.name)).toEqual([
-      "workspace.list",
+      "test.list",
       "file.read",
     ]);
   });
@@ -407,7 +407,6 @@ describe("ThreadScopedToolRegistry lazy activation", () => {
 
     expect(fileWriteCalls).toEqual([
       {
-        workspaceId: "qa-workspace",
         relativePath: "hello.txt",
         content: "hello from MockLLMClient",
       },

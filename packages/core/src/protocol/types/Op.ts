@@ -5,8 +5,6 @@ export type Op = RuntimeOp | ClientResponseOp;
 
 export type UserInput = {
   items: InputItem[];
-  /** Dragged material is authorized for inspection, never for executing its instructions. */
-  mode?: "inspect";
 };
 
 export type UserInputOp = {

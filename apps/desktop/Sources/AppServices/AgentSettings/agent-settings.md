@@ -7,7 +7,7 @@ LLM 模型配置、tool allowlist / denylist、外观主题与内置功能启用
 | 文件 | 职责 |
 |------|------|
 | `AgentSettingsStore.swift` | `@Observable` + `@MainActor`，从 `~/.spotAgent/settings.json` 读写外观主题、LLM 配置与 tool allowlist / denylist，500ms 轮询热加载 |
-| `BuiltinFeatureSettingsStore.swift` | 两个内置功能的默认关闭配置、原子写入与错误反馈 |
+| `BuiltinFeatureSettingsStore.swift` | Automation 默认关闭配置、原子写入与错误反馈 |
 | `AgentSettingsView.swift` | 模型设置的 SwiftUI 表单（provider / model / api / baseURL / apiKey），provider / api 使用 token 化 `SettingsSegmentedControl`，文本输入使用 `SettingsTextField` / `SettingsSecureField`，由 [Settings/SettingsView](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 嵌入 |
 
 ## 数据模型
@@ -26,7 +26,7 @@ LLM 模型配置、tool allowlist / denylist、外观主题与内置功能启用
     "api": "responses"   // responses | chat | completion
   },
   "tools": {
-    "allowlist": ["file.read", "file.write"], // 可选；为 null 时表示不启用白名单模式
+    "allowlist": ["file.write"], // 可选；为 null 时表示不启用白名单模式
     "denylist": ["file.write"]                // 已禁用 builtin 工具
   }
 }
@@ -42,7 +42,7 @@ LLM 模型配置、tool allowlist / denylist、外观主题与内置功能启用
 
 ## 内置功能配置
 
-- `BuiltinFeatureSettingsStore` 拥有 `~/.spotAgent/builtin-features.json`，字段为 `contextHistoryEnabled` 与 `automationEnabled`，初始值都为 `false`。正常入口是 [Settings 工具页](../../Settings/settings.md)。
+- `BuiltinFeatureSettingsStore` 拥有 `~/.spotAgent/builtin-features.json`，字段为 `automationEnabled`，初始值为 `false`；Context History 常驻，不持久化启用选择。正常入口是 [Settings 工具页](../../Settings/settings.md)。
 - 仅在文件成功原子写入后更新内存状态并通知 [BuiltinFeatures](../PlatformBridge/platform-bridge.md)；写入失败保留原有效选择并显示错误。文件缺失使用默认值，其他读取错误也必须可见。
 - 宿主启动时读取配置，工具页改变选择后立即生效；此 Store 不轮询外部文件，也不从旧 Plugin manifest 派生启用状态。
 - `HANDAGENT_HOST_DATA_HOME` 隔离配置与业务数据的开发用法见 [开发说明](../../../../../docs/dev.md)，业务目录归 [Host Automation](../../../../host-automation/host-automation.md) 所有。
@@ -52,7 +52,7 @@ LLM 模型配置、tool allowlist / denylist、外观主题与内置功能启用
 - **写入路径只走 Store update 方法**：`updateAppearance { ... }` / `update { ... }` / `updateToolSettings { ... }` → `persist()`；不要绕过这些入口直接改状态。
 - **轮询间隔修改需配套测试**：当前 500ms 是 UX/IO 折中值，改动须更新 `AgentSettingsStoreTests`。
 - **AgentSettingsView 不直接持有 Store**：通过 [AgentSettingsViewModel](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 代理；Store 只作为 ViewModel 的依赖。
-- **不要在 Store 里加 LLM 调用 / runtime 状态**：Store 只是 settings.json 的配置镜像；agent-server 侧自行 `readFileSync` 读同一个文件。tool allowlist/denylist 现在已由桌面 Settings UI 接入，tool 热加载在 agent-server 侧按文件戳刷新。
+- **不要在 Store 里加 LLM 调用 / runtime 状态**：Store 只是 settings.json 的配置镜像；agent-server 侧自行 `readFileSync` 读同一个文件。tool allowlist/denylist 由桌面 Settings UI 接入；默认历史和文件读取不在可禁用工具目录中，tool 热加载在 agent-server 侧按文件戳刷新。
 - **测试**：[AgentSettingsStoreTests](/Users/mu9/proj/handAgent/apps/desktop/TestsSwift/AppServices/AgentSettings/AgentSettingsStoreTests.swift) 必须通过临时 home 目录验证 IO + 轮询。
 
 ## 与其他模块的关系

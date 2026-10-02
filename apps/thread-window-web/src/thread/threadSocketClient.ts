@@ -2,8 +2,9 @@ import {
   encodeThreadList,
   encodeThreadResume,
   encodeOpSubmit,
-  encodeWorkspaceList,
+  encodePetList,
   type RuntimeOp,
+  type ThreadListEntry,
   isServerRequest,
   isThreadNotification,
   type ServerRequest,
@@ -30,9 +31,12 @@ export class ThreadSocketClient {
   private socket: WebSocketLike | null = null;
   private manuallyClosed = false;
   private outboundQueue: string[] = [];
+  private historyPages: ThreadListEntry[] = [];
+  private loadingHistoryPages = false;
 
   constructor(private readonly options: {
     url: string;
+    petId?: string;
     WebSocketImpl?: WebSocketConstructor;
     now?: () => string;
     id?: () => string;
@@ -65,8 +69,10 @@ export class ThreadSocketClient {
     this.outboundQueue.push(message);
   }
 
-  listThreads(): void {
+  listThreads(cursor?: string): void {
+    if (!cursor && !this.options.petId) { this.historyPages = []; this.loadingHistoryPages = true; }
     this.sendRaw(encodeThreadList({
+      petId: this.options.petId, cursor,
       commandId: this.nextId(),
       timestamp: this.now(),
     }));
@@ -101,7 +107,7 @@ export class ThreadSocketClient {
       }
       this.options.onConnectionState("connected");
       this.flushOutboundQueue(socket);
-      this.sendRaw(encodeWorkspaceList({
+      this.sendRaw(encodePetList({
         commandId: this.nextId(),
         timestamp: this.now(),
       }));
@@ -128,6 +134,17 @@ export class ThreadSocketClient {
       }
 
       if (isThreadNotification(value)) {
+        if (!this.options.petId && value.type === "thread.listed") {
+          this.historyPages = [...new Map([...this.historyPages, ...value.payload.threads].map(thread => [thread.id, thread])).values()];
+          this.options.onNotification({...value,payload:{...value.payload,threads:this.historyPages}});
+          if (value.payload.nextCursor) this.listThreads(value.payload.nextCursor);
+          else this.loadingHistoryPages = false;
+          return;
+        }
+        if (!this.options.petId && this.loadingHistoryPages && value.type === "thread.started") {
+          this.historyPages.push({id:value.threadId,...value.payload,createdAt:value.payload.createdAt ?? value.timestamp,updatedAt:value.timestamp,messageCount:0,status:"idle"});
+        }
+        if (value.type === "thread.deleted") this.historyPages = this.historyPages.filter(thread => thread.id !== value.payload.targetThreadId);
         this.options.onNotification(value);
       } else if (isServerRequest(value)) {
         this.options.onRequest(value);

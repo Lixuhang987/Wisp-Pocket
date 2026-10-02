@@ -5,7 +5,7 @@ Conversation Runtime 描述用户与 Agent 的持久交互，以及一次输入�
 ## Interaction
 
 **Thread**:
-一段可持久化的用户交互，包含输入、Turn 和历史。
+归属一只 Pet 的可持久化用户交互，包含输入、Turn 和历史。
 _Avoid_: Session、Conversation、Chat（指代持久交互单元时）
 
 **Turn**:
@@ -38,9 +38,13 @@ _Avoid_: Host Tool、Plugin Tool（指代通用机制时）
 拥有一组 Dynamic Tool 执行权的连接端；它不同于提供模型服务的 LLM provider。
 _Avoid_: LLM Provider、Tool Registry
 
-**Workspace**:
-用户注册的命名文件系统边界，文件 Tool 只能在选定 Workspace 内操作。
-_Avoid_: Project、Repository（指代文件访问边界时）
+**Pet**:
+具有稳定身份、角色设定和固定文件根的桌面伙伴；每段 Thread 只归属一只 Pet，同文件根不合并身份或历史。
+_Avoid_: Workspace、Profile（指代伙伴身份时）
+
+**Pet Snapshot**:
+Thread 创建时保存的角色版本，供该 Thread 的后续交互持续使用；文件根属于 Pet，不属于角色快照。
+_Avoid_: Workspace Snapshot
 
 **Permission**:
 对 Tool 调用的允许或拒绝决定，可仅用于本次调用，或按 Tool 名称持久记忆；持久决定不区分调用参数。

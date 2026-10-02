@@ -155,6 +155,17 @@ describe("Dynamic Tool image consumption", () => {
     ]);
   });
 
+  it.each(["responses", "chat", "anthropic"] as const)("ordinary default Tool images reach the real %s SDK without a Dynamic envelope", async (api) => {
+    const { result, requests } = await runImageTools(api, true, true);
+    const toolMessages = result.messages.filter((message) => message.role === "tool");
+    expect(JSON.parse(toolMessages[0].content)).not.toHaveProperty("callId");
+    const request = JSON.parse(requests[0]);
+    expect(requests[0]).toContain(images[0].base64);
+    if (api === "responses") expect(request.input.some((item: any) => item.type === "function_call_output" && item.output.some((part: any) => part.type === "input_image"))).toBe(true);
+    if (api === "chat") expect(request.messages.at(-1).content.some((part: any) => part.type === "image_url")).toBe(true);
+    if (api === "anthropic") expect(request.messages.flatMap((message: any) => message.content).some((part: any) => part.type === "tool_result" && part.content.some((item: any) => item.type === "image"))).toBe(true);
+  });
+
   it("reports the completion API capability limit before sending restored Dynamic Tool images", async () => {
     const fetch = vi.fn();
     const client = new VercelClient({ api: "completion", apiKey: "test-key", fetch });
@@ -170,7 +181,7 @@ describe("Dynamic Tool image consumption", () => {
   });
 });
 
-async function runImageTools(api: TestAPI, success = true) {
+async function runImageTools(api: TestAPI, success = true, ordinary = false) {
   const requests: string[] = [];
   const events: AgentRuntimeEvent[] = [];
   const fetch = vi.fn(async (_input, init) => {
@@ -214,7 +225,7 @@ async function runImageTools(api: TestAPI, success = true) {
       }
       yield* providerClient.stream(messages, tools, options);
     },
-  }, new ToolRegistry([dynamicTool]), { maxTimes: 2, systemPromptSections: [] });
+  }, new ToolRegistry([ordinary ? { name: dynamicTool.name, description: dynamicTool.description, inputSchema: dynamicTool.inputSchema, requiresPermission: false, async call(input: unknown) { const { callId: _id, ...result } = await bridge.call({ callId: "ordinary", arguments: input } as never); return result; } } : dynamicTool]), { maxTimes: 2, systemPromptSections: [] });
   const result = await runtime.runWithMessages(
     [{ role: "user", content: "按样本关联核对两张截图" }], (event) => events.push(event), { threadId: "thread-images", turnId: "turn-images" },
   );

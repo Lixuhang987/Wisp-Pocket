@@ -21,7 +21,7 @@ _Avoid_: Prompt Window、ThreadWindow
 _Avoid_: Chat Window、Conversation Window、PromptPanel
 
 **桌宠**:
-Wisp Pocket 的常驻轻量交互界面，以月见八千代形象接收主动拖入、展示 Thread 并承接回复。
+Wisp Pocket 的常驻轻量交互界面，以某个 Pet 的形象接收主动输入、展示其 Thread 并承接回复。
 _Avoid_: Wisp（指代桌宠时）、StatusBubble、ActivityWindow（指代用户可见界面时）
 
 **桌宠对话区**:
@@ -50,7 +50,7 @@ _Avoid_: Skill（指代该 manifest 能力时）、Action
 _Avoid_: Plugin、AgentTrigger Instance
 
 **AgentTrigger Instance**:
-用户基于 AgentTrigger Package 创建的一条已配置触发规则。
+用户基于 AgentTrigger Package 创建、明确指定目标 Pet 的一条触发规则。
 _Avoid_: Automation Policy、AgentTrigger Package
 
 **AgentTrigger Event**:

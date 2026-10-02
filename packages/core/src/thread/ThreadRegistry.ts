@@ -2,6 +2,11 @@ import { Thread } from "./Thread.ts";
 import type { CreateThreadInput, ThreadServices } from "./types/ThreadServices.ts";
 import { settleWithin } from "./utils/settleWithin.ts";
 
+export class ThreadNotFoundError extends Error {
+  readonly code = "not_found";
+  constructor(id: string) { super(`Thread not found: ${id}`); }
+}
+
 export class ThreadRegistry {
   private readonly loaded = new Map<string, Thread>();
   private readonly loading = new Map<string, Promise<Thread>>();
@@ -16,6 +21,8 @@ export class ThreadRegistry {
     this.requireOpen();
     const data = await this.services.storage.createThread(input);
     this.requireOpen();
+    const existing = this.loaded.get(data.metadata.id);
+    if (existing) return existing;
     const thread = new Thread(data.metadata.id, this.services, data);
     this.loaded.set(thread.id, thread);
     return thread;
@@ -31,7 +38,7 @@ export class ThreadRegistry {
     const task = (async () => {
       if (existing) { await existing.recover(); return existing; }
       const data = await this.services.storage.getThread(id);
-      if (!data) throw new Error(`Thread not found: ${id}`);
+      if (!data) throw new ThreadNotFoundError(id);
       await this.services.storage.resetThread(id);
       const status = await this.services.storage.recoverIncompleteTurnForSnapshot(id);
       const recovered = await this.services.storage.getThread(id);

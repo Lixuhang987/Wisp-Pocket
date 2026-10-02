@@ -12,7 +12,7 @@ final class ToolSettingsViewModelTests: XCTestCase {
             """
             {
               "tools": {
-                "denylist": ["file.read"]
+                "denylist": ["file.write"]
               }
             }
             """
@@ -21,8 +21,8 @@ final class ToolSettingsViewModelTests: XCTestCase {
         let store = AgentSettingsStore(homeDirectoryURL: homeURL)
         let viewModel = ToolSettingsViewModel(store: store)
 
-        XCTAssertFalse(viewModel.isEnabled("file.read"))
-        XCTAssertTrue(viewModel.isEnabled("file.write"))
+        XCTAssertFalse(viewModel.isEnabled("file.write"))
+
     }
 
     @MainActor
@@ -47,8 +47,8 @@ final class ToolSettingsViewModelTests: XCTestCase {
             """
             {
               "tools": {
-                "allowlist": ["file.write"],
-                "denylist": ["file.read"]
+                "allowlist": [],
+                "denylist": ["file.write"]
               }
             }
             """
@@ -57,10 +57,10 @@ final class ToolSettingsViewModelTests: XCTestCase {
         let store = AgentSettingsStore(homeDirectoryURL: homeURL)
         let viewModel = ToolSettingsViewModel(store: store)
 
-        viewModel.setEnabled("file.read", enabled: true)
+        viewModel.setEnabled("file.write", enabled: true)
 
         XCTAssertEqual(store.toolSettings.denylist, [])
-        XCTAssertEqual(store.toolSettings.allowlist, ["file.read", "file.write"])
+        XCTAssertEqual(store.toolSettings.allowlist, ["file.write"])
     }
 
     @MainActor
@@ -69,8 +69,6 @@ final class ToolSettingsViewModelTests: XCTestCase {
         let viewModel = ToolSettingsViewModel(store: store)
 
         XCTAssertEqual(viewModel.tools.map(\.name), [
-            "workspace.list",
-            "file.read",
             "file.write",
         ])
         XCTAssertEqual(viewModel.tools.first(where: { $0.name == "file.write" })?.riskLabel, "高风险")

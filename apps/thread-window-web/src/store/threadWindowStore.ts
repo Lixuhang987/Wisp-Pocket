@@ -14,7 +14,7 @@ import type { ThreadProjection, ThreadWindowProjection } from "./threadProjectio
 import { createWindowPreferences, windowPreferencePersistence, type WindowPreferences } from "./windowPreferences.ts";
 
 export type { ConnectionState } from "../thread/threadSocketClient.ts";
-export type { PermissionRequestState, WorkspaceRequestState } from "./threadProjection.ts";
+export type { PermissionRequestState } from "./threadProjection.ts";
 export type { ThreadItem } from "./threadItems.ts";
 export { isUserMessage, isAssistantMessage, isToolCall, isError } from "./threadItems.ts";
 
@@ -27,8 +27,7 @@ export type ThreadWindowState = Omit<ThreadWindowProjection, "threadsById"> & In
   enqueueInitialPrompt(prompt: InitialPromptPayload): void;
   ensureThreadState(threadId: string): void;
   resolvePermissionRequest(requestId: string): void;
-  resolveWorkspaceRequest(requestId: string): void;
-  setWorkspaces(workspaces: ThreadWindowProjection["workspaces"]): void;
+  setPets(pets: ThreadWindowProjection["pets"]): void;
   handleNotification(notification: ThreadNotification): void;
   handleRequest(request: ServerRequest): void;
 };
@@ -49,15 +48,15 @@ return create<ThreadWindowState>()(persist((set) => ({
   threadsById: {},
   pendingInitialPrompts: {},
   processedNotificationIds: {},
-  workspaces: [],
+  pets: [],
   ...createWindowPreferences(set),
 
   setConnectionState(state) {
     set({ connectionState: state });
   },
 
-  setWorkspaces(workspaces) {
-    set({ workspaces });
+  setPets(pets) {
+    set({ pets });
   },
 
   enqueueInitialPrompt(prompt) {
@@ -72,16 +71,13 @@ return create<ThreadWindowState>()(persist((set) => ({
     set(produce<ThreadWindowState>((draft) => projection.resolvePermissionRequest(draft, requestId)));
   },
 
-  resolveWorkspaceRequest(requestId) {
-    set(produce<ThreadWindowState>((draft) => projection.resolveWorkspaceRequest(draft, requestId)));
-  },
-
   handleNotification(notification) {
     set(produce<ThreadWindowState>((draft) => {
       if (!projection.acceptNotification(draft, notification)) return;
       let thread: ThreadState | undefined;
       if (notification.type === "thread.started") {
-        thread = draft.threadsById[notification.threadId] = emptyThreadState(notification.threadId, notification.payload.preview);
+        thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId, notification.payload.preview);
+        thread.petId = notification.payload.petId; thread.petRevision = notification.payload.petRevision; thread.rootPath = notification.payload.rootPath;
       } else if (notification.type === "request.resolved") {
         thread = draft.threadsById[notification.threadId];
       } else if ("threadId" in notification && notification.threadId) {

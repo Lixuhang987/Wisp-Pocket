@@ -1,3 +1,4 @@
+import { PetError, type Pet, type PetCreateInput, type PetPatch, type PetImageRef } from "@handagent/core/pet/Pet.ts";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -28,7 +29,7 @@ type ThreadStoreOptions = {
 type LiveThread = {
   meta: SessionMeta;
   preview: string | null;
-  workspaceId: string | null;
+  petId: string;
   createdAt: string;
   updatedAt: string;
   nextSequence: number;
@@ -51,7 +52,8 @@ type ThreadRow = {
   originator: string;
   agent_path: string | null;
   dynamic_tools_json: string | null;
-  workspace_id: string | null;
+  pet_id: string;
+  pet_snapshot_json: string;
   closed_at: string | null;
 };
 
@@ -77,10 +79,16 @@ export class ThreadStore {
 
   async createThread(params: CreateThreadParams): Promise<ThreadStoreResult<void>> {
     return this.withThreadQueue(params.threadId, () => {
+      if (this.db.prepare("SELECT 1 FROM deleted_threads WHERE thread_id = ?").get(params.threadId)) {
+        return err("thread_not_found", `Thread was deleted: ${params.threadId}`);
+      }
       if (this.liveThreads.has(params.threadId) || this.threadExists(params.threadId)) {
         return err("thread_exists", `Thread already exists: ${params.threadId}`);
       }
 
+      const pet = this.getPet(params.petId);
+      if (!pet) throw new PetError("not_found", `Pet not found: ${params.petId}`);
+      const petSnapshot = {petId:pet.id, revision:pet.revision, name:pet.name, rolePrompt:pet.rolePrompt};
       const timestamp = params.timestamp ?? this.now();
       this.liveThreads.set(params.threadId, {
         meta: {
@@ -92,10 +100,11 @@ export class ThreadStore {
           threadSource: params.threadSource ?? "user",
           ...(params.agentPath ? { agentPath: params.agentPath } : {}),
           ...(params.dynamicTools ? { dynamicTools: params.dynamicTools } : {}),
-          workspaceId: params.workspaceId ?? null,
+          petId: params.petId,
+          petSnapshot,
         },
         preview: params.preview ?? null,
-        workspaceId: params.workspaceId ?? null,
+        petId: params.petId,
         createdAt: timestamp,
         updatedAt: timestamp,
         nextSequence: 1,
@@ -121,7 +130,7 @@ export class ThreadStore {
       this.liveThreads.set(params.threadId, {
         meta: rowToSessionMeta(row),
         preview: row.preview,
-        workspaceId: row.workspace_id,
+        petId: row.pet_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         nextSequence: this.nextSequence(params.threadId),
@@ -178,7 +187,7 @@ export class ThreadStore {
         this.updateThreadRow(threadId, {
           preview: live.preview,
           updatedAt: live.updatedAt,
-          workspaceId: live.workspaceId,
+          petId: live.petId,
           closedAt: null,
         });
       });
@@ -232,8 +241,14 @@ export class ThreadStore {
 
   async deleteThread(threadId: ThreadId): Promise<ThreadStoreResult<void>> {
     return this.withThreadQueue(threadId, () => {
+      this.transaction(() => {
+        // Keep the stable creation identity after deleting its history. A lost ACK
+        // must never turn a retry into a new Thread or a repeated first turn.
+        this.db.prepare(`INSERT OR IGNORE INTO deleted_threads(thread_id)
+          SELECT thread_id FROM threads WHERE thread_id = ?`).run(threadId);
+        this.db.prepare("DELETE FROM threads WHERE thread_id = ?").run(threadId);
+      });
       this.liveThreads.delete(threadId);
-      this.db.prepare("DELETE FROM threads WHERE thread_id = ?").run(threadId);
       return ok(undefined);
     });
   }
@@ -253,7 +268,7 @@ export class ThreadStore {
         this.updateThreadRow(threadId, {
           preview,
           updatedAt,
-          workspaceId: live?.workspaceId,
+          petId: live?.petId,
           closedAt: undefined,
         });
       }
@@ -267,7 +282,7 @@ export class ThreadStore {
   async listThreads(): Promise<ThreadStoreResult<ThreadSummary[]>> {
     return this.capture(() => {
       const rows = this.db
-        .prepare("SELECT * FROM threads ORDER BY updated_at DESC")
+        .prepare("SELECT * FROM threads ORDER BY updated_at DESC, thread_id DESC")
         .all() as ThreadRow[];
       return ok(rows.map((row) => this.summaryForRow(row)));
     });
@@ -301,7 +316,7 @@ export class ThreadStore {
         this.updateThreadRow(threadId, {
           preview: row.preview,
           updatedAt,
-          workspaceId: row.workspace_id,
+          petId: row.pet_id,
           closedAt: row.closed_at,
         });
         const live = this.liveThreads.get(threadId);
@@ -318,9 +333,51 @@ export class ThreadStore {
     this.db.close();
   }
 
+  listPets(): Pet[] { return (this.db.prepare('SELECT data_json FROM pets ORDER BY created_at, id').all() as {data_json:string}[]).map(row => JSON.parse(row.data_json)); }
+  getPet(id: string): Pet | null { const row = this.db.prepare('SELECT data_json FROM pets WHERE id = ?').get(id) as {data_json:string}|undefined; return row ? JSON.parse(row.data_json) : null; }
+  createPet(input: PetCreateInput, commandId?: string): Pet {
+    let result!: Pet;
+    this.transaction(() => {
+      const prior = commandId ? this.db.prepare('SELECT pet_id FROM pet_commands WHERE command_id = ?').get(commandId) as {pet_id:string}|undefined : undefined;
+      if (prior) { result = this.getPet(prior.pet_id)!; return; }
+      const now = this.now();
+      result = {...input, description:input.description ?? '',id:crypto.randomUUID(),revision:1,isDefault:input.isDefault === true || this.listPets().length === 0,createdAt:now,updatedAt:now};
+      if (result.isDefault) this.clearDefault();
+      this.db.prepare('INSERT INTO pets(id,created_at,data_json) VALUES(?,?,?)').run(result.id,now,JSON.stringify(result));
+      if (commandId) this.db.prepare('INSERT INTO pet_commands(command_id,pet_id) VALUES(?,?)').run(commandId,result.id);
+    });
+    return result;
+  }
+  updatePet(id: string, expectedRevision: number, patch: PetPatch): Pet {
+    let result!: Pet;
+    this.transaction(() => {
+      const prior = this.getPet(id);
+      if (!prior) throw new PetError('not_found', `Pet not found: ${id}`);
+      if (prior.revision !== expectedRevision) throw new PetError('conflict','桌宠已被其他窗口编辑',prior.revision);
+      if (prior.isDefault && patch.isDefault === false) throw new PetError('invalid_input','请将另一只桌宠设为默认');
+      if (patch.isDefault === true) this.clearDefault();
+      result = {...prior,...patch,revision:prior.revision+1,updatedAt:this.now()};
+      this.db.prepare('UPDATE pets SET data_json=? WHERE id=?').run(JSON.stringify(result),id);
+    });
+    return result;
+  }
+  private clearDefault(): void {
+    for (const pet of this.listPets()) if (pet.isDefault) this.db.prepare('UPDATE pets SET data_json=? WHERE id=?').run(JSON.stringify({...pet,isDefault:false,revision:pet.revision+1,updatedAt:this.now()}),pet.id);
+  }
+  savePetImage(image: Extract<PetImageRef,{type:'imported'}>): void { this.db.prepare('INSERT OR REPLACE INTO pet_images(blob_id,data_json) VALUES(?,?)').run(image.blobId,JSON.stringify(image)); }
+  getPetImage(blobId:string): Extract<PetImageRef,{type:'imported'}>|null { const row=this.db.prepare('SELECT data_json FROM pet_images WHERE blob_id=?').get(blobId) as {data_json:string}|undefined; return row ? JSON.parse(row.data_json) : null; }
+
   private initialize(): void {
+    const columns = this.db.prepare('PRAGMA table_info(threads)').all() as {name:string}[];
+    if (columns.length && !columns.some(column => column.name === 'pet_snapshot_json')) {
+      this.db.close();
+      throw new Error('旧开发数据库不支持 Pet 模型。请备份 ~/.spotAgent/threads.sqlite 后使用新的数据文件重新启动；不会自动迁移或删除旧数据。');
+    }
     this.db.exec(`
       PRAGMA foreign_keys = ON;
+      CREATE TABLE IF NOT EXISTS pets (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, data_json TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS pet_commands (command_id TEXT PRIMARY KEY, pet_id TEXT NOT NULL REFERENCES pets(id));
+      CREATE TABLE IF NOT EXISTS pet_images (blob_id TEXT PRIMARY KEY, data_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS threads (
         thread_id TEXT PRIMARY KEY,
         preview TEXT,
@@ -332,9 +389,11 @@ export class ThreadStore {
         originator TEXT NOT NULL,
         agent_path TEXT,
         dynamic_tools_json TEXT,
-        workspace_id TEXT,
+        pet_id TEXT NOT NULL REFERENCES pets(id),
+        pet_snapshot_json TEXT NOT NULL,
         closed_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS deleted_threads (thread_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS thread_items (
         thread_id TEXT NOT NULL,
         sequence INTEGER NOT NULL,
@@ -427,9 +486,10 @@ export class ThreadStore {
         originator,
         agent_path,
         dynamic_tools_json,
-        workspace_id,
+        pet_id,
+        pet_snapshot_json,
         closed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     `).run(
       threadId,
       live.preview,
@@ -441,7 +501,8 @@ export class ThreadStore {
       live.meta.originator,
       live.meta.agentPath ?? null,
       live.meta.dynamicTools ? JSON.stringify(live.meta.dynamicTools) : null,
-      live.workspaceId,
+      live.petId,
+      JSON.stringify(live.meta.petSnapshot),
     );
   }
 
@@ -450,7 +511,7 @@ export class ThreadStore {
     input: {
       preview?: string | null;
       updatedAt: string;
-      workspaceId?: string | null;
+      petId?: string | null;
       closedAt?: string | null;
     },
   ): void {
@@ -458,15 +519,15 @@ export class ThreadStore {
       UPDATE threads
       SET preview = CASE WHEN ? THEN ? ELSE preview END,
           updated_at = ?,
-          workspace_id = CASE WHEN ? THEN ? ELSE workspace_id END,
+          pet_id = CASE WHEN ? THEN ? ELSE pet_id END,
           closed_at = CASE WHEN ? THEN ? ELSE closed_at END
       WHERE thread_id = ?
     `).run(
       Object.hasOwn(input, "preview") ? 1 : 0,
       input.preview ?? null,
       input.updatedAt,
-      Object.hasOwn(input, "workspaceId") ? 1 : 0,
-      input.workspaceId ?? null,
+      Object.hasOwn(input, "petId") ? 1 : 0,
+      input.petId ?? null,
       Object.hasOwn(input, "closedAt") ? 1 : 0,
       input.closedAt ?? null,
       threadId,
@@ -488,7 +549,15 @@ export class ThreadStore {
 
   private summaryForRow(row: ThreadRow): ThreadSummary {
     const metadata = this.metadataForRow(row);
-    return { ...metadata };
+    const events = this.rolloutItemsForThread(row.thread_id).filter(item => item.kind === "event_msg");
+    const running = new Set<string>();
+    let status: import("@handagent/core/protocol/types/ThreadProtocolShared.ts").RunStatus = "idle";
+    for (const event of events) {
+      if (event.kind !== "event_msg") continue;
+      if (event.payload.type === "turn.started") running.add(event.payload.turnId);
+      if (event.payload.type === "turn.completed") { running.delete(event.payload.turnId); status = event.payload.payload.status === "completed" ? "idle" : event.payload.payload.status; }
+    }
+    return { ...metadata, status: running.size ? "failed" : status };
   }
 
   private metadataForRow(row: ThreadRow): ThreadMetadata {
@@ -498,7 +567,9 @@ export class ThreadStore {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       messageCount: this.messagesForThread(row.thread_id).length,
-      workspaceId: row.workspace_id,
+      petId: row.pet_id,
+      petSnapshot: JSON.parse(row.pet_snapshot_json),
+      rootPath: this.getPet(row.pet_id)!.rootPath,
       ...(row.dynamic_tools_json
         ? { dynamicTools: JSON.parse(row.dynamic_tools_json) }
         : {}),
@@ -517,7 +588,9 @@ export class ThreadStore {
           createdAt: live?.createdAt ?? this.now(),
           updatedAt: live?.updatedAt ?? this.now(),
           messageCount: this.messagesForThread(threadId).length,
-          workspaceId: live?.workspaceId ?? null,
+          petId: live!.petId,
+          petSnapshot: live!.meta.petSnapshot!,
+          rootPath: this.getPet(live!.petId)!.rootPath,
           ...(live?.meta.dynamicTools ? { dynamicTools: live.meta.dynamicTools } : {}),
         };
 
@@ -525,7 +598,7 @@ export class ThreadStore {
     const started = new Set(this.rolloutItemsForThread(threadId).flatMap((item) =>
       item.kind === "event_msg" && item.payload.type === "turn.started" ? [item.payload.turnId] : []));
     const pendingInputs = messages.flatMap((message) => message.role === "user" && message.id && message.inputItems && !started.has(message.id)
-      ? [{ opId: message.id, payload: { items: message.inputItems, ...(message.inputMode ? { mode: message.inputMode } : {}) } }]
+      ? [{ opId: message.id, payload: { items: message.inputItems,  } }]
       : []);
     metadata.messageCount = messages.length;
     return {
@@ -585,7 +658,8 @@ function rowToSessionMeta(row: ThreadRow): SessionMeta {
     threadSource: row.thread_source === "subagent" ? "subagent" : "user",
     ...(row.agent_path ? { agentPath: row.agent_path } : {}),
     ...(row.dynamic_tools_json ? { dynamicTools: JSON.parse(row.dynamic_tools_json) } : {}),
-    workspaceId: row.workspace_id,
+    petId: row.pet_id,
+    petSnapshot: JSON.parse(row.pet_snapshot_json),
   };
 }
 

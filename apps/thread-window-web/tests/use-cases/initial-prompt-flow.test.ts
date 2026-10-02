@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   encodePermissionAnswer,
-  encodeWorkspaceAnswer,
   type InitialPromptPayload,
   type ServerRequest,
   type ThreadNotification,
@@ -82,14 +81,14 @@ describe("Thread input and socket flows", () => {
     createThreadWindowStore.setState(createThreadWindowStore.getInitialState(), true);
   });
 
-  it("connects, lists workspaces and threads, and dispatches inbound notifications without recovery requests", () => {
+  it("connects, lists pets and threads, and dispatches inbound notifications without recovery requests", () => {
     const events: string[] = [];
     const client = new ThreadSocketClient({
       url: "ws://127.0.0.1:4317/api/thread",
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("unused-id"),
       onConnectionState: (state) => events.push(`state:${state}`),
@@ -111,7 +110,7 @@ describe("Thread input and socket flows", () => {
 
     expect(events).toEqual(["state:connecting", "state:connected", "thread.listed"]);
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "workspace.list", commandId: "workspace-list-1" },
+      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
     ]);
     expect(socket.sent.map((raw) => JSON.parse(raw)).some((command) => command.type === "thread.resume")).toBe(false);
@@ -123,7 +122,7 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -135,7 +134,7 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({
+    inputs.startInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
@@ -148,14 +147,14 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: { preview: "hello" },
+        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
       }),
     });
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "workspace.list", commandId: "workspace-list-1" },
+      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
+      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       { type: "op.submit", threadId: "thread-1", commandId: "input-1", payload: { op: { type: "user_input", opId: "prompt-1", payload: { items: [{ type: "text", id: "text-1", text: "hello" }] } } } },
     ]);
@@ -165,7 +164,7 @@ describe("Thread input and socket flows", () => {
 
   it("keeps interleaved initial prompts associated through creation, snapshot, and recorded input", () => {
     const store = createThreadWindowStore;
-    const promptA: InitialPromptPayload = {
+    const promptA: InitialPromptPayload = {petId: "pet-default",
       clientRequestId: "prompt-a",
       userInput: {
         items: [
@@ -176,7 +175,7 @@ describe("Thread input and socket flows", () => {
         ],
       },
     };
-    const promptB: InitialPromptPayload = {
+    const promptB: InitialPromptPayload = {petId: "pet-default",
       clientRequestId: "prompt-b",
       userInput: { items: [{ type: "text", id: "text-b", text: "another question" }] },
     };
@@ -202,14 +201,14 @@ describe("Thread input and socket flows", () => {
       notificationId: "started-b",
       commandId: "prompt-b",
       timestamp,
-      payload: { preview: "another question" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "another question" },
     });
     socket.receive({
       type: "thread.snapshot",
       threadId: "thread-b",
       notificationId: "snapshot-b",
       timestamp,
-      payload: { messages: [], status: "running" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
     });
     socket.receive({
       type: "thread.started",
@@ -217,14 +216,14 @@ describe("Thread input and socket flows", () => {
       notificationId: "started-a",
       commandId: "prompt-a",
       timestamp,
-      payload: { preview: "focus on regressions" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "focus on regressions" },
     });
     socket.receive({
       type: "thread.snapshot",
       threadId: "thread-a",
       notificationId: "snapshot-a",
       timestamp,
-      payload: { messages: [], status: "running" },
+      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
     });
 
     expect(observedPrompts).toEqual([
@@ -293,7 +292,7 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1"),
       onConnectionState: () => {},
       onNotification: () => {},
@@ -303,7 +302,7 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({
+    inputs.startInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
@@ -315,7 +314,7 @@ describe("Thread input and socket flows", () => {
       type: "thread.start",
       commandId: "prompt-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      payload: { workspaceId: null },
+      payload: { petId: "pet-default" },
     });
   });
 
@@ -377,7 +376,7 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1"),
       onConnectionState: () => {},
       onNotification: () => {},
@@ -394,7 +393,7 @@ describe("Thread input and socket flows", () => {
 
     expect(FakeWebSocket.instances).toHaveLength(1);
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "workspace.list", commandId: "workspace-list-1" },
+      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
     ]);
   });
@@ -405,7 +404,7 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -417,7 +416,7 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
 
-    expect(() => inputs.startInitialPrompt({
+    expect(() => inputs.startInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello before open" }],
@@ -433,13 +432,13 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: { preview: "hello before open" },
+        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello before open" },
       }),
     });
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
-      { type: "workspace.list", commandId: "workspace-list-1" },
+      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
+      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       { type: "op.submit", threadId: "thread-1", commandId: "input-1", payload: { op: { type: "user_input", opId: "prompt-1", payload: { items: [{ type: "text", id: "text-1", text: "hello before open" }] } } } },
@@ -531,11 +530,6 @@ describe("Thread input and socket flows", () => {
       timestamp,
       payload: { items: [{ type: "text", id: "queued-text", text: "before open" }] },
     });
-    client.sendRaw(encodeWorkspaceAnswer({
-      requestId: "other-thread:workspace",
-      timestamp,
-      cancelled: true,
-    }));
 
     expect(socket.sent).toEqual([]);
     socket.open();
@@ -563,8 +557,7 @@ describe("Thread input and socket flows", () => {
           },
         },
       },
-      { type: "workspace.answered", requestId: "other-thread:workspace", timestamp, payload: { cancelled: true } },
-      { type: "workspace.list", commandId: "command-3", timestamp },
+      { type: "pet.list", commandId: "command-3", timestamp },
       { type: "thread.list", commandId: "command-4", timestamp },
     ]);
   });
@@ -583,13 +576,6 @@ describe("Thread input and socket flows", () => {
         timestamp,
         payload: { toolName: "file.write", toolCallId: `tool-${suffix}`, arguments: { path: `${threadId}.txt` } },
       });
-      socket.receive({
-        type: "workspace.requested",
-        requestId: `${threadId}:workspace-${suffix}`,
-        threadId,
-        timestamp,
-        payload: { prompt: `Pick for ${threadId}`, candidates: [candidate] },
-      });
     };
     requestPanels("thread-a", "1");
     requestPanels("thread-b", "1");
@@ -601,12 +587,10 @@ describe("Thread input and socket flows", () => {
         toolCallId: "tool-1",
         argumentsJSON: JSON.stringify({ path: "thread-a.txt" }),
       }],
-      workspaceRequests: [{ id: "thread-a:workspace-1", prompt: "Pick for thread-a", candidates: [candidate] }],
     });
     const threadB = store.getState().threadsById["thread-b"];
     expect(threadB).toMatchObject({
       permissionRequests: [{ id: "thread-b:permission-1" }],
-      workspaceRequests: [{ id: "thread-b:workspace-1" }],
     });
 
     client.sendRaw(encodePermissionAnswer({
@@ -618,18 +602,9 @@ describe("Thread input and socket flows", () => {
     store.getState().resolvePermissionRequest("thread-a:permission-1");
     expect(store.getState().threadsById["thread-a"]).toMatchObject({
       permissionRequests: [],
-      workspaceRequests: [{ id: "thread-a:workspace-1" }],
     });
-
-    client.sendRaw(encodeWorkspaceAnswer({
-      requestId: "thread-a:workspace-1",
-      timestamp,
-      workspaceId: "project",
-    }));
-    store.getState().resolveWorkspaceRequest("thread-a:workspace-1");
     expect(store.getState().threadsById["thread-a"]).toMatchObject({
       permissionRequests: [],
-      workspaceRequests: [],
     });
     expect(store.getState().threadsById["thread-b"]).toEqual(threadB);
     expect(socket.sent.map((raw) => JSON.parse(raw))).toEqual([
@@ -638,12 +613,6 @@ describe("Thread input and socket flows", () => {
         requestId: "thread-a:permission-1",
         timestamp,
         payload: { decision: "allow", scope: "always" },
-      },
-      {
-        type: "workspace.answered",
-        requestId: "thread-a:workspace-1",
-        timestamp,
-        payload: { workspaceId: "project" },
       },
     ]);
 
@@ -660,7 +629,6 @@ describe("Thread input and socket flows", () => {
       status: "failed",
       errorMessage: "tool execution failed",
       permissionRequests: [],
-      workspaceRequests: [],
     });
     expect(store.getState().threadsById["thread-b"]).toEqual(threadB);
   });
@@ -705,7 +673,7 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -717,7 +685,7 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({
+    inputs.startInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
@@ -731,7 +699,7 @@ describe("Thread input and socket flows", () => {
         notificationId: "n-other-started",
         commandId: "prompt-other",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: { preview: "other" },
+        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "other" },
       }),
     });
     socket.onmessage?.({
@@ -759,15 +727,15 @@ describe("Thread input and socket flows", () => {
         notificationId: "n-late-started",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: { preview: "hello" },
+        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
       }),
     });
 
     const sent = socket.sent.map((raw) => JSON.parse(raw));
     expect(sent).toMatchObject([
-      { type: "workspace.list", commandId: "workspace-list-1" },
+      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
+      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
     ]);
     expect(sent.some((command) => command.type === "input.submit")).toBe(false);
     expect(sent.some((command) => command.type === "thread.resume" && command.threadId === "thread-1")).toBe(false);
@@ -779,7 +747,7 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("workspace-list-1")
+        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -791,14 +759,14 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({
+    inputs.startInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "first" }],
       },
     });
 
-    expect(() => inputs.startInitialPrompt({
+    expect(() => inputs.startInitialPrompt({petId: "pet-default",
       clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-2", text: "second" }],
@@ -812,14 +780,14 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: { preview: "first" },
+        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "first" },
       }),
     });
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "workspace.list", commandId: "workspace-list-1" },
+      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: null } },
+      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       {
         type: "op.submit",
@@ -836,4 +804,16 @@ describe("Thread input and socket flows", () => {
       },
     ]);
   });
+});
+
+it("完整历史窗口自动取得后续分页，合并后可搜索并打开第 51 条", () => {
+  createThreadWindowStore.setState(createThreadWindowStore.getInitialState(), true);
+  const {client,socket}=connectStoreClient();socket.open();
+  const entry=(id:string)=>({id,petId:"pet-a",petRevision:1,rootPath:"/tmp",status:"idle" as const,preview:id,messageCount:1,createdAt:timestamp,updatedAt:timestamp});
+  socket.receive({type:"thread.listed",notificationId:"page-1",timestamp,payload:{threads:Array.from({length:50},(_,i)=>entry(`thread-${i}`)),nextCursor:"page-2"}});
+  expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({type:"thread.list",payload:{cursor:"page-2"}});
+  socket.receive({type:"thread.listed",notificationId:"page-2",timestamp,payload:{threads:[entry("old-51")]}});
+  expect(createThreadWindowStore.getState().history).toHaveLength(51);
+  expect(createThreadWindowStore.getState().history.find(t=>t.preview==="old-51")?.petId).toBe("pet-a");
+  client.resumeThread("old-51");expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({type:"thread.resume",threadId:"old-51"});client.disconnect();
 });

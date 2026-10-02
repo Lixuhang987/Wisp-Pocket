@@ -6,7 +6,6 @@
 
 | 文件 | 职责 |
 |------|------|
-| `AppConfig.ts` | `AppConfig` 类型 + `defaultAppConfig`；当前未在主链路使用，预留 |
 | `ModelSettings.ts` | `loadModelSettings()`：同步 `readFileSync` 读 `settings.json`，用 `zod` 归一化 `llm.{provider, model, summarizerModel, apiKey, baseUrl, api}`；JSON 解析失败抛错（带文件路径），其它字段缺失走默认；调用方负责是否加缓存 |
 | `ToolSettings.ts` | `loadToolSettings()` + `filterToolNames()`：解析 `tools.allowlist / tools.denylist`；`denylist` 优先；JSON 解析失败静默 fallback 到默认 |
 
@@ -27,7 +26,7 @@
     "api": "responses"
   },
   "tools": {
-    "allowlist": ["file.read", "file.write", "workspace.list"],
+    "allowlist": ["file.write"],
     "denylist": ["file.write"]
   }
 }

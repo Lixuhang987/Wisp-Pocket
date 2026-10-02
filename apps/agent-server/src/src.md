@@ -5,7 +5,7 @@
 ## 直接子节点
 
 - [server/server.md](/Users/mu9/proj/handAgent/apps/agent-server/src/server/server.md)：进程入口、HTTP/WebSocket 分派与组合根。
-- [thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)：Thread 命令接入、持久化适配、主动拖入读取和通知分发。
+- [thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)：Thread 命令接入、Pet 管理、持久化适配和通知分发。
 - [agent/agent.md](/Users/mu9/proj/handAgent/apps/agent-server/src/agent/agent.md)：历史 Agent 目录说明；生产 Thread owner 位于 core `thread/`。
 - [protocol/protocol.md](/Users/mu9/proj/handAgent/apps/agent-server/src/protocol/protocol.md)：runtime、UI 与持久化表达之间的翻译。
 - [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md)：Thread-scoped Tool registry 与 MCP 激活。

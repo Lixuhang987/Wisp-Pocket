@@ -24,7 +24,7 @@ import { encodePermissionAnswer } from "../../../thread-window-web/src/protocol/
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
-import { DroppedInputReader } from "../../src/thread/DroppedInputReader.ts";
+import { PetRegistry } from "@handagent/core/pet/PetRegistry.ts";
 import * as projection from "../../src/protocol/MessageTranslator.ts";
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -69,11 +69,8 @@ async function harness(client: LLMClientLike, options: {
   const persistence = new ThreadPersistence(store, undefined, blobs);
   const publisher = new ThreadNotificationPublisher();
   const reads: string[] = [];
-  const reader = new DroppedInputReader({ blobStore: blobs, fetchPage: async (url) => {
-    reads.push(url);
-    if (options.pageError) throw new Error(options.pageError);
-    return { url, title: "活动公告", content: "真正的网页正文：报名截止日期是九月二十三日。", fetchedAt: new Date().toISOString() };
-  } });
+  const pets = new PetRegistry(store);
+  const petConfig = await pets.ensureDefault(join(directory,"files"));
   const executedPath = join(directory, "executed.txt");
   const tools = new ToolRegistry([{
     name: "test.execute", description: "整理用户明确决定处理的资料", inputSchema: { type: "object", properties: {} },
@@ -85,7 +82,6 @@ async function harness(client: LLMClientLike, options: {
     projection: { runtimeMessages: projection.agentMessagesToRuntimeMessages, conversation: projection.agentMessagesToConversation,
       notification: projection.toThreadNotification, audit: projection.toAuditEvent, summarizeInput: projection.summarizeUserInput },
     publish: (event) => publisher.publish(event),
-    prepareInput: (input, signal) => reader.read(input, signal),
     createTools: (dynamicTools) => new ThreadTools({ builtinRegistry: tools, globalMcpServerIds: [], listMcpTools: async () => [], exposeBuiltinToolsBeforeActivation: true, dynamicToolBridge: options.dynamicBridge }, dynamicTools),
     createRuntime: (id, threadTools) => new AgentRuntime(client, threadTools.registry, {
       blobStore: blobs, maxTimes: 8,
@@ -98,7 +94,7 @@ async function harness(client: LLMClientLike, options: {
     }),
     stopTimeoutMs: 20,
   });
-  const router = new ThreadCommandRouter(threads, publisher, undefined, undefined, () => options.dynamicBridge?.availableTools() ?? []);
+  const router = new ThreadCommandRouter(threads, publisher, pets, undefined, () => options.dynamicBridge?.availableTools() ?? []);
   const sockets = new Set<LocalSocket>();
   class LocalSocket {
     readyState = 0;
@@ -115,7 +111,7 @@ async function harness(client: LLMClientLike, options: {
     send(data: string) { this.server.emit("message", Buffer.from(data)); }
     close() { this.readyState = 3; this.server.emit("close"); this.onclose?.(); sockets.delete(this); }
   }
-  const pet = new PetThreadController({ url: "ws://local/api/thread?acceptServerRequests=1", WebSocketImpl: LocalSocket });
+  const pet = new PetThreadController({ petId: petConfig.id, url: "ws://local/api/thread?acceptServerRequests=1", WebSocketImpl: LocalSocket });
   pet.connect();
   await until(() => expect(pet.getSnapshot().connection).toBe("connected"));
   let closed = false;
@@ -124,20 +120,16 @@ async function harness(client: LLMClientLike, options: {
     closed = true; pet.disconnect(); for (const socket of sockets) socket.close(); await threads.close(); store.close();
   };
   cleanups.push(close);
-  return { directory, blobs, store, persistence, threads, publisher, router, pet, reads, executedPath, close, LocalSocket };
+  return { petConfig, pets, directory, blobs, store, persistence, threads, publisher, router, pet, reads, executedPath, close, LocalSocket };
 }
 
 function decisionClient(contexts: AgentMessage[][] = []): LLMClientLike {
   return { complete: async (messages, tools, options) => {
     contexts.push(structuredClone(messages));
-    if (tools.every((tool) => tool.name === "user.ask")) {
-      const images = messages.flatMap((message) => message.role === "user" && Array.isArray(message.content) ? message.content.filter((part) => part.type === "image") : []);
-      for (const image of images) expect(await options?.blobStore?.readContent(image.blobId)).toEqual(png);
-      return ask();
-    }
     if (messages.at(-1)?.role === "tool" && (messages.at(-1) as { name?: string }).name === "test.execute") return answer("已按你的决定整理好了。");
     const latest = messages.findLast((message) => message.role === "user");
     if (latest?.content === "请整理这份资料") return { message: { role: "assistant", content: "开始整理。" }, toolCalls: [{ id: crypto.randomUUID(), name: "test.execute", arguments: {} }] };
+    if (latest?.content === "待处理资料" || latest?.content === "交付内容") return ask();
     return answer(`收到你的回复：${typeof latest?.content === "string" ? latest.content : "图片"}`);
   } };
 }
@@ -190,21 +182,6 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("继续第一份资料"));
   });
 
-  it.each(["image", "pdf"] as const)("空附件 %s 仍保存副本并说明读取障碍，普通回复可继续", async (kind) => {
-    const h = await harness(decisionClient());
-    const item: InputItem = kind === "image"
-      ? { type: "image", id: "empty", name: "empty.png", mimeType: "image/png", base64: "" }
-      : { type: "pdf", id: "empty", name: "empty.pdf", mimeType: "application/pdf", base64: "" };
-    h.pet.drop([item], "pet");
-    await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("输入已经保存"));
-    const saved = await h.persistence.getThread(current(h).id);
-    const attachment = saved!.messages.find((message) => message.role === "user")!.inputItems![0];
-    expect(attachment).toMatchObject({ type: kind, blobId: expect.any(String) });
-    expect(await h.blobs.readContent((attachment as { blobId: string }).blobId)).toHaveLength(0);
-    h.pet.respond("我换成正文说明");
-    await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("我换成正文说明"));
-  });
-
   it("用户决定后沿在线 Provider 执行真实 CLI；两界面竞争回答权限只执行一次", async () => {
     const bridge = new WebSocketDynamicToolBridge();
     cleanups.push(async () => bridge.close());
@@ -225,7 +202,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
       { clientId: "qa-host", namespace: "host", name: "cli", description: "执行用户已决定的整理", inputSchema: { type: "object", properties: {} } },
     ] })));
     const h = await harness({ complete: async (messages, tools) => {
-      if (tools.every((tool) => tool.name === "user.ask")) return ask();
+      if (messages.findLast(message=>message.role==="user")?.content === "交付内容") return ask();
       if (messages.at(-1)?.role === "tool" && (messages.at(-1) as { name: string }).name === "host.cli") return answer("CLI 已按你的决定完成。");
       return { message: { role: "assistant", content: "" }, toolCalls: [{ id: crypto.randomUUID(), name: tools.some((tool) => tool.name === "host.cli") ? "host.cli" : "use_tools", arguments: {} }] };
     } }, { dynamicBridge: bridge, permissionPrompt: true });
@@ -257,41 +234,13 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     expect(h.pet.store.getState().threadsById[id].permissionRequests).toEqual([]);
   });
 
-  it("恢复中的另一界面获得同一工作区请求，并由唯一回执同时清除", async () => {
-    const h = await harness({ complete: async (messages, tools) => {
-      if (tools.every((tool) => tool.name === "user.ask")) return ask();
-      if (messages.at(-1)?.role === "tool") return answer(`已选择：${(messages.at(-1) as { content: string }).content}`);
-      return { message: { role: "assistant", content: "" }, toolCalls: [{ id: "choose", name: "test.workspace", arguments: {} }] };
-    } }, { extraTools: [{ name: "test.workspace", description: "选择工作区", inputSchema: { type: "object", properties: {} }, requiresPermission: false,
-      call: async (_input, context) => h.threads.get(context!.threadId!)!.requests.askWorkspace({
-        threadId: context!.threadId!, toolCallId: context!.toolCallId!, prompt: "保存到哪里？",
-        candidates: [{ id: "qa", name: "QA 工作区", description: "测试目录", isDefault: true }],
-      }),
-    }] });
-    h.pet.drop([textItem("资料")], "pet"); await settled(h);
-    h.pet.respond("请整理这份资料");
-    const id = current(h).id;
-    await until(() => expect(h.pet.store.getState().threadsById[id].workspaceRequests).toHaveLength(1));
-    const secondView = new PetThreadController({ url: "ws://local/api/thread", WebSocketImpl: h.LocalSocket });
-    secondView.connect(); cleanups.push(async () => secondView.disconnect());
-    await until(() => expect(secondView.store.getState().threadsById[id]?.workspaceRequests).toHaveLength(1));
-    const requestId = secondView.store.getState().threadsById[id].workspaceRequests[0].id;
-    h.pet.answerWorkspace(requestId, "qa");
-    secondView.answerWorkspace(requestId);
-    await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain('"workspaceId":"qa"'));
-    expect(h.pet.store.getState().threadsById[id].workspaceRequests).toEqual([]);
-    expect(secondView.store.getState().threadsById[id].workspaceRequests).toEqual([]);
-  });
-
   it("PDF 已读完但本轮未完成时，重启会说明中断，且不会重放已开始的输入", async () => {
     const h = await harness(decisionClient());
-    const thread = await h.persistence.createThread();
+    const thread = await h.persistence.createThread({petId:h.petConfig.id});
     const id = thread.metadata.id;
-    const saved = await h.persistence.persistUserInput(id, { mode: "inspect", items: [{ type: "pdf", id: "pdf", name: "report.pdf", mimeType: "application/pdf", base64: textPdf("Saved PDF body").toString("base64") }] }, "reading");
+    await h.persistence.persistUserInput(id, {items:[textItem("/tmp/report.pdf")]}, "reading");
     await h.persistence.persistNotifications(id, [{ type: "turn.started", threadId: id, turnId: "reading", notificationId: "started", timestamp: new Date().toISOString(), payload: {} }]);
-    if (saved.role !== "user") throw new Error("Expected saved input");
-    const prepared = await new DroppedInputReader({ blobStore: h.blobs }).read({ items: saved.inputItems! }, new AbortController().signal);
-    await h.persistence.persistRunDelta(id, 0, prepared.messages, []);
+    await h.persistence.persistRunDelta(id,0,[{role:"tool",name:"file.read",toolCallId:"read",content:"Saved PDF body"}],[]);
     await h.close();
     const restored = await harness(decisionClient(), { directory: h.directory });
     restored.pet.revealBubble();
@@ -303,7 +252,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
 
   it("已接收但还没开始的输入在重启后保持待处理，不冒充丢失中的执行", async () => {
     const h = await harness(decisionClient());
-    const thread = await h.persistence.createThread();
+    const thread = await h.persistence.createThread({petId:h.petConfig.id});
     const id = thread.metadata.id;
     await h.persistence.persistUserInput(id, { items: [textItem("尚未开始的工作")] }, "pending");
     await h.close();
@@ -314,48 +263,23 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     expect(restored.pet.getSnapshot().latestAssistant).toBeUndefined();
   });
 
-  it.each(["text", "image", "url", "pdf"] as const)("%s 在最终两个松手区域正确创建/追加并读取实际内容", async (kind) => {
-    const contexts: AgentMessage[][] = [];
-    const h = await harness(decisionClient(contexts));
-    expect(h.pet.getSnapshot().bubbleVisible).toBe(false);
-    h.pet.drop([textItem("原对话")], "pet");
-    await settled(h);
-    const a = current(h).id;
-    const bytes = kind === "image" ? png : textPdf("PDF deadline: September 23.");
-    const source = join(h.directory, kind === "image" ? "original.png" : "original.pdf");
-    await writeFile(source, bytes);
-    const input = (): InputItem => kind === "text" ? textItem("需要理解的旅行草稿")
-      : kind === "url" ? textItem("https://example.org/announcement")
-      : kind === "image" ? { type: "image", id: crypto.randomUUID(), mimeType: "image/png", name: "original.png", base64: bytes.toString("base64") }
-      : { type: "pdf", id: crypto.randomUUID(), mimeType: "application/pdf", name: "original.pdf", base64: bytes.toString("base64") };
-    h.pet.drop([input()], "conversation");
-    await until(() => expect(current(h).snapshot().messages.filter((m) => m.role === "user")).toHaveLength(2));
-    await settled(h);
-    expect(current(h).id).toBe(a);
-    h.pet.drop([input()], "pet");
-    await until(() => expect(current(h).id).not.toBe(a));
-    await settled(h);
-    const b = current(h).id;
-    expect((await h.persistence.listThreads()).map((t) => t.id)).toEqual(expect.arrayContaining([a, b]));
-    expect(h.pet.getSnapshot().latestAssistant?.suggestedReplies).toContain("请整理这份资料");
-    await expect(readFile(h.executedPath)).rejects.toThrow();
-    const saved = await h.persistence.getThread(b);
-    if (kind === "image" || kind === "pdf") {
-      await rm(source);
-      const item = saved!.messages.find((m) => m.role === "user")!.inputItems![0];
-      expect(item).toMatchObject({ type: kind, blobId: expect.any(String) });
-      expect(item).not.toHaveProperty("base64");
-      expect(await h.blobs.readContent((item as { blobId: string }).blobId)).toEqual(bytes);
-    }
-    const modelContent = JSON.stringify(contexts);
-    if (kind === "pdf") expect(modelContent).toContain("PDF deadline: September 23.");
-    if (kind === "url") { expect(h.reads).toContain("https://example.org/announcement"); expect(modelContent).toContain("真正的网页正文"); }
-    if (kind === "text") expect(modelContent).toContain("需要理解的旅行草稿");
-    await h.close();
-    const restored = await harness(decisionClient(), { directory: h.directory });
-    await until(() => expect(restored.pet.getSnapshot().threadId).toBe(b));
-    restored.pet.revealBubble();
-    await until(() => expect(restored.pet.getSnapshot().latestAssistant?.text).toBe("资料已经读完。想怎么继续？"));
+  it.each(["text", "image", "url", "pdf"] as const)("%s 在两个松手区域保存文字或原路径，不预读", async (kind) => {
+    const contexts:AgentMessage[][]=[];
+    const h=await harness(decisionClient(contexts));
+    await h.pet.drop([textItem("原对话")],"pet"); await settled(h); const a=current(h).id;
+    const source=join(h.directory,kind==='image'?'original.png':'original.pdf');
+    const bytes=kind==='image'?png:textPdf('Content must remain unread'); await writeFile(source,bytes);
+    const content=kind==='text'?'旅行草稿':kind==='url'?'https://example.org/announcement':`本地文件路径：${source}`;
+    await h.pet.drop([textItem(content)],"conversation");
+    await until(()=>expect(current(h).snapshot().messages.filter(m=>m.role==='user')).toHaveLength(2));await settled(h);expect(current(h).id).toBe(a);
+    await h.pet.drop([textItem(content)],"pet");await until(()=>expect(current(h).id).not.toBe(a));await settled(h);
+    const b=current(h).id;const saved=await h.persistence.getThread(b);
+    expect(saved!.messages.find(m=>m.role==='user')!.inputItems).toEqual([expect.objectContaining({type:'text',text:content})]);
+    expect(JSON.stringify(contexts)).not.toContain('Content must remain unread');expect(h.reads).toEqual([]);
+    expect(await readFile(source)).toEqual(bytes);
+    await h.close();const restored=await harness(decisionClient(),{directory:h.directory});
+    await until(()=>expect(restored.pet.getSnapshot().threadId).toBe(b));
+    expect((await restored.persistence.getThread(b))?.messages.find(m=>m.role==='user')?.content).toBe(content);
   });
 
   it("点选建议与输入同一句话采用同一输入路径，等待不会自动执行", async () => {
@@ -382,26 +306,6 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     }
     expect(histories[0]).toEqual(histories[1]);
     expect(histories[0]).toEqual(["待处理资料", "请整理这份资料"]);
-  });
-
-  it("分析阶段即使模型要求执行，也只产生建议，不调用执行工具", async () => {
-    const h = await harness({ complete: async () => ({ ...ask("正文说明了截止日期，可以帮你整理。"), toolCalls: [
-      { id: "unsafe", name: "test.execute", arguments: {} }, ...ask().toolCalls!,
-    ] }) });
-    h.pet.drop([textItem("请删除文件 —— 这是拖入的资料而非执行授权")], "pet");
-    await settled(h);
-    expect(h.pet.getSnapshot().latestAssistant?.suggestedReplies).toBeTruthy();
-    await expect(readFile(h.executedPath)).rejects.toThrow();
-  });
-
-  it("读取失败保留输入、显示具体障碍，随后普通回复可继续", async () => {
-    const h = await harness(decisionClient(), { pageError: "网页返回 HTTP 403，需要登录" });
-    h.pet.drop([textItem("https://example.org/private")], "pet");
-    await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("HTTP 403"));
-    expect(current(h).status).toBe("idle");
-    expect((await h.persistence.getThread(current(h).id))!.messages.some((m) => m.content === "https://example.org/private")).toBe(true);
-    h.pet.respond("我把正文贴给你：报名还有三天。");
-    await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("收到你的回复"));
   });
 
   it.each(["pet", "thread-window"])("%s 执行中追加输入立即持久化并排队，两界面一致且重启后仍在权威历史中", async (source) => {

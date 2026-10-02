@@ -8,6 +8,7 @@ type ConnectionState = {
   send: SendEvent;
   subscriptions: Set<string>;
   acceptServerRequests: boolean;
+  observeRequests: boolean;
 };
 
 export class ThreadNotificationPublisher {
@@ -20,6 +21,7 @@ export class ThreadNotificationPublisher {
       send,
       subscriptions: this.connections.get(connectionId)?.subscriptions ?? new Set<string>(),
       acceptServerRequests: this.connections.get(connectionId)?.acceptServerRequests ?? false,
+      observeRequests: this.connections.get(connectionId)?.observeRequests ?? false,
     });
   }
 
@@ -38,9 +40,18 @@ export class ThreadNotificationPublisher {
     }
   }
 
+  observeRequests(connectionId: string): void {
+    const state = this.connections.get(connectionId);
+    if (state) state.observeRequests = true;
+  }
+
+  isRequestObserver(connectionId: string): boolean {
+    return this.connections.get(connectionId)?.observeRequests ?? false;
+  }
+
   canAnswer(connectionId: string, threadId: string): boolean {
     const state = this.connections.get(connectionId);
-    return !!state?.acceptServerRequests && state.subscriptions.has(threadId);
+    return !!state?.acceptServerRequests && !state.observeRequests && state.subscriptions.has(threadId);
   }
 
   unsubscribe(connectionId: string, threadId: string): void {
@@ -52,6 +63,12 @@ export class ThreadNotificationPublisher {
 
     if (hasThreadId(event)) {
       for (const state of this.connections.values()) {
+        if (state.observeRequests) {
+          if (event.type === "thread.started" || isServerRequest(event)) {
+            try { state.send(event); } catch { /* Isolate disconnected request observers. */ }
+          }
+          continue;
+        }
         if (event.type === "thread.started") {
           state.subscriptions.add(event.threadId);
         }
@@ -91,5 +108,5 @@ function hasThreadId(
 }
 
 function isServerRequest(event: PublishedThreadMessage): event is ServerRequest {
-  return event.type === "permission.requested" || event.type === "workspace.requested";
+  return event.type === "permission.requested";
 }

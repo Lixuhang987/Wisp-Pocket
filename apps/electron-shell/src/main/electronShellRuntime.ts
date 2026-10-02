@@ -24,6 +24,8 @@ type ThreadWindowHost = {
 };
 
 type ActivityWindowHost = {
+  showPet?(petId:string): Promise<void>;
+  hidePet?(petId:string): Promise<void>;
   show(): Promise<void>;
   updateTheme(theme: HostTheme): Promise<void>;
 };
@@ -91,6 +93,14 @@ export class ElectronShellRuntime {
       }
       case "activity_window.show":
         await this.runCommand(command, () => this.options.activityWindow.show());
+        return;
+      case "pet.show":
+      case "pet.hide":
+        await this.runCommand(command, async () => {
+          const action = command.type === "pet.show" ? this.options.activityWindow.showPet : this.options.activityWindow.hidePet;
+          if (!action) throw new Error("Pet windows unavailable");
+          await action.call(this.options.activityWindow, command.petId);
+        });
         return;
       case "theme.changed":
         await this.runCommand(command, async () => {

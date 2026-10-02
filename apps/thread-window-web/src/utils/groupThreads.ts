@@ -1,22 +1,21 @@
 // apps/thread-window-web/src/utils/groupThreads.ts
 import type { ThreadListEntry } from '../protocol/threadProtocol.ts';
 
-const workspaceNameCollator = new Intl.Collator("en", {
+const petNameCollator = new Intl.Collator("en", {
   numeric: true,
   sensitivity: "base",
 });
 
 export interface GroupedThreads {
-  workspaceGroups: Array<{
-    workspace: { id: string; name: string; rootPath: string };
+  petGroups: Array<{
+    pet: { id: string; name: string; rootPath: string };
     threads: ThreadListEntry[];
   }>;
-  defaultGroup: ThreadListEntry[];
 }
 
-export function groupThreadsByWorkspace(
+export function groupThreadsByPet(
   threads: ThreadListEntry[],
-  workspaces: Array<{ id: string; name: string; rootPath: string }>,
+  pets: Array<{ id: string; name: string; rootPath: string }>,
   searchQuery: string
 ): GroupedThreads {
   // 过滤搜索
@@ -26,25 +25,24 @@ export function groupThreadsByWorkspace(
       )
     : threads;
 
-  // 按 workspaceId 分组
-  const grouped = new Map<string | null, ThreadListEntry[]>();
+  // 按 petId 分组
+  const grouped = new Map<string, ThreadListEntry[]>();
   for (const thread of filtered) {
-    const key = thread.workspaceId ?? null;
+    const key = thread.petId;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(thread);
   }
 
-  const sortedWorkspaces = [...workspaces].sort((a, b) => {
-    const byName = workspaceNameCollator.compare(a.name, b.name);
+  const sortedPets = [...pets].sort((a, b) => {
+    const byName = petNameCollator.compare(a.name, b.name);
     if (byName !== 0) return byName;
     return a.id.localeCompare(b.id);
   });
 
   return {
-    workspaceGroups: sortedWorkspaces.map(ws => ({
-      workspace: ws,
+    petGroups: sortedPets.map(ws => ({
+      pet: ws,
       threads: grouped.get(ws.id) ?? [],
     })),
-    defaultGroup: grouped.get(null) ?? [],
   };
 }

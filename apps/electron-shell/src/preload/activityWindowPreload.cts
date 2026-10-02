@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 type HostTheme = {
   preference: "light" | "dark" | "system";
@@ -7,7 +7,7 @@ type HostTheme = {
 
 declare global {
   interface Window {
-    handAgentActivityWindowConfig?: { threadWebSocketURL?: string };
+    handAgentActivityWindowConfig?: { threadWebSocketURL?: string; petId?: string };
     handAgentTheme?: HostTheme;
     handAgentSubscribeThemeChange?: (handler: (theme: HostTheme) => void) => () => void;
     handAgentPet?: {
@@ -24,6 +24,9 @@ const threadWebSocketURL = readThreadWebSocketURL();
 const fallbackTheme: HostTheme = { preference: "system", resolved: "light" };
 let latestTheme = readInitialTheme();
 const themeHandlers = new Set<(theme: HostTheme) => void>();
+const revealHandlers = new Set<() => void>();
+let pendingReveal = false;
+ipcRenderer.on("pet-window:reveal", () => { pendingReveal = revealHandlers.size === 0; for (const handler of revealHandlers) handler(); });
 
 ipcRenderer.on("handagent:theme-changed", (_event: unknown, theme: HostTheme) => {
   if (!isHostTheme(theme)) {
@@ -36,11 +39,11 @@ ipcRenderer.on("handagent:theme-changed", (_event: unknown, theme: HostTheme) =>
 });
 
 contextBridge.executeInMainWorld({
-  func: (url: string, theme: HostTheme) => {
-    window.handAgentActivityWindowConfig = { threadWebSocketURL: url };
+  func: (url: string, theme: HostTheme, petId: string) => {
+    window.handAgentActivityWindowConfig = { threadWebSocketURL: url, petId };
     window.handAgentTheme = theme;
   },
-  args: [threadWebSocketURL, latestTheme],
+  args: [threadWebSocketURL, latestTheme, decodeURIComponent(process.argv.find(arg => arg.startsWith("--handagent-pet-id="))?.slice("--handagent-pet-id=".length) ?? "")],
 });
 
 contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (theme: HostTheme) => void) => {
@@ -52,6 +55,12 @@ contextBridge.exposeInMainWorld("handAgentSubscribeThemeChange", (handler: (them
 });
 
 contextBridge.exposeInMainWorld("handAgentPet", {
+  getPathForFile(file: File): string { return webUtils.getPathForFile(file); },
+  chooseFiles(): Promise<string[]> { return ipcRenderer.invoke("pet-window:choose-files"); },
+  showPet(petId: string): Promise<void> { return ipcRenderer.invoke("pet-window:show-pet", petId); },
+  hidePet(): void { ipcRenderer.send("pet-window:hide"); },
+  setReceiving(value: boolean): void { ipcRenderer.send("pet-window:receiving",value); },
+  onReveal(handler: () => void): () => void { revealHandlers.add(handler); if (pendingReveal) { pendingReveal = false; handler(); } return () => { revealHandlers.delete(handler); }; },
   setLayout(mode: "pet" | "compact" | "expanded", contentHeight?: number): void {
     if (contentHeight === undefined) ipcRenderer.send("pet-window:set-layout", mode);
     else ipcRenderer.send("pet-window:set-layout", mode, contentHeight);

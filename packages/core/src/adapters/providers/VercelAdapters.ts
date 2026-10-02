@@ -10,7 +10,6 @@ import {
 } from "ai";
 import { createParser, type EventSourceMessage } from "eventsource-parser";
 import type { BlobStore } from "../../blob/types/BlobStore.ts";
-import type { DynamicToolCallResponsePayload } from "../../protocol/types/DynamicTool.ts";
 import type { AgentImageContentPart, AgentMessage } from "../../runtime/types/AgentMessage.ts";
 import type { RegisteredTool } from "../../tools/ToolRegistry.ts";
 
@@ -244,7 +243,7 @@ export function hasImageContent(messages: AgentMessage[]): boolean {
     }
     if (message.role === "tool") {
       try {
-        return isDynamicToolImageResponse(JSON.parse(message.content));
+        return isToolImageResponse(JSON.parse(message.content));
       } catch {
         return false;
       }
@@ -286,7 +285,7 @@ function toToolResultOutput(content: string): ToolResultPart["output"] {
       value: content,
     };
   }
-  if (!isDynamicToolImageResponse(value)) {
+  if (!isToolImageResponse(value)) {
     return { type: "json" as const, value };
   }
 
@@ -306,10 +305,10 @@ function toToolResultOutput(content: string): ToolResultPart["output"] {
   };
 }
 
-function isDynamicToolImageResponse(value: unknown): value is DynamicToolCallResponsePayload {
+function isToolImageResponse(value: unknown): value is { success: boolean; contentItems: Array<{ type: "inputText"; text: string } | { type: "inputImage"; imageUrl: string }> } {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const payload = value as Record<string, unknown>;
-  return typeof payload.callId === "string" && typeof payload.success === "boolean" &&
+  return (payload.callId === undefined || typeof payload.callId === "string") && typeof payload.success === "boolean" &&
     Array.isArray(payload.contentItems) &&
     payload.contentItems.every((item) => typeof item === "object" && item !== null && (
       (item.type === "inputText" && typeof item.text === "string") ||
@@ -324,7 +323,7 @@ function toVercelToolImagePart(imageUrl: string) {
   }
   const url = new URL(imageUrl);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Dynamic Tool image must be a base64 image data URL or an HTTP(S) URL.");
+    throw new Error("Tool image must be a base64 image data URL or an HTTP(S) URL.");
   }
   return { type: "image-url" as const, url: imageUrl };
 }
@@ -366,7 +365,7 @@ function moveToolImagesToUserMessages(messages: ModelMessage[]): ModelMessage[] 
               pendingImages.push({ type: "image", image: new URL(item.url) });
               break;
             default:
-              throw new Error(`Unsupported Dynamic Tool image content: ${item.type}`);
+              throw new Error(`Unsupported Tool image content: ${item.type}`);
           }
         }
         text.push(`图片随本组工具结果后的消息提供（toolCallId: ${part.toolCallId}）。`);

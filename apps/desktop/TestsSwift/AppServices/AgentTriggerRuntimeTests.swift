@@ -18,7 +18,8 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 config: ["folderIds": .stringList(["folder-a"])],
                 promptTemplate: "Summarize bookmark",
                 deliveryPolicy: .default,
-                notificationPolicy: .default
+                notificationPolicy: .default,
+                targetPetId: "pet-test"
             ),
             AgentTriggerInstance(
                 id: "daily-study",
@@ -31,7 +32,8 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 ],
                 promptTemplate: "Run scheduled task",
                 deliveryPolicy: .default,
-                notificationPolicy: .default
+                notificationPolicy: .default,
+                targetPetId: "pet-test"
             ),
         ]))
 
@@ -66,7 +68,8 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 config: ["folderIds": .stringList(["folder-a"])],
                 promptTemplate: "Summarize bookmark",
                 deliveryPolicy: .default,
-                notificationPolicy: .default
+                notificationPolicy: .default,
+                targetPetId: "pet-test"
             )
         ]))
 
@@ -120,7 +123,8 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 config: ["folderIds": .stringList(["folder-a"])],
                 promptTemplate: "Read {{title}} at {{url}} from {{folderId}}",
                 deliveryPolicy: .default,
-                notificationPolicy: .default
+                notificationPolicy: .default,
+                targetPetId: "pet-test"
             )
         ]))
 
@@ -153,6 +157,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
 
         wait(for: [submitted], timeout: 1.0)
         XCTAssertEqual(prompts.count, 1)
+        XCTAssertEqual(prompts.first?.targetPetId, "pet-test")
         guard case .text(_, let text) = prompts.first?.userInput.items.first else {
             return XCTFail("Expected text input item")
         }
@@ -175,7 +180,8 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 config: ["folderIds": .stringList(["folder-a"])],
                 promptTemplate: "Summarize {{url}}",
                 deliveryPolicy: .default,
-                notificationPolicy: .default
+                notificationPolicy: .default,
+                targetPetId: "pet-test"
             )
         ]))
 
@@ -213,6 +219,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
 
         wait(for: [submitted], timeout: 1.0)
         XCTAssertEqual(prompts.count, 1)
+        XCTAssertEqual(prompts.first?.targetPetId, "pet-test")
         guard case .text(_, let text) = prompts.first?.userInput.items.first else {
             return XCTFail("Expected text input item")
         }

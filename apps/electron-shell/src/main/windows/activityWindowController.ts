@@ -8,7 +8,7 @@ export type { PetLayout } from "../../petWindowLayout.js";
 export type BrowserWindowLike = {
   webContents: {
     on(event: "render-process-gone", listener: (event: unknown, details: { reason: string }) => void): unknown;
-    send(channel: "handagent:theme-changed", theme: HostTheme): void;
+    send(channel: string, theme?: HostTheme): void;
   };
   on(event: "closed", listener: () => void): unknown;
   loadFile(filePath: string): Promise<unknown> | unknown;
@@ -16,10 +16,14 @@ export type BrowserWindowLike = {
   getBounds(): Rectangle;
   setIgnoreMouseEvents(ignore: boolean, options: { forward: boolean }): void;
   showInactive(): void;
+  hide?(): void;
+  close?(): void;
 };
 
 type ScreenProvider = {
   getPrimaryWorkArea(): Rectangle;
+  getDisplayForPoint?(point: Point): {id:string;workArea:Rectangle};
+  getWorkAreaForDisplay?(id: string): Rectangle | undefined;
   getWorkAreaForPoint(point: Point): Rectangle;
   getCursorScreenPoint(): Point;
   subscribeWorkAreaChanges(listener: () => void): () => void;
@@ -29,6 +33,8 @@ type Options = {
   activityWindowHTMLPath: string;
   preloadPath: string;
   threadWebSocketURL?: string;
+  petId?: string;
+  initialOffset?: number;
   initialTheme?: HostTheme;
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
   screenProvider: ScreenProvider;
@@ -73,6 +79,10 @@ export class ActivityWindowController {
     this.updateMouseHit();
     window.showInactive();
   }
+
+  hide(): void { this.window?.hide?.(); }
+  close(): void { this.window?.close?.(); }
+  reveal(): void { this.window?.webContents.send("pet-window:reveal"); }
 
   currentWebContents(): BrowserWindowLike["webContents"] | null {
     return this.window?.webContents ?? null;
@@ -132,11 +142,11 @@ export class ActivityWindowController {
   private ensureWindow(): BrowserWindowLike {
     if (this.window) return this.window;
     const primaryArea = this.options.screenProvider.getPrimaryWorkArea();
-    this.position ??= this.options.positionStore.load() ?? {
-      right: primaryArea.x + primaryArea.width - WINDOW_MARGIN - layoutSizes.compact.width + petWindowLayout.character.right,
+    this.position ??= this.restorePosition(this.options.positionStore.load()) ?? {
+      right: primaryArea.x + primaryArea.width - WINDOW_MARGIN - (this.options.initialOffset ?? 0) - layoutSizes.compact.width + petWindowLayout.character.right,
       bottom: primaryArea.y + primaryArea.height - WINDOW_MARGIN,
     };
-    const additionalArguments = [`--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`];
+    const additionalArguments = [`--handagent-pet-id=${encodeURIComponent(this.options.petId ?? "")}`,`--handagent-theme=${encodeURIComponent(JSON.stringify(this.theme))}`];
     if (this.options.threadWebSocketURL) {
       additionalArguments.push(`--handagent-pet-thread-websocket-url=${encodeURIComponent(this.options.threadWebSocketURL)}`);
     }
@@ -186,6 +196,7 @@ export class ActivityWindowController {
       this.moveOrigin = null;
       this.interactiveRegions = [];
       this.updateMouseHit();
+      window.close?.();
       this.options.onRendererCrashed?.(details.reason);
     });
     return window;
@@ -209,7 +220,8 @@ export class ActivityWindowController {
     }
     this.unsubscribeScreen ??= this.options.screenProvider.subscribeWorkAreaChanges(() => {
       if (!this.position) return;
-      this.place(this.position, this.workAreaForPosition(this.position));
+      const restored = this.restorePosition(this.options.positionStore.load()) ?? this.position;
+      this.place(restored, this.workAreaForPosition(restored));
       this.savePosition();
     });
   }
@@ -251,8 +263,16 @@ export class ActivityWindowController {
     this.window.setIgnoreMouseEvents(!interactive, { forward: true });
   }
 
+  private restorePosition(saved: PetPosition | null): PetPosition | null {
+    if (!saved?.display || !this.options.screenProvider.getWorkAreaForDisplay) return saved;
+    const area = this.options.screenProvider.getWorkAreaForDisplay(saved.display.id) ?? this.options.screenProvider.getPrimaryWorkArea();
+    return {right:area.x + saved.display.x * area.width,bottom:area.y + saved.display.y * area.height};
+  }
+
   private savePosition(): void {
-    if (this.position) this.options.positionStore.save(this.position);
+    if (!this.position) return;
+    const display = this.options.screenProvider.getDisplayForPoint?.({x:this.position.right - 1,y:this.position.bottom - 1});
+    this.options.positionStore.save({...this.position, ...(display ? {display:{id:display.id,x:(this.position.right-display.workArea.x)/display.workArea.width,y:(this.position.bottom-display.workArea.y)/display.workArea.height}} : {})});
   }
 }
 

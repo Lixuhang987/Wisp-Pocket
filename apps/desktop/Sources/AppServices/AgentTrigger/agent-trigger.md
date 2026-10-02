@@ -19,3 +19,5 @@
 - Event 只渲染为后台 UserInput，不把 AgentTrigger 来源写入 agent-server、core 或 thread-store。
 - AgentTrigger 与 Automation Policy 是不同概念：前者决定何时创建输入，后者描述可回放的宿主操作。
 - Chrome bridge 的可靠性遗留项以 [TODO.md](/Users/mu9/proj/handAgent/docs/TODO.md) 为准。
+
+Instance 必须持久化明确 targetPetId，新表单须主动选择目标。事件提交携带此身份，由 Swift Thread client 的 thread.start 验证存在性；失败写入共享 Store 的可见投递状态，Settings 展示错误。旧开发 Instance 缺少目标不进入运行路径，不转换为默认宠。Pet 配置与查询归 [AgentServer client](../AgentServer/agent-server.md)，触发器不缓存另一份配置。

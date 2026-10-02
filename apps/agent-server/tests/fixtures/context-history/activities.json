@@ -1,0 +1,16 @@
+[
+  {
+    "app" : {
+      "bundleId" : "test.context",
+      "pid" : "123"
+    },
+    "axSummaryId" : "A13F0FCD-8AF2-42D6-B0A3-187285120697",
+    "id" : "swift-sample",
+    "thumbnailId" : "swift-screenshot",
+    "timestamp" : "2023-11-14T22:13:20Z",
+    "window" : {
+      "id" : "1",
+      "title" : "Context"
+    }
+  }
+]

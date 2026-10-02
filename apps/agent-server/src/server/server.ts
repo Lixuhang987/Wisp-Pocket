@@ -20,7 +20,7 @@ import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
 import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
 import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
 import { ThreadPersistence } from "../thread/ThreadPersistence.ts";
-import { DroppedInputReader } from "../thread/DroppedInputReader.ts";
+import { createDefaultReadTools } from "../actions/DefaultReadTools.ts";
 import { ThreadRegistry } from "@handagent/core/thread/ThreadRegistry.ts";
 import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
 import * as projection from "../protocol/MessageTranslator.ts";
@@ -46,10 +46,12 @@ export function attachThreadSocketHandlers(
     commandRouter,
     eventPublisher,
     acceptServerRequests = false,
+    observeRequests = false,
   }: {
     commandRouter: ThreadCommandRouter;
     eventPublisher: ThreadNotificationPublisher;
     acceptServerRequests?: boolean;
+    observeRequests?: boolean;
   },
 ): void {
   const connectionId = `connection-${++nextConnectionId}`;
@@ -60,6 +62,8 @@ export function attachThreadSocketHandlers(
   if (acceptServerRequests) {
     eventPublisher.acceptServerRequests(connectionId);
   }
+
+  if (observeRequests) eventPublisher.observeRequests(connectionId);
 
   socket.on("message", async (raw) => {
     const message = parseSocketMessage(raw);
@@ -76,6 +80,13 @@ export function attachThreadSocketHandlers(
 
       await commandRouter.receive(message, connectionId);
       return;
+    }
+    if (message && typeof message === "object" && "commandId" in message && typeof message.commandId === "string") {
+      const petCommand = "type" in message && typeof message.type === "string" && message.type.startsWith("pet.");
+      eventPublisher.publishToConnection(connectionId, {
+        type: petCommand ? "pet.error" : "thread.error", notificationId: crypto.randomUUID(), commandId: message.commandId,
+        timestamp: new Date().toISOString(), payload: {code:"invalid_input",message:"命令参数无效，请检查所属桌宠、必填字段及只读文件根。"},
+      });
     }
   });
 
@@ -209,7 +220,6 @@ const UserInputOpSchema = z.object({
   timestamp: z.string(),
   payload: z.object({
     items: z.array(InputItemSchema).min(1),
-    mode: z.literal("inspect").optional(),
   }),
 });
 
@@ -261,15 +271,19 @@ const DynamicToolsSchema = z.array(DynamicToolSpecSchema).superRefine((tools, ct
   }
 });
 
+const PetImageRefSchema = z.discriminatedUnion('type',[
+  z.object({type:z.literal('builtin'),id:z.literal('yachiyo')}).strict(),
+  z.object({type:z.literal('imported'),blobId:z.string(),mimeType:z.enum(['image/png','image/jpeg','image/webp']),width:z.number().int().min(1).max(4096),height:z.number().int().min(1).max(4096)}).strict(),
+]);
 const ThreadCommandSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("thread.start"),
     commandId: z.string(),
     timestamp: z.string(),
     payload: z.object({
-      workspaceId: z.string().nullable(),
+      petId: z.string().min(1),
       dynamicTools: DynamicToolsSchema.optional(),
-    }),
+    }).strict(),
   }),
   z.object({
     type: z.literal("thread.resume"),
@@ -281,6 +295,7 @@ const ThreadCommandSchema = z.discriminatedUnion("type", [
     type: z.literal("thread.list"),
     commandId: z.string(),
     timestamp: z.string(),
+    payload: z.object({petId:z.string().optional(),limit:z.number().int().min(1).max(100).optional(),cursor:z.string().optional()}).strict().optional(),
   }),
   z.object({
     type: z.literal("thread.delete"),
@@ -295,11 +310,10 @@ const ThreadCommandSchema = z.discriminatedUnion("type", [
     timestamp: z.string(),
     payload: z.object({ op: RuntimeOpSchema }),
   }),
-  z.object({
-    type: z.literal("workspace.list"),
-    commandId: z.string(),
-    timestamp: z.string(),
-  }),
+  z.object({type:z.literal('pet.list'),commandId:z.string(),timestamp:z.string()}),
+  z.object({type:z.literal('pet.create'),commandId:z.string(),timestamp:z.string(),payload:z.object({name:z.string().trim().min(1),description:z.string().optional(),rolePrompt:z.string().trim().min(1),imageRef:PetImageRefSchema,rootPath:z.string().min(1),isDefault:z.boolean().optional()}).strict()}),
+  z.object({type:z.literal('pet.update'),commandId:z.string(),timestamp:z.string(),payload:z.object({id:z.string(),expectedRevision:z.number().int().min(1),patch:z.object({name:z.string().trim().min(1).optional(),description:z.string().optional(),rolePrompt:z.string().trim().min(1).optional(),imageRef:PetImageRefSchema.optional(),isDefault:z.boolean().optional()}).strict()}).strict()}),
+  z.object({type:z.literal('pet.image.import'),commandId:z.string(),timestamp:z.string(),payload:z.object({mimeType:z.enum(['image/png','image/jpeg','image/webp']),base64:z.string().max(28*1024*1024)}).strict()}),
 ]) satisfies z.ZodType<ThreadCommand>;
 
 const ClientResponseSchema = z.discriminatedUnion("type", [
@@ -311,15 +325,6 @@ const ClientResponseSchema = z.discriminatedUnion("type", [
       decision: z.enum(["allow", "deny"]),
       scope: z.enum(["once", "always"]).optional(),
       reason: z.string().optional(),
-    }),
-  }),
-  z.object({
-    type: z.literal("workspace.answered"),
-    requestId: z.string(),
-    timestamp: z.string(),
-    payload: z.object({
-      workspaceId: z.string().optional(),
-      cancelled: z.boolean().optional(),
     }),
   }),
 ]) satisfies z.ZodType<ClientResponse>;
@@ -396,7 +401,8 @@ export async function startServer({
     attachThreadSocketHandlers(socket, {
       commandRouter,
       eventPublisher,
-        acceptServerRequests: request.url?.includes("acceptServerRequests=1") ?? false,
+      acceptServerRequests: new URL(request.url ?? "/", "http://localhost").searchParams.get("acceptServerRequests") === "1",
+      observeRequests: new URL(request.url ?? "/", "http://localhost").searchParams.get("observeRequests") === "1",
     });
   });
 
@@ -466,7 +472,7 @@ export async function startServer({
 export async function startDefaultServer(port = 4317) {
   const [
     { AgentRuntime },
-    { FileWorkspaceRegistry },
+    { PetRegistry },
     { FilePermissionPolicy },
     { SettingsBackedLLMClient },
     { SettingsBackedToolRegistry },
@@ -480,7 +486,7 @@ export async function startDefaultServer(port = 4317) {
     { createDefaultWebTools },
   ] = await Promise.all([
     import("@handagent/core/runtime/AgentRuntime.ts"),
-    import("@handagent/core/adapters/filesystem/FileWorkspaceRegistry.ts"),
+    import("@handagent/core/pet/PetRegistry.ts"),
     import("@handagent/core/adapters/filesystem/FilePermissionPolicy.ts"),
     import("../settings/SettingsBackedLLMClient.ts"),
     import("../settings/SettingsBackedToolRegistry.ts"),
@@ -501,18 +507,12 @@ export async function startDefaultServer(port = 4317) {
   const mcpConfig = await readMCPConfig(paths.mcpConfigPath);
   const mcpServers = new Map(mcpConfig.servers.map((server) => [server.id, server]));
 
-  const workspaceRegistry = new FileWorkspaceRegistry({
-    filePath: paths.workspacesPath,
-    defaultRootPath: paths.defaultWorkspaceDir,
-  });
-  await workspaceRegistry.getDefault();
+  const petRegistry = new PetRegistry(store);
+  await petRegistry.ensureDefault(paths.defaultPetRoot);
 
   const dynamicToolBridge = new WebSocketDynamicToolBridge();
   let threads: ThreadRegistry;
-  const toolRegistry = new SettingsBackedToolRegistry({
-    workspaceRegistry,
-    workspaceAskResolver: (request) => threads.get(request.threadId ?? "")?.requests.askWorkspace(request) ?? Promise.resolve({ cancelled: true }),
-  });
+  const toolRegistry = new SettingsBackedToolRegistry();
   await toolRegistry.refresh();
   const llmMode = resolveLLMMode();
 
@@ -546,7 +546,6 @@ export async function startDefaultServer(port = 4317) {
   console.log(`[agent-server] llm mode: ${llmMode}`);
 
   const persistence = new ThreadPersistence(store, undefined, blobStore);
-  const inputReader = new DroppedInputReader({ blobStore });
   const activityPublisher = new AgentActivityPublisher();
   const eventPublisher = new ThreadNotificationPublisher((event) => activityPublisher.observe(event));
   threads = new ThreadRegistry({
@@ -559,7 +558,6 @@ export async function startDefaultServer(port = 4317) {
       summarizeInput: projection.summarizeUserInput,
     },
     publish: (event) => eventPublisher.publish(event),
-    prepareInput: (input, signal) => inputReader.read(input, signal),
     createTools: (dynamicTools) => new ThreadTools({
       builtinRegistry: toolRegistry.registry,
       refreshBuiltins: () => toolRegistry.refresh(),
@@ -567,7 +565,7 @@ export async function startDefaultServer(port = 4317) {
       listMcpTools: (id) => mcpRegistry.listTools(id),
       dynamicToolBridge,
       exposeBuiltinToolsBeforeActivation: llmMode === "mock",
-      defaultTools: createDefaultWebTools(),
+      defaultTools: [...createDefaultWebTools(), ...createDefaultReadTools({contextHistoryRoot:join(paths.spotDir,"context-history")})],
     }, dynamicTools, { log: (message) => console.warn(message) }),
     createRuntime: (id, tools) => new AgentRuntime(llmClient, tools.registry, {
       permissionPolicy, blobStore, turnSummarizer: summarizer,
@@ -575,7 +573,7 @@ export async function startDefaultServer(port = 4317) {
       isThreadActivated: () => tools.isActivated(),
     }),
   });
-  const commandRouter = new ThreadCommandRouter(threads, eventPublisher, workspaceRegistry, undefined, () => dynamicToolBridge.availableTools());
+  const commandRouter = new ThreadCommandRouter(threads, eventPublisher, petRegistry, undefined, () => dynamicToolBridge.availableTools(), blobStore);
   const server = await startServer({ commandRouter, eventPublisher, activityPublisher, dynamicToolBridge,
     staticFilesDir: resolveThreadWindowWebDistDir(), blobStore, port });
   let shutdown: Promise<void> | undefined;
@@ -595,8 +593,7 @@ interface ServerPaths {
   threadsDbPath: string;
   logDir: string;
   blobsDir: string;
-  workspacesPath: string;
-  defaultWorkspaceDir: string;
+  defaultPetRoot: string;
   mcpConfigPath: string;
   permissionsPath: string;
 }
@@ -608,8 +605,7 @@ function resolveServerPaths(): ServerPaths {
     threadsDbPath: join(spotDir, "threads.sqlite"),
     logDir: join(spotDir, "log"),
     blobsDir: join(spotDir, "blobs"),
-    workspacesPath: join(spotDir, "workspaces.json"),
-    defaultWorkspaceDir: join(spotDir, "workspace"),
+    defaultPetRoot: join(spotDir, "workspace"),
     mcpConfigPath: join(spotDir, "mcp.json"),
     permissionsPath: join(spotDir, "permissions.json"),
   };

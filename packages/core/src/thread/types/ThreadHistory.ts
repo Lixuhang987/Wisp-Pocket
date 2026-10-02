@@ -8,14 +8,16 @@ export type ThreadMetadata = {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
-  workspaceId: string | null;
+  petId: string;
+  petSnapshot: import("../../pet/Pet.ts").PetSnapshot;
+  rootPath: string;
   dynamicTools?: DynamicToolSpec[];
 };
 
 export type ThreadSummary = Pick<
   ThreadMetadata,
-  "id" | "preview" | "createdAt" | "updatedAt" | "messageCount" | "workspaceId"
->;
+  "id" | "preview" | "createdAt" | "updatedAt" | "messageCount" | "petId" | "petSnapshot" | "rootPath"
+> & {status?: import("../../protocol/types/ThreadProtocolShared.ts").RunStatus};
 
 export type PersistedThread = {
   version: 1;

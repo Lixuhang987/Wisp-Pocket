@@ -12,11 +12,13 @@ struct AgentTriggerSettingsView: View {
             } else {
                 PackageListView(viewModel: viewModel)
             }
+            if let error = viewModel.deliveryErrorMessage { SettingsErrorFooter(message: error) }
             if let error = viewModel.saveErrorMessage {
                 SettingsErrorFooter(message: error)
             }
         }
         .overlayScrollbar()
+        .task { await viewModel.reloadPets() }
     }
 }
 
@@ -202,6 +204,14 @@ private struct PackageDetailView: View {
             SettingsSectionHeader("新增自动化")
             SettingsSection {
                 if hasFormFields {
+                    SettingsRow("目标桌宠") {
+                        Picker("目标桌宠", selection: $viewModel.targetPetId) {
+                            Text("请选择桌宠").tag("")
+                            ForEach(viewModel.pets) { pet in
+                                Text("\(pet.name) · \(pet.id.prefix(8))").tag(pet.id)
+                            }
+                        }
+                    }
                     SettingsRow("标题") {
                         SettingsTextField(placeholder: "My Automation", text: $title)
                     }

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CurrentThread } from "../src/CurrentThread.ts";
 import { ThreadStore } from "../src/ThreadStore.ts";
 import {
+  seedPet,
   cleanupTempRoot,
   fixedNow,
   materializedStoreWithSession,
@@ -25,7 +26,7 @@ describe("ThreadStore use cases", () => {
     tempRoot = root;
     const store = new ThreadStore({ dbPath, now: fixedNow });
 
-    await unwrap(store.createThread({
+    await unwrap(store.createThread({ petId:seedPet(store),
       threadId: "thread-1",
       forkedFromId: null,
       parentThreadId: null,
@@ -80,7 +81,7 @@ describe("ThreadStore use cases", () => {
     tempRoot = root;
     const store = new ThreadStore({ dbPath, now: fixedNow });
 
-    await unwrap(store.createThread({
+    await unwrap(store.createThread({ petId:seedPet(store),
       threadId: "thread-dynamic-tools",
       threadSource: "user",
       dynamicTools: [
@@ -127,7 +128,7 @@ describe("ThreadStore use cases", () => {
     const { root, dbPath } = await tempSqlitePath();
     tempRoot = root;
     const store = new ThreadStore({ dbPath, now: fixedNow });
-    const current = await unwrap(CurrentThread.create(store, {
+    const current = await unwrap(CurrentThread.create(store, { petId:seedPet(store),
       threadId: "thread-1",
       threadSource: "user",
     }));

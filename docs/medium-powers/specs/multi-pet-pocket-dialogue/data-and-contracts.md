@@ -1,6 +1,6 @@
 # 数据与协议合约
 
-本文是[多桌宠规格](./multi-pet-pocket-dialogue.md)的目标行为，尚未实现；字段和命令名是本次实施合约，不代表现有 API。
+本文保留[多桌宠规格](./multi-pet-pocket-dialogue.md)的数据验收合约；实现已落地，当前字段以 owning 类型定义为准，实机状态见 manual QA。
 
 ## Pet 替换 Workspace
 
@@ -11,7 +11,7 @@
 | `name` / `description` | name trim 后非空；description 可空，只描述工作方式；同名选择器以缩略图和短 ID 辅助区分 |
 | `rolePrompt` / `revision` | rolePrompt trim 后非空；每次成功编辑 revision 递增；原始文本可编辑，revision 用于快照来源与并发检查 |
 | `imageRef` | 必填，引用已成功导入的静态图片或现有内置八千代资源；不是易失的外部文件路径或远程 URL |
-| `rootPath` | 每宠一个非空绝对目录；用户可选已有目录或创建目录，后端统一验证 / 创建失败返回错误；允许重复，不按路径去重或合并宠 |
+| `rootPath` | 每宠一个非空绝对目录；用户可选已有目录或创建目录，后端统一验证 / 创建失败返回错误；允许重复，不按路径去重或合并宠；创建后不可修改，后端拒绝 rootPath 更新 |
 | `isDefault` | 始终恰有一个默认宠；初次空安装自动种入内置图、基础角色提示和既有应用默认文件根 |
 
 不设三宠硬上限；所有列表、窗口与测试夹具使用集合，不依赖三个固定槽或枚举角色。空安装只播种一只默认宠，其他由用户自由创建；显示子集不限制已创建数量。
@@ -23,10 +23,10 @@
 | 数据 / 操作 | 合约 |
 | --- | --- |
 | `petId` | Thread 创建时必填且只能指向存在的 Pet；永久不变，替代旧 workspaceId，不再保留未归属分组 |
-| `petSnapshot` | 服务端在创建时保存 petId、revision、name、rolePrompt、rootPath 的实际值；不信任客户端提交的快照；Thread 只能在快照可靠保存后对外确认创建 |
-| 编辑提示词 / rootPath | 只影响之后创建的 Thread；已有 Thread、排队输入和运行 Turn 始终采用原快照，UI 标注“使用原设定”及实际文件位置；不修改旧产物、不移动文件 |
+| `petSnapshot` | 服务端在创建时保存 petId、revision、name、rolePrompt 的实际值（不保存 rootPath）；不信任客户端提交的快照；Thread 只能在快照可靠保存后对外确认创建 |
+| 编辑提示词 / rootPath | 提示词仅影响新 Thread，已有 Thread 继续角色快照；rootPath 创建后不可修改，后端拒绝修改请求，编辑界面只展示固定目录。UI 的“使用原设定”只指角色；不移动文件 |
 | 编辑名字 / 图片 | 即时用于桌宠和列表展示，petId 与 Thread 不变；历史详情仍能查看创建时名称和角色版本；旧图片不需要逐 Thread 复制 |
-| Runtime 创建 / 恢复 / 中断后重建 | 都从 Thread 快照取得角色提示和文件根，不能临时查询当前 Pet 覆盖；角色段复用既有 system sections，不伪装成 UserInput 或 Append Prompt |
+| Runtime 创建 / 恢复 / 中断后重建 | 角色从 Thread 快照取得，文件根从 Thread 所属 Pet 的固定配置取得；不能用当前角色覆盖已有快照；角色段复用既有 system sections，不伪装成 UserInput 或 Append Prompt |
 | 提示组合 | 共享后端工具与 Permission 规则仍生效；角色段描述习惯，用户明确任务可覆盖口吻与格式；资料作为材料，不提升为角色 / 授权指令 |
 | 历史查询 | 后端按 petId 筛选，分页排序固定为 updatedAt + id，返回 nextCursor；默认每页 50、上限 100；下一页不重复已返回项，新变化通过刷新处理 |
 | list / started / snapshot | 都有一致的 petId、角色 revision、实际 rootPath 等身份摘要；snapshot 另含完整实际角色快照，UI 不从通知时间或路径猜归属。列表提供轻量运行状态，由 Thread owner / 持久记录派生，不复制运行状态 owner；同宠其他 Thread 的请求不引入聚合提醒或自动导航 |
@@ -38,7 +38,7 @@
 
 删除 `workspace.list` / `workspace.askUser` 及 `workspace.requested` / `workspace.answered` 路径；宠归属在输入前由用户选定，不让模型选“别宠文件根”来替代用户导航。按桌宠分组的 UI 也不再提供 Thread 的 Workspace 选择器。
 
-`file.read` 直接替换旧 Workspace 读取工具，沿 [ADR 0004](../../../adr/0004-context-history-default-tools.md) 默认开放且免 Permission；读取允许任意路径，绝对路径直接读取，相对路径以 Thread rootPath 快照解析。每次读取取得当前文件内容，不缓存替代真实读取。`file.write` 保留 relativePath / content，移除 workspaceId，不新增模型可自由指定的 petId / rootPath 参数；执行上下文从 Thread 快照取得，不能复用另一 Thread 的绑定工具实例。
+`file.read` 直接替换旧 Workspace 读取工具，沿 [ADR 0004](../../../adr/0004-context-history-default-tools.md) 默认开放且免 Permission；读取允许任意路径，绝对路径直接读取，相对路径以 Thread 所属 Pet 的固定 rootPath 解析。每次读取取得当前文件内容，不缓存替代真实读取。`file.write` 保留 relativePath / content，移除 workspaceId，不新增模型可自由指定的 petId / rootPath 参数；执行文件上下文从 Thread 所属 Pet 取得，不能复用另一 Thread 的绑定工具实例。
 
 file.write 继续拒绝绝对 relativePath、`..` 越界、符号链接越界和写入目标符号链接，保留大小限制与临时文件原子替换；缺失 Thread 上下文或旧归属参数明确失败。rootPath 是相对路径基准和内置写入边界，不能描述成读取或整个进程 / OS 的沙箱。桌宠原文件路径作为文本 Input Item 交付，不自动预读、不复制原文件、不增加文件变更监控或失效恢复；实际读取失败由工具如实返回。MCP / Dynamic Tool 仍遵守各自策略。
 
@@ -57,7 +57,7 @@ pet.listed / pet.error 只回发起连接，成功变更通知广播相关 UI �
 | `pet.list` → `pet.listed` | 返回全部配置和唯一默认项，供选择器 / Settings 使用，不把原始角色提示广播进每条 Activity |
 | `pet.image.import` → `pet.image.imported` | 接收 PNG / JPEG / WebP 的 MIME 与 base64，后端验证原始大小、实际图片格式与解码尺寸后保存副本，定向返回 imageRef；不创建 Thread，不将图片作为 UserInput 发送给模型 |
 | `pet.create` → `pet.created` | 图片导入和配置持久成功后返回稳定 Pet；同一次 commandId 重投只产生一个宠，失败不留下可见半成品 |
-| `pet.update` → `pet.updated` | 指定 id、expectedRevision、patch；过期返回 conflict 和最新 revision，保留客户端表单；设置 isDefault 时原子切换唯一默认项 |
+| `pet.update` → `pet.updated` | 指定 id、expectedRevision、patch（不接受 rootPath）；过期返回 conflict 和最新 revision，保留客户端表单；设置 isDefault 时原子切换唯一默认项 |
 | `pet.error` | 定向返回 commandId、错误 code 和可读原因；至少区别 invalid_input / not_found / conflict / storage_failed |
 | `thread.start` → `thread.started` | 用必填 petId 替代 workspaceId；未知宠失败；只创建不执行，后续首轮仍经 op.submit；commandId 重投返回同一 Thread |
 | `thread.list` → `thread.listed` | 可选 petId、limit、cursor；省略 petId 表示完整管理入口查询全部，但每项始终带 petId，不能表示无主 Thread。状态 / 请求变化沿已有通知更新该 Thread 轻量摘要，打开详情时才用 snapshot 恢复完整消息与请求 |
@@ -72,6 +72,6 @@ PetRegistry 的持久 adapter 复用现有 SQLite 存储包与事务，不新增
 
 Swift Settings 改为查询 / 发送 Pet 管理命令，不继续直写 workspaces.json，也不另写 pets.json；renderer localStorage 只用于可恢复的界面偏好 / 草稿，不存业务配置。
 
-直接采用 Pet 目标模型与新 schema，不保留旧 Workspace API、配置读取或旧数据迁移 / 转换器，不保证旧开发 Thread 与触发器配置可继续使用。旧格式不进入新运行路径；初始化或开发数据重建的具体动作由后续实现完成，本轮不修改用户数据，也不删除用户 rootPath 下的文件。
+直接采用 Pet 目标模型与新 schema，不保留旧 Workspace API、配置读取或旧数据迁移 / 转换器，不保证旧开发 Thread 与触发器配置可继续使用。旧格式不进入新运行路径；旧 schema 明确拒绝打开，不自动迁移或清除；本次不修改用户数据，也不删除用户 rootPath 下的文件。
 
 角色版本不需要完整编辑历史表：当前配置加每 Thread 自足快照即可恢复。模型凭据、其他工具的 Permission 和用户文件不复制到 Pet 记录。排队消息在应用重启后的处理策略见 [TODO](../../../TODO.md)，本期不新增继续 / 放弃队列协议。

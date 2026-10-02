@@ -291,7 +291,7 @@ export async function storeUserInput(input: UserInput, blobStore: BlobStore): Pr
     const { base64: _bytes, ...metadata } = item;
     items.push({ ...metadata, blobId: record.id } as InputItem);
   }
-  return { items, ...(input.mode ? { mode: input.mode } : {}) };
+  return { items };
 }
 
 export function summarizeUserInput(userInput: UserInput): string {

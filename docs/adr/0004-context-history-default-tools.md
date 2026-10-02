@@ -1,6 +1,6 @@
 # 默认读取工具与统一 Thread 输入
 
-状态：已确认设计决定；尚未实现，完整规格与验收见 [Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6)，执行流程见 [TODO](../TODO.md)。本决定调整 [ADR 0003](./0003-context-history-without-plugin-framework.md) 中 Context History 的 Dynamic Tool 接入与可禁用采集约定，Automation 的接入不在本次范围内。
+状态：已实现，实机与真实模型待验见 [manual QA](../manual-qa.md)；完整规格见 [Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6)，执行与检查记录见 [实施计划](../medium-powers/plans/2026-10-02-pets-default-reading.md)。本决定调整 [ADR 0003](./0003-context-history-without-plugin-framework.md) 中 Context History 的 Dynamic Tool 接入与可禁用采集约定，Automation 的接入不在本次范围内。
 
 为了让 Agent 首次理解用户资料时即可按需结合既有工作背景，四个 Context History 历史读取能力改为 agent-server 中直接读取本地记录的普通 Tool，Swift 继续拥有实时采集与写入。首轮工具由共享 Thread 后端统一开放 `user.ask` 和四个历史工具，不依赖前端入口或 `use_tools` 激活；四个历史工具调用无需 Permission 确认。查询只读取已保存记录，不触发实时采集。
 
@@ -8,9 +8,9 @@
 
 仅桌宠将 PDF、图片等文件输入改为提交原文件路径，由 LLM 按需调用默认开放的 `file.read` 取得实际内容，后端删除原 `inspect` 自动预读。新读取实现直接替换旧 Workspace 文本工具，首版允许任意路径，无需 Workspace 或 Permission 确认。用户原文件不复制；每次读取取得路径当前内容，修改后读最新内容，移动、删除或无法访问时报错。已读取结果仍按 Thread 历史机制保存，不得由输入路径直接宣称已读取内容。
 
-[多桌宠规格](../medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)直接采用本读取 / 输入规则：Pet 的 rootPath 是相对路径基准和内置写入边界，不限制 file.read 的任意路径读取；角色 / 文件根快照按 Thread 保存。桌宠本期不接收截图或剪贴板图片，不增加原文件变更监控或失效恢复。这些为确认的目标边界，尚未实现。
+[多桌宠规格](../medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)直接采用本读取 / 输入规则：Pet 的 rootPath 是相对路径基准和内置写入边界，不限制 file.read 的任意路径读取；角色快照按 Thread 保存，Pet 文件根创建后不可修改，Thread 不存文件根快照。桌宠本期不接收截图或剪贴板图片，不增加原文件变更监控或失效恢复。这些边界已落地；原生行为及真实模型理解仍须实机验证。
 
-前端彼此独立，本次只调整桌宠输入前端。桌宠路径使用现有文本 Input Item 表达，避免新增要求其他前端适配的文件类型。PromptPanel、ThreadWindow 和 AgentTrigger 前端不改造；PromptPanel 的截图仍按当前图片 bytes/Blob 链路进入模型，保留其现有输入协议和临时文件生命周期。共享后端统一工具规则不意味着统一所有前端的资料交付方式。宿主设置只做已确认的采集控制与状态展示修改。
+前端彼此独立，本次只调整桌宠输入前端。桌宠路径使用现有文本 Input Item 表达，避免新增要求其他前端适配的文件类型。Issue #6 保持其他输入前端交付方式；合并实现的 Issue #7 同步必要 Pet 协议、Settings 管理和 AgentTrigger 目标归属。PromptPanel 的截图仍按当前图片 bytes/Blob 链路进入模型，保留其现有输入协议和临时文件生命周期。共享后端统一工具规则不意味着统一所有前端的资料交付方式。宿主设置呈现真实采集状态，Pet 管理范围由 Issue #7 规定。
 
 移除 Context History 的采集开关，采集随 Swift Host 应用生命周期常驻运行。保留期限和自动删除后续单独设计，不在本次实现。常驻描述应用运行期间的采集生命周期，不改变 macOS 系统权限要求。采集失败或缺少权限时保留已有历史查询能力，在设置中明确展示失败与缺失权限。
 

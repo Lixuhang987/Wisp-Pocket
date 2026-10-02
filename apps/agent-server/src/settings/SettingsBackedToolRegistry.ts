@@ -1,6 +1,4 @@
 import { statSync } from "node:fs";
-import type { WorkspaceRegistry } from "@handagent/core/workspace/types/Workspace.ts";
-import type { WorkspaceAskResolver } from "@handagent/core/tools/builtins/WorkspaceAskUserTool.ts";
 import {
   loadToolSettings,
   toolSettingsFilePath,
@@ -25,10 +23,6 @@ export class SettingsBackedToolRegistry {
   private cachedStamp?: string;
 
   constructor(
-    private readonly options: {
-      workspaceRegistry?: WorkspaceRegistry;
-      workspaceAskResolver?: WorkspaceAskResolver;
-    },
     dependencies: SettingsBackedToolRegistryDependencies = {},
   ) {
     this.loadToolSettings = dependencies.loadToolSettings ?? loadToolSettings;
@@ -46,8 +40,6 @@ export class SettingsBackedToolRegistry {
 
     const result = await registerTools({
       registry: this.registry,
-      workspaceRegistry: this.options.workspaceRegistry,
-      workspaceAskResolver: this.options.workspaceAskResolver,
       settings: this.loadToolSettings(),
     });
     this.cachedStamp = settingsStamp;

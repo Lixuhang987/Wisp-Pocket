@@ -31,15 +31,15 @@ export const mockLLMScenarios: MockLLMScenario[] = [
     complete: () => assistant("Mock assistant response: main chain is reachable."),
   },
   toolScenario({
-    id: "workspace-list",
-    trigger: "[mock:workspace-list]",
-    description: "调用 workspace.list，再根据 tool result 返回最终回复。",
+    id: "history-index",
+    trigger: "[mock:history-index]",
+    description: "调用 context_history.activity_index，再根据 tool result 返回最终回复。",
     toolCall: {
-      id: "mock-workspace-list-1",
-      name: "workspace.list",
+      id: "mock-history-index-1",
+      name: "context_history.activity_index",
       arguments: {},
     },
-    finalText: "Mock workspace.list completed.",
+    finalText: "Mock context_history.activity_index completed.",
   }),
   toolScenario({
     id: "clipboard-read",
@@ -82,7 +82,6 @@ export const mockLLMScenarios: MockLLMScenario[] = [
       id: "mock-file-write-1",
       name: "file.write",
       arguments: {
-        workspaceId: "qa-workspace",
         relativePath: "hello.txt",
         content: "hello from MockLLMClient",
       },
@@ -92,14 +91,12 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "file-read",
     trigger: "[mock:file-read]",
-    description: "调用 file.read，覆盖 cached=turn 的读取链路。",
+    description: "调用 file.read，按当前 Pet 固定根解析相对路径。",
     toolCall: {
       id: "mock-file-read-1",
       name: "file.read",
       arguments: {
-        workspaceId: "qa-workspace",
-        relativePath: "hello.txt",
-        cached: "turn",
+        path: "hello.txt",
       },
     },
     finalText: "Mock file.read completed for hello.txt.",
@@ -107,12 +104,11 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "path-escape",
     trigger: "[mock:path-escape]",
-    description: "返回越狱路径 file.write，用于验证 workspace 沙箱拒绝。",
+    description: "返回越狱路径 file.write，用于验证 Pet 文件根边界拒绝。",
     toolCall: {
       id: "mock-path-escape-1",
       name: "file.write",
       arguments: {
-        workspaceId: "qa-workspace",
         relativePath: "../../etc/passwd",
         content: "should be rejected",
       },
@@ -122,12 +118,11 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "symlink-escape",
     trigger: "[mock:symlink-escape]",
-    description: "返回指向 symlink 内路径的 file.write，用于验证 workspace realpath 沙箱拒绝。",
+    description: "返回指向 symlink 内路径的 file.write，用于验证 Pet realpath 文件根边界拒绝。",
     toolCall: {
       id: "mock-symlink-escape-1",
       name: "file.write",
       arguments: {
-        workspaceId: "qa-workspace",
         relativePath: "outside-link/escape.txt",
         content: "should be rejected through symlink",
       },
@@ -135,18 +130,18 @@ export const mockLLMScenarios: MockLLMScenario[] = [
     finalText: "Mock symlink escape scenario finished.",
   }),
   toolScenario({
-    id: "workspace-ask",
-    trigger: "[mock:workspace-ask]",
-    description: "调用 workspace.askUser，用于验证 ThreadWindow 内联 workspace 选择链路。",
+    id: "user-ask",
+    trigger: "[mock:user-ask]",
+    description: "调用 user.ask，用于验证按需追问与普通消息续聊。",
     toolCall: {
-      id: "mock-workspace-ask-1",
-      name: "workspace.askUser",
+      id: "mock-user-ask-1",
+      name: "user.ask",
       arguments: {
-        prompt: "请选择 QA 要写入的 workspace",
-        candidateIds: ["qa-workspace", "tmp"],
+        message: "需要整理成什么格式？",
+        suggestedReplies: ["简短摘要", "详细说明"],
       },
     },
-    finalText: "Mock workspace.askUser completed.",
+    finalText: "Mock user.ask completed.",
   }),
   toolScenario({
     id: "permission-write",
@@ -156,7 +151,6 @@ export const mockLLMScenarios: MockLLMScenario[] = [
       id: "mock-permission-write-1",
       name: "file.write",
       arguments: {
-        workspaceId: "qa-workspace",
         relativePath: "permission-check.txt",
         content: "permission scenario content",
       },

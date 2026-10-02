@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useState, useLayoutEffect, useRef } from "react";
 import type { ThreadState } from "../../../thread-window-web/src/store/threadWindowStore.ts";
 import type { AssistantMessageItem, ThreadItem } from "../../../thread-window-web/src/store/threadItems.ts";
 import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentUrl.ts";
@@ -15,6 +15,8 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
   onRespond: (text: string) => void;
   threadURL: string;
 }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => { if (!expanded || !thread?.permissionRequests.length) return; const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [expanded, thread?.permissionRequests.length]);
   const historyRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
@@ -31,7 +33,7 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
     observer.observe(history);
     observer.observe(contentRef.current!);
     return () => observer.disconnect();
-  }, [expanded, thread?.threadId, thread?.messages, thread?.permissionRequests, thread?.workspaceRequests, status, error]);
+  }, [expanded, thread?.threadId, thread?.messages, thread?.permissionRequests, status, error]);
 
   const messages = expanded ? thread?.messages ?? [] : latestAssistant ? [latestAssistant] : [];
   const suggestedReplies = latestAssistant?.awaitingReply ? latestAssistant.suggestedReplies ?? [] : [];
@@ -50,19 +52,15 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
         {error && <p className="pet-error" role="alert">{error}</p>}
       </div>}
       {expanded && thread?.permissionRequests.map((request) => <section className="pet-request" data-pet-interactive key={request.id} aria-label="执行权限">
-        <p>允许使用 {request.toolName}？</p>
+        <p>{controller.getSnapshot().pet?.name} · {thread.title || thread.threadId}<br />允许使用 {request.toolName}？</p>
         <pre>{request.argumentsJSON}</pre>
+        {request.expiresAt && <small>剩余 {Math.max(0, Math.ceil((request.expiresAt - now) / 1000))} 秒</small>}
         <div className="pet-request__actions">
-          <button type="button" onClick={() => attempt(() => controller.answerPermission(request.id, "allow"))}>允许一次</button>
-          <button type="button" onClick={() => attempt(() => controller.answerPermission(request.id, "deny"))}>拒绝</button>
-        </div>
-      </section>)}
-      {expanded && thread?.workspaceRequests.map((request) => <section className="pet-request" data-pet-interactive key={request.id} aria-label="选择工作区">
-        <p>{request.prompt}</p>
-        <div className="pet-suggestions">
-          {request.candidates.map((candidate) => <button key={candidate.id} type="button" title={candidate.description}
-            onClick={() => attempt(() => controller.answerWorkspace(request.id, candidate.id))}>{candidate.name}</button>)}
-          <button type="button" onClick={() => attempt(() => controller.answerWorkspace(request.id))}>取消</button>
+          <button type="button" disabled={!!request.expiresAt && request.expiresAt <= now} onClick={() => attempt(() => controller.answerPermission(request.id, "allow"))}>允许一次</button>
+          <button type="button" disabled={!!request.expiresAt && request.expiresAt <= now} onClick={() => attempt(() => controller.answerPermission(request.id, "deny"))}>拒绝</button>
+          <button type="button" disabled={!!request.expiresAt && request.expiresAt <= now} onClick={() => attempt(() => controller.answerPermission(request.id, "allow", "always"))}>永久允许</button>
+          <button type="button" disabled={!!request.expiresAt && request.expiresAt <= now} onClick={() => attempt(() => controller.answerPermission(request.id, "deny", "always"))}>永久拒绝</button>
+          <small>永久决定对所有桌宠的此工具生效。</small>
         </div>
       </section>)}
       {suggestedReplies.length > 0 && <div className="pet-suggestions pet-current-suggestions" aria-label="当前建议">

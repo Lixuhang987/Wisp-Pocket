@@ -67,7 +67,7 @@ describe("VercelClient real API integration", () => {
         {
           role: "user",
           content:
-            "You are running a Wisp Pocket integration test. Call file.write exactly once with workspaceId qa-workspace, relativePath api-integration.txt, and content hello from real api integration test. Do not provide a final answer until after the tool result is provided.",
+            "You are running a Wisp Pocket integration test. Call file.write exactly once with relativePath api-integration.txt, and content hello from real api integration test. Do not provide a final answer until after the tool result is provided.",
         },
       ];
 
@@ -93,7 +93,6 @@ describe("VercelClient real API integration", () => {
         );
         expect(fileWriteCall).toBeDefined();
         expect(fileWriteCall?.arguments).toMatchObject({
-          workspaceId: expect.any(String),
           relativePath: expect.any(String),
           content: expect.any(String),
         });
@@ -110,7 +109,6 @@ describe("VercelClient real API integration", () => {
             name: "file.write",
             content: JSON.stringify({
               ok: true,
-              workspaceId: fileWriteCall!.arguments.workspaceId,
               relativePath: fileWriteCall!.arguments.relativePath,
             }),
           },
@@ -175,24 +173,20 @@ function parseApiOverride(value: string | undefined): OpenAIApiType | undefined 
 function referenceFileWriteTool(): RegisteredTool {
   return {
     name: "file.write",
-    description: "Write a UTF-8 text file inside a named Wisp Pocket workspace.",
+    description: "Write a UTF-8 text file inside the current Pet root.",
     inputSchema: {
       type: "object",
       properties: {
-        workspaceId: {
-          type: "string",
-          description: "Workspace identifier.",
-        },
         relativePath: {
           type: "string",
-          description: "Relative path inside the workspace.",
+          description: "Relative path inside the Pet root.",
         },
         content: {
           type: "string",
           description: "File content to write.",
         },
       },
-      required: ["workspaceId", "relativePath", "content"],
+      required: ["relativePath", "content"],
       additionalProperties: false,
     },
   };

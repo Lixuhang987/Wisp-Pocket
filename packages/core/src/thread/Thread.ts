@@ -12,6 +12,9 @@ import { settleWithin } from "./utils/settleWithin.ts";
 export class Thread {
   readonly requests: ThreadRequests;
   readonly createdAt: string;
+  readonly petId: string;
+  readonly petSnapshot: import("../pet/Pet.ts").PetSnapshot;
+  readonly rootPath: string;
   private history: AgentMessage[];
   private readonly tools: ThreadTools;
   private runtime: ThreadRuntime;
@@ -26,6 +29,9 @@ export class Thread {
     this.history = structuredClone(data.messages);
     this.inputs = structuredClone(data.pendingInputs ?? []);
     this.createdAt = data.metadata.createdAt;
+    this.petId = data.metadata.petId;
+    this.petSnapshot = structuredClone(data.metadata.petSnapshot);
+    this.rootPath = data.metadata.rootPath;
     this.state = status;
     this.tools = services.createTools(data.metadata.dynamicTools ?? []);
     this.runtime = services.createRuntime(id, this.tools);
@@ -38,6 +44,7 @@ export class Thread {
   snapshot() {
     const pending = new Set(this.inputs.map((input) => input.opId));
     return {
+      petId: this.petId, petRevision: this.petSnapshot.revision, petSnapshot: structuredClone(this.petSnapshot), rootPath: this.rootPath,
       messages: this.services.projection.conversation(structuredClone(this.history)).map((message) => {
         if (message.role === "user" && pending.has(message.id)) return { ...message, pending: true };
         if (message.role === "assistant" && this.active) return { ...message, awaitingReply: false };
@@ -56,7 +63,11 @@ export class Thread {
     if (op.type === "interrupt") return this.interrupt();
     await this.serial(async () => {
       this.requireWritable();
-      if (this.history.some((message) => message.role === "user" && message.id === op.opId)) return;
+      const duplicate = this.history.find(message => message.role === "user" && message.id === op.opId);
+      if (duplicate?.role === "user") {
+        this.services.publish({type:"user.message.recorded",threadId:this.id,notificationId:`${this.id}-${op.opId}-user-recorded`,timestamp:this.now(),payload:{messageId:op.opId,text:this.services.projection.summarizeInput({items:duplicate.inputItems ?? []}),items:duplicate.inputItems,pending:this.inputs.some(input=>input.opId===op.opId)}});
+        return;
+      }
       try {
         const saved = await this.recordInput(op);
         this.inputs.push(saved);
@@ -165,27 +176,14 @@ export class Thread {
         if (this.valid(active)) this.services.publish(started);
       });
       if (this.valid(active)) {
-        const inspecting = active.input.payload.mode === "inspect";
-        if (!inspecting) {
-          if (!this.tools.isActivated() && this.history.some((message) => message.role === "tool" && message.name === META_TOOL_NAME)) await this.tools.activate();
-          await this.tools.refresh();
-        }
+        if (!this.tools.isActivated() && this.history.some((message) => message.role === "tool" && message.name === META_TOOL_NAME)) await this.tools.activate();
+        await this.tools.refresh();
         if (!this.valid(active)) return;
         const pending = new Set([...this.inputs.map((input) => input.opId), active.id]);
         const inputMessage = this.history.find((message) => message.role === "user" && message.id === active.id);
         const ordered = this.history.filter((message) => message.role !== "user" || !message.id || !pending.has(message.id));
         if (inputMessage) ordered.push(inputMessage);
         const messages = this.services.projection.runtimeMessages(structuredClone(ordered));
-        if (inspecting && this.services.prepareInput) {
-          const prepared = await this.services.prepareInput(active.input.payload, active.controller.signal);
-          if (!this.valid(active)) return;
-          await this.appendGenerated(active, prepared.messages);
-          messages.push(...structuredClone(prepared.messages));
-          if (prepared.error) {
-            await this.finishWithMessage(active, prepared.error, "completed");
-            return;
-          }
-        }
         const base = messages.length;
         const events: ThreadAuditEvent[] = [];
         const notifications: ThreadNotification[] = [];
@@ -197,8 +195,7 @@ export class Thread {
           const audit = this.services.projection.audit(event, time);
           if (audit) events.push(audit);
         }, { threadId: this.id, turnId: active.id, signal: active.controller.signal,
-          ...(inspecting ? { interactionMode: "inspect" as const }
-            : this.history.some((message) => message.role === "user" && message.inputMode === "inspect") ? { interactionMode: "reply" as const } : {}) });
+          rootPath: this.rootPath, rolePrompt: this.petSnapshot.rolePrompt });
         if (!this.valid(active)) return;
         // The runtime owns a detached summary working copy; only committed deltas enter history.
         const committed = structuredClone(result.messages).map((message, index) => index >= base && message.role === "assistant" && message.id

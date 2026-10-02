@@ -27,7 +27,7 @@ describe("LLM integration artifacts", () => {
               tools: [
                 {
                   name: "file.write",
-                  description: "write a workspace file",
+                  description: "write a Pet file",
                   inputSchema: {
                     type: "object",
                     properties: {

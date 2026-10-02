@@ -11,7 +11,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case mcp
     case permissions
     case shortcuts
-    case workspaces
+    case pets
 
     var id: String { rawValue }
 
@@ -25,7 +25,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .mcp: return "MCP"
         case .permissions: return "权限"
         case .shortcuts: return "快捷键"
-        case .workspaces: return "工作区"
+        case .pets: return "桌宠"
         }
     }
 
@@ -39,7 +39,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .mcp: return "server.rack"
         case .permissions: return "lock.shield"
         case .shortcuts: return "keyboard"
-        case .workspaces: return "folder"
+        case .pets: return "folder"
         }
     }
 }

@@ -20,16 +20,21 @@ class Socket {
 
 let controller: PetThreadController;
 let sequence = 0;
-const note = (type: string, extra: object = {}) => ({ type, notificationId: String(++sequence), timestamp: "2026-09-13T01:00:00.000Z", ...extra });
+const note = (type: string, extra: any = {}) => ({ type, notificationId: String(++sequence), timestamp: "2026-09-13T01:00:00.000Z", ...extra, ...(extra.payload ? {payload: {petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},petId:"pet-default",petRevision:1,rootPath:"/tmp",...extra.payload}} : {}) });
 beforeEach(() => {
   localStorage.clear();
   Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
   globalThis.ResizeObserver = class { observe() {} disconnect() {} unobserve() {} };
   HTMLElement.prototype.scrollIntoView = vi.fn();
-  window.handAgentPet = { setLayout: vi.fn(), setInteractiveRegions: vi.fn(), beginMove: vi.fn(), move: vi.fn(), endMove: vi.fn() };
-  controller = new PetThreadController({ url: "ws://local/api/thread", WebSocketImpl: Socket });
+  window.handAgentPet = {getPathForFile: file=>`/tmp/${file.name}`,chooseFiles:async()=>[],setReceiving:vi.fn(),showPet:async()=>{},hidePet:vi.fn(),onReveal:()=>()=>{}, setLayout: vi.fn(), setInteractiveRegions: vi.fn(), beginMove: vi.fn(), move: vi.fn(), endMove: vi.fn() };
+  controller = new PetThreadController({ petId:"pet-default", url: "ws://local/api/thread", WebSocketImpl: Socket });
 });
 afterEach(() => { cleanup(); controller.disconnect(); vi.restoreAllMocks(); });
+
+async function ackLast() {
+  const sent=Socket.latest.sent.at(-1)!;
+  await act(async()=>Socket.latest.receive(note("user.message.recorded",{threadId:sent.threadId,payload:{messageId:sent.payload.op.opId,text:sent.payload.op.payload.items[0].text,items:sent.payload.op.payload.items}})));
+}
 
 function mount() {
   render(<App controller={controller} />);
@@ -41,10 +46,18 @@ function startThread(text = "第一行\n第二行\n第三行\n第四行\n第五�
     Socket.latest.receive(note("thread.started", { threadId: "a", payload: { preview: "资料" } }));
     Socket.latest.receive(note("user.message.recorded", { threadId: "a", payload: { messageId: "input", text: "我的资料", items: [{ type: "text", id: "item", text: "我的资料" }] } }));
     Socket.latest.receive(note("assistant.delta", { threadId: "a", turnId: "turn", itemId: "answer", payload: { text, suggestedReplies: ["请整理这份资料"], awaitingReply: true } }));
+    controller.selectThread("a"); controller.revealBubble();
   });
 }
 
 describe("桌宠的轻量交互", () => {
+  it("历史详情保留创建时宠名和角色版本", () => {
+    mount();startThread();
+    act(() => Socket.latest.receive(note("thread.snapshot", {threadId:"a",payload:{messages:[],status:"idle",petSnapshot:{petId:"pet-default",revision:2,name:"原名称",rolePrompt:"原角色"}}})));
+    expect(screen.getByText("创建时：原名称 · 角色 v2")).toBeTruthy();
+  });
+
+
   it.each([false, true])("服务端保存失败可见且遵守主动隐藏，已创建 Thread=%s", async (started) => {
     mount();
     fireEvent.drop(screen.getByRole("button", { name: /月见八千代/ }), {
@@ -52,7 +65,7 @@ describe("桌宠的轻量交互", () => {
     });
     await waitFor(() => expect(Socket.latest.sent.at(-1)?.type).toBe("thread.start"));
     act(() => {
-      if (started) Socket.latest.receive(note("thread.started", { threadId: "a", payload: { preview: "资料" } }));
+      if (started) Socket.latest.receive(note("thread.started", { commandId: Socket.latest.sent.at(-1)!.commandId, threadId: "a", payload: { preview: "资料" } }));
       Socket.latest.receive(note("thread.error", { ...(started ? { threadId: "a" } : {}), payload: { message: "保存输入失败：磁盘已满" } }));
     });
     expect(screen.getByRole("alert").textContent).toContain("磁盘已满");
@@ -108,6 +121,8 @@ describe("桌宠的轻量交互", () => {
     expect(input.value).toBe("还有另一条补充");
     fireEvent.keyDown(input, { key: "Enter" });
     expect(Socket.latest.sent.at(-1)).toMatchObject({ type: "op.submit", threadId: "first", payload: { op: { payload: { items: [{ text: "还有另一条补充" }] } } } });
+    expect(input.value).toBe("还有另一条补充");
+    await ackLast();
     expect(input.value).toBe("");
     expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(1);
   });
@@ -201,12 +216,13 @@ describe("桌宠的轻量交互", () => {
     expect(vi.mocked(window.handAgentPet!.setLayout).mock.lastCall?.[0]).toBe("compact");
   });
 
-  it("常态即可点击当前建议和发送自由回复，不需要先展开历史", () => {
+  it("常态即可点击当前建议和发送自由回复，不需要先展开历史", async () => {
     mount(); startThread("看看这些安排。");
     fireEvent.click(screen.getByRole("button", { name: "请整理这份资料" }));
     expect(Socket.latest.sent.at(-1)).toMatchObject({
       type: "op.submit", threadId: "a", payload: { op: { payload: { items: [{ type: "text", text: "请整理这份资料" }] } } },
     });
+    await ackLast();
     fireEvent.change(screen.getByRole("textbox", { name: "回复当前对话" }), { target: { value: "先只看第一项" } });
     fireEvent.click(screen.getByRole("button", { name: "发送回复" }));
     expect(Socket.latest.sent.at(-1)).toMatchObject({
@@ -333,12 +349,13 @@ describe("桌宠的轻量交互", () => {
     expect(screen.getByTestId("pet-latest").textContent).toBe("后台的新结果");
   });
 
-  it("建议按钮和自由输入都提交普通 UserInput，执行中仍可回复并显示待处理", () => {
+  it("建议按钮和自由输入都提交普通 UserInput，执行中仍可回复并显示待处理", async () => {
     mount(); startThread();
     fireEvent.mouseEnter(screen.getByTestId("pet-conversation"));
     fireEvent.click(screen.getByRole("button", { name: "请整理这份资料" }));
     const suggestion = Socket.latest.sent.filter((message) => message.type === "op.submit").at(-1)!;
     expect(suggestion.payload.op.payload).toEqual({ items: [{ type: "text", id: expect.any(String), text: "请整理这份资料" }] });
+    await ackLast();
     act(() => Socket.latest.receive(note("turn.started", { threadId: "a", turnId: "executing", payload: {} })));
     const input = screen.getByRole("textbox", { name: "回复当前对话" });
     fireEvent.change(input, { target: { value: "补充一条" } });
@@ -356,30 +373,28 @@ describe("桌宠的轻量交互", () => {
     const count = Socket.latest.sent.length;
     fireEvent.dragEnter(pet, { dataTransfer });
     fireEvent.dragOver(pet, { dataTransfer });
-    expect(screen.getByText("新对话")).toBeTruthy();
+    expect(screen.getByText(/· 新对话/)).toBeTruthy();
     expect(Socket.latest.sent).toHaveLength(count);
     fireEvent.dragOver(bubble, { dataTransfer });
     expect(screen.getByText("添加到当前对话")).toBeTruthy();
     fireEvent.drop(bubble, { dataTransfer });
     await waitFor(() => expect(Socket.latest.sent.at(-1)?.type).toBe("op.submit"));
-    expect(Socket.latest.sent.at(-1)).toMatchObject({ threadId: "a", payload: { op: { payload: { mode: "inspect", items: [{ text: "拖入的资料" }] } } } });
+    expect(Socket.latest.sent.at(-1)).toMatchObject({ threadId: "a", payload: { op: { payload: { items: [{ text: "拖入的资料" }] } } } });
     fireEvent.drop(pet, { dataTransfer });
     await waitFor(() => expect(Socket.latest.sent.at(-1)?.type).toBe("thread.start"));
   });
 
-  it.each(["image/png", "application/pdf"])("浏览器 File 拖入 %s 会读取字节并发送，不依赖原路径", async (type) => {
+  it.each(["image/png", "application/pdf"])("浏览器 File 拖入 %s 只交付原路径", async (type) => {
     mount(); startThread();
     const file = new File(["attachment bytes"], type === "image/png" ? "photo.png" : "report.pdf", { type });
     const dataTransfer = { types: ["Files"], files: [file], getData: () => "" };
     fireEvent.drop(screen.getByTestId("pet-conversation"), { dataTransfer });
     await waitFor(() => expect(Socket.latest.sent.at(-1)?.type).toBe("op.submit"));
-    expect(Socket.latest.sent.at(-1)?.payload.op.payload.items[0]).toMatchObject({ type: type === "image/png" ? "image" : "pdf", name: file.name, base64: btoa("attachment bytes") });
+    expect(Socket.latest.sent.at(-1)?.payload.op.payload.items[0]).toMatchObject({ type: "text", text: expect.stringContaining(`/tmp/${file.name}`) });
   });
 
   it.each(["pet", "conversation"] as const)("拖入 %s 后在读取文件期间隐藏，读取与提交完成均不解除隐藏", async (target) => {
     mount(); startThread();
-    let reader: FileReader | undefined;
-    vi.spyOn(FileReader.prototype, "readAsDataURL").mockImplementation(function (this: FileReader) { reader = this; });
     const file = new File(["pdf bytes"], "report.pdf", { type: "application/pdf" });
     const pet = screen.getByRole("button", { name: /月见八千代/ });
     fireEvent.drop(target === "pet" ? pet : screen.getByTestId("pet-conversation"), {
@@ -387,8 +402,7 @@ describe("桌宠的轻量交互", () => {
     });
     fireEvent.click(pet);
     expect(screen.queryByTestId("pet-conversation")).toBeNull();
-    Object.defineProperty(reader!, "result", { value: `data:application/pdf;base64,${btoa("pdf bytes")}` });
-    await act(async () => reader!.onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>));
+    await act(async () => {});
     const submitted = Socket.latest.sent.at(-1)!;
     expect(submitted.type).toBe(target === "pet" ? "thread.start" : "op.submit");
     expect(screen.queryByTestId("pet-conversation")).toBeNull();
@@ -400,17 +414,16 @@ describe("桌宠的轻量交互", () => {
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "回复当前对话" }));
   });
 
-  it("松手后异步读取附件期间新建另一 Thread，附件仍追加松手时的对话", async () => {
+  it("松手后异步接收期间主动切换另一 Thread，附件仍追加松手时的对话", async () => {
     mount(); startThread();
-    let reader: FileReader | undefined;
-    vi.spyOn(FileReader.prototype, "readAsDataURL").mockImplementation(function (this: FileReader) { reader = this; });
     const file = new File(["pdf bytes"], "report.pdf", { type: "application/pdf" });
     fireEvent.drop(screen.getByTestId("pet-conversation"), { dataTransfer: { types: ["Files"], files: [file], getData: () => "" } });
     act(() => Socket.latest.receive(note("thread.started", { threadId: "b", payload: { preview: "后建对话", createdAt: "2026-09-13T02:00:00.000Z" } })));
-    Object.defineProperty(reader!, "result", { value: `data:application/pdf;base64,${btoa("pdf bytes")}` });
-    await act(async () => reader!.onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>));
+    fireEvent.click(screen.getByRole("button", {name:"对话"}));
+    fireEvent.click(screen.getByRole("button", {name:/^后建对话/}));
+    await act(async () => {});
     await waitFor(() => expect(Socket.latest.sent.at(-1)?.type).toBe("op.submit"));
-    expect(Socket.latest.sent.at(-1)).toMatchObject({ threadId: "a", payload: { op: { payload: { items: [{ name: "report.pdf" }] } } } });
+    expect(Socket.latest.sent.at(-1)).toMatchObject({ threadId: "a", payload: { op: { payload: { items: [{ type:"text", text: expect.stringContaining("/tmp/report.pdf") }] } } } });
     expect(controller.getSnapshot().threadId).toBe("b");
   });
 });

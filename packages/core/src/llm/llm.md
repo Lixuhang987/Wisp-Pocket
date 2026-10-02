@@ -12,7 +12,7 @@
 - 测试与旧调用方可通过 `complete()` 接口接入，helper 负责与流式路径互通；不要在 Runtime 内按 Provider 类型分支。
 - 中断使用显式 `AbortSignal`；BlobStore 通过调用参数传入，由 Provider 适配层在需要图片 bytes 时读取。
 - AgentMessage 保存 Runtime 表达；Input Item 负责用户输入协议的 round-trip，Provider 消费格式只在 adapter 中生成。
-- 工具结果中的图片、错误与 callId 关联由 [Dynamic Tool adapter](../tools/tools.md) 和 Provider 适配共同保留，不应丢成纯 base64 文本。
+- 工具结果中的图片、错误与 callId 关联由 [Tool](../tools/tools.md) 和 Provider 适配共同保留，普通 Tool 图片不要求 Dynamic callId，不应丢成纯 base64 文本。
 
 ## 相邻所有权
 

@@ -21,7 +21,7 @@ import {
 } from "../tools/MetaToolUseTool.ts";
 
 import type { AgentRunResult, AssistantMessageStartEvent, AssistantMessageDeltaEvent, AssistantMessageEndEvent, ToolCallEvent, ToolResultEvent, PermissionDecisionEvent, RuntimeErrorEvent, AgentRuntimeEvent, AgentRuntimeRunOptions, AgentRuntimeEventSink, ToolExecutionResult } from "./types/AgentRuntime.ts";
-import { USER_QUESTION_TOOL_NAME, userQuestionTool, userQuestionSchema, INSPECT_INPUT_PROMPT, FOLLOW_UP_PROMPT } from "./UserQuestion.ts";
+import { USER_QUESTION_TOOL_NAME, userQuestionTool, userQuestionSchema } from "./UserQuestion.ts";
 export type { AgentRunResult, AssistantMessageStartEvent, AssistantMessageDeltaEvent, AssistantMessageEndEvent, ToolCallEvent, ToolResultEvent, PermissionDecisionEvent, RuntimeErrorEvent, AgentRuntimeEvent, AgentRuntimeRunOptions } from "./types/AgentRuntime.ts";
 
 export class AgentRuntime {
@@ -98,7 +98,7 @@ export class AgentRuntime {
       }
 
       for (const toolCall of toolCalls) {
-        if (runOptions.interactionMode && toolCall.name === USER_QUESTION_TOOL_NAME) {
+        if (toolCall.name === USER_QUESTION_TOOL_NAME) {
           const question = userQuestionSchema.safeParse(toolCall.arguments);
           if (!question.success) {
             nextMessages.push({ role: "tool", toolCallId: toolCall.id, name: toolCall.name, content: "询问需要 message 和 suggestedReplies，请修正参数。" });
@@ -137,12 +137,6 @@ export class AgentRuntime {
   }): Promise<void> {
     const { toolCall, messages, onEvent, runOptions } = input;
     throwIfAborted(runOptions.signal);
-
-    if (runOptions.interactionMode === "inspect") {
-      messages.push({ role: "tool", toolCallId: toolCall.id, name: toolCall.name,
-        content: "当前仅获准读取拖入资料并提出建议。请使用 user.ask，等待用户明确回复后再执行。" });
-      return;
-    }
 
     const tool = this.toolRegistry.get(toolCall.name);
     if (!tool) {
@@ -225,6 +219,8 @@ export class AgentRuntime {
         threadId,
         turnId: runOptions.turnId,
         toolCallId: toolCall.id,
+        rootPath: runOptions.rootPath,
+        signal: runOptions.signal,
       });
       throwIfAborted(runOptions.signal);
       content = serializeToolResult(result);
@@ -314,6 +310,8 @@ export class AgentRuntime {
         threadId: runOptions.threadId,
         turnId: runOptions.turnId,
         toolCallId: toolCall.id,
+        rootPath: runOptions.rootPath,
+        signal: runOptions.signal,
       });
       throwIfAborted(runOptions.signal);
       content = serializeToolResult(result);
@@ -339,14 +337,11 @@ export class AgentRuntime {
     const messageId = `assistant-${assistantCount}`;
     let content = "";
     const toolCalls: ToolCallEnvelope[] = [];
-    const tools = runOptions.interactionMode === "inspect" ? [userQuestionTool]
-      : [...this.toolRegistry.list(), ...(runOptions.interactionMode ? [userQuestionTool] : [])];
+    const tools = [...this.toolRegistry.list().filter(tool => tool.name !== USER_QUESTION_TOOL_NAME), userQuestionTool];
     const llmMessages = await buildSystemPromptMessages({
-      sections: this.systemPromptSections,
+      sections: [...this.systemPromptSections, ...(runOptions.rolePrompt ? [{name:"pet-role",resolve:() => `桌宠角色（表达习惯，用户明确任务可覆盖口吻和格式；不能改变工具和权限规则）：\n${runOptions.rolePrompt}`}]:[])],
       context: { tools },
-      messages: runOptions.interactionMode
-        ? [{ role: "system", content: runOptions.interactionMode === "inspect" ? INSPECT_INPUT_PROMPT : FOLLOW_UP_PROMPT }, ...messages]
-        : messages,
+      messages,
     });
 
     throwIfAborted(runOptions.signal);

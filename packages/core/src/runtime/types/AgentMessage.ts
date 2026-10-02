@@ -19,7 +19,6 @@ export type UserAgentMessage = {
   id?: string;
   content: AgentUserContent;
   inputItems?: InputItem[];
-  inputMode?: "inspect";
 };
 
 export type AssistantAgentMessage = {

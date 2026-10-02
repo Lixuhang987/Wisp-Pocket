@@ -2,6 +2,7 @@ import Foundation
 
 enum ActivityWindowCommandKind: Equatable {
     case show
+    case petVisibility(petId: String, visible: Bool)
 }
 
 struct ActivityWindowCommandResult: Equatable {
@@ -17,4 +18,11 @@ protocol ActivityWindowCommanding: AnyObject {
 
     @discardableResult
     func showActivityWindow() throws -> String
+    func setPetVisible(petId: String, visible: Bool) throws -> String
+}
+
+extension ActivityWindowCommanding {
+    func setPetVisible(petId: String, visible: Bool) throws -> String {
+        throw SwiftThreadClientError.startFailed("桌宠窗口控制不可用")
+    }
 }

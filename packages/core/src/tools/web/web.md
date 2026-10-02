@@ -2,7 +2,7 @@
 
 ## 目录职责
 
-`tools/web/` 存放默认公开的公共 Web 资料工具。它们属于 core tool 协议，但不进入 `registerBuiltins.ts` 的 workspace/file builtin 注册表，也不受 `~/.spotAgent/settings.json` 的 allowlist / denylist 控制。
+`tools/web/` 存放默认公开的公共 Web 资料工具。它们属于 core tool 协议，但不进入 `registerBuiltins.ts` 的 file builtin 注册表，也不受 `~/.spotAgent/settings.json` 的 allowlist / denylist 控制。
 
 ## 文件
 

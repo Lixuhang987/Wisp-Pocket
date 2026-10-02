@@ -1,19 +1,15 @@
-import type { PermissionRequestState, WorkspaceRequestState } from '../store/threadWindowStore.ts';
+import type { PermissionRequestState } from '../store/threadWindowStore.ts';
 
 interface RequestPanelsProps {
   permissionRequests: PermissionRequestState[];
-  workspaceRequests: WorkspaceRequestState[];
   onAnswerPermission: (requestId: string, decision: 'allow' | 'deny', scope: 'once' | 'always') => void;
-  onAnswerWorkspace: (requestId: string, workspaceId: string | null) => void;
 }
 
 export function RequestPanels({
   permissionRequests,
-  workspaceRequests,
   onAnswerPermission,
-  onAnswerWorkspace,
 }: RequestPanelsProps) {
-  if (permissionRequests.length === 0 && workspaceRequests.length === 0) {
+  if (permissionRequests.length === 0) {
     return null;
   }
 
@@ -54,38 +50,10 @@ export function RequestPanels({
               永久拒绝
             </button>
           </div>
-          <p className="mt-xs text-xs text-app-text-muted">永久决定适用于此工具的所有参数和所有 Thread。</p>
+          <p className="mt-xs text-xs text-app-text-muted">永久决定适用于此工具的所有参数和所有桌宠、所有 Thread。</p>
         </section>
       ))}
-      {workspaceRequests.map((request) => (
-        <section
-          key={request.id}
-          className="min-w-0 rounded-xl border border-app-hairline bg-app-surface-elevated/95 px-sm py-sm shadow-[var(--thread-window-floating-shadow)]"
-        >
-          <strong className="mb-sm block text-sm font-medium text-app-text-primary">
-            {request.prompt}
-          </strong>
-          <div className="flex flex-wrap gap-xs">
-            {request.candidates.map((candidate) => (
-              <button
-                type="button"
-                key={candidate.id}
-                onClick={() => onAnswerWorkspace(request.id, candidate.id)}
-                className="h-9 rounded-md bg-app-accent px-sm text-sm font-medium text-app-on-accent transition-colors duration-200 hover:bg-app-accent-hover focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
-              >
-                {candidate.name}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => onAnswerWorkspace(request.id, null)}
-              className="h-9 rounded-md border border-app-hairline bg-app-surface px-sm text-sm font-medium text-app-text-primary transition-colors duration-200 hover:bg-app-canvas focus:outline-none focus:ring-4 focus:ring-app-accent-ring"
-            >
-              取消
-            </button>
-          </div>
-        </section>
-      ))}
+
     </div>
   );
 }

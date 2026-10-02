@@ -1,0 +1,15 @@
+{
+  "app" : {
+    "bundleId" : "test.context",
+    "pid" : 123
+  },
+  "root" : {
+    "role" : "AXWindow",
+    "title" : "Swift fixture evidence"
+  },
+  "window" : {
+    "id" : 1,
+    "ownerPid" : 123,
+    "title" : "Context"
+  }
+}

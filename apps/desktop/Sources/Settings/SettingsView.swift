@@ -8,7 +8,7 @@ struct SettingsView: View {
     @Bindable var appendPromptSettingsViewModel: AppendPromptSettingsViewModel
     @Bindable var mcpSettingsViewModel: MCPSettingsViewModel
     @Bindable var permissionRulesViewModel: PermissionRulesViewModel
-    @Bindable var workspaceViewModel: WorkspaceSettingsViewModel
+    @Bindable var petViewModel: PetSettingsViewModel
     let shortcutActions: [ActionDefinition]
     @Environment(\.appTheme) private var theme
     @State private var selectedTab = SettingsTab.model
@@ -42,8 +42,8 @@ struct SettingsView: View {
             PermissionRulesView(viewModel: permissionRulesViewModel)
         case .shortcuts:
             ShortcutSettingsView(actions: shortcutActions)
-        case .workspaces:
-            WorkspaceSettingsView(viewModel: workspaceViewModel)
+        case .pets:
+            PetSettingsView(viewModel: petViewModel)
         }
     }
 }

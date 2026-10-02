@@ -1,3 +1,4 @@
+import type { Pet, PetImageRef, PetErrorCode } from "../../pet/Pet.ts";
 import type { InputItem } from "./Op.ts";
 import type {
   RunStatus,
@@ -12,6 +13,9 @@ export type ThreadStartedNotification = {
   commandId?: string;
   timestamp: string;
   payload: {
+    petId: string;
+    petRevision: number;
+    rootPath: string;
     preview: string | null;
     createdAt?: string;
   };
@@ -118,6 +122,7 @@ export type ThreadListedNotification = {
   timestamp: string;
   payload: {
     threads: ThreadListEntry[];
+    nextCursor?: string;
   };
 };
 
@@ -144,19 +149,13 @@ export type ThreadErrorNotification = {
   };
 };
 
-export type WorkspaceListedNotification = {
-  type: "workspace.listed";
-  notificationId: string;
-  commandId?: string;
-  timestamp: string;
-  payload: {
-    workspaces: Array<{
-      id: string;
-      name: string;
-      rootPath: string;
-    }>;
-  };
-};
+type PetNotificationBase = {notificationId:string;commandId?:string;timestamp:string};
+export type PetListedNotification = PetNotificationBase & {type:'pet.listed';payload:{pets:Pet[]}};
+export type PetCreatedNotification = PetNotificationBase & {type:'pet.created';payload:{pet:Pet}};
+export type PetUpdatedNotification = PetNotificationBase & {type:'pet.updated';payload:{pet:Pet}};
+export type PetImageImportedNotification = PetNotificationBase & {type:'pet.image.imported';payload:{imageRef:PetImageRef}};
+export type PetErrorNotification = PetNotificationBase & {type:'pet.error';payload:{code:PetErrorCode;message:string;currentRevision?:number}};
+export type PetNotification = PetListedNotification | PetCreatedNotification | PetUpdatedNotification | PetImageImportedNotification | PetErrorNotification;
 
 export type RequestResolvedNotification = {
   type: "request.resolved";
@@ -179,5 +178,5 @@ export type ThreadNotification =
   | ThreadListedNotification
   | ThreadDeletedNotification
   | ThreadErrorNotification
-  | WorkspaceListedNotification
+  | PetNotification
   | RequestResolvedNotification;

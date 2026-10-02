@@ -69,13 +69,13 @@ public final class ContextHistoryModule {
             }
         }
         do {
-            _ = try await withTaskCancellationHandler {
+            let result = try await withTaskCancellationHandler {
                 try await task.value
             } onCancel: {
                 task.cancel()
             }
             guard isRunning, samplingID == id else { return }
-            lastSampleAt = now
+            if result.activitySampleId != nil || result.screenshotId != nil { lastSampleAt = now }
             lastErrorMessage = nil
         } catch is CancellationError {
             // A disabled or stopped module must not publish stale state from its previous session.
@@ -86,10 +86,6 @@ public final class ContextHistoryModule {
     }
 
     public func handle(tool: String, arguments: Any?) -> DynamicToolResult {
-        router.handle(tool: tool, arguments: arguments, collectionStatus: [
-            "isRunning": isRunning,
-            "lastSampleAt": lastSampleAt.map { contextHistoryTimestamp($0) as Any } ?? NSNull(),
-            "lastErrorMessage": lastErrorMessage.map { $0 as Any } ?? NSNull(),
-        ])
+        router.handle(tool: tool, arguments: arguments)
     }
 }

@@ -19,7 +19,7 @@ describe("Thread ownership through public lifecycle", () => {
     const contexts: AgentMessage[][] = [];
     const h = threadHarness({ complete: async (messages) => { contexts.push(structuredClone(messages)); return echo.complete(messages); } });
     try {
-      const thread = await h.threads.create({});
+      const thread = await h.threads.create({ petId: h.pet.id,});
       expect(await h.threads.load(thread.id)).toBe(thread);
       await thread.submit(input("first"));
       await wait(() => expect(thread.status).toBe("idle"));
@@ -38,7 +38,7 @@ describe("Thread ownership through public lifecycle", () => {
       class Socket extends EventEmitter { send() {} }
       const socket = new Socket();
       attachThreadSocketHandlers(socket as never, { commandRouter: h.router, eventPublisher: h.publisher });
-      const thread = await h.threads.create({});
+      const thread = await h.threads.create({ petId: h.pet.id,});
       socket.emit("message", JSON.stringify({ type: "op.submit", threadId: thread.id, commandId: "input", timestamp: "now", payload: { op: input("background") } }));
       await entered.promise;
       socket.emit("close");
@@ -53,7 +53,7 @@ describe("Thread ownership through public lifecycle", () => {
   it("persists before input acknowledgement and before successful completion", async () => {
     const h = threadHarness(echo);
     try {
-      const thread = await h.threads.create({});
+      const thread = await h.threads.create({ petId: h.pet.id,});
       const gate = Promise.withResolvers<void>();
       const persist = h.persistence.persistNotifications.bind(h.persistence);
       vi.spyOn(h.persistence, "persistNotifications").mockImplementation(async (id, events) => {
@@ -73,7 +73,7 @@ describe("Thread ownership through public lifecycle", () => {
   it("pauses on failed persistence, reports without another write and reloads consistent history", async () => {
     const h = threadHarness(echo);
     try {
-      const thread = await h.threads.create({});
+      const thread = await h.threads.create({ petId: h.pet.id,});
       const persist = vi.spyOn(h.persistence, "persistRunDelta").mockRejectedValue(new Error("disk full"));
       await thread.submit(input("one"));
       await wait(() => expect(thread.status).toBe("failed"));
@@ -94,7 +94,7 @@ describe("Thread ownership through public lifecycle", () => {
     const entered = Promise.withResolvers<void>();
     const h = threadHarness({ complete: async (messages) => { entered.resolve(); await gate.promise; return echo.complete(messages); } });
     try {
-      const thread = await h.threads.create({});
+      const thread = await h.threads.create({ petId: h.pet.id,});
       await thread.submit(input("stop")); await entered.promise;
       await thread.interrupt();
       expect(thread.status).toBe("interrupted");
@@ -122,7 +122,7 @@ describe("Thread ownership through public lifecycle", () => {
       }),
     });
     try {
-      const thread = await h.threads.create({ dynamicTools: [{
+      const thread = await h.threads.create({ petId: h.pet.id, dynamicTools: [{
         clientId: "swift-host", namespace: "automation", name: "run", description: "Run saved policy", inputSchema: { type: "object" },
       }] });
       await thread.submit(input("run then interrupt"));
@@ -146,7 +146,7 @@ describe("Thread ownership through public lifecycle", () => {
     const entered = Promise.withResolvers<void>();
     const h = threadHarness({ complete: async (messages) => { entered.resolve(); await gate.promise; return echo.complete(messages); } });
     try {
-      const thread = await h.threads.create({});
+      const thread = await h.threads.create({ petId: h.pet.id,});
       await thread.submit(input("delete")); await entered.promise;
       const deleting = h.threads.delete(thread.id);
       await expect(thread.submit(input("race"))).rejects.toThrow("closed");
@@ -162,7 +162,7 @@ describe("Thread ownership through public lifecycle", () => {
   it("reports deletion failure through the protocol", async () => {
     const h = threadHarness(echo);
     try {
-      const thread = await h.threads.create({});
+      const thread = await h.threads.create({ petId: h.pet.id,});
       h.publisher.attachConnection("ui", () => {});
       vi.spyOn(h.persistence, "deleteThread").mockRejectedValue(new Error("cannot delete"));
       await h.router.receive({ type: "thread.delete", commandId: "delete", timestamp: "now", payload: { targetThreadId: thread.id } }, "ui");
@@ -175,7 +175,7 @@ describe("Thread ownership through public lifecycle", () => {
     const directory = await mkdtemp(join(tmpdir(), "thread-restart-"));
     const path = join(directory, "threads.sqlite");
     const h = threadHarness(echo, {}, path);
-    const thread = await h.threads.create({});
+    const thread = await h.threads.create({ petId: h.pet.id,});
     await thread.submit(input("saved")); await wait(() => expect(thread.status).toBe("idle"));
     await h.close();
     const complete = vi.fn(echo.complete);
@@ -195,7 +195,7 @@ it.each(["input", "completion"])("honors interrupt while %s persistence is delay
   const gate = Promise.withResolvers<void>();
   const entered = Promise.withResolvers<void>();
   try {
-    const thread = await h.threads.create({});
+    const thread = await h.threads.create({ petId: h.pet.id,});
     const persist = h.persistence.persistNotifications.bind(h.persistence);
     vi.spyOn(h.persistence, "persistNotifications").mockImplementation(async (id, events) => {
       if (events.some((event) => phase === "input" ? event.type === "user.message.recorded" : event.type === "turn.completed" && event.payload.status === "completed")) {
@@ -221,7 +221,7 @@ it("queues inputs during execution, preserves their order and isolates other Thr
     return echo.complete(messages);
   } });
   try {
-    const a = await h.threads.create({}); const b = await h.threads.create({});
+    const a = await h.threads.create({ petId: h.pet.id,}); const b = await h.threads.create({ petId: h.pet.id,});
     await a.submit(input("first")); await entered.promise;
     await a.submit(input("second")); await a.submit(input("third"));
     await b.submit(input("other")); await wait(() => expect(b.status).toBe("idle"));

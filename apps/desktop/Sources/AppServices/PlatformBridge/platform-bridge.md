@@ -1,11 +1,11 @@
 # Host Dynamic Tools
 
-本目录把共享 macOS 能力与两个已知内置模块接入 Dynamic Tool。`DynamicToolProviderService` 处理请求并保留 `callId`；`host_macos` 进入 `MacPlatformProvider`，`context_history` / `automation` 进入 `BuiltinFeatures`，业务状态归 [Host Automation](../../../../host-automation/host-automation.md)。
+本目录把共享 macOS 能力接入常驻 Context History 采集与可选 Automation Dynamic Tool。`DynamicToolProviderService` 处理请求并保留 `callId`；`host_macos` 进入 `MacPlatformProvider`，`automation` 进入 `BuiltinFeatures`；历史查询由 agent-server 普通 Tool 读取保存数据，业务状态归 [Host Automation](../../../../host-automation/host-automation.md)。
 
 ## 直接文件
 
 - `MacHostDynamicTools.swift`：原生工具声明、方法映射与 Provider 请求分派。
-- `BuiltinFeatureToolSpecs.swift`：两个业务模块的公开参数、结果与失败说明。
+- `BuiltinFeatureToolSpecs.swift`：Automation 的公开参数、结果与失败说明。
 - `BuiltinFeatures.swift`：显式持有配置、Context History 和 Automation，并同步启停与工具声明。
 - `MacPlatformProvider.swift`：应用/窗口、ScreenCaptureKit、Vision 与 Accessibility 的共享系统实现。
 - `MacAutomationLiveEventRecorder.swift`：按 Recording Session 共享并回收 macOS 事件监听。
@@ -13,11 +13,11 @@
 ## 所有权与生命周期
 
 - 生产组合点 [AppServices](../app-services.md) 创建同一个 `MacPlatformProvider`，原生 Tool 与两个模块直接复用它。`HostAutomationCapabilities` 只表达固定系统边界，不做能力发现、安装或进程托管。
-- 两个模块默认关闭。启用选择由 [BuiltinFeatureSettingsStore](../AgentSettings/agent-settings.md) 持久化；写入成功才应用选择并发布新的工具声明。
-- Context History 采集与 Automation 操作由应用生命周期管理。关闭窗口继续；禁用或退出取消任务并清理监听，已保存历史与 Policy 保留。
+- Context History 常驻采集；Automation 默认关闭，其启用选择由 [BuiltinFeatureSettingsStore](../AgentSettings/agent-settings.md) 持久化；写入成功才应用选择并发布新的工具声明。
+- Context History 采集与 Automation 操作由应用生命周期管理。关闭窗口继续；退出取消任务并清理监听，Automation 另可禁用，已保存历史与 Policy 保留。
 - 正常退出由 [Coordinator](../../Coordinator/coordinator.md) 等待 `BuiltinFeatures.stopAndWait()`：先撤下业务声明、配置回调并停止模块，再等待 Automation 在途操作收尾。同步 `stop()` 只发出取消，不代表 Run 已保存；等待与持久化边界见 [业务源码指南](../../../../host-automation/Sources/sources.md)。
 - Thread 中断只停止推理与旧 Turn 投影；现有 Dynamic Tool 协议没有远程 cancel，不会自动停止 Host 步骤。需要停止 Automation 宿主任务时禁用功能或退出应用，Thread 等待上限见 [core Thread](../../../../../packages/core/src/thread/thread.md)。
-- 原生 `host_macos` 工具始终声明；业务 namespace 只在对应模块启用时声明。禁用后的调用返回失败，不把旧 Thread 中仍保留的声明当作启用授权。
+- 原生 `host_macos` 工具始终声明；Automation namespace 仅启用时声明；历史查询不进入 Dynamic Tool。禁用后的调用返回失败，不把旧 Thread 中仍保留的声明当作启用授权。
 - Automation event tap 只在请求 `captureUserEvents=true` 时创建，多个 Recording Session 共享监听源；最后一个会话停止或模块停机后释放。实时事件的证据时间合约见 [业务源码指南](../../../../host-automation/Sources/sources.md)。
 
 ## 通道与内容合约

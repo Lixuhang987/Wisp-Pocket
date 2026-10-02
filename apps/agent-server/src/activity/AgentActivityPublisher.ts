@@ -82,8 +82,6 @@ export class AgentActivityPublisher {
         );
       case "permission.requested":
         return this.nextState(event.threadId, "waiting", "等待权限确认", "permission");
-      case "workspace.requested":
-        return this.nextState(event.threadId, "waiting", "等待工作区选择", "workspace");
       case "turn.completed":
         if (event.payload.status === "failed") {
           return this.failedState(event.threadId);
@@ -111,7 +109,12 @@ export class AgentActivityPublisher {
       case "thread.snapshot":
       case "thread.listed":
       case "thread.deleted":
-      case "workspace.listed":
+      case "pet.listed":
+      case "pet.created":
+      case "pet.updated":
+      case "pet.image.imported":
+      case "pet.error":
+      case "request.resolved":
         return null;
     }
   }

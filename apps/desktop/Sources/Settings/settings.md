@@ -1,21 +1,21 @@
 # Settings 模块
 
-设置窗口的容器与各 Tab 视图。当前九个 Tab：模型配置、外观主题、工具与内置功能、AgentTrigger 管理、Append Prompt 管理、MCP 管理、权限规则管理、快捷键配置、工作区管理。窗口本身由 Coordinator 用 `NSWindow + NSHostingController` 管理。
+设置窗口的容器与各 Tab 视图。当前九个 Tab：模型配置、外观主题、工具与内置功能、AgentTrigger 管理、Append Prompt 管理、MCP 管理、权限规则管理、快捷键配置、桌宠管理。窗口本身由 Coordinator 用 `NSWindow + NSHostingController` 管理。
 
 ## 文件
 
 | 文件 | 职责 |
 |------|------|
-| `SettingsView.swift` | 设置容器，挂"模型" / "外观" / "工具" / "AgentTrigger" / "追加" / "MCP" / "权限" / "快捷键" / "工作区"九个 Tab |
+| `SettingsView.swift` | 设置容器，挂"模型" / "外观" / "工具" / "AgentTrigger" / "追加" / "MCP" / "权限" / "快捷键" / "桌宠"九个 Tab |
 | `AgentSettingsViewModel.swift` | `@Observable` 代理：把 `AgentSettingsStore.settings` 包装成可双向绑定的属性 |
 | `AppearanceSettingsViewModel.swift` / `AppearanceSettingsView.swift` | 外观主题偏好 UI 与写入 |
-| `ToolSettingsViewModel.swift` / `ToolSettingsView.swift` | Context History / Automation 开关、采集状态与配置错误，以及 Agent builtin tool 列表 |
+| `ToolSettingsViewModel.swift` / `ToolSettingsView.swift` | Context History 状态 / Automation 开关、采集状态与配置错误，以及 Agent builtin tool 列表 |
 | `AgentTriggerSettingsViewModel.swift` / `AgentTriggerSettingsView.swift` | 两级触发器设置：一级展示已安装 package 行（左侧 name + description，右侧"N 个自动化 >"进入二级），二级顶部展示 name + description，并按 `providerKind` 渲染表单管理"自动化"（`AgentTriggerInstance`）。Chrome Bookmarks 详情页显示扩展连接状态：先检查 Native Messaging Host manifest/helper 和当前 `bridge.json`，再读取 helper 写入的 `status.json`，只有不早于当前 bridge 的 connected 状态才视为正在监听；新增表单读取 `folders.json` 展示 Chrome 收藏夹文件夹树，用户只看到文件夹名称、层级和内部数量，保存时写入内部 folderIds 和实例级 `promptTemplate`，提示词可使用 `{{url}}`、`{{title}}`、`{{folderId}}` 等事件字段，内置默认值会带上收藏标题和 URL；System Clock 保持时间点与时区配置。内置 manifest 与 `ensureBuiltinPackagesInstalled` 由 `AgentTriggerStore` 提供，启动期由 `AppServices` 在 runtime reload 之前调用以确保首次启动直接可见 |
 | `AppendPromptSettingsViewModel.swift` / `AppendPromptSettingsView.swift` | 管理 Append Prompt manifest；写入 `~/.spotAgent/actions/append-prompts/action.json`，prompt 不包含参数字段 |
 | `MCPSettingsViewModel.swift` / `MCPSettingsView.swift` | 直接读写 `~/.spotAgent/mcp.json` 的 stdio / streamableHttp server 列表 |
 | `PermissionRulesViewModel.swift` / `PermissionRulesView.swift` | 直接读写 `~/.spotAgent/permissions.json`，展示永久规则并支持撤销 |
 | `ShortcutSettingsView.swift` | 快捷键配置 UI；固定系统入口全局快捷键、应用内快捷键（会话窗口）和 manifest `ActionDefinition` 派生的 Action 快捷键 |
-| `WorkspaceSettingsViewModel.swift` / `WorkspaceSettingsView.swift` | 直接读写 `~/.spotAgent/workspaces.json` |
+| `PetSettingsViewModel.swift` / `PetSettingsView.swift` | 通过 SwiftThreadClient 向后端查询 / 创建 / 更新 Pet，不写本地宠配置文件 |
 | `SettingsStyles.swift` | `SettingsTab` / `SettingsTabBar`，以及 Settings 对 Common 组件的薄包装或 typealias（`SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor` / `SettingsActionButton` / `SettingsEmptyState` / `SettingsErrorFooter` / `SettingsPage` 等） |
 | `SettingsTextHelpers.swift` | 设置页共用字符串 trim / identifier helper |
 
@@ -26,7 +26,7 @@
 ```
 Coordinator.send(.openSettings)
   └─ SettingsLifecycle.openOrFocus(...)
-       └─ SettingsView(settingsViewModel:, appearanceViewModel:, toolSettingsViewModel:, appendPromptSettingsViewModel:, mcpSettingsViewModel:, permissionRulesViewModel:, shortcutActions:, workspaceViewModel:)
+       └─ SettingsView(settingsViewModel:, appearanceViewModel:, toolSettingsViewModel:, appendPromptSettingsViewModel:, mcpSettingsViewModel:, permissionRulesViewModel:, shortcutActions:, petViewModel:)
             ├─ AgentSettingsView        → ~/.spotAgent/settings.json
             ├─ AppearanceSettingsView   → settings.json + theme.changed
             ├─ ToolSettingsView         → builtin-features.json + settings.json tools
@@ -35,19 +35,21 @@ Coordinator.send(.openSettings)
             ├─ MCPSettingsView          → ~/.spotAgent/mcp.json
             ├─ PermissionRulesView      → ~/.spotAgent/permissions.json
             ├─ ShortcutSettingsView     → KeyboardShortcuts UserDefaults
-            └─ WorkspaceSettingsView    → ~/.spotAgent/workspaces.json
+            └─ PetSettingsView          → /api/thread Pet 管理命令
 ```
 
 Append Prompt 只定义 trigger/title/description/template/globalShortcut。PromptPanel 选择后会追加 chip，提交时以 `skill` Input Item 进入 `UserInput.items`；Settings 不创建参数声明、运行期类型或 MCP 绑定字段。
 
-工具页的两个内置功能默认关闭，选择经 [BuiltinFeatureSettingsStore](../AppServices/AgentSettings/agent-settings.md) 保存后立即生效。Context History 开关同时控制采集和工具入口；状态显示等待首次采样、最近采样或明确失败，不提供“停止采集但单独保留查询”的第二开关。关闭设置窗口不改变功能启用状态。
+Context History 随宿主常驻采集；工具页只展示真实最近采样 / 权限或采集失败。Automation 独立默认关闭，经 [BuiltinFeatureSettingsStore](../AppServices/AgentSettings/agent-settings.md) 保存后立即生效。默认历史工具与 file.read 不提供禁用入口。
+
+Pet 表单持有未保存草稿，失败 / revision 冲突时保留字段。创建可指定固定 rootPath；编辑只显示目录，名称与图像即时生效，角色提示仅新 Thread 使用。图片先导入后端受管 Blob，成功后引用 imageRef；预览走只读 Blob HTTP，内置图复用打包的八千代首帧。显示 / 隐藏经 Electron command 回执，不改业务身份。
 
 ## 编辑此目录的约束
 
 - **Settings UI 优先使用 Common**：所有表单输入走 `SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor`，页级容器走 `SettingsPage`，动作按钮走 `SettingsActionButton`（role: `primary` / `secondary` / `destructive`），表单底部动作区走 `SettingsFormActions`，错误提示走 `SettingsErrorFooter`，空状态走 `SettingsEmptyState`。这些 Settings 类型应是 Common 的薄包装或 typealias；不要在 Settings 内复制 Common 已覆盖的绘制逻辑。
 - **主题安全**：Common / Settings 组件统一消费 `@Environment(\.appTheme)`，确保 light / dark 下 placeholder、输入内容、强调与危险操作可读。输入 placeholder 由 Common overlay 真实渲染，不只依赖 macOS 原生 `TextField(prompt:)` 着色。
 - **SwiftLint 约束**：仓库根 `.swiftlint.yml` 只对 `apps/desktop/Sources/Settings` 与 `apps/desktop/Sources/AppServices/AgentSettings` 启用，并强制裸输入、硬编码颜色和常见裸动作按钮约束（`SettingsStyles.swift` 在 `excluded` 内）。脚本入口 `bash ./scripts/swiftlint.sh` 通过 SwiftPM `SwiftLintCommandPlugin` 运行，并被 `scripts/test.sh` 在其他检查之前调用。
-- **ViewModel 是配置代理层**：模型和 Agent builtin tool 使用 `AgentSettingsStore`；内置功能使用 `BuiltinFeatureSettingsStore`，只观察模块公开的采集状态；Append Prompt / MCP / 权限 / Workspace 代理各自共享 JSON 文件。
+- **ViewModel 是配置代理层**：模型和 Agent builtin tool 使用 `AgentSettingsStore`；内置功能使用 `BuiltinFeatureSettingsStore`，只观察模块公开的采集状态；Append Prompt / MCP / 权限代理各自共享 JSON 文件；Pet 配置代理后端 PetRegistry。
 - **AgentTrigger 独立于现有手动 trigger**：Settings 里的 AgentTrigger 页只服务后台自动触发能力，不复用 Append Prompt 的 package 目录、配置语义或提交流程。
 - **AgentTrigger 表单错误生命周期**：保存失败时保留表单及错误；取消或收起时，局部字段和 ViewModel 的本次错误必须一起重置，不写入已有 Instance 或重载 runtime。错误仍由 ViewModel 单独持有。
 - **写入时统一 trim**：所有字符串字段在 setter 或创建入口中 trim。

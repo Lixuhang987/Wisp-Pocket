@@ -1,3 +1,4 @@
+import type { PetWindowCollection } from "./windows/petWindowCollection.js";
 import type { Rectangle } from "electron";
 import type { ActivityWindowController } from "./windows/activityWindowController.js";
 
@@ -8,12 +9,15 @@ type IpcMain = {
   removeListener(channel: string, listener: IpcListener): unknown;
 };
 
-export function registerPetWindowIpc(ipcMain: IpcMain, controller: ActivityWindowController): () => void {
+export function registerPetWindowIpc(ipcMain: IpcMain, source: ActivityWindowController | PetWindowCollection): () => void {
+  let controller: Pick<ActivityWindowController, "setLayout" | "setInteractiveRegions" | "beginMove" | "move" | "endMove">;
+  let sender: unknown;
   const listeners: Array<[string, IpcListener]> = [];
   const register = (channel: string, receive: (...args: unknown[]) => void): void => {
     const listener: IpcListener = (event, ...args) => {
-      const current = controller.currentWebContents();
-      if (current === null || event.sender !== current) return;
+      const matched = "controllerForSender" in source ? source.controllerForSender(event.sender) : source.currentWebContents() === event.sender ? source : undefined;
+      if (!matched) return;
+      controller = matched; sender = event.sender;
       receive(...args);
     };
     listeners.push([channel, listener]);
@@ -31,6 +35,8 @@ export function registerPetWindowIpc(ipcMain: IpcMain, controller: ActivityWindo
   register("pet-window:begin-move", (...args) => { if (args.length === 0) controller.beginMove(); });
   register("pet-window:move", (...args) => { if (args.length === 0) controller.move(); });
   register("pet-window:end-move", (...args) => { if (args.length === 0) controller.endMove(); });
+  register("pet-window:hide", (...args) => { if (args.length===0 && "petIdForSender" in source) { const id=source.petIdForSender(sender); if(id)void source.hidePet(id); } });
+  register("pet-window:receiving", (...args) => { if(args.length===1 && typeof args[0]==="boolean" && "petIdForSender" in source) { const id=source.petIdForSender(sender);if(id)source.setReceiving(id,args[0]); } });
   return () => {
     for (const [channel, listener] of listeners) ipcMain.removeListener(channel, listener);
   };

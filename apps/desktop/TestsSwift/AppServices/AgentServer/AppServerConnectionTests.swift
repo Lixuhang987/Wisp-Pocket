@@ -213,6 +213,7 @@ final class SwiftThreadClientTests: XCTestCase {
         let start = transport.tasks[0].sentObjects[0]
         XCTAssertEqual(start["type"] as? String, "thread.start")
         let startPayload = start["payload"] as? [String: Any]
+        XCTAssertEqual(startPayload?["petId"] as? String, "pet-test")
         let dynamicTools = startPayload?["dynamicTools"] as? [[String: Any]]
         XCTAssertEqual(dynamicTools?.count, 9)
         XCTAssertTrue(dynamicTools?.contains { $0["name"] as? String == "screen_capture" } == true)
@@ -240,6 +241,71 @@ final class SwiftThreadClientTests: XCTestCase {
         XCTAssertEqual(op?["type"] as? String, "user_input")
     }
 
+    func testPromptPanelResolvesDefaultPetBeforeStartingThread() async throws {
+        let transport = RecordingAppServerConnectionTransport()
+        let connection = AppServerConnection(serverURL: URL(string: "ws://127.0.0.1:4317/api/thread")!, transport: transport)
+        let client = SwiftThreadClient(connection: connection)
+        client.connect()
+        let task = Task { try await client.submitInitialPrompt(PromptSubmission(
+            userInput: PromptUserInput(items: [.image(id: "capture", mimeType: "image/png", base64: "capture-bytes")]), summary: "截图")) }
+        await Task.yield()
+        let list = transport.tasks[0].sentObjects[0]
+        XCTAssertEqual(list["type"] as? String, "pet.list")
+        transport.tasks[0].succeedReceive(String(decoding: try JSONSerialization.data(withJSONObject: [
+            "type": "pet.listed", "commandId": list["commandId"]!, "payload": ["pets": [[
+                "id": "default-pet", "name": "默认", "description": "", "rolePrompt": "协助", "revision": 1,
+                "imageRef": ["type": "builtin", "id": "yachiyo"], "rootPath": "/tmp/default", "isDefault": true
+            ]]]
+        ]), as: UTF8.self))
+        for _ in 0..<20 where transport.tasks[0].sentObjects.count < 2 { await Task.yield() }
+        let start = try XCTUnwrap(transport.tasks[0].sentObjects.last)
+        XCTAssertEqual(start["type"] as? String, "thread.start")
+        XCTAssertEqual((start["payload"] as? [String: Any])?["petId"] as? String, "default-pet")
+        transport.tasks[0].succeedReceive(String(decoding: try JSONSerialization.data(withJSONObject: [
+            "type": "thread.started", "commandId": start["commandId"]!, "threadId": "thread-default"
+        ]), as: UTF8.self))
+        let id = try await task.value
+        XCTAssertEqual(id, "thread-default")
+        let op = ((transport.tasks[0].sentObjects.last?["payload"] as? [String: Any])?["op"] as? [String: Any])
+        let input = op?["payload"] as? [String: Any]
+        XCTAssertEqual((input?["items"] as? [[String: Any]])?.first?["base64"] as? String, "capture-bytes")
+    }
+
+    func testPetSettingsQueriesBackendAndConflictPreservesDraft() async throws {
+        let transport = RecordingAppServerConnectionTransport()
+        let connection = AppServerConnection(serverURL: URL(string: "ws://127.0.0.1:4317/api/thread")!, transport: transport)
+        let client = SwiftThreadClient(connection: connection)
+        client.connect()
+        let model = PetSettingsViewModel(client: client)
+        let load = Task { await model.reload() }
+        await Task.yield()
+        let list = transport.tasks[0].sentObjects[0]
+        XCTAssertEqual(list["type"] as? String, "pet.list")
+        let pet: [String: Any] = ["id": "pet-1", "name": "伙伴", "description": "", "rolePrompt": "协助写作", "revision": 1,
+                                "imageRef": ["type": "builtin", "id": "yachiyo"], "rootPath": "/tmp/notes", "isDefault": true]
+        transport.tasks[0].succeedReceive(String(decoding: try JSONSerialization.data(withJSONObject: [
+            "type": "pet.listed", "commandId": list["commandId"]!, "payload": ["pets": [pet]]
+        ]), as: UTF8.self))
+        await load.value
+        model.beginEditing(try XCTUnwrap(model.pets.first))
+        model.name = "新名字"
+        let save = Task { await model.save() }
+        await Task.yield()
+        let update = transport.tasks[0].sentObjects[1]
+        XCTAssertEqual(update["type"] as? String, "pet.update")
+        let payload = try XCTUnwrap(update["payload"] as? [String: Any])
+        XCTAssertEqual(payload["expectedRevision"] as? Int, 1)
+        XCTAssertNil((payload["patch"] as? [String: Any])?["rootPath"])
+        transport.tasks[0].succeedReceive(String(decoding: try JSONSerialization.data(withJSONObject: [
+            "type": "pet.error", "commandId": update["commandId"]!,
+            "payload": ["code": "conflict", "message": "配置已更新，请重新载入", "currentRevision": 2]
+        ]), as: UTF8.self))
+        await save.value
+        XCTAssertEqual(model.name, "新名字")
+        XCTAssertTrue(model.isEditing)
+        XCTAssertTrue(model.errorMessage?.contains("配置已更新") == true)
+    }
+
     func testSubmitInitialPromptIncludesBuiltinDynamicToolsFromProvider() async throws {
         let transport = RecordingAppServerConnectionTransport()
         let connection = AppServerConnection(
@@ -252,8 +318,8 @@ final class SwiftThreadClientTests: XCTestCase {
             dynamicToolsProvider: {
                 MacHostDynamicTools.toolSpecs + [[
                     "clientId": "swift-host",
-                    "namespace": "context_history",
-                    "name": "activity_index",
+                    "namespace": "automation",
+                    "name": "list",
                     "description": "Read the activity index.",
                     "inputSchema": ["type": "object"],
                 ]]
@@ -268,10 +334,11 @@ final class SwiftThreadClientTests: XCTestCase {
 
         let start = transport.tasks[0].sentObjects[0]
         let startPayload = start["payload"] as? [String: Any]
+        XCTAssertEqual(startPayload?["petId"] as? String, "pet-test")
         let dynamicTools = startPayload?["dynamicTools"] as? [[String: Any]]
         XCTAssertEqual(dynamicTools?.count, 10)
         XCTAssertTrue(dynamicTools?.contains {
-            $0["namespace"] as? String == "context_history" && $0["name"] as? String == "activity_index"
+            $0["namespace"] as? String == "automation" && $0["name"] as? String == "list"
         } == true)
 
         transport.tasks[0].succeedReceive(
@@ -294,7 +361,8 @@ final class SwiftThreadClientTests: XCTestCase {
 private func makePromptSubmission(_ text: String) -> PromptSubmission {
     PromptSubmission(
         userInput: PromptUserInput(items: [.text(id: "text-1", text: text)]),
-        summary: text
+        summary: text,
+        targetPetId: "pet-test"
     )
 }
 

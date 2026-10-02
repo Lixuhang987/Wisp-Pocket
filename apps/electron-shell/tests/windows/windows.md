@@ -7,6 +7,7 @@
 | 文件 | 覆盖对象 |
 |------|------|
 | `../use-cases/thread-window-commands.test.ts` | hidden ThreadWindow prepare、load failure、initial prompt 注入、show/focus 和 close 主路径 |
+| `../use-cases/multi-pet-window.test.ts` | 五窗独立、隐藏延后回收、Permission 召回和两 sender 的 IPC 隔离 |
 | `activityWindowController.test.ts` | 桌宠主题初值/后续更新、并发加载、加载中关闭和 renderer crash 边界 |
 
 ## 测试前提

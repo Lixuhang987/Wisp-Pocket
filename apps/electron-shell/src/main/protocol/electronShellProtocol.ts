@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export type InitialPromptPayload = {
   clientRequestId: string;
+  petId?: string;
   userInput: UserInput;
 };
 
@@ -53,6 +54,7 @@ export type SwiftToElectronCommand =
   | OpenInitialPromptCommand
   | OpenHistoryCommand
   | FocusThreadWindowCommand
+  | { channel:"electron_shell"; type:"pet.show"|"pet.hide"; commandId:string; petId:string }
   | ShowActivityWindowCommand
   | ThemeChangedCommand
   | ShutdownCommand;
@@ -178,6 +180,7 @@ const SwiftToElectronCommandSchema = z.discriminatedUnion("type", [
     type: z.literal("thread_window.open_initial_prompt"),
     payload: z.object({
       clientRequestId: z.string(),
+      petId: z.string().optional(),
       userInput: UserInputSchema,
     }),
   }),
@@ -191,6 +194,8 @@ const SwiftToElectronCommandSchema = z.discriminatedUnion("type", [
   BaseCommandSchema.extend({
     type: z.literal("activity_window.show"),
   }),
+  BaseCommandSchema.extend({type:z.literal("pet.show"),petId:z.string().min(1)}),
+  BaseCommandSchema.extend({type:z.literal("pet.hide"),petId:z.string().min(1)}),
   BaseCommandSchema.extend({
     type: z.literal("theme.changed"),
     theme: HostThemeSchema,

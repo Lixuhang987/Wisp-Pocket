@@ -84,7 +84,8 @@ final class AgentTriggerStoreTests: XCTestCase {
             config: ["scheduleAt": .stringList(["09:00"])],
             promptTemplate: "Keep me.",
             deliveryPolicy: .default,
-            notificationPolicy: .default
+            notificationPolicy: .default,
+                targetPetId: "pet-test"
         )
         let removed = AgentTriggerInstance(
             id: "to-remove",
@@ -94,7 +95,8 @@ final class AgentTriggerStoreTests: XCTestCase {
             config: ["scheduleAt": .stringList(["10:00"])],
             promptTemplate: "Drop me.",
             deliveryPolicy: .default,
-            notificationPolicy: .default
+            notificationPolicy: .default,
+                targetPetId: "pet-test"
         )
         XCTAssertTrue(store.saveInstances([kept, removed]))
 
@@ -119,7 +121,8 @@ final class AgentTriggerStoreTests: XCTestCase {
                 ],
                 promptTemplate: "Summarize this bookmark.",
                 deliveryPolicy: .default,
-                notificationPolicy: .default
+                notificationPolicy: .default,
+                targetPetId: "pet-test"
             ),
             AgentTriggerInstance(
                 id: "daily-study",
@@ -132,7 +135,8 @@ final class AgentTriggerStoreTests: XCTestCase {
                 ],
                 promptTemplate: "Start the daily study routine.",
                 deliveryPolicy: .default,
-                notificationPolicy: .default
+                notificationPolicy: .default,
+                targetPetId: "pet-test"
             ),
         ]
 

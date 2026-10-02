@@ -4,9 +4,14 @@ struct AgentTriggerInstancesFile: Codable, Equatable {
     var instances: [AgentTriggerInstance]
 }
 
+@Observable
 @MainActor
 final class AgentTriggerStore {
     private(set) var saveErrorMessage: String?
+    private(set) var deliveryErrorMessage: String?
+
+    func recordDeliveryFailure(_ message: String) { deliveryErrorMessage = message }
+
 
     @ObservationIgnored private let fileManager: FileManager
     @ObservationIgnored private let homeDirectoryURL: URL

@@ -1,7 +1,7 @@
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HistorySidebar } from "./components/HistorySidebar.tsx";
-import { ThreadWorkspacePane } from "./components/ThreadWorkspacePane.tsx";
+import { ThreadPetPane } from "./components/ThreadPetPane.tsx";
 import { openHistoryThread } from "./history/openHistoryThread.ts";
 import {
   getThreadWebSocketURL,
@@ -13,7 +13,6 @@ import {
   encodePermissionAnswer,
   encodeThreadDelete,
   encodeThreadStart,
-  encodeWorkspaceAnswer,
 } from "./protocol/threadProtocol.ts";
 import { createThreadWindowStore } from "./store/threadWindowStore.ts";
 import { ThreadSocketClient } from "./thread/threadSocketClient.ts";
@@ -113,7 +112,7 @@ export function App() {
 
     pendingSelectionCommandsRef.current.add(commandId);
     try {
-      client.sendRaw(encodeThreadStart({ commandId, timestamp, workspaceId: null }));
+      client.sendRaw(encodeThreadStart({ commandId, timestamp, petId: createThreadWindowStore.getState().pets.find(pet => pet.isDefault)?.id ?? "" }));
     } catch (error) {
       pendingSelectionCommandsRef.current.delete(commandId);
       throw error;
@@ -136,7 +135,7 @@ export function App() {
         />
       ) : null}
       <section className="relative min-h-0 min-w-0 overflow-hidden">
-        <ThreadWorkspacePane
+        <ThreadPetPane
           threadId={activeThreadId}
           onSubmit={(threadId, userInput) => {
             inputControllerRef.current?.submitComposerInput(threadId, userInput);
@@ -161,13 +160,7 @@ export function App() {
               scope,
             }));
           }}
-          onAnswerWorkspace={(requestId, workspaceId) => {
-            clientRef.current?.sendRaw(encodeWorkspaceAnswer({
-              requestId,
-              timestamp: now(),
-              ...(workspaceId ? { workspaceId } : { cancelled: true }),
-            }));
-          }}
+
         />
         <AlertDialog.Root
           open={deleteTargetThreadId !== null}

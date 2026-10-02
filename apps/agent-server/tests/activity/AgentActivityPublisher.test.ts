@@ -480,19 +480,8 @@ describe("AgentActivityPublisher", () => {
         arguments: { path: "a.txt" },
       },
     });
-    publisher.observe({
-      type: "workspace.requested",
-      requestId: "thread-2:tool-2",
-      threadId: "thread-2",
-      timestamp: "2026-06-08T00:00:01.000Z",
-      payload: {
-        toolCallId: "tool-2",
-        prompt: "请选择 workspace",
-        candidates: [],
-      },
-    });
 
-    expect(events.at(-2)).toMatchObject({
+    expect(events.at(-1)).toMatchObject({
       type: "activity.changed",
       activeThreadId: "thread-1",
       status: "waiting",
@@ -500,14 +489,7 @@ describe("AgentActivityPublisher", () => {
       waitingRequest: "permission",
       error: null,
     });
-    expect(events.at(-1)).toMatchObject({
-      type: "activity.changed",
-      activeThreadId: "thread-2",
-      status: "waiting",
-      latestSummary: "等待工作区选择",
-      waitingRequest: "workspace",
-      error: null,
-    });
+
   });
 
   it("broadcasts changes to all current subscribers and stops sending to detached subscribers", () => {

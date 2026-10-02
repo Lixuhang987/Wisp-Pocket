@@ -91,7 +91,8 @@ final class ChromeBookmarksAgentTriggerProviderTests: XCTestCase {
             config: ["folderIds": .stringList(folderIds)],
             promptTemplate: "Summarize {{url}}",
             deliveryPolicy: .default,
-            notificationPolicy: .default
+            notificationPolicy: .default,
+                targetPetId: "pet-test"
         )
     }
 

@@ -1,19 +1,19 @@
 # 内置功能实机验收步骤
 
-对应 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)。本文件提供可重复操作步骤，待验收状态放在 [manual-qa](../manual-qa.md)；只有真实桌面、工具响应与持久化证据共同支持时才归档通过项。系统权限、环境阻塞和测试工具限制须与产品缺陷区分。
+初始对应 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)，Context History 步骤已按 Issue #6 更新；原 CH1–CH5 归档证据仅适用于原构建。本文件提供可重复操作步骤，待验收状态放在 [manual-qa](../manual-qa.md)；只有真实桌面、工具响应与持久化证据共同支持时才归档通过项。系统权限、环境阻塞和测试工具限制须与产品缺陷区分。
 
 ## 环境与证据
 
 - 使用本次 worktree 的最终构建，记录分支、commit/diff、macOS、bundle 路径、签名、进程、端口及屏幕录制/辅助功能/事件监听权限。基线与打包命令见 [开发说明](../dev.md)。
 - 通过 `HANDAGENT_HOST_DATA_HOME` 隔离内置配置和业务数据；其他设置与 Thread 数据不会一起重定向。使用可撤销的测试窗口、文本和流程，保留原环境状态以便恢复。
-- 工具必须走实际 Swift Dynamic Tool Provider；测试辅助客户端应记录请求入口、callId 与响应。图片还需确认模型消费或 UI 能读取真实内容，不能只看磁盘有文件。
+- 实时宿主 / Automation 工具走实际 Swift Dynamic Tool Provider，历史查询走 agent-server 普通工具读取 Swift 已存记录；测试辅助客户端记录实际入口、调用标识与响应。图片还需确认模型消费或 UI 能读取真实内容，不能只看磁盘有文件。
 - 每个编号记录日期、环境、输入动作、工具结果、可见 UI、文件/进程证据及结论。通过项由 project-live-qa 归档脚本从 manual-qa 移出；未执行或证据不足的项保留待验证。
 
-## CH1：默认关闭与配置持久化
+## CH1：常驻采集与独立 Automation 配置
 
-1. 在全新的内置数据 home 启动应用，打开 Settings → 工具，确认两个开关关闭，没有开始采集，原生工具仍可用。
-2. 启用 Context History 与 Automation，确认配置文件保存两个选择，界面可见等待采样/采样状态；通过连接声明或新建 Thread 核对 `context_history.*`、`automation.*` 工具可见。
-3. 退出并重新启动同一数据 home，确认两个选择仍启用。声明变化不应使已在途的另一模块调用误报 offline；既有 Thread 的 metadata 不要求自动改写。
+1. 在全新的内置数据 home 启动应用，打开 Settings → 工具，确认 Context History 无开关且开始采集或展示真实权限失败，Automation 默认关闭。
+2. 启用 Automation，确认仅保存其启用选择。新建 Thread 首轮直接可见四个 context_history 工具，激活其他工具后仍保留；automation 工具沿既有激活路径。
+3. 退出再启动同一数据 home，确认采集自动恢复、Automation 选择保留；断开 Swift Provider 后已有历史仍可查询。声明刷新不应误断在途调用。
 
 ## CH2：变化、周期与定期截图
 
@@ -23,21 +23,21 @@
 
 ## CH3：分层查询与图片可读性
 
-1. 调用 `context_history.activity_index`，核对轻量样本 id、时间、app/window、thumbnailId 和 collection 状态；不包含完整 AX 或原图。
+1. 调用 `context_history.activity_index`，核对轻量样本 id、时间、app/window、thumbnailId；实时采集状态只在 Swift 设置中核对；不包含完整 AX 或原图。
 2. 按多个样本 id 调用 `sample_details`，读取实际 AX 内容并与所观察窗口核对。
 3. 调用 `thumbnails`，按返回截图 id 调用 `screenshot_original`；解码工具返回的图片，检查尺寸、内容、时间及样本关联，并验证消费方实际收到图片。
 4. 对隔离数据副本制造缺失/损坏证据或提交无效 id，确认明确失败；权限不足和采集失败从状态可定位，不能把空数组当作采集正常。
 
 ## CH4：关闭窗口后继续采集
 
-1. 保持采集启用，关闭 Settings 和所有可见 ThreadWindow，确认 Swift Host 仍在运行。
+1. 保持应用运行，关闭 Settings 和所有可见 ThreadWindow，确认 Swift Host 仍在运行。
 2. 切换受控前台窗口并等待周期/截图间隔，重新打开窗口经工具查询，确认关闭窗口期间仍有新样本与图片。
 
-## CH5：禁用、退出与重启
+## CH5：权限失败、退出与重启
 
-1. 禁用 Context History，记录文件计数、时间戳或 hash，等待超过采样/截图间隔；确认没有新写入，旧 Thread 调用该模块返回禁用失败。
-2. 重新启用后完全退出 Wisp Pocket，确认本次宿主与相关任务/监听结束，数据不再增长；不能只关闭窗口代替退出。
-3. 再次启动同一数据 home，确认保存的选择被遵守，经真实工具仍可读取退出前样本和图片；最后恢复本次验证修改的开关。
+1. 在可恢复的系统权限环境验证辅助功能 / 屏幕录制失败，设置显示具体原因；查询旧历史仍成功，授予权限后后续采样恢复。记录权限变化与恢复证据。
+2. 完全退出 Wisp Pocket，确认本次宿主与相关任务/监听结束，数据不再增长；不能只关闭窗口代替退出。
+3. 再次启动同一数据 home，确认采集自动开始，经默认历史工具仍可读取退出前样本和图片；最后恢复本次验证修改的权限和 Automation 开关。
 
 ## AU1：跨调用录制与保存
 

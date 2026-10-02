@@ -22,6 +22,6 @@
 
 ## 修改边界
 
-- 本桥只连接 `/api/dynamic-tools`。Permission/Workspace 经 `/api/thread` 和 core Thread 的 ServerRequest/ClientResponse 处理，接入见 [thread](../thread/thread.md)。
+- 本桥只连接 `/api/dynamic-tools`。Permission 经 `/api/thread` 和 core Thread 的 ServerRequest/ClientResponse 处理，接入见 [thread](../thread/thread.md)。
 - socket 身份与声明刷新见 [server](../server/server.md)；字段以 [core protocol](../../../../packages/core/src/protocol/protocol.md) 为准。
 - 新增 Provider 路由必须保持 token 隔离；验证入口见 [bridge 测试](../../tests/bridges/bridges.md) 与 [主路径用例](../../tests/use-cases/use-cases.md)。

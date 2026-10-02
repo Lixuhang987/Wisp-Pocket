@@ -9,16 +9,4 @@ export type PermissionAnsweredResponse = {
   };
 };
 
-export type WorkspaceAnsweredResponse = {
-  type: "workspace.answered";
-  requestId: string;
-  timestamp: string;
-  payload: {
-    workspaceId?: string;
-    cancelled?: boolean;
-  };
-};
-
-export type ClientResponse =
-  | PermissionAnsweredResponse
-  | WorkspaceAnsweredResponse;
+export type ClientResponse = PermissionAnsweredResponse;

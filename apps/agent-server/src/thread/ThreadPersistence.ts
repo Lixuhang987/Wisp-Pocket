@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { ThreadNotFoundError } from "@handagent/core/thread/ThreadRegistry.ts";
 import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
 import { FilesystemBlobStore } from "@handagent/core/adapters/filesystem/FilesystemBlobStore.ts";
@@ -24,7 +26,8 @@ import {
 
 export type CreatePersistedThreadInput = {
   preview?: string | null;
-  workspaceId?: string | null;
+  petId: string;
+  commandId?: string;
   dynamicTools?: DynamicToolSpec[];
 };
 
@@ -37,12 +40,14 @@ export class ThreadPersistence {
     private readonly blobStore: BlobStore = new FilesystemBlobStore(),
   ) {}
 
-  async createThread(input: CreatePersistedThreadInput = {}): Promise<PersistedThread> {
-    const id = generateThreadId();
+  async createThread(input: CreatePersistedThreadInput): Promise<PersistedThread> {
+    const id = input.commandId ? `thread-${createHash("sha256").update(input.commandId).digest("hex")}` : generateThreadId();
+    const existing = await this.getThread(id);
+    if (existing) { if (existing.metadata.petId !== input.petId) throw new Error("commandId already belongs to another Pet"); return existing; }
     const current = await this.createCurrentThread({
       threadId: id,
       preview: input.preview,
-      workspaceId: input.workspaceId,
+      petId: input.petId,
       dynamicTools: input.dynamicTools,
       timestamp: this.now(),
       threadSource: "user",
@@ -95,7 +100,6 @@ export class ThreadPersistence {
       ...(messageId ? { id: messageId } : {}),
       content: await composeUserInputContent(savedInput, this.blobStore),
       inputItems: savedInput.items,
-      ...(savedInput.mode ? { inputMode: savedInput.mode } : {}),
     };
     await this.appendAndPersist(threadId, [
       { kind: "response_item", payload: userMessage },
@@ -246,7 +250,9 @@ export class ThreadPersistence {
   }
 
   private async createCurrentThread(params: CreateThreadParams): Promise<CurrentThread> {
-    return unwrap(await CurrentThread.create(this.store, params));
+    const result = await CurrentThread.create(this.store, params);
+    if (!result.ok && result.error.code === "thread_not_found") throw new ThreadNotFoundError(params.threadId);
+    return unwrap(result);
   }
 
   private async requireThread(threadId: string): Promise<PersistedThread> {

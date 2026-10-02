@@ -308,8 +308,8 @@ describe("AgentRuntime", () => {
     const events: unknown[] = [];
     const toolCalls = [
       {
-        id: "call-workspace",
-        name: "workspace.list",
+        id: "call-list",
+        name: "test.list",
         arguments: {},
       },
       {
@@ -324,7 +324,7 @@ describe("AgentRuntime", () => {
         const lastMessage = messages[messages.length - 1];
         if (lastMessage.role === "user") {
           return {
-            message: { role: "assistant" as const, content: "我会读取workspace 和文件。" },
+            message: { role: "assistant" as const, content: "我会列出资料并读取文件。" },
             toolCalls,
           };
         }
@@ -338,7 +338,7 @@ describe("AgentRuntime", () => {
     const runtime = new AgentRuntime(
       client,
       new ToolRegistry([
-        new NamedResultTool("workspace.list", [{ id: "ws-1", name: "Workspace" }]),
+        new NamedResultTool("test.list", [{ id: "document-1", name: "Document" }]),
         new NamedResultTool("file.read", { content: "file text" }),
       ]),
     );
@@ -353,14 +353,14 @@ describe("AgentRuntime", () => {
       {
         role: "assistant",
         id: "assistant-1",
-        content: "我会读取workspace 和文件。",
+        content: "我会列出资料并读取文件。",
         toolCalls,
       },
       {
         role: "tool",
-        toolCallId: "call-workspace",
-        name: "workspace.list",
-        content: JSON.stringify([{ id: "ws-1", name: "Workspace" }]),
+        toolCallId: "call-list",
+        name: "test.list",
+        content: JSON.stringify([{ id: "document-1", name: "Document" }]),
       },
       {
         role: "tool",
@@ -378,7 +378,7 @@ describe("AgentRuntime", () => {
       {
         type: "assistant_message_delta",
         messageId: "assistant-1",
-        payload: { text: "我会读取workspace 和文件。" },
+        payload: { text: "我会列出资料并读取文件。" },
       },
       {
         type: "assistant_message_end",
@@ -387,16 +387,16 @@ describe("AgentRuntime", () => {
       },
       {
         type: "tool_call",
-        toolCallId: "call-workspace",
-        toolName: "workspace.list",
+        toolCallId: "call-list",
+        toolName: "test.list",
         input: {},
       },
       {
         type: "tool_result",
-        toolCallId: "call-workspace",
-        toolName: "workspace.list",
+        toolCallId: "call-list",
+        toolName: "test.list",
         status: "success",
-        output: JSON.stringify([{ id: "ws-1", name: "Workspace" }]),
+        output: JSON.stringify([{ id: "document-1", name: "Document" }]),
         durationMs: expect.any(Number),
       },
       {

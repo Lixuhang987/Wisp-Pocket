@@ -22,7 +22,8 @@ final class SystemClockAgentTriggerProviderTests: XCTestCase {
             ],
             promptTemplate: "Run scheduled task",
             deliveryPolicy: .default,
-            notificationPolicy: .default
+            notificationPolicy: .default,
+                targetPetId: "pet-test"
         )
         var emittedEvents: [AgentTriggerEvent] = []
 
@@ -58,7 +59,8 @@ final class SystemClockAgentTriggerProviderTests: XCTestCase {
             ],
             promptTemplate: "Run scheduled task",
             deliveryPolicy: .default,
-            notificationPolicy: .default
+            notificationPolicy: .default,
+                targetPetId: "pet-test"
         )
 
         try provider.start(instances: [instance]) { _ in }
