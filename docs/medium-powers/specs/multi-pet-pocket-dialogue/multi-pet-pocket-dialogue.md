@@ -2,6 +2,8 @@
 
 状态：本地待实现 spec；2026-10-02。仅保存本地，未发布 GitHub Issue，未实现产品能力。用户已确认测试边界；角色 / 文件根快照、归档和图片导入细则是为可执行性补齐的默认决定。
 
+实现前核查发现共享输入设计冲突及未闭合流程，见[澄清清单](./implementation-questions.md)；其中推荐尚待确认，须统一规格后再实施。
+
 ## 问题陈述（Problem Statement）
 
 用户希望自由创建多个有不同角色提示词和图片的桌宠，各自承载多段对话，并在 A「口袋对话」中直接交付资料、回复和找回历史。当前单宠跟随全局最新创建的 Thread，Workspace 承担文件根与历史分组，不能表达“同一文件夹、不同桌宠、各自对话”。只增加角色窗口或把侧栏标题改名，会让首轮输入、角色提示、文件工具和重启恢复继续采用旧归属。
@@ -88,3 +90,4 @@
 - [interaction-and-entrypoints.md](./interaction-and-entrypoints.md)：A 方案与各入口的接收、导航、窗口、故障合约。
 - [acceptance.md](./acceptance.md)：可执行验收场景与实现完成门槛。
 - [evidence-and-routing.md](./evidence-and-routing.md)：调研取舍、当前事实与按模块阅读路由。
+- [implementation-questions.md](./implementation-questions.md)：实现前待确认行为、设计冲突与工程补齐边界。

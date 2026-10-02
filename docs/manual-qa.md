@@ -15,6 +15,8 @@
 - **交互规格修正（2026-10-02）**：移除误采纳的固定消息展开面板；当前 T29 / M05 保留点击唤出并聚焦、常态最新消息、hover 全部当前 Thread 历史、移出回常态且保留焦点 / 草稿。桌宠 surface 补显式基线，根架构与 docs / surface 索引强调先读现有合约再筛选调研；本轮链接 / 一致性 / diff 检查及 TypeScript/Web、Swift test/build 均通过，仅修改文档，不新增实机通过结论。
 - **本次范围收敛（2026-10-02）**：只保留多宠同屏；删除阅读标记及其他前端的界面 / 导航 / 就绪改造要求与相应验收，重新编号为 36 条用户故事、29 项自动化场景和 8 项同屏实机场景。根架构补单后端与独立前端的设计边界，共享协议消费者只做必要适配；本轮链接 / 编号 / 一致性 / diff 检查与 TypeScript/Web、Swift test/build 均通过，仍是文档交付，不新增实机通过结论。
 
+- **实现前澄清核查（2026-10-02）**：新增[澄清清单](./medium-powers/specs/multi-pet-pocket-dialogue/implementation-questions.md)，记录共享输入设计冲突、请求 / pending / 归档阅读 / 键盘验收缺口及尚待确认的默认值；只读子 agent 已核对代码事实；本轮链接 / 编号 / diff 及 TypeScript/Web、Swift test/build 检查通过。仅记录文档核查，不新增产品实机通过结论。
+
 ## 桌宠紧凑交互合并验证（2026-09-15）
 
 - **范围**：在 `.worktrees/merge-pet-compact-20260915` 将 `codex/pet-compact-hover-20260914` 的 `f54d09f` 合入 `main` 基线 `9f0762b`；同步 [PRODUCT.md](./PRODUCT.md)、[桌宠 surface](./surfaces/desktop-pet.md) 与相关索引，移除已完成的桌宠布局待办。
