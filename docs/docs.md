@@ -21,7 +21,7 @@
 - [adr/adr.md](/Users/mu9/proj/handAgent/docs/adr/adr.md)：跨模块架构决策、实现状态与排除范围。
 - [human/human.md](/Users/mu9/proj/handAgent/docs/human/human.md)：面向人工操作和系统能力的补充说明。
 - [research/research.md](./research/research.md)：外部产品与交互研究；区分官方事实、观察和设计建议。
-- [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：历史 spec / plan 集合。
+- [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：待实现规格与历史 spec / plan 集合。
 - [superpowers/superpowers.md](/Users/mu9/proj/handAgent/docs/superpowers/superpowers.md)：历史视觉 / 输入资料资产。
 
 ## 放置规则

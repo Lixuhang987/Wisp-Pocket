@@ -9,6 +9,16 @@
 
 ---
 
+## 多桌宠 A「口袋对话」本地规格（2026-10-02）
+
+- [x] 核对主 checkout 修改、目录文档、领域术语与调研分支；本轮仅写文档，无需 worktree。
+- [x] 对照当前代码筛选调研结论，明确自由创建、角色提示与图片、桌宠直接替代 Workspace 并持有可重复 rootPath、不做跨宠转交的边界。
+- [x] 用户确认复用桌宠入口到真实 Thread/Runtime/SQLite 的测试边界；原生窗口行为另做实机验收。
+- [x] 保存可执行 [spec](./medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)、协议及数据约束和验收场景，更新直接父目录索引。
+- [x] 检查规格链接、需求一致性与 diff，完成 TypeScript/Web、Swift test/build 三项提交前检查；文档交付记录已加入 manual QA，本轮文档随任务提交。
+- [ ] 后续实现须从主 checkout 通过 `scripts/create-worktree.sh` 创建独立 worktree，确认 CodeGraph 索引并跑分层基线，再读目标目录文档、修改代码及验证。
+- [ ] 实现完成后更新 owning 文档，安排不继承上下文的独立子 agent 审核 spec / 代码 / 文档，更新 manual QA，执行三项提交前检查后提交。
+
 ## 全功能实机 QA 与缺陷修复（2026-09-14）
 
 目标为验证当前已实现功能；尚未确认的新设计仍按各自待办推进。本轮从主 checkout 的 `main` 打包与操作，证据保存在 `.cache/live-qa-20260914/`。

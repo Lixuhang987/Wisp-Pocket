@@ -1,9 +1,10 @@
 # specs
 
-本目录保存历史需求和非目标；已落地行为应压缩到 owning 模块文档或 manual QA。
+本目录保存待实现规格、历史需求和非目标；各规格显式标注状态，已落地行为应压缩到 owning 模块文档或 manual QA。
 
 ## 直接子节点
 
+- [multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md](./multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)：待实现的多桌宠 A「口袋对话」本地规格；Pet 直接替代 Workspace、自由创建、角色 / 图片绑定、可重复 rootPath 和按宠分区。
 - `2026-06-24-agenttrigger-thread-path-migration-spec.md`
 - `2026-06-24-chrome-bookmarks-folder-picker-spec.md`
 - `2026-06-24-websearch-tool-spec.md`

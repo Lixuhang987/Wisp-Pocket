@@ -6,6 +6,13 @@
 
 先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
 
+## 多桌宠本地规格文档交付（2026-10-02）
+
+- **状态**：仅完成 [A「口袋对话」本地 spec](./medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)，未实现多宠能力、未发布 Issue。本项记录文档交付，不计为产品实机验收通过。
+- **范围**：自由创建 N 宠，每宠角色提示 / 图片 / rootPath，Pet 直接替代 Workspace；可重复文件根、按 petId 区分 Thread，不做跨宠转交。调研结论按当前用户决定和 main 代码筛选。
+- **本轮验证**：规格链接、父级索引、需求一致性与 diff 检查通过；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均通过。仅修改 Markdown，无新增产品实机结果。
+- **后续验收**：实现后按 spec 的 T01–T31 自动化场景和 M01–M08 实机场景补充证据；现有单宠 QA 仍描述当前实现，不能套用作多宠通过证明。
+
 ## 桌宠紧凑交互合并验证（2026-09-15）
 
 - **范围**：在 `.worktrees/merge-pet-compact-20260915` 将 `codex/pet-compact-hover-20260914` 的 `f54d09f` 合入 `main` 基线 `9f0762b`；同步 [PRODUCT.md](./PRODUCT.md)、[桌宠 surface](./surfaces/desktop-pet.md) 与相关索引，移除已完成的桌宠布局待办。
