@@ -220,10 +220,20 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     fullSocket.connect();
     fullSocket.resumeThread(id);
     cleanups.push(async () => fullSocket.disconnect());
+    const observed: any[] = [];
+    const observer = new EventEmitter() as EventEmitter & { send(data: string): void };
+    observer.send = data => observed.push(JSON.parse(data));
+    attachThreadSocketHandlers(observer, { commandRouter: h.router, eventPublisher: h.publisher, observeRequests: true });
+    cleanups.push(async () => { observer.emit("close"); });
     h.pet.respond("请整理这份资料");
     await until(() => expect(fullView.getState().threadsById[id]?.permissionRequests).toHaveLength(1));
     const requestId = fullView.getState().threadsById[id].permissionRequests[0].id;
     expect(h.pet.store.getState().threadsById[id].permissionRequests[0].id).toBe(requestId);
+    expect(observed.filter(frame => frame.type === "permission.requested")).toHaveLength(1);
+    observer.emit("message", JSON.stringify({ type: "thread.list", commandId: "observer-reconnect", timestamp: "now", payload: { petId: h.petConfig.id } }));
+    await until(() => expect(observed.filter(frame => frame.type === "permission.requested")).toHaveLength(2));
+    observer.emit("message", encodePermissionAnswer({ requestId, decision: "allow", scope: "once", timestamp: new Date().toISOString() }));
+    expect(h.threads.get(id)!.requests.snapshot()).toHaveLength(1);
     expect(calls).toBe(0);
     fullSocket.sendRaw(encodePermissionAnswer({ requestId, decision: "allow", scope: "once", timestamp: new Date().toISOString() }));
     h.pet.answerPermission(requestId, "deny");
@@ -232,6 +242,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     expect(await readFile(executedPath, "utf8")).toBe("CLI completed after user decision");
     expect(fullView.getState().threadsById[id].permissionRequests).toEqual([]);
     expect(h.pet.store.getState().threadsById[id].permissionRequests).toEqual([]);
+    expect(observed.every(frame => ["permission.requested", "thread.listed"].includes(frame.type))).toBe(true);
   });
 
   it("PDF 已读完但本轮未完成时，重启会说明中断，且不会重放已开始的输入", async () => {

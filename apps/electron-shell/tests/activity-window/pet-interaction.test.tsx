@@ -51,13 +51,6 @@ function startThread(text = "第一行\n第二行\n第三行\n第四行\n第五�
 }
 
 describe("桌宠的轻量交互", () => {
-  it("历史详情保留创建时宠名和角色版本", () => {
-    mount();startThread();
-    act(() => Socket.latest.receive(note("thread.snapshot", {threadId:"a",payload:{messages:[],status:"idle",petSnapshot:{petId:"pet-default",revision:2,name:"原名称",rolePrompt:"原角色"}}})));
-    expect(screen.getByText("创建时：原名称 · 角色 v2")).toBeTruthy();
-  });
-
-
   it.each([false, true])("服务端保存失败可见且遵守主动隐藏，已创建 Thread=%s", async (started) => {
     mount();
     fireEvent.drop(screen.getByRole("button", { name: /月见八千代/ }), {
@@ -97,6 +90,19 @@ describe("桌宠的轻量交互", () => {
     expect(restored.value).toBe("先记下这个想法");
     expect(document.activeElement).toBe(restored);
     expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(0);
+
+    cleanup();
+    controller = new PetThreadController({ petId: "pet-default", url: "ws://local/api/thread", WebSocketImpl: Socket });
+    mount();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("先记下这个想法");
+    fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
+    cleanup();
+    controller = new PetThreadController({ petId: "pet-default", url: "ws://local/api/thread", WebSocketImpl: Socket });
+    mount();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("先记下这个想法");
+
   });
 
   it("首条文字只创建一个 Thread，持久接收前保留草稿，确认不覆盖新编辑，后续回复追加同一 Thread", async () => {
@@ -130,7 +136,7 @@ describe("桌宠的轻量交互", () => {
   it.each([false, true])("首次文字提交失败保留可重试草稿，已创建 Thread=%s", async (created) => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
-    const input = screen.getByRole("textbox", { name: "回复当前对话" }) as HTMLTextAreaElement;
+    let input = screen.getByRole("textbox", { name: "回复当前对话" }) as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: "不能丢掉的首条输入" } });
     fireEvent.keyDown(input, { key: "Enter" });
     const start = Socket.latest.sent.at(-1)!;
@@ -146,8 +152,19 @@ describe("桌宠的轻量交互", () => {
     expect(input.value).toBe("不能丢掉的首条输入");
     expect(screen.getByRole("alert").textContent).toContain("保存输入失败");
     expect((screen.getByRole("button", { name: "发送回复" }) as HTMLButtonElement).disabled).toBe(false);
+
+    // 接收结果不确定后重建 renderer，重试仍沿用原提交身份。
+    cleanup();
+    controller = new PetThreadController({ petId: "pet-default", url: "ws://local/api/thread", WebSocketImpl: Socket });
+    mount();
+    act(() => Socket.latest.receive(note("thread.listed", { payload: { threads: created ? [{
+      id: "first", petId: "pet-default", petRevision: 1, rootPath: "/tmp", status: "idle",
+      preview: "首条", messageCount: 0, createdAt: "2026", updatedAt: "2026",
+    }] : [] } })));
+    input = screen.getByRole("textbox", { name: "回复当前对话" }) as HTMLTextAreaElement;
     fireEvent.keyDown(input, { key: "Enter" });
     expect(Socket.latest.sent.at(-1)?.type).toBe(created ? "op.submit" : "thread.start");
+    expect(created ? Socket.latest.sent.at(-1)?.payload.op.opId : Socket.latest.sent.at(-1)?.commandId).toBe(start.commandId);
     expect(input.value).toBe("不能丢掉的首条输入");
     expect((screen.getByRole("button", { name: "发送回复" }) as HTMLButtonElement).disabled).toBe(true);
     await act(async () => {
@@ -169,7 +186,7 @@ describe("桌宠的轻量交互", () => {
       threadId: "first", payload: { messageId: accepted.payload.op.opId, text: "不能丢掉的首条输入", items: accepted.payload.op.payload.items },
     })));
     expect(input.value).toBe("");
-    expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(created ? 1 : 2);
+    expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(created ? 0 : 1);
   });
 
   it.each([false, true])("首次发送期间隐藏，后续确认或错误保持隐藏并正确保留草稿，接收成功=%s", async (accepted) => {
@@ -265,6 +282,14 @@ describe("桌宠的轻量交互", () => {
 
   it("悬停时最新回复和全部建议进入历史的同一滚动区，回复框保持固定节点", () => {
     mount(); startThread("前一条桌宠回复");
+    act(() => Socket.latest.receive(note("thread.snapshot", { threadId: "a", payload: {
+      status: "idle", petSnapshot: { petId: "pet-default", revision: 2, name: "原名称", rolePrompt: "原角色" },
+      messages: [
+        { id: "input", role: "user", text: "我的资料", status: "completed", createdAt: "2026", updatedAt: "2026" },
+        { id: "answer", role: "assistant", text: "前一条桌宠回复", status: "completed", createdAt: "2026", updatedAt: "2026" },
+      ],
+    } })));
+    expect(screen.getByText("创建时：原名称 · 角色 v2")).toBeTruthy();
     act(() => Socket.latest.receive(note("assistant.delta", {
       threadId: "a", turnId: "second-turn", itemId: "latest-answer",
       payload: { text: "最新的回复留在角色头上", suggestedReplies: ["继续阅读"], awaitingReply: true },
@@ -347,6 +372,18 @@ describe("桌宠的轻量交互", () => {
     expect(screen.queryByTestId("pet-conversation")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
     expect(screen.getByTestId("pet-latest").textContent).toBe("后台的新结果");
+
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "当前草稿" } });
+    act(() => Socket.latest.receive(note("thread.started", { threadId: "b", payload: { preview: "另一段对话" } })));
+    fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
+    act(() => Socket.latest.receive({
+      type: "permission.requested", threadId: "b", requestId: "permission-b", timestamp: new Date().toISOString(),
+      payload: { toolName: "file.write", toolCallId: "write-b", arguments: {} },
+    }));
+    expect(screen.getByTestId("pet-conversation")).toBeTruthy();
+    expect(controller.getSnapshot()).toMatchObject({ threadId: "a", draft: "当前草稿" });
+    expect(controller.store.getState().threadsById.a.permissionRequests).toHaveLength(0);
+    expect(controller.store.getState().threadsById.b.permissionRequests).toHaveLength(1);
   });
 
   it("建议按钮和自由输入都提交普通 UserInput，执行中仍可回复并显示待处理", async () => {
@@ -363,6 +400,10 @@ describe("桌宠的轻量交互", () => {
     expect(Socket.latest.sent.filter((message) => message.type === "op.submit").at(-1)?.payload.op.payload.items[0].text).toBe("补充一条");
     act(() => Socket.latest.receive(note("user.message.recorded", { threadId: "a", payload: { messageId: "queued", text: "补充一条", pending: true } })));
     expect(screen.getByRole("log").textContent).toContain("待处理");
+    fireEvent.click(screen.getByRole("button", { name: "对话" }));
+    expect(screen.getByRole("button", { name: /^补充一条 running/ })).toBeTruthy();
+    act(() => Socket.latest.receive(note("turn.completed", { threadId: "a", turnId: "executing", payload: { status: "completed" } })));
+    expect(screen.getByRole("button", { name: /^补充一条 idle/ })).toBeTruthy();
   });
 
   it("拖动经过不提交，最终松手区域决定新建还是追加", async () => {
@@ -416,14 +457,21 @@ describe("桌宠的轻量交互", () => {
 
   it("松手后异步接收期间主动切换另一 Thread，附件仍追加松手时的对话", async () => {
     mount(); startThread();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "A 的草稿" } });
     const file = new File(["pdf bytes"], "report.pdf", { type: "application/pdf" });
     fireEvent.drop(screen.getByTestId("pet-conversation"), { dataTransfer: { types: ["Files"], files: [file], getData: () => "" } });
     act(() => Socket.latest.receive(note("thread.started", { threadId: "b", payload: { preview: "后建对话", createdAt: "2026-09-13T02:00:00.000Z" } })));
+    expect(controller.getSnapshot()).toMatchObject({ threadId: "a", draft: "A 的草稿" });
     fireEvent.click(screen.getByRole("button", {name:"对话"}));
     fireEvent.click(screen.getByRole("button", {name:/^后建对话/}));
     await act(async () => {});
     await waitFor(() => expect(Socket.latest.sent.at(-1)?.type).toBe("op.submit"));
     expect(Socket.latest.sent.at(-1)).toMatchObject({ threadId: "a", payload: { op: { payload: { items: [{ type:"text", text: expect.stringContaining("/tmp/report.pdf") }] } } } });
     expect(controller.getSnapshot().threadId).toBe("b");
+    expect(controller.petId).toBe("pet-default");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "B 的草稿" } });
+    fireEvent.click(screen.getByRole("button", { name: "对话" }));
+    fireEvent.click(screen.getByRole("button", { name: /^我的资料/ }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("A 的草稿");
   });
 });

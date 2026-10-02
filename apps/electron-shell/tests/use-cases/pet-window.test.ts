@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ElectronShellRuntime } from "../../src/main/electronShellRuntime.js";
 import { registerPetWindowIpc } from "../../src/main/petWindowIpc.js";
 import { ActivityWindowController } from "../../src/main/windows/activityWindowController.js";
+import { PetWindowCollection } from "../../src/main/windows/petWindowCollection.js";
 import { PetPositionStore } from "../../src/main/windows/petPositionStore.js";
 
 const nodeRequire = createRequire(import.meta.url);
@@ -21,6 +22,8 @@ type PetBridge = {
   beginMove(): void;
   move(): void;
   endMove(): void;
+  hidePet(): void;
+  setReceiving(receiving: boolean): void;
 };
 
 beforeEach(() => vi.useFakeTimers());
@@ -34,7 +37,7 @@ afterEach(() => {
 
 describe("桌宠原生窗口用例", () => {
   it("非激活显示后展开、接收点击滚动与外部 drop，并从透明空白恢复命中", async () => {
-    const harness = await createHarness();
+    const harness = await createHarness({ collection: true });
     const { window, bridge, screen } = harness;
 
     expect(window.options).toMatchObject({
@@ -47,7 +50,7 @@ describe("桌宠原生窗口用例", () => {
     expect(window.showInactiveCount).toBe(1);
     expect(window.focusedSurface).toBe("other-app");
     expect(harness.mainWorld.handAgentActivityWindowConfig).toEqual({
-      petId: "",
+      petId: "pet-a",
       threadWebSocketURL: "ws://127.0.0.1:4317/api/thread?acceptServerRequests=1",
     });
     expect(Object.keys(bridge).sort()).toEqual([
@@ -80,6 +83,23 @@ describe("桌宠原生窗口用例", () => {
     screen.cursor = { x: 1120, y: 796 };
     vi.advanceTimersByTime(32);
     expect(window.deliverMouse("drop")).toBe("renderer");
+
+    bridge.setReceiving(true);
+    bridge.hidePet();
+    expect(window.hideCount).toBe(1);
+    expect(window.destroyed).toBe(false);
+    bridge.setReceiving(false);
+    expect(window.destroyed).toBe(true);
+    await harness.collection.accept({ type: "thread.started", threadId: "thread-a", payload: { petId: "pet-a" } });
+    await harness.collection.accept({
+      type: "permission.requested", threadId: "thread-a", requestId: "permission-a",
+      timestamp: new Date().toISOString(), payload: {},
+    });
+    const recalled = harness.petWindows.get("pet-a")!;
+    expect(recalled).not.toBe(window);
+    expect(recalled.showInactiveCount).toBe(1);
+    expect(recalled.focusedSurface).toBe("other-app");
+    expect(recalled.webContents.send).toHaveBeenCalledWith("pet-window:reveal");
   });
 
   it("角色拖动保持捕获，记住位置，关闭 ThreadWindow 后继续使用同一桌宠，再次启动恢复", async () => {
@@ -131,6 +151,24 @@ describe("桌宠原生窗口用例", () => {
     bridge.setLayout("pet");
     expect(window.bounds).toEqual({ x: -426, y: 356, width: 208, height: 208 });
     expect(JSON.parse(readFileSync(positionPath, "utf8"))).toEqual({ right: -226, bottom: 564 });
+
+    let displayId = "left-display";
+    const relativeScreen = Object.assign(new FakeScreen({x:-1600,y:0,width:1600,height:1000}), {
+      getDisplayForPoint: () => ({id:displayId,workArea:relativeScreen.workArea}),
+      getWorkAreaForDisplay: (id:string) => id===displayId ? relativeScreen.workArea : undefined,
+    });
+    const first = await createHarness({screen: relativeScreen});
+    const saved = JSON.parse(readFileSync(first.positionPath,"utf8"));
+    expect(saved.display).toMatchObject({id:"left-display",x:expect.any(Number),y:expect.any(Number)});
+    first.window.destroy();
+    relativeScreen.workArea={x:-2000,y:100,width:2000,height:1200};
+    const restored=await createHarness({screen: relativeScreen,positionPath:first.positionPath});
+    expect(restored.window.bounds.x+200).toBe(Math.round(relativeScreen.workArea.x+saved.display.x*relativeScreen.workArea.width));
+    expect(restored.window.bounds.y+restored.window.bounds.height).toBe(Math.round(relativeScreen.workArea.y+saved.display.y*relativeScreen.workArea.height));
+    displayId="main-display";relativeScreen.workArea={x:0,y:0,width:1440,height:900};relativeScreen.emit("work-area-changed");
+    expect(restored.window.bounds.x).toBeGreaterThanOrEqual(0);expect(restored.window.bounds.y).toBeGreaterThanOrEqual(0);
+    expect(restored.window.bounds.x+restored.window.bounds.width).toBeLessThanOrEqual(1440);
+    expect(JSON.parse(readFileSync(first.positionPath,"utf8")).display.id).toBe("main-display");
   });
 
   it("角色在左、对话在右，各布局保持角色右下角锚点", async () => {
@@ -182,7 +220,7 @@ describe("桌宠原生窗口用例", () => {
   it("配置损坏时仍可显示，并只允许当前桌宠的有效 IPC 改变窗口", async () => {
     const positionPath = createPositionPath();
     writeFileSync(positionPath, "{unfinished");
-    const { bridge, window, ipcMain, screen } = await createHarness({ positionPath });
+    const { bridge, window, ipcMain, screen, petWindows } = await createHarness({ positionPath, collection: true, secondPet: true });
     bridge.setLayout("compact");
     const expectedBounds = { ...window.bounds };
     ipcMain.emit("pet-window:set-layout", { sender: {} }, "expanded");
@@ -203,26 +241,59 @@ describe("桌宠原生窗口用例", () => {
     expect(window.deliverMouse("mouseDown")).toBe("renderer");
     bridge.setLayout("pet");
     expect(window.bounds).toEqual({ x: 990, y: 668, width: 208, height: 208 });
+
+    const other = petWindows.get("pet-b")!;
+    const otherBounds = { ...other.bounds };
+    ipcMain.emit("pet-window:begin-move", { sender: window.webContents });
+    screen.cursor = { x: -2900, y: -2900 };
+    ipcMain.emit("pet-window:move", { sender: window.webContents }, "pet-b");
+    expect(window.bounds).toEqual({ x: 990, y: 668, width: 208, height: 208 });
+    ipcMain.emit("pet-window:move", { sender: window.webContents });
+    expect(window.bounds).not.toEqual({ x: 990, y: 668, width: 208, height: 208 });
+    expect(other.bounds).toEqual(otherBounds);
+    ipcMain.emit("pet-window:hide", { sender: window.webContents }, "pet-b");
+    ipcMain.emit("pet-window:hide", { sender: {} });
+    expect(window.hideCount).toBe(0);
+    expect(other.hideCount).toBe(0);
+    bridge.hidePet();
+    expect(window.destroyed).toBe(true);
+    expect(other.destroyed).toBe(false);
   });
 });
 
-async function createHarness(options: { positionPath?: string; screen?: FakeScreen } = {}) {
+async function createHarness(options: { positionPath?: string; screen?: FakeScreen; collection?: boolean; secondPet?: boolean } = {}) {
   const positionPath = options.positionPath ?? createPositionPath();
   const screen = options.screen ?? new FakeScreen();
   let window!: FakeBrowserWindow;
+  const petWindows = new Map<string, FakeBrowserWindow>();
   const controller = new ActivityWindowController({
     activityWindowHTMLPath: "/dist/activity-window/index.html",
     preloadPath,
     positionStore: new PetPositionStore(positionPath),
+    petId: options.collection ? "pet-a" : undefined,
     screenProvider: screen,
     createWindow: (windowOptions) => {
       window = new FakeBrowserWindow(windowOptions);
       liveWindows.push(window);
+      petWindows.set("pet-a", window);
       return window;
     },
   });
+  const collection = new PetWindowCollection({
+    url: "ws://local/api/thread", preferences: { load: () => ({}), save: vi.fn() },
+    createController: petId => petId === "pet-a" ? controller : new ActivityWindowController({
+      activityWindowHTMLPath: "/dist/activity-window/index.html", preloadPath, petId,
+      positionStore: new PetPositionStore(createPositionPath()), screenProvider: screen,
+      createWindow: windowOptions => {
+        const other = new FakeBrowserWindow(windowOptions);
+        liveWindows.push(other);
+        petWindows.set(petId, other);
+        return other;
+      },
+    }),
+  });
   const ipcMain = new EventEmitter();
-  registerPetWindowIpc(ipcMain, controller);
+  registerPetWindowIpc(ipcMain, options.collection ? collection : controller);
   const runtime = new ElectronShellRuntime({
     activityWindow: controller,
     prewarmer: {
@@ -231,7 +302,8 @@ async function createHarness(options: { positionPath?: string; screen?: FakeScre
     },
     send: () => {}, now: () => "2026-09-13T00:00:00.000Z", stopSupervisor: () => {}, quit: () => {},
   });
-  await runtime.handleCommand({ channel: "electron_shell", type: "activity_window.show", commandId: "show-pet" });
+  if (options.collection) await collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-a" }, ...(options.secondPet ? [{ id: "pet-b" }] : [])] } });
+  else await runtime.handleCommand({ channel: "electron_shell", type: "activity_window.show", commandId: "show-pet" });
   const mainWorld: Record<string, unknown> = {};
   (globalThis as { window?: unknown }).window = mainWorld;
   const previousArgv = process.argv;
@@ -251,7 +323,7 @@ async function createHarness(options: { positionPath?: string; screen?: FakeScre
   } finally {
     process.argv = previousArgv;
   }
-  return { controller, runtime, window, screen, positionPath, ipcMain, mainWorld, bridge: mainWorld.handAgentPet as PetBridge };
+  return { controller, collection, petWindows, runtime, window, screen, positionPath, ipcMain, mainWorld, bridge: mainWorld.handAgentPet as PetBridge };
 }
 
 function createPositionPath(): string {
@@ -276,6 +348,7 @@ class FakeBrowserWindow extends EventEmitter {
   webContents = Object.assign(new EventEmitter(), { send: vi.fn() });
   bounds: Rectangle = { x: 0, y: 0, width: 1, height: 1 };
   showInactiveCount = 0;
+  hideCount = 0;
   loadFileCount = 0;
   ignored = false;
   destroyed = false;
@@ -292,6 +365,8 @@ class FakeBrowserWindow extends EventEmitter {
   }
   async loadFile(): Promise<void> { this.loadFileCount += 1; }
   showInactive(): void { this.showInactiveCount += 1; }
+  hide(): void { this.hideCount += 1; }
+  close(): void { this.destroy(); }
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -318,23 +393,3 @@ function withElectronMock(mock: unknown, run: () => void): void {
     ? mock : originalLoad(request, parent, isMain)) as typeof originalLoad;
   try { run(); } finally { module._load = originalLoad; }
 }
-
-it("按显示器关联和相对锚点恢复，布局变化保持位置比例，拔屏后仍可达", async () => {
-  let displayId = "left-display";
-  const screen = Object.assign(new FakeScreen({x:-1600,y:0,width:1600,height:1000}), {
-    getDisplayForPoint: () => ({id:displayId,workArea:screen.workArea}),
-    getWorkAreaForDisplay: (id:string) => id===displayId ? screen.workArea : undefined,
-  });
-  const first = await createHarness({screen});
-  const saved = JSON.parse(readFileSync(first.positionPath,"utf8"));
-  expect(saved.display).toMatchObject({id:"left-display",x:expect.any(Number),y:expect.any(Number)});
-  first.window.destroy();
-  screen.workArea={x:-2000,y:100,width:2000,height:1200};
-  const restored=await createHarness({screen,positionPath:first.positionPath});
-  expect(restored.window.bounds.x+200).toBe(Math.round(screen.workArea.x+saved.display.x*screen.workArea.width));
-  expect(restored.window.bounds.y+restored.window.bounds.height).toBe(Math.round(screen.workArea.y+saved.display.y*screen.workArea.height));
-  displayId="main-display";screen.workArea={x:0,y:0,width:1440,height:900};screen.emit("work-area-changed");
-  expect(restored.window.bounds.x).toBeGreaterThanOrEqual(0);expect(restored.window.bounds.y).toBeGreaterThanOrEqual(0);
-  expect(restored.window.bounds.x+restored.window.bounds.width).toBeLessThanOrEqual(1440);
-  expect(JSON.parse(readFileSync(first.positionPath,"utf8")).display.id).toBe("main-display");
-});

@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- `use-cases/`：通过真实 App、store、输入控制器与 socket 验证选择、首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期。
+- `use-cases/`：通过真实 App、store、输入控制器与 socket 验证选择、首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期；连接列表用例包含自动分页合并与第 51 条打开。
 - `boundaries/`：协议 guard、preload 配置和主题边界。
 - 目录根测试：组件、布局、滚动、持久化和 design token 的局部回归。
 
