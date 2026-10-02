@@ -15,7 +15,7 @@
 | `settings/` | `SettingsBackedLLMClient` 与 `SettingsBackedToolRegistry` 的 stamp 缓存和热加载 |
 | `actions/` | `MCPServerRegistry` |
 | [bridges/bridges.md](./bridges/bridges.md) | Dynamic Tool 的 token fencing、发送失败清理、显式超时和断线语义 |
-| [fixtures/fixtures.md](./fixtures/fixtures.md) | Swift实际保存格式与PDF边界共享夹具 |
+| [fixtures/fixtures.md](./fixtures/fixtures.md) | Swift实际保存格式共享夹具 |
 | `support/` | 测试辅助实现，目前包含内存 BlobStore |
 | `path-alias.test.ts` | 扫描测试目录内跨包 import，验证 `@handagent/core/*` path alias 能覆盖测试引用 |
 

@@ -28,4 +28,4 @@ Context History 和 Automation 的可变业务状态由 `MainActor` 隔离。两
 
 历史目录使用 activities.json / screenshots.json 数组索引，日期为 ISO8601；Activity 的 app/window 值保存为字符串，AX JSON 保留原始数值。AX 先原子落盘，再发布 Activity；PNG 的 base64 文本写入 screenshots/original 与 thumbnails，随后原子发布截图索引，最后更新 Activity.thumbnailId。单文件原子替换不构成跨文件事务：截图已发布但 Activity 反向关联尚未更新是正常过渡，已发布证据缺失 / 损坏则必须失败。Node 读取不触发实时采样，不能从历史时间推断采集状态。
 
-Node 适配与证据校验见 [后端源码](../../agent-server/src/src.md)。跨语言 fixture 由 ContextHistoryTests.testExportsSharedSwiftStoreFixture 用真实 Store 导出；测试只重定位绝对图片路径，不自造记录格式。
+Node 适配与证据校验见 [后端源码](../../agent-server/src/src.md)。跨语言 fixture 已用真实 Store 导出并作为静态证据保留；来源与消费边界见 [共享夹具](../../agent-server/tests/fixtures/context-history/context-history.md)，常规测试不重新导出。

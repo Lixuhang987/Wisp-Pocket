@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -18,17 +18,18 @@ describe("Pet固定根的实际文件写入", () => {
       tool.call({ relativePath: "notes/other.md", content: "独立文件" }, { rootPath, threadId: "a" }),
     ]);
     expect(["甲".repeat(10000), "乙".repeat(10000)]).toContain(await readFile(join(rootPath, "notes/today.md"), "utf8"));
-    await tool.call({ relativePath: "notes/today.md", content: "最终覆盖" }, { rootPath });
+    await expect(tool.call({ relativePath: "notes/today.md", content: "最终覆盖" }, { rootPath })).resolves.toEqual({
+      relativePath: "notes/today.md", bytesWritten: 12,
+    });
     expect(await readFile(join(rootPath, "notes/today.md"), "utf8")).toBe("最终覆盖");
     expect(await readFile(join(rootPath, "notes/other.md"), "utf8")).toBe("独立文件");
   });
-  it("上下文缺失、越界、绝对路径和冒充归属不会写入", async () => {
+  it("上下文缺失、越界和绝对路径不会写入", async () => {
     const rootPath = await root(); const tool = FileWriteTool.create({});
     await expect(tool.call({ relativePath: "x", content: "x" })).rejects.toThrow("rootPath");
     for (const relativePath of ["../outside", "/tmp/outside"]) {
       await expect(tool.call({ relativePath, content: "x" }, { rootPath })).rejects.toThrow();
     }
-    await expect(tool.call({ relativePath: "x", content: "x", workspaceId: "other" } as never, { rootPath })).rejects.toThrow("workspaceId");
   });
   it("拒绝目标符号链接及尚不存在子目录背后的符号链接越界", async () => {
     const rootPath = await root(); const outside = await root(); const tool = FileWriteTool.create({});

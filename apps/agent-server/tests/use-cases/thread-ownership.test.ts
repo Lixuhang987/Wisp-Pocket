@@ -162,12 +162,23 @@ describe("Thread ownership through public lifecycle", () => {
   it("reports deletion failure through the protocol", async () => {
     const h = threadHarness(echo);
     try {
-      const thread = await h.threads.create({ petId: h.pet.id,});
+      // 已持久但尚未加载的历史：删除失败后仍可恢复，不能把存储故障误判为删除。
+      const thread = (await h.persistence.createThread({ petId: h.pet.id })).metadata;
       h.publisher.attachConnection("ui", () => {});
-      vi.spyOn(h.persistence, "deleteThread").mockRejectedValue(new Error("cannot delete"));
+      const deletion = vi.spyOn(h.persistence, "deleteThread").mockRejectedValue(new Error("cannot delete"));
       await h.router.receive({ type: "thread.delete", commandId: "delete", timestamp: "now", payload: { targetThreadId: thread.id } }, "ui");
       expect(h.events.at(-1)).toMatchObject({ type: "thread.error", payload: { message: "cannot delete" } });
       expect(await h.persistence.getThread(thread.id)).not.toBeNull();
+      deletion.mockRestore();
+      vi.spyOn(h.persistence, "getThread").mockRejectedValueOnce(new Error("database unavailable"));
+      await h.router.receive({ type: "thread.resume", commandId: "resume-unavailable", timestamp: "now", threadId: thread.id }, "ui");
+      expect(h.events.at(-1)).toMatchObject({ type: "thread.error", payload: { message: "database unavailable" } });
+      expect(h.events.at(-1)!.payload).not.toHaveProperty("code");
+      await h.router.receive({ type: "thread.resume", commandId: "resume-recovered", timestamp: "now", threadId: thread.id }, "ui");
+      expect(h.events.at(-1)).toMatchObject({ type: "thread.snapshot", threadId: thread.id });
+      await h.router.receive({ type: "thread.delete", commandId: "retry-delete", timestamp: "now", payload: { targetThreadId: thread.id } }, "ui");
+      await h.router.receive({ type: "thread.resume", commandId: "resume-deleted", timestamp: "now", threadId: thread.id }, "ui");
+      expect(h.events.at(-1)).toMatchObject({ type: "thread.error", payload: { code: "not_found" } });
     } finally { await h.close(); }
   });
 
@@ -176,13 +187,17 @@ describe("Thread ownership through public lifecycle", () => {
     const path = join(directory, "threads.sqlite");
     const h = threadHarness(echo, {}, path);
     const thread = await h.threads.create({ petId: h.pet.id,});
-    await thread.submit(input("saved")); await wait(() => expect(thread.status).toBe("idle"));
+    const accepted = input("saved");
+    await thread.submit(accepted); await wait(() => expect(thread.status).toBe("idle"));
     await h.close();
     const complete = vi.fn(echo.complete);
     const restored = threadHarness({ complete }, {}, path);
     try {
       const [a, b] = await Promise.all([restored.threads.load(thread.id), restored.threads.load(thread.id)]);
       expect(a).toBe(b); expect(a.snapshot().messages).toHaveLength(2); expect(complete).not.toHaveBeenCalled();
+      await Promise.all([a.submit(accepted), b.submit(accepted)]);
+      expect(complete).not.toHaveBeenCalled();
+      expect((await restored.persistence.getMessages(thread.id)).filter(message => message.role === "user")).toHaveLength(1);
       await a.submit(input("next")); await wait(() => expect(a.status).toBe("idle"));
       expect(a.snapshot().messages).toHaveLength(4);
     } finally { await restored.close(); await rm(directory, { recursive: true, force: true }); }

@@ -23,15 +23,15 @@ const images = [
   },
 ] as const;
 
-describe("Dynamic Tool image consumption", () => {
+describe("Tool image consumption", () => {
   it.each(["responses", "anthropic"] as const)(
-    "sends image bytes and their metadata through real runtime and %s SDK tool results",
+    "sends Dynamic and ordinary Tool images through real runtime and %s SDK tool results",
     async (api) => {
       const { result, requests, bridge, events } = await runImageTools(api);
       const completed = events.findLast((event) => event.type === "assistant_message_end");
       expect(completed).toMatchObject({ messageId: expect.any(String), payload: { status: "completed" } });
       expect(result.messages.at(-1)).toEqual({ role: "assistant", id: completed?.messageId, content: "已核对视觉证据" });
-      expect(bridge.call).toHaveBeenCalledTimes(2);
+      expect(bridge.call).toHaveBeenCalledTimes(1);
       expect(bridge.call.mock.calls[0][0]).toMatchObject({
         threadId: "thread-images", turnId: "turn-images", callId: "thread-images:turn-images:call-1",
         namespace: "context_history", tool: "screenshot_original", arguments: { id: "screenshot-1" },
@@ -49,7 +49,7 @@ describe("Dynamic Tool image consumption", () => {
         expect(api === "responses" ? output.call_id : output.tool_use_id).toBe(`call-${index + 1}`);
         const parts = api === "responses" ? output.output : output.content;
         expect(parts).toEqual([
-          { type: api === "responses" ? "input_text" : "text", text: JSON.stringify({ callId: `call-${index + 1}`, success: true }) },
+          { type: api === "responses" ? "input_text" : "text", text: JSON.stringify({ ...(index === 0 ? { callId: "call-1" } : {}), success: true }) },
           { type: api === "responses" ? "input_text" : "text", text: JSON.stringify(fixture.metadata) },
           { type: api === "responses" ? "input_text" : "text", text: "图像 contentItems[1]：" },
           api === "responses"
@@ -67,6 +67,8 @@ describe("Dynamic Tool image consumption", () => {
         callId: "call-1", success: true,
         contentItems: expect.arrayContaining([{ type: "inputImage", imageUrl: `data:image/png;base64,${images[0].base64}` }]),
       });
+      expect(JSON.parse(persistedTools[1].content)).toMatchObject({ success: true, contentItems: expect.any(Array) });
+      expect(JSON.parse(persistedTools[1].content)).not.toHaveProperty("callId");
     },
   );
 
@@ -155,17 +157,6 @@ describe("Dynamic Tool image consumption", () => {
     ]);
   });
 
-  it.each(["responses", "chat", "anthropic"] as const)("ordinary default Tool images reach the real %s SDK without a Dynamic envelope", async (api) => {
-    const { result, requests } = await runImageTools(api, true, true);
-    const toolMessages = result.messages.filter((message) => message.role === "tool");
-    expect(JSON.parse(toolMessages[0].content)).not.toHaveProperty("callId");
-    const request = JSON.parse(requests[0]);
-    expect(requests[0]).toContain(images[0].base64);
-    if (api === "responses") expect(request.input.some((item: any) => item.type === "function_call_output" && item.output.some((part: any) => part.type === "input_image"))).toBe(true);
-    if (api === "chat") expect(request.messages.at(-1).content.some((part: any) => part.type === "image_url")).toBe(true);
-    if (api === "anthropic") expect(request.messages.flatMap((message: any) => message.content).some((part: any) => part.type === "tool_result" && part.content.some((item: any) => item.type === "image"))).toBe(true);
-  });
-
   it("reports the completion API capability limit before sending restored Dynamic Tool images", async () => {
     const fetch = vi.fn();
     const client = new VercelClient({ api: "completion", apiKey: "test-key", fetch });
@@ -181,7 +172,7 @@ describe("Dynamic Tool image consumption", () => {
   });
 });
 
-async function runImageTools(api: TestAPI, success = true, ordinary = false) {
+async function runImageTools(api: TestAPI, success = true) {
   const requests: string[] = [];
   const events: AgentRuntimeEvent[] = [];
   const fetch = vi.fn(async (_input, init) => {
@@ -213,19 +204,32 @@ async function runImageTools(api: TestAPI, success = true, ordinary = false) {
     clientId: "swift-host", namespace: "context_history", name: "screenshot_original", description: "读取截图原图",
     inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
   }, bridge);
+  // 同一次成功调用读取两种来源；第二张由普通工具返回相同视觉协议。
+  // 只替代外部图像来源，不模拟 Runtime 或 Provider 的转换逻辑。
+  const ordinaryTool = {
+    name: "image.read", description: "读取外部图片", inputSchema: dynamicTool.inputSchema, requiresPermission: false,
+    async call(input: { id: string }) {
+      const fixture = images.find(image => image.metadata.id === input.id)!;
+      return { success: true, contentItems: [
+        { type: "inputText", text: JSON.stringify(fixture.metadata) },
+        { type: "inputImage", imageUrl: `data:image/png;base64,${fixture.base64}` },
+        { type: "inputText", text: `图片归属 ${fixture.metadata.id}` },
+      ] };
+    },
+  };
   const runtime = new AgentRuntime({
     async *stream(messages, tools, options) {
       // 仅替换第一次模型决策；真实 Tool、runtime、provider client 与 SDK 负责后续图片链路。
       if (!messages.some((message) => message.role === "tool")) {
         yield {
           type: "message_end", message: { role: "assistant", content: "" },
-          toolCalls: images.map((image, index) => ({ id: `call-${index + 1}`, name: dynamicTool.name, arguments: { id: image.metadata.id } })),
+          toolCalls: images.map((image, index) => ({ id: `call-${index + 1}`, name: success && index === 1 ? ordinaryTool.name : dynamicTool.name, arguments: { id: image.metadata.id } })),
         };
         return;
       }
       yield* providerClient.stream(messages, tools, options);
     },
-  }, new ToolRegistry([ordinary ? { name: dynamicTool.name, description: dynamicTool.description, inputSchema: dynamicTool.inputSchema, requiresPermission: false, async call(input: unknown) { const { callId: _id, ...result } = await bridge.call({ callId: "ordinary", arguments: input } as never); return result; } } : dynamicTool]), { maxTimes: 2, systemPromptSections: [] });
+  }, new ToolRegistry([dynamicTool, ordinaryTool]), { maxTimes: 2, systemPromptSections: [] });
   const result = await runtime.runWithMessages(
     [{ role: "user", content: "按样本关联核对两张截图" }], (event) => events.push(event), { threadId: "thread-images", turnId: "turn-images" },
   );

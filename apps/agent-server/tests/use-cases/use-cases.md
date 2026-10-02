@@ -8,11 +8,12 @@
 - `thread-ownership.test.ts`：Thread 状态所有权、持久化、断连、删除、运行隔离及真实 Thread/Bridge 的中断与晚到结果。
 - `pet-conversation.test.ts`：真实 Thread/SQLite/Blob 与桌宠入口，覆盖首次文字、原路径输入、普通回复、持久 pending、跨界面请求、删除及恢复。
 
-- `pet-identity.test.ts`：真实配置与 socket 管理、五宠独立身份、角色请求隔离、服务/SQLite 重建、输入去重、分页及轻量 Permission 观察。
+- `pet-identity.test.ts`：两个新增主路径：公开 socket 创建同根多宠并验证图片、角色隔离和服务重建；删除后的创建 ACK 重试跨重启保持幂等。
 - `default-reading.test.ts`：首轮默认读取、权限策略、真实文件/历史与工具结果进入模型。
 
 ## 验证边界
 
+- 重启输入去重复用 `thread-ownership` 的既有历史恢复用例；存储故障与真实删除的区分复用其协议删除失败用例。轻量观察连接的 Permission 事实接收、回执资格与正文隔离复用 `pet-conversation` 的真实 CLI 授权流，避免另建仅检查内部调用的测试。
 - 桌宠首次纯文字从 controller 经过共享输入控制器到真实 Thread 与 SQLite；打开空回复框不留历史，接收后可读到持久输入，后续回复留在同一 Thread。原生点击、自动焦点和中文输入法仍由 renderer 与实机验收覆盖。
 - Dynamic Tool 用例使用真实 `WebSocketDynamicToolBridge` 与 `DynamicToolAdapter`，以 socket 传输替身输入 hello/request/response。相同连接的声明刷新须保留在途调用并更新新 Thread 的默认集合，旧 Thread metadata 保持不变；显式空集合仍为空，旧连接不能刷新新身份的集合。默认长操作等待实际结果，真正关闭连接后才 offline。显式超时另由 bridge 边界测试覆盖。
 - Thread 中断用例保留真实 ThreadTools、DynamicToolAdapter、Runtime 与 Bridge；中断返回后晚到的 Provider 响应不得改写已保存历史、恢复旧 Turn 或触发下一次模型调用。它不证明宿主任务被远程取消。

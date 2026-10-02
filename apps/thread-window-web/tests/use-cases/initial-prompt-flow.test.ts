@@ -83,14 +83,15 @@ describe("Thread input and socket flows", () => {
 
   it("connects, lists pets and threads, and dispatches inbound notifications without recovery requests", () => {
     const events: string[] = [];
-    const client = new ThreadSocketClient({
+    const { client } = createInputClient({
       url: "ws://127.0.0.1:4317/api/thread",
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
         .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
-        .mockReturnValueOnce("unused-id"),
+        .mockReturnValueOnce("page-2")
+        .mockReturnValue("resume-51"),
       onConnectionState: (state) => events.push(`state:${state}`),
       onNotification: (notification) => events.push(notification.type),
       onRequest: (request) => events.push(request.type),
@@ -114,6 +115,21 @@ describe("Thread input and socket flows", () => {
       { type: "thread.list", commandId: "list-1" },
     ]);
     expect(socket.sent.map((raw) => JSON.parse(raw)).some((command) => command.type === "thread.resume")).toBe(false);
+
+    const entry = (id: string) => ({
+      id, petId: "pet-a", petRevision: 1, rootPath: "/tmp", status: "idle" as const,
+      preview: id, messageCount: 1, createdAt: timestamp, updatedAt: timestamp,
+    });
+    socket.receive({ type: "thread.listed", notificationId: "page-1", timestamp, payload: {
+      threads: Array.from({ length: 50 }, (_, i) => entry(`thread-${i}`)), nextCursor: "page-2",
+    } });
+    expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({ type: "thread.list", payload: { cursor: "page-2" } });
+    socket.receive({ type: "thread.listed", notificationId: "page-2", timestamp, payload: { threads: [entry("old-51")] } });
+    expect(createThreadWindowStore.getState().history).toHaveLength(51);
+    expect(createThreadWindowStore.getState().history.find(thread => thread.preview === "old-51")?.petId).toBe("pet-a");
+    client.resumeThread("old-51");
+    expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({ type: "thread.resume", threadId: "old-51" });
+    client.disconnect();
   });
 
   it("sends initial prompt as thread.start then resumes and starts the turn after thread.started", () => {
@@ -804,16 +820,4 @@ describe("Thread input and socket flows", () => {
       },
     ]);
   });
-});
-
-it("完整历史窗口自动取得后续分页，合并后可搜索并打开第 51 条", () => {
-  createThreadWindowStore.setState(createThreadWindowStore.getInitialState(), true);
-  const {client,socket}=connectStoreClient();socket.open();
-  const entry=(id:string)=>({id,petId:"pet-a",petRevision:1,rootPath:"/tmp",status:"idle" as const,preview:id,messageCount:1,createdAt:timestamp,updatedAt:timestamp});
-  socket.receive({type:"thread.listed",notificationId:"page-1",timestamp,payload:{threads:Array.from({length:50},(_,i)=>entry(`thread-${i}`)),nextCursor:"page-2"}});
-  expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({type:"thread.list",payload:{cursor:"page-2"}});
-  socket.receive({type:"thread.listed",notificationId:"page-2",timestamp,payload:{threads:[entry("old-51")]}});
-  expect(createThreadWindowStore.getState().history).toHaveLength(51);
-  expect(createThreadWindowStore.getState().history.find(t=>t.preview==="old-51")?.petId).toBe("pet-a");
-  client.resumeThread("old-51");expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({type:"thread.resume",threadId:"old-51"});client.disconnect();
 });
