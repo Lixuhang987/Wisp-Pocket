@@ -27,7 +27,9 @@
 ## 多桌宠 A「口袋对话」本地规格（2026-10-02）
 
 - [x] 实现前澄清核查：读取 spec / surface / glossary / 新输入 ADR，并由独立只读子 agent 核对窗口、请求与队列事实；纯文档任务无需 worktree。
-- [ ] 回答[实现前澄清清单](./medium-powers/specs/multi-pet-pocket-dialogue/implementation-questions.md)后，统一共享输入 / 文件边界和多宠流程；推荐尚未确认，暂不实施。
+- [x] 用户回答九项澄清；同步[实现前决定](./medium-powers/specs/multi-pet-pocket-dialogue/implementation-questions.md)、统一共享输入 / 文件边界，移除归档、旧数据迁移与额外验收要求。
+- [x] 规格、链接、编号、范围与 diff 检查通过；TypeScript/Web、Swift test/build 三项检查通过，manual QA 已更新，仅本轮文档随任务提交。
+- [ ] 有排队消息，应用重启后的处理：后续单独确定未开始输入的继续、取消及展示策略；本期不新增队列控制协议。
 - [x] 本轮范围收敛先核对 spec、surface 与根架构；仅修文档，无需 worktree，保留其他任务的未提交修改。
 - [x] 清理本次不做的显示方式、消息阅读状态及其他前端设计 / 验收，补充单后端与独立前端的架构边界。
 - [x] 故事与验收编号、文档链接和 diff 检查通过；TypeScript/Web、Swift test/build 三项提交前检查通过，manual QA 已更新，仅本轮文档随任务提交。

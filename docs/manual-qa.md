@@ -17,13 +17,12 @@
 ## 多桌宠本地规格文档交付（2026-10-02）
 
 - **状态**：仅完成 [A「口袋对话」本地 spec](./medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)，未实现多宠能力、未发布 Issue。本项记录文档交付，不计为产品实机验收通过。
-- **范围**：自由创建 N 宠，每宠角色提示 / 图片 / rootPath，Pet 直接替代 Workspace；可重复文件根、按 petId 区分 Thread，不做跨宠转交。调研结论按当前用户决定和 main 代码筛选。
-- **本轮验证**：规格链接、父级索引、需求一致性与 diff 检查通过；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均通过。仅修改 Markdown，无新增产品实机结果。
-- **后续验收**：实现后按 spec 的 T01–T29 自动化场景和 M01–M08 实机场景补充证据；现有单宠 QA 仍描述当前实现，不能套用作多宠通过证明。
-- **交互规格修正（2026-10-02）**：移除误采纳的固定消息展开面板；当前 T29 / M05 保留点击唤出并聚焦、常态最新消息、hover 全部当前 Thread 历史、移出回常态且保留焦点 / 草稿。桌宠 surface 补显式基线，根架构与 docs / surface 索引强调先读现有合约再筛选调研；本轮链接 / 一致性 / diff 检查及 TypeScript/Web、Swift test/build 均通过，仅修改文档，不新增实机通过结论。
-- **本次范围收敛（2026-10-02）**：只保留多宠同屏；删除阅读标记及其他前端的界面 / 导航 / 就绪改造要求与相应验收，重新编号为 36 条用户故事、29 项自动化场景和 8 项同屏实机场景。根架构补单后端与独立前端的设计边界，共享协议消费者只做必要适配；本轮链接 / 编号 / 一致性 / diff 检查与 TypeScript/Web、Swift test/build 均通过，仍是文档交付，不新增实机通过结论。
-
-- **实现前澄清核查（2026-10-02）**：新增[澄清清单](./medium-powers/specs/multi-pet-pocket-dialogue/implementation-questions.md)，记录共享输入设计冲突、请求 / pending / 归档阅读 / 键盘验收缺口及尚待确认的默认值；只读子 agent 已核对代码事实；本轮链接 / 编号 / diff 及 TypeScript/Web、Swift test/build 检查通过。仅记录文档核查，不新增产品实机通过结论。
+- **最终范围**：自由创建 N 宠同屏，每宠角色提示 / 静态自定义图片 / rootPath，Pet 直接替代 Workspace；文件根可重复、Thread 按 petId 区分，不做跨宠转交。file.read 默认开放、任意路径、免 Permission；原文件路径交付，不预读或复制用户资料。写入仍受 Thread 快照文件根与 Permission 限制。
+- **交互边界**：点击唤出并聚焦、常态最新消息、hover 当前 Thread 全部历史、移出收起且保留焦点 / 草稿。隐藏宠的有效 Permission 请求使它重新显示到桌面而不抢焦点；同宠其他 Thread 由用户显式选择，不增加特殊提醒或自动切选。
+- **范围删减**：不做宠物归档、旧 API 兼容或旧开发数据迁移；不接收桌宠截图 / 剪贴板图片，删除额外键盘 / VoiceOver 设计与验收条款。应用重启后的排队消息处理单列 TODO。
+- **决策核对**：[实现前九项决定](./medium-powers/specs/multi-pet-pocket-dialogue/implementation-questions.md)已由用户回答，统一 [ADR 0004](./adr/0004-context-history-default-tools.md)、PRODUCT 与 spec；仅文档修改，尚未执行数据重建。
+- **后续验收**：按当前 34 条用户故事、T01–T28 自动化场景和 M01–M07 实机场景补证据；现有单宠 QA 不能作为多宠通过证明。
+- **本轮验证**：本轮规格链接 / 编号 / 范围 / diff 与 TypeScript/Web、Swift test/build 三项检查均通过；仅修改文档，不新增产品实机通过结论。
 
 ## 桌宠紧凑交互合并验证（2026-09-15）
 
