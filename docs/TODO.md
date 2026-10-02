@@ -9,6 +9,21 @@
 
 ---
 
+## 默认读取工具与桌宠路径输入（2026-10-02，规格发布）
+
+完整规格与验收见 [Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6)（`ready-for-agent`），架构决定见 [ADR 0004](./adr/0004-context-history-default-tools.md)。共享后端默认开放历史读取、任意路径 `file.read` 和按需 `user.ask`，取消输入分阶段；仅桌宠改为原路径输入，其他独立前端保持现状。Swift 常驻采集，失败状态在设置中显示。以上尚未实现，保留与自动删除后续单独设计。
+
+- [x] 核对共享创建入口、当前工具懒激活及 `inspect` 限制；本轮设计讨论和文档记录无需 worktree。
+- [x] 确认 Node 历史读取、后端统一首轮开放、Swift 常驻采集及取消开关，记录 ADR。
+- [x] 确认彻底移除分阶段执行限制、四个历史读取工具免确认、采集失败保留旧历史查询与设置提示；记录 ADR，并核对附件读取须与模式字段解耦。
+- [x] 用户补充确认删除 `UserInput.mode`；PDF、图片等以路径提交，由 LLM 调用默认开放的文件读取 Tool 实际读取，第一版允许任意路径，取消后端自动预读。
+- [x] 用户确认直接替换 `file.read`、默认开放且免确认、直接引用原路径不保存副本；原文件变更后读当前内容，失效明确报错。
+- [x] 用户确认以现有客户端到真实 Thread/Runtime/SQLite 的主路径为主要测试边界，补充 Swift 采集/设置状态和原生/真实多模态 QA。
+- [x] 用户修正范围：输入前端只调整桌宠，其他独立前端保持现状；桌宠路径使用现有文本 Input Item，PromptPanel 截图继续当前图片协议，宿主设置仅做已确认的采集修改。
+- [x] 规格发布为 Issue #6，标记 `ready-for-agent`；回读核对范围、33 条用户故事及 21 项自动化验收，文档交付已记录到 manual QA。
+- [ ] 后续实现任务从主 checkout 通过 `scripts/create-worktree.sh` 创建 worktree，确认 CodeGraph 索引并运行分层基线，再阅读目标目录文档链、修改代码。
+- [ ] 验证实现，更新 owning 文档及 manual QA，安排不继承上下文的独立子 agent 审核 spec / 代码 / 文档，完成三项提交前检查并提交。
+
 ## 多桌宠 A「口袋对话」本地规格（2026-10-02）
 
 - [x] 实现前澄清核查：读取 spec / surface / glossary / 新输入 ADR，并由独立只读子 agent 核对窗口、请求与队列事实；纯文档任务无需 worktree。

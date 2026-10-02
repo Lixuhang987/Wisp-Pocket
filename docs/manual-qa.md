@@ -6,6 +6,14 @@
 
 先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
 
+## 默认读取工具规格发布（2026-10-02）
+
+- **状态**：中文规格已发布为 [Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6)，标签为 `ready-for-agent`；本轮仅交付规格与 [ADR 0004](./adr/0004-context-history-default-tools.md)，尚未实现，不计为产品实机验收通过。
+- **范围**：共享后端默认开放历史读取、任意路径 `file.read` 和按需 `user.ask`，取消 `mode` / `inspect/reply`；输入前端只调整桌宠，PromptPanel 截图继续现有图片协议，ThreadWindow 前端保持现状。Swift 常驻采集与设置状态按已确认决定调整。
+- **规格核对**：用户已确认真实 Thread/Runtime/SQLite 主路径测试边界；已回读 Issue 的 33 条用户故事、21 项自动化验收及实机范围，核对 `ready-for-agent` 标签。文档一致性与 diff 检查通过。
+- **提交检查**：TypeScript/Web、Swift test/build 三项检查均通过；Issue 正文与发布稿一致，6 个新增本地文档链接有效。本轮仅修改文档，不新增产品行为或实机通过结论。
+- **后续验收**：实现后按 Issue 验证首次工具可见、免确认读取、原路径变更/失效、图片实际进入模型及采集失败时旧历史可查；原生拖入和真实模型理解另做实机 QA，回归未修改的 PromptPanel / ThreadWindow。
+
 ## 多桌宠本地规格文档交付（2026-10-02）
 
 - **状态**：仅完成 [A「口袋对话」本地 spec](./medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)，未实现多宠能力、未发布 Issue。本项记录文档交付，不计为产品实机验收通过。
