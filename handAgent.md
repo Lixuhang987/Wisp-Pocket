@@ -53,6 +53,7 @@ flowchart TD
 ## 阅读路由
 
 1. 从 [CONTEXT-MAP.md](/Users/mu9/proj/handAgent/CONTEXT-MAP.md) 取得相关术语。
-2. 应用入口见 [apps/apps.md](/Users/mu9/proj/handAgent/apps/apps.md)。
-3. 跨平台核心见 [packages/packages.md](/Users/mu9/proj/handAgent/packages/packages.md)。
-4. 协议字段以 [packages/core/src/protocol](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md) 和代码类型为真相。
+2. 编写或修订涉及界面的 spec / 设计前，先从 [docs/docs.md](/Users/mu9/proj/handAgent/docs/docs.md) 读取 PRODUCT 与对应 surface，确认现有交互合约，再筛选调研；未经明确要求改变的交互继续保留。
+3. 应用入口见 [apps/apps.md](/Users/mu9/proj/handAgent/apps/apps.md)。
+4. 跨平台核心见 [packages/packages.md](/Users/mu9/proj/handAgent/packages/packages.md)。
+5. 协议字段以 [packages/core/src/protocol](/Users/mu9/proj/handAgent/packages/core/src/protocol/protocol.md) 和代码类型为真相。

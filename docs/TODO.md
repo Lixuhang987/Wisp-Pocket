@@ -11,6 +11,9 @@
 
 ## 多桌宠 A「口袋对话」本地规格（2026-10-02）
 
+- [x] 本轮修订先核对 surface、所属目录文档及 renderer：点击唤出并聚焦、常态最新消息、hover 全部当前 Thread 历史已写明且已实现；纯文档修订无需 worktree。
+- [x] 删除 spec 与验收中新增的固定消息展开状态，补充 surface 的现有交互保留基线及上级阅读路由。
+- [x] 核对文档链接与一致性，TypeScript/Web、Swift test/build 三项提交前检查通过，manual QA 已记录规格修正；仅本轮文档修改随任务提交。
 - [x] 核对主 checkout 修改、目录文档、领域术语与调研分支；本轮仅写文档，无需 worktree。
 - [x] 对照当前代码筛选调研结论，明确自由创建、角色提示与图片、桌宠直接替代 Workspace 并持有可重复 rootPath、不做跨宠转交的边界。
 - [x] 用户确认复用桌宠入口到真实 Thread/Runtime/SQLite 的测试边界；原生窗口行为另做实机验收。

@@ -12,6 +12,7 @@
 - **范围**：自由创建 N 宠，每宠角色提示 / 图片 / rootPath，Pet 直接替代 Workspace；可重复文件根、按 petId 区分 Thread，不做跨宠转交。调研结论按当前用户决定和 main 代码筛选。
 - **本轮验证**：规格链接、父级索引、需求一致性与 diff 检查通过；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均通过。仅修改 Markdown，无新增产品实机结果。
 - **后续验收**：实现后按 spec 的 T01–T31 自动化场景和 M01–M08 实机场景补充证据；现有单宠 QA 仍描述当前实现，不能套用作多宠通过证明。
+- **交互规格修正（2026-10-02）**：移除误采纳的固定消息展开面板；T31 / M05 改为保留点击唤出并聚焦、常态最新消息、hover 全部当前 Thread 历史、移出回常态且保留焦点 / 草稿。桌宠 surface 补显式基线，根架构与 docs / surface 索引强调先读现有合约再筛选调研；本轮链接 / 一致性 / diff 检查及 TypeScript/Web、Swift test/build 均通过，仅修改文档，不新增实机通过结论。
 
 ## 桌宠紧凑交互合并验证（2026-09-15）
 
