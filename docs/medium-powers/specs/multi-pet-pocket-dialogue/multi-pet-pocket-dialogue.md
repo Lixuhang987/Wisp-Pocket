@@ -1,6 +1,6 @@
 # 多桌宠 A「口袋对话」实现规格
 
-状态：实现已落地，实机与真实模型待验；2026-10-02。已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)，实现与检查记录见 [合并计划](../../plans/2026-10-02-pets-default-reading.md)，人工验收见 [manual QA](../../../manual-qa.md)。用户已确认测试边界和实现前九项决定；角色快照与创建后不可修改的文件根与静态图方案已确认，图片导入限制为工程默认。
+状态：实现已落地，实机与真实模型待验；交互按 2026-10-03 用户修订更新。已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)，实现与检查记录见 [合并计划](../../plans/2026-10-02-pets-default-reading.md)，人工验收见 [manual QA](../../../manual-qa.md)。用户已确认测试边界和实现前九项决定；角色快照与创建后不可修改的文件根与静态图方案已确认，图片导入限制为工程默认。
 
 实现前决定见[决策记录](./implementation-questions.md)；共享输入与文件读取遵守 [ADR 0004](../../../adr/0004-context-history-default-tools.md)，不再保留旧分阶段规则。
 

@@ -4,6 +4,7 @@
 
 ## 最新决定与共同合约
 
+- 2026-10-03 用户修正桌宠：伙伴 / 对话 / 隐藏入口仅在右键菜单出现；当前对话不展示目录，也不通过 title 提示路径。悬停浏览必须保持角色、回复框和短内容的屏幕位置稳定。
 - 2026-10-02 用户覆盖 #7：Pet 创建后 `rootPath` 不可修改；后端拒绝更新文件根，编辑界面仅展示。Thread 不保存文件根快照，执行时从不可转移的 `petId` 取得 Pet 固定根。
 - 角色提示仍在 Thread 创建时保存版本快照；修改名字和图片即时展示，修改角色仅影响新 Thread。实际文件位置从所属 Pet 派生。
 - PetRegistry / SQLite 是配置唯一来源，替换 Workspace；ThreadRegistry / Thread 是执行、历史、请求唯一来源。所有消费者共用 `/api/thread`。
@@ -36,7 +37,7 @@
 6. 全部实现后运行 TypeScript/Web、Swift test/build、Electron完整build；双轴独立代码审核并修复发现。
 7. 分发无上下文的独立文档审核，核对两个issue及本页用户覆盖决定，更新manual QA后提交。
 
-## 验证状态
+## 验证状态（2026-10-02 实施历史）
 
 - 隔离目录：`.worktrees/issues-6-7-pets-reading`，分支 `codex/issues-6-7-pets-reading`。
 - 基点：`c40b875a7bfa0d23a51dd0591a13b4b361aca45e`。
@@ -50,7 +51,7 @@
 - manual QA 已新增 M01–M07 和真实模型 / 采集权限待验项，并校正旧待验步骤；旧实机归档和历史构建证据未改写为本次通过。TODO 的实现收尾项已在最终检查与审核通过后移除，保留延后的重启队列策略。
 - 首轮检查 419 个改动文档本地链接，均可解析；git diff --check 通过。显示器关联 / 相对锚点缺口现已补实现与用例，并同步 windows owning 文档；真实多屏行为仍在 M04 待验。
 
-## 代码审核修复与增量文档复核
+## 代码审核修复与增量文档复核（2026-10-02 实施历史）
 
 - 双轴代码审核提出的五项问题已修复，Standards 复核关闭：删除 Thread 时事务内保留稳定创建身份墓碑，跨重启 ACK 重试不复活历史；ThreadWindow 自动取完分页；桌宠超过一页时以 resume 的 not_found 清理已删选择；点击显隐按宠持久化；历史列表随运行状态更新。
 - 文件读取采用非阻塞打开后验证普通文件，真实 mkfifo 用例证明无写入端的 FIFO 不挂住读取；默认读取专项共 13 项。此改动不扩大支持格式。
@@ -58,3 +59,15 @@
 - 独立文档审核已复核上述最新代码及 owning 指南，并把重试删除、完整分页、离线删除、显隐恢复、列表状态与角色来源加入 manual QA。M01–M07 及真实模型仍全部待验，未借自动化结果宣称实机通过。
 - 最终整合检查全部通过：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build`、`pnpm build:electron-shell`，另有 thread-store 5 项测试通过。主 agent 日志分别为 `/tmp/handagent-final-ts.log`、`/tmp/handagent-final-swift-test.log`、`/tmp/handagent-final-swift-build.log`、`/tmp/handagent-final-electron-build.log`；文档审核已回读其成功结果。
 - 两轴审核最终无遗留：Standards 的 5 项和 Spec 的 2 项均已关闭，其中删除墓碑问题重叠。独立文档增量审核完成，最新实现、规格、owning 指南及 manual QA 一致，最终按 git diff HEAD 核对 418 个本地链接及 PDF 二进制属性，链接与 diff 检查通过；由主 agent 完成提交。
+
+## 2026-10-03 桌宠回归修复计划
+
+- 本轮在 `.worktrees/pets-hover-context-menu-fix` / `codex/pets-hover-context-menu-fix` 执行，基于多宠实现提交 `7e352e7`。上方最终整合与独立审核属于 2026-10-02 历史，不作为本轮检查证据；最新用户要求覆盖旧常驻入口及对话内文件位置展示。
+- 用例：角色周围不设常驻管理入口，逐宠对话显隐恢复与点击语义保持；右键角色打开菜单，伙伴 / 对话 / 隐藏沿用现有动作，大小调节继续可用；菜单支持关闭与键盘操作。右侧对话保持标题、交付文件及原角色提示，不展示文件根。仅 hover 展开历史，角色 / 回复框 / 短内容保持底部位置，移出保留焦点和草稿。
+- 沿用数据与接口：逐宠 controller 的选择 / 草稿 / 显隐不变；菜单是 renderer 局部状态，动作复用 PetManager、历史弹层及 handAgentPet.hidePet；布局继续通过 setLayout(mode, contentHeight) 和 setInteractiveRegions 发送给原生控制器，不增加协议。
+- 先测入口：扩展 pet-interaction 既有大小、hover / 回复节点和 drop 后切历史用例，覆盖右键到动作的完整流；复用 pet-window 的锚点用例。用独立 Electron 渲染 harness 加载当前 worktree 的真实 renderer / CSS / preload / controller，测量 hover 前后标题与回复框屏幕坐标，先复现再验证。此回归任务新增自动测试预算最多 1 项，优先零新增并扩展现有用例；此前 #6/#7 测试保持。
+- 检查点：鼠标进入对话 → React expanded → DOM 尺寸 / 内容测量 → preload IPC → 原生 bounds / 命中 → 鼠标仍在同一内容；每一步用真实渲染坐标或既有 IPC 主路径断言验证。
+- 先确认跳跃发生在 renderer 布局还是原生定位，再作最小改动；同步目录指南、surface 与规格，独立文档审核后更新 manual QA，执行提交前检查并提交。
+- 回归检查已通过：既有 renderer 共 23 项，无新增测试项，扩展其中三个用例；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 Electron build 均成功。结果位于本轮 worktree `.cache/pets-fix-final-web.log`、`pets-fix-final-swift-test.log`、`pets-fix-final-swift-build.log`、`pets-fix-electron-build.log`，独立文档审核已回读成功结果。
+- 真实 Electron 受控空对话复现：修复前标题上跳 469.55px，标题移入消息的底部对齐滚动内容、紧凑测量包含标题后，连续五次移入 / 移出的标题 / 角色 / 回复框屏幕坐标变化均为 0，路径 title 为 null；菜单截图核对四个入口在角色上方。证据为本轮 worktree `.cache/pet-hover-result.json`、`pet-hover.png`、`pet-context-menu.png`。后端、屏幕与光标为受控 fixture，只证明此布局链路；完整宿主、长历史、中文输入法与多屏仍在 manual QA 待验。
+- 无继承上下文的独立文档审核已完成：读取全部多宠规格、修改目录的 owning 指南及父级至 `handAgent.md`，核对最新用户决定、源码与受控渲染证据；修正右键入口、目录查看范围及对话显隐恢复的表述，明确历史检查与本轮证据。manual QA 已更新，全部实机待验项保留；改动文档的本地链接、锚点与 `git diff --check` 通过。TODO 的本轮工作流已迁移到 manual QA 与本节记录。

@@ -200,12 +200,15 @@ describe("桌宠的轻量交互", () => {
     const bubble = screen.getByTestId("pet-conversation");
     const input = screen.getByRole("textbox", { name: "回复当前对话" });
     expect(screen.getByRole("button", { name: "请整理这份资料" })).toBeTruthy();
+    const heading = bubble.querySelector(".pet-conversation-heading")!;
+    expect(bubble.querySelector(".pet-history-content")!.contains(heading)).toBe(true);
     expect(screen.queryByRole("log")).toBeNull();
     expect(screen.getByTestId("pet-latest").className).toContain("pet-latest");
     expect(vi.mocked(window.handAgentPet!.setLayout).mock.lastCall?.[0]).toBe("compact");
     fireEvent.mouseEnter(bubble);
     expect(screen.getByTestId("pet-latest").textContent).toContain("第五行全文");
     expect(screen.getByRole("log").querySelector('[data-author="user"]')?.textContent).toContain("我的资料");
+    expect(screen.getByRole("log").contains(heading)).toBe(true);
     act(() => input.focus());
     fireEvent.mouseLeave(bubble);
     expect(screen.queryByRole("log")).toBeNull();
@@ -230,7 +233,7 @@ describe("桌宠的轻量交互", () => {
     });
   });
 
-  it("右键调节角色大小、刷新实际命中并恢复偏好，回复节点与草稿保持不变", () => {
+  it("右键菜单进入伙伴、对话、隐藏和大小调节，刷新命中并恢复偏好，回复节点与草稿保持不变", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       if (!this.classList.contains("pet-character")) return new DOMRect();
       const width = Number.parseFloat(this.style.width);
@@ -244,6 +247,23 @@ describe("桌宠的轻量交互", () => {
     fireEvent.change(input, { target: { value: "保留这份草稿" } });
     expect(pet.style.width).toBe("128px");
     fireEvent.contextMenu(pet);
+    expect(screen.getByRole("menu", { name: "桌宠菜单" })).toBeTruthy();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "对话" }));
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    fireEvent.contextMenu(pet);
+    fireEvent.click(screen.getByRole("menuitem", { name: "对话" }));
+    expect(screen.getByRole("region", { name: "本宠对话" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.contextMenu(pet);
+    fireEvent.click(screen.getByRole("menuitem", { name: "伙伴" }));
+    expect(screen.getByRole("region", { name: "伙伴管理" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.contextMenu(pet);
+    fireEvent.click(screen.getByRole("menuitem", { name: "隐藏" }));
+    expect(window.handAgentPet!.hidePet).toHaveBeenCalledOnce();
+    fireEvent.contextMenu(pet);
+    fireEvent.click(screen.getByRole("menuitem", { name: "调整大小" }));
     const slider = screen.getByRole("slider", { name: "桌宠大小" });
     fireEvent.change(slider, { target: { value: "150" } });
     expect(pet.style.width).toBe("192px");
@@ -258,6 +278,7 @@ describe("桌宠的轻量交互", () => {
     const restoredPet = screen.getByRole("button", { name: /月见八千代/ });
     expect(restoredPet.style.width).toBe("192px");
     fireEvent.contextMenu(restoredPet);
+    fireEvent.click(screen.getByRole("menuitem", { name: "调整大小" }));
     expect((screen.getByRole("slider", { name: "桌宠大小" }) as HTMLInputElement).value).toBe("150");
     fireEvent.click(screen.getByRole("button", { name: "恢复默认大小" }));
     expect(restoredPet.style.width).toBe("128px");
@@ -419,7 +440,8 @@ describe("桌宠的轻量交互", () => {
     const file = new File(["pdf bytes"], "report.pdf", { type: "application/pdf" });
     fireEvent.drop(screen.getByTestId("pet-conversation"), { dataTransfer: { types: ["Files"], files: [file], getData: () => "" } });
     act(() => Socket.latest.receive(note("thread.started", { threadId: "b", payload: { preview: "后建对话", createdAt: "2026-09-13T02:00:00.000Z" } })));
-    fireEvent.click(screen.getByRole("button", {name:"对话"}));
+    fireEvent.contextMenu(screen.getByRole("button", {name:/月见八千代/}));
+    fireEvent.click(screen.getByRole("menuitem", {name:"对话"}));
     fireEvent.click(screen.getByRole("button", {name:/^后建对话/}));
     await act(async () => {});
     await waitFor(() => expect(Socket.latest.sent.at(-1)?.type).toBe("op.submit"));

@@ -83,9 +83,11 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 .pet-size-reset { align-self: flex-end; color: var(--pet-accent); font-size: var(--ha-typography-caption-size); }
 @media (prefers-reduced-motion: reduce) { *, *::after { animation: none !important; scroll-behavior: auto !important; } }
 
-.pet-toolbar { z-index: 3; position:absolute; bottom:0; left:var(--pet-inset); display:flex; align-items:center; gap:4px; max-width:calc(var(--pet-character-right) - 12px); font-size:var(--ha-typography-caption-size); color:var(--ha-color-text-primary); border-radius:var(--ha-radius-md); background:var(--ha-color-surface); }
-.pet-toolbar span { max-width:72px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.pet-toolbar button,.pet-popover button,.pet-conversation-heading button { border:1px solid var(--ha-color-hairline); border-radius:var(--ha-radius-sm); padding:4px; background:var(--ha-color-surface); color:inherit; cursor:pointer; }
+.pet-context-menu { position:absolute; left:var(--pet-inset); width:192px; display:flex; flex-direction:column; gap:var(--ha-spacing-xxs); padding:var(--ha-spacing-xs); z-index:11; border:1px solid var(--pet-border); border-radius:var(--ha-radius-md); background:var(--ha-color-surface-elevated); color:var(--pet-ink); box-shadow:var(--pet-shadow); font-size:var(--ha-typography-caption-size); }
+.pet-context-identity { padding:var(--ha-spacing-xxs); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--pet-muted); }
+.pet-context-menu button { padding:var(--ha-spacing-xs); border:0; border-radius:var(--ha-radius-sm); color:inherit; background:transparent; text-align:left; cursor:pointer; }
+.pet-context-menu button:hover,.pet-context-menu button:focus-visible { background:var(--pet-soft); }
+.pet-popover button,.pet-conversation-heading button { border:1px solid var(--ha-color-hairline); border-radius:var(--ha-radius-sm); padding:4px; background:var(--ha-color-surface); color:inherit; cursor:pointer; }
 .pet-popover { position:absolute; left:var(--pet-inset); right:var(--pet-inset); bottom:40px; max-height:calc(100% - 52px); overflow:auto; padding:12px; color:var(--ha-color-text-primary); background:var(--ha-color-surface-elevated); border:1px solid var(--ha-color-hairline); border-radius:var(--ha-radius-lg); z-index:10; font-size:var(--ha-typography-body-size); }
 .pet-popover header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
 .pet-popover input,.pet-popover textarea { width:100%; box-sizing:border-box; padding:6px; margin-block:4px; background:var(--ha-color-surface); color:inherit; border:1px solid var(--ha-color-hairline); border-radius:var(--ha-radius-sm); }
