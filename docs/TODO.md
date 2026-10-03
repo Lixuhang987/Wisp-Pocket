@@ -11,7 +11,8 @@
 
 - [ ] 新增 menu bar 入口，菜单暂时只有“设置”，点击打开新增的 Electron 设置页面。
 - [ ] 第一阶段目标：原生设置收敛为 Appearance、系统快捷键（唤起 Wisp、捕获选区、截图）、Host 功能（Context History 状态、Automation）与 AgentTrigger；Electron 承载 AI、Agent 与 Pets 设置。
-- [ ] 完成设计追问并由用户确认共同理解：原生设置的访问路径、首期范围、配置读写与生效归属、非系统快捷键的归属，以及 Prompts 的含义。
+- 已确认：本轮完整迁移 AI、Agent、Pets 的现有功能；原生设置暂时继续使用 PromptPanel 入口，不新增 Electron 跳转入口。
+- [ ] 完成设计追问并由用户确认共同理解：配置读写与生效归属、模板快捷键的归属、Prompts 的含义，以及 Electron 设置窗口与导航。
 - [x] 读取共享产品文档、Settings surface 与跨上下文架构，调查现有设置和入口；本轮仅讨论设计，不修改代码。
 - [ ] 确认范围后，从主 checkout 执行 `scripts/create-worktree.sh` 创建 `.worktrees/<task-name>/`，确认独立 CodeGraph 索引与显式 projectPath。
 - [ ] 在 worktree 先执行 `scripts/test.sh` 与 `scripts/swiftw build` 分层基线，再沿目标目录指南及父目录读到 `handAgent.md`，开始实现。
