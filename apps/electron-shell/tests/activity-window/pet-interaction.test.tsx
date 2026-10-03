@@ -109,6 +109,11 @@ describe("桌宠的轻量交互", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
     const input = screen.getByRole("textbox", { name: "回复当前对话" }) as HTMLTextAreaElement;
+    window.handAgentPet!.chooseFiles = async () => ["/tmp/reading.pdf"];
+    const beforeFiles = Socket.latest.sent.length;
+    fireEvent.click(screen.getByRole("button", { name: "添加文件" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "移除 reading.pdf" })).toBeTruthy());
+    expect(Socket.latest.sent).toHaveLength(beforeFiles);
     fireEvent.change(input, { target: { value: "帮我安排今天的阅读" } });
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -118,18 +123,42 @@ describe("桌宠的轻量交互", () => {
     act(() => Socket.latest.receive(note("thread.started", { commandId: starts[0]!.commandId, threadId: "first", payload: { preview: "阅读" } })));
     const submitted = Socket.latest.sent.at(-1)!;
     expect(submitted).toMatchObject({ type: "op.submit", threadId: "first", payload: { op: { opId: starts[0]!.commandId } } });
-    expect(submitted.payload.op.payload).toEqual({ items: [{ type: "text", id: expect.any(String), text: "帮我安排今天的阅读" }] });
+    expect(submitted.payload.op.payload.items).toEqual([
+      { type: "text", id: expect.any(String), text: "帮我安排今天的阅读" },
+      { type: "text", id: expect.any(String), text: expect.stringContaining("/tmp/reading.pdf") },
+    ]);
     expect(input.value).toBe("帮我安排今天的阅读");
     fireEvent.change(input, { target: { value: "还有另一条补充" } });
+    window.handAgentPet!.chooseFiles = async () => ["/tmp/later.txt"];
+    fireEvent.click(screen.getByRole("button", { name: "添加文件" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "移除 later.txt" })).toBeTruthy());
     await act(async () => Socket.latest.receive(note("user.message.recorded", {
       threadId: "first", payload: { messageId: submitted.payload.op.opId, text: "帮我安排今天的阅读", items: submitted.payload.op.payload.items, pending: true },
     })));
     expect(input.value).toBe("还有另一条补充");
+    expect(controller.getSnapshot().files.map(file => file.path)).toEqual(["/tmp/later.txt"]);
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(Socket.latest.sent.at(-1)).toMatchObject({ type: "op.submit", threadId: "first", payload: { op: { payload: { items: [{ text: "还有另一条补充" }] } } } });
+    expect(Socket.latest.sent.at(-1)).toMatchObject({ type: "op.submit", threadId: "first" });
+    expect(Socket.latest.sent.at(-1)?.payload.op.payload.items).toEqual([
+      { type: "text", id: expect.any(String), text: "还有另一条补充" },
+      { type: "text", id: expect.any(String), text: expect.stringContaining("/tmp/later.txt") },
+    ]);
     expect(input.value).toBe("还有另一条补充");
     await ackLast();
     expect(input.value).toBe("");
+    expect(controller.getSnapshot().files).toEqual([]);
+    expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(1);
+    window.handAgentPet!.chooseFiles = async () => ["/tmp/only.txt"];
+    fireEvent.click(screen.getByRole("button", { name: "添加文件" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "移除 only.txt" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "发送回复" }));
+    expect(Socket.latest.sent.at(-1)?.payload.op.payload.items).toEqual([
+      { type: "text", id: expect.any(String), text: expect.stringContaining("/tmp/only.txt") },
+    ]);
+    await ackLast();
+    fireEvent.click(screen.getByRole("button", { name: "新建对话" }));
+    expect(controller.getSnapshot().threadId).toBeNull();
+    expect(document.activeElement).toBe(input);
     expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(1);
   });
 
@@ -137,6 +166,9 @@ describe("桌宠的轻量交互", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
     let input = screen.getByRole("textbox", { name: "回复当前对话" }) as HTMLTextAreaElement;
+    window.handAgentPet!.chooseFiles = async () => ["/tmp/retry.pdf"];
+    fireEvent.click(screen.getByRole("button", { name: "添加文件" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "移除 retry.pdf" })).toBeTruthy());
     fireEvent.change(input, { target: { value: "不能丢掉的首条输入" } });
     fireEvent.keyDown(input, { key: "Enter" });
     const start = Socket.latest.sent.at(-1)!;
@@ -162,6 +194,7 @@ describe("桌宠的轻量交互", () => {
       preview: "首条", messageCount: 0, createdAt: "2026", updatedAt: "2026",
     }] : [] } })));
     input = screen.getByRole("textbox", { name: "回复当前对话" }) as HTMLTextAreaElement;
+    expect(screen.getByRole("button", { name: "移除 retry.pdf" })).toBeTruthy();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(Socket.latest.sent.at(-1)?.type).toBe(created ? "op.submit" : "thread.start");
     expect(created ? Socket.latest.sent.at(-1)?.payload.op.opId : Socket.latest.sent.at(-1)?.commandId).toBe(start.commandId);
@@ -186,6 +219,7 @@ describe("桌宠的轻量交互", () => {
       threadId: "first", payload: { messageId: accepted.payload.op.opId, text: "不能丢掉的首条输入", items: accepted.payload.op.payload.items },
     })));
     expect(input.value).toBe("");
+    expect(controller.getSnapshot().files).toEqual([]);
     expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(created ? 0 : 1);
   });
 
@@ -217,15 +251,14 @@ describe("桌宠的轻量交互", () => {
     const bubble = screen.getByTestId("pet-conversation");
     const input = screen.getByRole("textbox", { name: "回复当前对话" });
     expect(screen.getByRole("button", { name: "请整理这份资料" })).toBeTruthy();
-    const heading = bubble.querySelector(".pet-conversation-heading")!;
-    expect(bubble.querySelector(".pet-history-content")!.contains(heading)).toBe(true);
+    expect(bubble.querySelector(".pet-reply")!.contains(screen.getByRole("button", { name: "添加文件" }))).toBe(true);
     expect(screen.queryByRole("log")).toBeNull();
     expect(screen.getByTestId("pet-latest").className).toContain("pet-latest");
     expect(vi.mocked(window.handAgentPet!.setLayout).mock.lastCall?.[0]).toBe("compact");
     fireEvent.mouseEnter(bubble);
     expect(screen.getByTestId("pet-latest").textContent).toContain("第五行全文");
     expect(screen.getByRole("log").querySelector('[data-author="user"]')?.textContent).toContain("我的资料");
-    expect(screen.getByRole("log").contains(heading)).toBe(true);
+    expect(screen.getByRole("log").contains(input)).toBe(false);
     act(() => input.focus());
     fireEvent.mouseLeave(bubble);
     expect(screen.queryByRole("log")).toBeNull();
@@ -310,7 +343,7 @@ describe("桌宠的轻量交互", () => {
         { id: "answer", role: "assistant", text: "前一条桌宠回复", status: "completed", createdAt: "2026", updatedAt: "2026" },
       ],
     } })));
-    expect(screen.getByText("创建时：原名称 · 角色 v2")).toBeTruthy();
+    expect(controller.store.getState().threadsById.a.petSnapshot).toMatchObject({ name: "原名称", revision: 2 });
     act(() => Socket.latest.receive(note("assistant.delta", {
       threadId: "a", turnId: "second-turn", itemId: "latest-answer",
       payload: { text: "最新的回复留在角色头上", suggestedReplies: ["继续阅读"], awaitingReply: true },
@@ -417,7 +450,12 @@ describe("桌宠的轻量交互", () => {
     act(() => Socket.latest.receive(note("turn.started", { threadId: "a", turnId: "executing", payload: {} })));
     const input = screen.getByRole("textbox", { name: "回复当前对话" });
     fireEvent.change(input, { target: { value: "补充一条" } });
-    fireEvent.click(screen.getByRole("button", { name: "发送回复" }));
+    fireEvent.click(screen.getByRole("button", { name: "停止本轮" }));
+    expect(Socket.latest.sent.at(-1)).toMatchObject({ type: "op.submit", threadId: "a", payload: { op: { type: "interrupt" } } });
+    expect((input as HTMLTextAreaElement).value).toBe("补充一条");
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(Socket.latest.sent.at(-1)?.payload.op.type).toBe("interrupt");
+    fireEvent.keyDown(input, { key: "Enter" });
     expect(Socket.latest.sent.filter((message) => message.type === "op.submit").at(-1)?.payload.op.payload.items[0].text).toBe("补充一条");
     act(() => Socket.latest.receive(note("user.message.recorded", { threadId: "a", payload: { messageId: "queued", text: "补充一条", pending: true } })));
     expect(screen.getByRole("log").textContent).toContain("待处理");
@@ -497,5 +535,15 @@ describe("桌宠的轻量交互", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "对话" }));
     fireEvent.click(screen.getByRole("button", { name: /^我的资料/ }));
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("A 的草稿");
+    let finishPicking!: (paths: string[]) => void;
+    window.handAgentPet!.chooseFiles = () => new Promise(resolve => { finishPicking = resolve; });
+    fireEvent.click(screen.getByRole("button", { name: "添加文件" }));
+    fireEvent.click(screen.getByRole("button", { name: "新建对话" }));
+    await act(async () => finishPicking(["/tmp/context.txt"]));
+    expect(controller.getSnapshot()).toMatchObject({ threadId: null, files: [] });
+    act(() => controller.selectThread("a"));
+    expect(screen.getByRole("button", { name: "移除 context.txt" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "移除 context.txt" }));
+    expect(controller.getSnapshot().files).toEqual([]);
   });
 });

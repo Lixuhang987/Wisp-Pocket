@@ -1,10 +1,10 @@
-import { useEffect, useState, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useState, useLayoutEffect, useRef } from "react";
 import type { ThreadState } from "../../../thread-window-web/src/store/threadWindowStore.ts";
 import type { AssistantMessageItem, ThreadItem } from "../../../thread-window-web/src/store/threadItems.ts";
 import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentUrl.ts";
 import type { PetThreadController } from "./petThreadController.ts";
 
-export function PetConversation({ thread, latestAssistant, expanded, status, error, controller, attempt, onRespond, threadURL, heading }: {
+export function PetConversation({ thread, latestAssistant, expanded, status, error, controller, attempt, onRespond, threadURL }: {
   thread?: ThreadState;
   latestAssistant?: AssistantMessageItem;
   expanded: boolean;
@@ -14,7 +14,6 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
   attempt: (action: () => void) => boolean;
   onRespond: (text: string) => void;
   threadURL: string;
-  heading: ReactNode;
 }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => { if (!expanded || !thread?.permissionRequests.length) return; const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [expanded, thread?.permissionRequests.length]);
@@ -46,7 +45,6 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
       }
     }}>
     <div className="pet-history-content" ref={contentRef}>
-      {heading}
       {messages.map((message) => <PetMessage key={message.id} message={message}
         latest={message.id === latestAssistant?.id} threadURL={threadURL} />)}
       {(status || error) && <div className="pet-message pet-notice" data-pet-interactive>

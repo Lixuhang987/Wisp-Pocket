@@ -71,19 +71,25 @@ it("五宠的两段历史与新话题草稿在 renderer 重建后分别恢复", 
   for (let i = 0; i < 5; i++) {
     const pet = openPet(`pet-${i}`, [`a-${i}`, `b-${i}`]);
     pet.setDraft(`A${i}`);
+    pet.addFiles([`/tmp/A${i}.pdf`]);
     pet.selectThread(`b-${i}`);
     pet.setDraft(`B${i}`);
+    pet.addFiles([`/tmp/B${i}.pdf`]);
     pet.newTopic();
     pet.setDraft(`New${i}`);
+    pet.addFiles([`/tmp/New${i}.pdf`]);
     if (i % 2 === 0) pet.revealBubble(); else pet.hideBubble();
     pet.disconnect();
   }
   for (let i = 0; i < 5; i++) {
     const pet = openPet(`pet-${i}`, [`a-${i}`, `b-${i}`]);
     expect(pet.getSnapshot()).toMatchObject({ threadId: null, draft: `New${i}`, bubbleVisible: i % 2 === 0 });
+    expect(pet.getSnapshot().files.map(file => file.path)).toEqual([`/tmp/New${i}.pdf`]);
     pet.selectThread(`a-${i}`);
     expect(pet.getSnapshot().draft).toBe(`A${i}`);
+    expect(pet.getSnapshot().files.map(file => file.path)).toEqual([`/tmp/A${i}.pdf`]);
     pet.selectThread(`b-${i}`);
     expect(pet.getSnapshot().draft).toBe(`B${i}`);
+    expect(pet.getSnapshot().files.map(file => file.path)).toEqual([`/tmp/B${i}.pdf`]);
   }
 });

@@ -9,7 +9,7 @@
 | `main/` | [main/main.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/main/main.md) | Electron main process：Swift bridge、agent-server supervisor、窗口生命周期和 command 路由 |
 | `preload/` | [preload/preload.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/preload/preload.md) | ThreadWindow / ActivityWindow 的受控 renderer globals 与 IPC 暴露 |
 | `activity-window/` | [activity-window/activity-window.md](/Users/mu9/proj/handAgent/apps/electron-shell/src/activity-window/activity-window.md) | React 桌宠 renderer，通过 `/api/thread` 接收拖入、显示历史并回复 |
-| `petWindowLayout.ts` | 无独立子文档 | renderer 与 main 共用的角色几何、默认比例、对话列与回复框尺寸及窗口布局合约 |
+| `petWindowLayout.ts` | 无独立子文档 | renderer 与 main 共用的角色几何、默认比例、对话列、输入行与工具行尺寸及窗口布局合约 |
 
 ## 进程边界
 

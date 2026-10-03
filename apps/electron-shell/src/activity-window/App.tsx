@@ -7,7 +7,7 @@ import { PetSizeControl, usePetSize } from "./PetSizeControl.tsx";
 import { PetManager } from "./PetManager.tsx";
 import { PetContextMenu, type PetMenuAction } from "./PetContextMenu.tsx";
 import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentUrl.ts";
-import { readDroppedItems, pathInput } from "./readDroppedItems.ts";
+import { readDroppedItems } from "./readDroppedItems.ts";
 import { petWindowLayout } from "../petWindowLayout.ts";
 
 type HostTheme = { preference: "light" | "dark" | "system"; resolved: "light" | "dark" };
@@ -52,6 +52,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   const [error, setError] = useState<string | null>(null);
   const displayedError = error ?? snapshot.error ?? thread?.errorMessage ?? controller.store.getState().windowErrorMessage;
   const [reading, setReading] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [dropTarget, setDropTarget] = useState<PetDropTarget | null>(null);
   const [moving, setMoving] = useState(false);
   const [petSize, setPetSize] = usePetSize(controller.petId);
@@ -90,7 +91,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
 
   useEffect(() => setImageFailed(false), [snapshot.pet?.imageRef]);
   useEffect(() => window.handAgentPet?.onReveal(() => controller.revealBubble()), [controller]);
-  useEffect(() => { window.handAgentPet?.setReceiving(reading || snapshot.receiving); }, [reading, snapshot.receiving]);
+  useEffect(() => { window.handAgentPet?.setReceiving(choosing || reading || snapshot.receiving); }, [choosing, reading, snapshot.receiving]);
 
   useLayoutEffect(() => {
     if (visible && focusRequested.current) {
@@ -136,7 +137,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       stage?.removeEventListener("scroll", reportRegions, true);
       window.removeEventListener("resize", reportRegions);
     };
-  }, [layout, historyOpen, managerOpen, petSize, sizeControlsOpen, contextMenuOpen, visible, status, displayedError, thread?.messages, thread?.permissionRequests, thread?.title, thread?.petSnapshot, snapshot.pet]);
+  }, [layout, historyOpen, managerOpen, petSize, sizeControlsOpen, contextMenuOpen, visible, status, displayedError, thread?.messages, thread?.permissionRequests, snapshot.files, snapshot.pet]);
 
   function attempt(action: () => void): boolean {
     try { action(); setError(null); return true; }
@@ -147,10 +148,10 @@ export function App({ controller: suppliedController }: { controller?: PetThread
     controller.setDraft(text);
   }
 
-  function respond(text: string): void {
-    if (!text.trim() || submissionPending.current) return;
+  function respond(text: string, includeFiles = false): void {
+    if ((!text.trim() && (!includeFiles || !snapshot.files.length)) || submissionPending.current) return;
     attempt(() => {
-      const accepted = controller.respond(text);
+      const accepted = controller.respond(text, includeFiles);
       if (!accepted) { updateDraft(""); return; }
       submissionPending.current = true;
       setSubmitting(true);
@@ -161,6 +162,25 @@ export function App({ controller: suppliedController }: { controller?: PetThread
         setSubmitting(false);
       });
     });
+  }
+
+  async function chooseFiles(): Promise<void> {
+    const targetThreadId = snapshot.threadId;
+    setChoosing(true);
+    setError(null);
+    try {
+      const paths = await window.handAgentPet?.chooseFiles();
+      if (paths?.length) controller.addFiles(paths, targetThreadId);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
+    finally { setChoosing(false); }
+  }
+
+  function newTopic(): void {
+    controller.newTopic();
+    controller.revealBubble();
+    setHistoryOpen(false);
+    setError(null);
+    replyRef.current?.focus({ preventScroll: true });
   }
 
   function dragOver(event: DragEvent, target: PetDropTarget): void {
@@ -208,6 +228,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       "--pet-conversation-width": `${petWindowLayout.conversationWidth}px`,
       "--pet-inset": `${petWindowLayout.inset}px`,
       "--pet-reply-height": `${petWindowLayout.replyHeight}px`,
+      "--pet-toolbar-height": `${petWindowLayout.toolbarHeight}px`,
     } as CSSProperties} onDragLeave={(event) => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
     }}>
@@ -216,7 +237,6 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       {managerOpen && <PetManager controller={controller} threadURL={threadURL()} onClose={() => setManagerOpen(false)} />}
       {historyOpen && <section className="pet-popover" data-pet-interactive aria-label="本宠对话">
         <header><span>{snapshot.pet?.name}的对话</span><button onClick={() => setHistoryOpen(false)}>关闭</button></header>
-        <button onClick={() => { controller.newTopic(); controller.revealBubble(); setHistoryOpen(false); }}>新话题</button>
         {snapshot.history.map(item => <div className="pet-history-row" key={item.id}>
           <button onClick={() => { controller.selectThread(item.id); controller.revealBubble(); setHistoryOpen(false); }}>{item.preview || "新对话"}<small>{item.status} · {item.updatedAt.slice(0,16).replace("T"," ")}</small></button>
           <button aria-label={`删除 ${item.preview || "新对话"}`} onClick={() => setDeleteTarget(item.id)}>删除</button>
@@ -232,14 +252,11 @@ export function App({ controller: suppliedController }: { controller?: PetThread
           onDragOver={(event) => dragOver(event, "conversation")} onDrop={(event) => void drop(event, "conversation")}>
           <PetConversation thread={thread} latestAssistant={snapshot.latestAssistant} expanded={expanded}
             status={showStatus ? status : undefined} error={displayedError}
-            controller={controller} attempt={attempt} onRespond={respond} threadURL={threadURL()} heading={<div className="pet-conversation-heading" data-pet-interactive>
-            {snapshot.pet?.name ?? "月见八千代"} · {thread?.title || "新对话"}
-            {thread?.petSnapshot && snapshot.pet && thread.petSnapshot.revision !== snapshot.pet.revision && <small>使用原角色设定 v{thread.petSnapshot.revision}</small>}
-            {thread?.petSnapshot && <small>创建时：{thread.petSnapshot.name} · 角色 v{thread.petSnapshot.revision}</small>}
-            {thread?.status === "running" && <button onClick={() => attempt(() => controller.stop())}>停止本轮</button>}
-            <button onClick={() => { setReading(true); void window.handAgentPet?.chooseFiles().then(async paths => { if (paths.length) await controller.drop(paths.map(path => pathInput(path)), snapshot.threadId ? "conversation" : "pet", snapshot.threadId ?? undefined); }).catch(failure => setError(String(failure))).finally(() => setReading(false)); }}>交付文件</button>
-          </div>} />
-          <PetReply draft={draft} setDraft={updateDraft} onRespond={respond} inputRef={replyRef} submitting={submitting} />
+            controller={controller} attempt={attempt} onRespond={respond} threadURL={threadURL()} />
+          <PetReply draft={draft} setDraft={updateDraft} files={snapshot.files} onRemoveFile={id => controller.removeFile(id)}
+            onChooseFiles={() => void chooseFiles()} onNewTopic={newTopic} onStop={() => attempt(() => controller.stop())}
+            onRespond={text => respond(text, true)} inputRef={replyRef} submitting={submitting || snapshot.receiving}
+            choosing={choosing} running={thread?.status === "running"} />
           {dropTarget === "conversation" && <div className="pet-drop-label">添加到当前对话</div>}
         </section>
       )}

@@ -5,15 +5,17 @@ import { makeThreadWindowStore } from "../../../thread-window-web/src/store/thre
 import type { AssistantMessageItem } from "../../../thread-window-web/src/store/threadItems.ts";
 import { ThreadSocketClient } from "../../../thread-window-web/src/thread/threadSocketClient.ts";
 import { ThreadInputController } from "../../../thread-window-web/src/thread/threadInputController.ts";
+import { pathInput } from "./readDroppedItems.ts";
 
 export type PetDropTarget = "pet" | "conversation";
+export type PetDraftFile = { id: string; path: string };
 export type PetSnapshot = {
-  threadId: string | null; pet?: Pet; bubbleVisible: boolean; draft: string; error?: string;
+  threadId: string | null; pet?: Pet; bubbleVisible: boolean; draft: string; files: PetDraftFile[]; error?: string;
   latestAssistant?: AssistantMessageItem; connection: "disconnected" | "connecting" | "connected";
   history: ThreadListEntry[]; nextCursor?: string | null; receiving: boolean;
 };
-type Submission = { id: string; threadId?: string; items: InputItem[]; key: string; navigation: number; draftKey?: string; resolve?: () => void; reject?: (error: Error) => void };
-type Preferences = { selectedThreadId?: string | null; drafts: Record<string, string>; visibility?: "visible" | "hidden"; submissions?: Array<Omit<Submission,"resolve"|"reject">> };
+type Submission = { id: string; threadId?: string; items: InputItem[]; key: string; navigation: number; draftKey?: string; draftText?: string; files?: PetDraftFile[]; resolve?: () => void; reject?: (error: Error) => void };
+type Preferences = { selectedThreadId?: string | null; drafts: Record<string, string>; files?: Record<string, PetDraftFile[]>; visibility?: "visible" | "hidden"; submissions?: Array<Omit<Submission,"resolve"|"reject">> };
 
 /** One independent UI projection bound permanently to one Pet. */
 export class PetThreadController {
@@ -24,7 +26,7 @@ export class PetThreadController {
   private readonly listeners = new Set<() => void>();
   private preferences: Preferences = { drafts: {} };
   private visibility: "startup" | "visible" | "hidden" = "startup";
-  private snapshot: PetSnapshot = { threadId: null, bubbleVisible: false, draft: "", connection: "disconnected", history: [], receiving: false };
+  private snapshot: PetSnapshot = { threadId: null, bubbleVisible: false, draft: "", files: [], connection: "disconnected", history: [], receiving: false };
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private closed = true;
   private error?: string;
@@ -74,6 +76,20 @@ export class PetThreadController {
   hideBubble(): void { this.visibility = "hidden"; this.preferences.visibility = "hidden"; this.save(); this.changed(); }
   revealBubble(): void { this.visibility = "visible"; this.preferences.visibility = "visible"; this.save(); this.changed(); }
   setDraft(text: string, threadId = this.preferences.selectedThreadId): void { this.preferences.drafts[threadId ?? "new"] = text; this.save(); this.changed(); }
+  addFiles(paths: string[], threadId = this.preferences.selectedThreadId): void {
+    if (threadId && !this.ownsThread(threadId)) throw new Error("目标对话已删除，文件没有改投其他对话。");
+    if (paths.some(path => !path.startsWith("/"))) throw new Error("文件没有可交付的本地原路径。");
+    const key = threadId ?? "new";
+    const files = this.preferences.files ??= {};
+    const current = files[key] ?? [];
+    files[key] = [...current, ...[...new Set(paths)].filter(path => !current.some(file => file.path === path)).map(path => ({ id: crypto.randomUUID(), path }))];
+    this.save(); this.changed();
+  }
+  removeFile(id: string): void {
+    const key = this.preferences.selectedThreadId ?? "new";
+    if (this.preferences.files) this.preferences.files[key] = (this.preferences.files[key] ?? []).filter(file => file.id !== id);
+    this.save(); this.changed();
+  }
   selectThread(threadId: string): void {
     if (!this.ownsThread(threadId)) throw new Error("该对话不属于当前桌宠。");
     this.navigation += 1;
@@ -82,22 +98,20 @@ export class PetThreadController {
   newTopic(): void { this.navigation += 1; this.preferences.selectedThreadId = null; this.save(); this.changed(); }
   listMore(): void { if (this.nextCursor) { this.loadingMore = true; this.socket.listThreads(this.nextCursor); } }
   deleteThread(threadId: string): void { this.requireConnection(); if (!this.ownsThread(threadId)) throw new Error("该对话不属于当前桌宠。"); this.socket.sendRaw(encodeThreadDelete({targetThreadId:threadId, commandId:crypto.randomUUID(),timestamp:new Date().toISOString()})); }
-  stop(): void { const threadId = this.preferences.selectedThreadId; if (threadId) this.socket.submitOp(threadId, {type:"interrupt",opId:crypto.randomUUID(),timestamp:new Date().toISOString(),payload:{reason:"user"}}); }
+  stop(): void { this.requireConnection(); const threadId = this.preferences.selectedThreadId; if (threadId) this.socket.submitOp(threadId, {type:"interrupt",opId:crypto.randomUUID(),timestamp:new Date().toISOString(),payload:{reason:"user"}}); }
   drop(items: InputItem[], target: PetDropTarget, threadId = this.preferences.selectedThreadId ?? undefined, id = crypto.randomUUID()): Promise<void> {
     if (target === "conversation" && !threadId) throw new Error("当前没有可追加的对话，请把内容拖到角色上。");
     return this.submit(items, target === "pet" ? undefined : threadId, id);
   }
-  respond(text: string): Promise<void> | undefined {
-    if (!text.trim()) return;
+  respond(text: string, includeFiles = false): Promise<void> | undefined {
     const key = this.preferences.selectedThreadId ?? "new";
     const originalDraft = this.preferences.drafts[key] ?? "";
-    const accepted = this.submit([{type:"text",id:crypto.randomUUID(),text:text.trim()}], this.preferences.selectedThreadId ?? undefined);
-    const submission = [...this.submissions.values()].find(s => s.resolve && s.items.length === 1 && s.items[0].type === "text" && s.items[0].text === text.trim());
-    if (submission && originalDraft.trim() === text.trim()) submission.draftKey = key;
-    return accepted.then(() => {
-      const target = submission?.draftKey;
-      if (target && this.preferences.drafts[target] === originalDraft) { delete this.preferences.drafts[target]; this.save(); this.changed(); }
-    });
+    const files = includeFiles ? this.preferences.files?.[key] ?? [] : [];
+    const items: InputItem[] = text.trim() ? [{type:"text",id:crypto.randomUUID(),text:text.trim()}] : [];
+    items.push(...files.map(file => ({ ...pathInput(file.path), id: file.id })));
+    if (!items.length) return;
+    return this.submit(items, this.preferences.selectedThreadId ?? undefined, crypto.randomUUID(),
+      { draftKey: key, draftText: originalDraft.trim() === text.trim() ? originalDraft : undefined, files });
   }
   answerPermission(requestId: string, decision: "allow" | "deny", scope: "once" | "always" = "once"): void {
     this.requireConnection(); this.socket.sendRaw(encodePermissionAnswer({requestId,decision,scope,timestamp:new Date().toISOString()}));
@@ -105,13 +119,14 @@ export class PetThreadController {
   command(type: "pet.image.import" | "pet.create" | "pet.update", payload: Record<string, unknown>, commandId = crypto.randomUUID()): Promise<ThreadNotification> {
     this.requireConnection(); return new Promise((resolve,reject)=> { this.management.set(commandId,{resolve,reject}); this.socket.sendRaw(JSON.stringify({type,payload,commandId,timestamp:new Date().toISOString()})); });
   }
-  private submit(items: InputItem[], threadId?: string, id = crypto.randomUUID()): Promise<void> {
+  private submit(items: InputItem[], threadId?: string, id = crypto.randomUUID(), draft?: Pick<Submission, "draftKey" | "draftText" | "files">): Promise<void> {
     this.requireConnection();
     if (threadId && !this.ownsThread(threadId)) throw new Error("该对话已经删除或不属于当前桌宠。");
     const key = JSON.stringify([threadId ?? "new", items.map(({id: _id,...item})=>item)]);
     let submission = [...this.submissions.values()].find(s=>s.key===key || !!threadId && s.threadId===threadId && JSON.stringify(s.items.map(({id:_id,...item})=>item))===JSON.stringify(items.map(({id:_id,...item})=>item)));
     if (submission?.resolve) throw new Error("正在接收这份输入，请稍候。");
     submission ??= {id,threadId,items,key,navigation:this.navigation}; this.submissions.set(submission.id, submission);
+    if (draft) Object.assign(submission, draft);
     const current = submission;
     const accepted = new Promise<void>((resolve,reject)=> { current.resolve=resolve; current.reject=reject; });
     if (current.threadId) this.socket.submitOp(current.threadId,{type:"user_input",opId:current.id,timestamp:new Date().toISOString(),payload:{items:current.items}});
@@ -126,7 +141,12 @@ export class PetThreadController {
       const submission = notification.commandId ? this.submissions.get(notification.commandId) : undefined;
       if (submission) {
         submission.threadId = notification.threadId;
-        if (submission.navigation === this.navigation) { if (!this.preferences.selectedThreadId) { this.preferences.drafts[notification.threadId] = this.preferences.drafts.new ?? ""; delete this.preferences.drafts.new; if (submission.draftKey === "new") submission.draftKey = notification.threadId; } this.preferences.selectedThreadId = notification.threadId; this.save(); }
+        if (submission.navigation === this.navigation) { if (!this.preferences.selectedThreadId) {
+          this.preferences.drafts[notification.threadId] = this.preferences.drafts.new ?? ""; delete this.preferences.drafts.new;
+          if (this.preferences.files?.new) { this.preferences.files[notification.threadId] = this.preferences.files.new; delete this.preferences.files.new; }
+          if (submission.draftKey === "new") submission.draftKey = notification.threadId;
+        } this.preferences.selectedThreadId = notification.threadId; }
+        this.save();
       }
     } else if (notification.type === "thread.listed") {
       this.nextCursor = notification.payload.nextCursor;
@@ -136,16 +156,16 @@ export class PetThreadController {
         if (selected && !history.some(t=>t.id===selected)) {
           // A selected item may live on another page; resume provides its authoritative existence.
           if (notification.payload.nextCursor) this.socket.resumeThread(selected);
-          else { delete this.preferences.drafts[selected]; this.preferences.selectedThreadId = history[0]?.id ?? null; }
+          else { this.clearDraft(selected); this.preferences.selectedThreadId = history[0]?.id ?? null; }
         } else if (selected === undefined) this.preferences.selectedThreadId = history[0]?.id ?? null;
         this.restoring = false; this.save(); if (this.preferences.selectedThreadId) this.socket.resumeThread(this.preferences.selectedThreadId);
       }
     } else if (notification.type === "thread.deleted" && notification.payload.status === "deleted") {
-      const id = notification.payload.targetThreadId; delete this.preferences.drafts[id];
+      const id = notification.payload.targetThreadId; this.clearDraft(id);
       if (this.preferences.selectedThreadId===id) { this.preferences.selectedThreadId=this.history()[0]?.id ?? null; if (this.preferences.selectedThreadId) this.socket.resumeThread(this.preferences.selectedThreadId); } this.save();
     }
     if (notification.type === "thread.error" && notification.threadId === this.preferences.selectedThreadId && "code" in notification.payload && notification.payload.code === "not_found") {
-      delete this.preferences.drafts[notification.threadId!];
+      this.clearDraft(notification.threadId!);
       this.preferences.selectedThreadId = this.history().find(thread => thread.id !== notification.threadId)?.id ?? null;
       this.save();
       if (this.preferences.selectedThreadId) this.socket.resumeThread(this.preferences.selectedThreadId);
@@ -157,14 +177,26 @@ export class PetThreadController {
       else if (notification.type === "thread.deleted" && notification.payload.targetThreadId===submission.threadId) this.finish(submission,new Error("目标对话已删除，输入没有改投其他对话。"));
     }
   }
-  private finish(submission: Submission, error?: Error): void { if (error) submission.reject?.(error); else submission.resolve?.(); submission.resolve=undefined;submission.reject=undefined; }
+  private clearDraft(key: string): void { delete this.preferences.drafts[key]; if (this.preferences.files) delete this.preferences.files[key]; }
+  private finish(submission: Submission, error?: Error): void {
+    if (error) submission.reject?.(error);
+    else {
+      const key = submission.draftKey;
+      if (key) {
+        if (submission.draftText !== undefined && this.preferences.drafts[key] === submission.draftText) delete this.preferences.drafts[key];
+        if (this.preferences.files?.[key]) this.preferences.files[key] = this.preferences.files[key].filter(file => !submission.files?.some(sent => sent.id === file.id));
+      }
+      submission.resolve?.();
+    }
+    submission.resolve=undefined;submission.reject=undefined;
+  }
   private history(): ThreadListEntry[] { return this.store.getState().history.filter(t=>t.petId===this.petId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)); }
   private ownsThread(id: string): boolean { return this.history().some(t=>t.id===id) || this.store.getState().threadsById[id]?.petId===this.petId; }
   private requireConnection(): void { if (this.store.getState().connectionState!=="connected") throw new Error("还没有连上服务，输入尚未提交。"); }
   private save(): void { this.preferences.submissions = [...this.submissions.values()].map(({resolve:_resolve,reject:_reject,...submission})=>submission); try { localStorage.setItem(this.preferenceKey,JSON.stringify(this.preferences)); this.error=undefined; } catch { this.error="草稿保存失败，本次输入仍保留在窗口中。"; } }
   private changed(): void {
     const state=this.store.getState(), threadId=this.preferences.selectedThreadId ?? null, thread=threadId ? state.threadsById[threadId] : undefined;
-    this.snapshot={threadId,pet:state.pets.find(p=>p.id===this.petId),bubbleVisible:this.visibility==="visible",draft:this.preferences.drafts[threadId??"new"]??"",error:this.error,
+    this.snapshot={threadId,pet:state.pets.find(p=>p.id===this.petId),bubbleVisible:this.visibility==="visible",draft:this.preferences.drafts[threadId??"new"]??"",files:this.preferences.files?.[threadId??"new"]??[],error:this.error,
       latestAssistant:thread?.messages.findLast((item):item is AssistantMessageItem=>item.type==="assistant_message"&&!!item.text.trim()),connection:state.connectionState,
       history:this.history(),nextCursor:this.nextCursor,receiving:[...this.submissions.values()].some(s=>!!s.resolve)};
     for(const listener of this.listeners) listener();

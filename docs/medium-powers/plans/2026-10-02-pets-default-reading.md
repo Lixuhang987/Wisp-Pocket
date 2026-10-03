@@ -4,6 +4,7 @@
 
 ## 最新决定与共同合约
 
+- 2026-10-03 输入修订：删除整块身份标题气泡；输入框下方用小图标添加文件和新建对话。文件选择仅加入当前草稿上下文，主动发送才提交文字与路径；发送按钮在当前 Thread 运行时切换为停止，Enter 仍可提交后续输入，IME 不误发。
 - 2026-10-03 用户修正桌宠：伙伴 / 对话 / 隐藏入口仅在右键菜单出现；当前对话不展示目录，也不通过 title 提示路径。悬停浏览必须保持角色、回复框和短内容的屏幕位置稳定。
 - 2026-10-02 用户覆盖 #7：Pet 创建后 `rootPath` 不可修改；后端拒绝更新文件根，编辑界面仅展示。Thread 不保存文件根快照，执行时从不可转移的 `petId` 取得 Pet 固定根。
 - 角色提示仍在 Thread 创建时保存版本快照；修改名字和图片即时展示，修改角色仅影响新 Thread。实际文件位置从所属 Pet 派生。
@@ -37,12 +38,9 @@
 6. 全部实现后运行 TypeScript/Web、Swift test/build、Electron完整build；双轴独立代码审核并修复发现。
 7. 分发无上下文的独立文档审核，核对两个issue及本页用户覆盖决定，更新manual QA后提交。
 
-## 验证状态（2026-10-02 实施历史）
+## 原实现工作区（历史）
 
-- 隔离目录：`.worktrees/issues-6-7-pets-reading`，分支 `codex/issues-6-7-pets-reading`。
-- 基点：`c40b875a7bfa0d23a51dd0591a13b4b361aca45e`。
-- CodeGraph索引已初始化，TypeScript/Web与Swift build基线通过。
-- 实机与真实模型尚待验；完成后只记录实际证据，不将自动化替身结果当实机成功。
+2026-10-02 在 `.worktrees/issues-6-7-pets-reading` / `codex/issues-6-7-pets-reading` 从 `c40b875a7bfa0d23a51dd0591a13b4b361aca45e` 实施；独立索引、TypeScript/Web 与 Swift build 基线通过。各批次自动化结果只证明对应构建，M01–M07 与真实模型始终另列待验。
 
 ## 原实现验证记录（2026-10-02）
 
@@ -83,13 +81,20 @@
 ## 2026-10-03 桌宠回归修复计划
 
 - 本轮在 `.worktrees/pets-hover-context-menu-fix` / `codex/pets-hover-context-menu-fix` 执行，基于多宠实现提交 `7e352e7`。上方检查与独立审核分别属于原实现及测试维护分支，不作为两分支合并后的检查证据；最新用户要求覆盖旧常驻入口及对话内文件位置展示。
-- 用例：角色周围不设常驻管理入口，逐宠对话显隐恢复与点击语义保持；右键角色打开菜单，伙伴 / 对话 / 隐藏沿用现有动作，大小调节继续可用；菜单支持关闭与键盘操作。右侧对话保持标题、交付文件及原角色提示，不展示文件根。仅 hover 展开历史，角色 / 回复框 / 短内容保持底部位置，移出保留焦点和草稿。
-- 沿用数据与接口：逐宠 controller 的选择 / 草稿 / 显隐不变；菜单是 renderer 局部状态，动作复用 PetManager、历史弹层及 handAgentPet.hidePet；布局继续通过 setLayout(mode, contentHeight) 和 setInteractiveRegions 发送给原生控制器，不增加协议。
+- 用例：角色周围不设常驻管理入口，逐宠对话显隐恢复与点击语义保持；右键角色打开菜单，伙伴 / 对话 / 隐藏沿用现有动作，大小调节继续可用；菜单支持关闭与键盘操作。当时右侧对话保留标题、交付文件及原角色提示（已被下节输入修订覆盖），不展示文件根。仅 hover 展开历史，角色 / 回复框 / 短内容保持底部位置，移出保留焦点和草稿。
 - 先测入口：扩展 pet-interaction 既有大小、hover / 回复节点和 drop 后切历史用例，覆盖右键到动作的完整流；复用 pet-window 的锚点用例。用独立 Electron 渲染 harness 加载当前 worktree 的真实 renderer / CSS / preload / controller，测量 hover 前后标题与回复框屏幕坐标，先复现再验证。此回归任务新增自动测试预算最多 1 项，实际新增 0 项；#6/#7 测试维护另按上节收敛。
-- 检查点：鼠标进入对话 → React expanded → DOM 尺寸 / 内容测量 → preload IPC → 原生 bounds / 命中 → 鼠标仍在同一内容；每一步用真实渲染坐标或既有 IPC 主路径断言验证。
-- 先确认跳跃发生在 renderer 布局还是原生定位，再作最小改动；同步目录指南、surface 与规格，独立文档审核后更新 manual QA，执行提交前检查并提交。
 - 合并前修复验证：既有 renderer 共 23 项，无新增测试项，扩展其中三个用例；`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 Electron build 均成功。结果位于本轮 worktree `.cache/pets-fix-final-web.log`、`pets-fix-final-swift-test.log`、`pets-fix-final-swift-build.log`、`pets-fix-electron-build.log`，独立文档审核已回读成功结果。
 - 真实 Electron 受控空对话复现：修复前标题上跳 469.55px，标题移入消息的底部对齐滚动内容、紧凑测量包含标题后，连续五次移入 / 移出的标题 / 角色 / 回复框屏幕坐标变化均为 0，路径 title 为 null；菜单截图核对四个入口在角色上方。证据为本轮 worktree `.cache/pet-hover-result.json`、`pet-hover.png`、`pet-context-menu.png`。后端、屏幕与光标为受控 fixture，只证明此布局链路；完整宿主、长历史、中文输入法与多屏仍在 manual QA 待验。
 - 无继承上下文的独立文档审核已完成：读取全部多宠规格、修改目录的 owning 指南及父级至 `handAgent.md`，核对最新用户决定、源码与受控渲染证据；修正右键入口、目录查看范围及对话显隐恢复的表述，明确历史检查与本轮证据。manual QA 已更新，全部实机待验项保留；改动文档的本地链接、锚点与 `git diff --check` 通过。TODO 的本轮工作流已迁移到 manual QA 与本节记录。
 - 并行维护整合：合入 `codex/issues-6-7-pets-reading` 的测试维护提交 `452c027`，保留其角色来源、显隐 / 稳定身份重建、Permission 与状态 / 草稿断言；新的对话选择操作适配为右键角色 → menuitem。维护删除独立角色来源 case 并移动断言，合并后 renderer 专项 22 项通过，本修复新增仍为 0；三项完整检查和 Electron build 均成功。日志为 `.cache/pets-fix-merged-renderer.log`、`pets-fix-merged-{web,swift-test,swift-build,electron-build}.log`，独立文档审核已回读。生产源码未因本次 merge 改动，上述五次坐标证据继续适用。
 - 增量文档审核已复核四个冲突文件与相应 spec / owning 链路，保留双方断言及验证边界；manual QA 明确 FIFO / 失败矩阵已转为人工抽验，23 项仅为合并前历史，22 项为合并后结果。三份文档的 28 个本地链接（含 4 个锚点）及 `git diff --check` 通过，无遗留冲突；生产行为和实机待验范围未改变。
+
+## 输入工具行实施（2026-10-03）
+
+- 在 `.worktrees/pet-composer-icons` 从 `a3b4eab` 实施，独立索引及 `scripts/test.sh` 基线通过。用户本轮决定覆盖上节保留标题和独立停止按钮的描述。
+- 选择文件 → preload 原路径 → controller 按 Thread/new 暂存 `{id,path}` → 文件名 chip；此阶段不创建或提交。发送 → 现有 submit 的一次 UserInput（文字与 pathInput）→ 持久 ACK → 清除已提交且未改动的文字、按 id 清已提交文件；失败保留，重建沿用提交身份。新建对话仅导航 new 并聚焦；选择开始时固定草稿键，异步返回不改投。资料和草稿随主动创建迁移，切历史与隐藏保留；删 Thread 同步清其资料。建议继续独立文字输入，不消耗待发送文件。
+- `PetSnapshot.files` / preferences 的逐草稿 files 属于 renderer 状态；submit 保存 `draftKey/draftText/files` 以便恢复后 ACK 也能清理。发送按钮根据所选 Thread.status 切换 send/interrupt，停止不清输入；提交未确认时禁止重复发送，输入仍可编辑。输入行固定 44px，下方工具行固定高度，文件 chip 在其上且限高滚动；共享窗口测量计入整个 composer，原生命中随资料变化刷新。
+- 先扩展 `pet-interaction` 的首轮文字流程验证选文件暂存/统一提交/ACK 保留新编辑；失败重试 case 加入文件；执行中回复 case 验证按钮停止和 Enter 排队；既有 hover/命中及 `pet-identity` 五宠草稿流程同步文件隔离。累计新增仍为 #6=3、#7=4，本轮新增 0；不新增证明标题/旧按钮已删除的负向测试。真实 Electron harness 核对 composer/消息/角色 hover 坐标和图标位置。
+- 本轮检查全部通过：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 Electron build；最终日志为 `/tmp/pet-composer-final-{web,swift-test,swift-build}.log`、`/tmp/pet-composer-build.log`。renderer 共 24 项（交互 22、身份 2），沿用既有 case，本轮新增 0。
+- 真实 Electron 受控 harness 加载已选文件，五次 hover 的输入 / composer / 角色屏幕坐标位移均为 0，输入行 44px、下方工具行 28px；证据为本 worktree `.cache/pet-composer-geometry.json`、`pet-composer.png`。harness 旧字段 `heading` / `titleJump` 实际测量 `.pet-reply-input`，不表示仍有身份标题。后端断连，屏幕 / 光标 / 选择器为 fixture，只证明布局；完整宿主及 M01–M07 仍待验。
+- 无上下文独立文档审核已完成：阅读全部多宠规格、修改目录指南及父级至 `handAgent.md`，核对实现、用户修订、最终日志和受控截图，修正旧身份提示及历史证据边界。owning、surface、spec 与 manual QA 已同步，本轮工作流已从 TODO 移出；16 份改动 md 的 116 个本地链接（5 个锚点）及 diff 检查通过，无文档遗留，由主 agent 提交并同步目标分支。

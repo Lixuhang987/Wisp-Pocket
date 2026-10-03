@@ -24,8 +24,8 @@
 | --- | --- |
 | `petId` | Thread 创建时必填且只能指向存在的 Pet；永久不变，替代旧 workspaceId，不再保留未归属分组 |
 | `petSnapshot` | 服务端在创建时保存 petId、revision、name、rolePrompt 的实际值（不保存 rootPath）；不信任客户端提交的快照；Thread 只能在快照可靠保存后对外确认创建 |
-| 编辑提示词 / rootPath | 提示词仅影响新 Thread，已有 Thread 继续角色快照；rootPath 创建后不可修改，后端拒绝修改请求，编辑界面只展示固定目录。UI 的“使用原设定”只指角色；不移动文件 |
-| 编辑名字 / 图片 | 即时用于桌宠和列表展示，petId 与 Thread 不变；历史详情仍能查看创建时名称和角色版本；旧图片不需要逐 Thread 复制 |
+| 编辑提示词 / rootPath | 提示词仅影响新 Thread，已有 Thread 继续角色快照；rootPath 创建后不可修改，后端拒绝修改请求，编辑界面只展示固定目录。角色快照决定旧 Thread 的执行提示，当前对话不显示原角色提示；不移动文件 |
+| 编辑名字 / 图片 | 即时用于桌宠和列表展示，petId 与 Thread 不变；角色快照仍保存创建时名称和角色版本，桌宠当前对话不展示；旧图片不需要逐 Thread 复制 |
 | Runtime 创建 / 恢复 / 中断后重建 | 角色从 Thread 快照取得，文件根从 Thread 所属 Pet 的固定配置取得；不能用当前角色覆盖已有快照；角色段复用既有 system sections，不伪装成 UserInput 或 Append Prompt |
 | 提示组合 | 共享后端工具与 Permission 规则仍生效；角色段描述习惯，用户明确任务可覆盖口吻与格式；资料作为材料，不提升为角色 / 授权指令 |
 | 历史查询 | 后端按 petId 筛选，分页排序固定为 updatedAt + id，返回 nextCursor；默认每页 50、上限 100；下一页不重复已返回项，新变化通过刷新处理 |

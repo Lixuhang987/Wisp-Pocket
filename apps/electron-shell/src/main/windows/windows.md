@@ -27,7 +27,7 @@
 
 - 窗口透明、无边框、置顶；`showInactive()` 负责启动展示。保留 `focusable: true`、`acceptFirstMouse: true`，角色主动点击唤出时由 renderer 聚焦回复框；hover 和后台更新不请求窗口聚焦。
 - 初次在主屏工作区右下方按集合顺序错位定位，并预留角色右侧的对话列。`PetPosition` 保存角色右下角的屏幕 DIP 坐标及显示器 ID、相对 workArea 锚点；恢复/布局变化先沿显示器关联还原，原屏消失后回可达主屏；窗口右边界还包含对话列，不能当作角色锚点。
-- 角色本地锚点与对话列尺寸来自 [src 共享布局](../../src.md)。`compact` 使用 renderer 上报的内容高度，在角色所需最小高度与展开上限之间收紧或增高；`expanded` 使用统一浏览高度。两种模式都只利用锚点上方可用空间，切换和内容变化保留角色及回复框的底部锚点，溢出由 renderer 的上方浏览区裁剪。恢复位置、屏幕变动和拖动仍将完整窗口限制在目标工作区内。
+- 角色本地锚点与对话列尺寸来自 [src 共享布局](../../src.md)。`compact` 使用 renderer 上报的内容高度，在角色所需最小高度与展开上限之间收紧或增高；`expanded` 使用统一浏览高度。两种模式都只利用锚点上方可用空间，切换和内容变化保留角色及 composer 的底部锚点（输入行与下方工具行随资料高度统一测量），溢出由 renderer 的上方浏览区裁剪。恢复位置、屏幕变动和拖动仍将完整窗口限制在目标工作区内。
 - 位置存储只保存角色锚点及显示器关联；大小偏好、消息、当前 Thread 和回复草稿归 renderer。角色缩放不改变窗口布局槽位，main 只消费实际命中矩形。已有桌宠窗口被重复显示或 ThreadWindow 关闭时，继续使用同一 renderer。
 - renderer 按[桌宠布局](../../activity-window/activity-window.md)统一浏览视口裁剪上方气泡、建议和请求，经 [preload](../../preload/preload.md) 上报角色和各交互表面的本地矩形；main 再按窗口边界裁剪，用系统光标轮询决定 `setIgnoreMouseEvents(..., { forward: true })`。透明间隙保持穿透，外部应用拖入时也能恢复命中，不能只依赖 renderer 的 mousemove。
 - `beginMove`、`move`、`endMove` 只使用 main 读取的系统光标。拖动期间保留鼠标事件，让 renderer 的 pointer capture 跨窗口边界继续工作；结束后保存位置并恢复局部命中。

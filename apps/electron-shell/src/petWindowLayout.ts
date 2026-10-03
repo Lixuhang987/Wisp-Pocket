@@ -9,6 +9,7 @@ export const petWindowLayout = {
   conversationWidth,
   inset,
   replyHeight: 44,
+  toolbarHeight: 28,
   sizes: {
     pet: { width: 208, height: 208 },
     compact: { width: conversationLeft + conversationWidth + inset, height: 336 },
