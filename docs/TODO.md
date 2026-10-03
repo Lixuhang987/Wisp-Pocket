@@ -10,14 +10,19 @@
 ## Electron 设置迁移（设计讨论中，2026-10-03）
 
 - [ ] 新增 menu bar 入口，菜单暂时只有“设置”，点击打开新增的 Electron 设置页面。
-- [ ] 第一阶段目标：原生设置收敛为 Appearance、系统快捷键（唤起 Wisp、捕获选区、截图）、Host 功能（Context History 状态、Automation）与 AgentTrigger；Electron 承载 AI、Agent 与 Pets 设置。
-- 已确认：本轮完整迁移 AI、Agent、Pets 的现有功能；原生设置暂时继续使用 PromptPanel 入口，不新增 Electron 跳转入口。
-- [ ] 完成设计追问并由用户确认共同理解：配置读写与生效归属、模板快捷键的归属、Prompts 的含义，以及 Electron 设置窗口与导航。
+- [ ] 第一阶段目标：原生保留 Appearance、快捷键、Host 功能（Context History 状态、Automation）、AgentTrigger 与 Append Prompt；Electron 完整迁移 AI、Agent 的 Tools / MCP / Permissions 与 Pets 现有功能，暂不建立 Prompts 页。
+- 已确认：原生设置暂时继续使用 PromptPanel 入口，不新增 Electron 跳转入口；Electron 设置采用独立窗口与 AI / Agent / Pets 分组，每次打开默认 AI，不记住页面，重复打开聚焦已有窗口。
+- 已确认：后端使用的数据由后端提供配置接口，现有 JSON 存储可以保留；主题与 Append Prompt 由 Swift 修改。边界理由见 [ADR 0005](./adr/0005-settings-data-ownership.md)。
+- [ ] 完成设计追问并由用户确认共同理解：未保存表单的切页 / 关闭行为。
 - [x] 读取共享产品文档、Settings surface 与跨上下文架构，调查现有设置和入口；本轮仅讨论设计，不修改代码。
 - [ ] 确认范围后，从主 checkout 执行 `scripts/create-worktree.sh` 创建 `.worktrees/<task-name>/`，确认独立 CodeGraph 索引与显式 projectPath。
 - [ ] 在 worktree 先执行 `scripts/test.sh` 与 `scripts/swiftw build` 分层基线，再沿目标目录指南及父目录读到 `handAgent.md`，开始实现。
 - [ ] 完成迁移与必要验证，运行 TypeScript/Web、Swift test/build 提交前检查，更新相关模块文档。
 - [ ] spec 实现后由不继承上下文的独立子 agent 审核 spec、代码与文档；确认审核结论，将已实现项移入 `manual-qa.md` 后提交。
+
+## MCP 配置运行刷新（设置迁移之后）
+
+- [ ] 后端配置接口修改 MCP 后，由后端自行刷新连接与工具状态；前端不编排刷新。设置迁移本轮仅交付配置读写接口，保存成功不等于运行连接已更新。
 
 ## 重启后的排队消息策略
 
