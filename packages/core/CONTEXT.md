@@ -2,10 +2,12 @@
 
 Conversation Runtime 描述用户与 Agent 的持久交互，以及一次输入如何形成有边界的执行过程。
 
+Workspace 与 Pet 的术语边界遵循 [ADR 0006](../../docs/adr/0006-workspace-pet-separation.md)。
+
 ## Interaction
 
 **Thread**:
-归属一只 Pet 的可持久化用户交互，包含输入、Turn 和历史。
+归属一只 Pet 及该 Pet 所属 Workspace 的可持久化用户交互，包含输入、Turn 和历史。
 _Avoid_: Session、Conversation、Chat（指代持久交互单元时）
 
 **Turn**:
@@ -38,12 +40,16 @@ _Avoid_: Host Tool、Plugin Tool（指代通用机制时）
 拥有一组 Dynamic Tool 执行权的连接端；它不同于提供模型服务的 LLM provider。
 _Avoid_: LLM Provider、Tool Registry
 
+**Workspace**:
+具有独立身份、项目目录和项目指令的工作上下文；同一实际目录复用同一个 Workspace，项目指令来自 AGENTS.md。
+_Avoid_: Pet、Profile（指代项目上下文时）
+
 **Pet**:
-具有稳定身份、角色设定和固定文件根的桌面伙伴；每段 Thread 只归属一只 Pet，同文件根不合并身份或历史。
+具有稳定身份和角色设定、固定归属一个 Workspace 的桌面伙伴；多个 Pet 可共享 Workspace，但不合并身份或 Thread。
 _Avoid_: Workspace、Profile（指代伙伴身份时）
 
 **Pet Snapshot**:
-Thread 创建时保存的角色版本，供该 Thread 的后续交互持续使用；文件根属于 Pet，不属于角色快照。
+Thread 创建时保存的角色版本，供该 Thread 的后续交互持续使用；项目目录属于 Workspace，不属于角色快照。
 _Avoid_: Workspace Snapshot
 
 **Permission**:

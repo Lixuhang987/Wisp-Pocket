@@ -28,9 +28,9 @@
 
 ## Workspace 与 Pet 拆分（设计讨论中，2026-10-03）
 
-- [ ] 评估独立 Workspace（项目身份、文件根、项目指令）与 Pet 的引用关系，多个 Pet 可共享 Workspace；这是 Issue #8 发布之后的新设计讨论，尚未变更该规格。
-- [ ] 确定 Pet 是否可以切换默认项目、Thread 执行目录的固定归属、项目指令来源及同目录 Workspace 身份规则，再同步领域词表和必要 ADR。
-- [ ] 单独确定项目指令的生效版本、Workspace / Pet 的删除约束及前端失效引用清理，不能以领域拆分代替界面状态同步。
+- [x] 确认 Workspace 一对多 Pet、Pet 一对多 Thread；Pet 的 workspaceId 不可变；同一实际目录复用 Workspace，项目指令来自 AGENTS.md。已同步词表与 [ADR 0006](./adr/0006-workspace-pet-separation.md)，尚未实现、未变更 Issue #8。
+- [x] 确认 Thread 直接归属 Pet，同时保存 petId 与 workspaceId；桌宠按 petId 查询，ThreadWindow 按 workspaceId 查询，后端必须保证两种归属一致。
+- [ ] 一次性确定剩余设计：Workspace 根能否修改、AGENTS.md 加载范围 / 时机 / 失败处理 / 优先级、删除与引用约束、前端失效引用清理、ThreadWindow 项目导航与新建 Pet 选择，以及 Workspace 管理入口。
 - 当前事实：Pet 可见集合已是前端按 petId 保存的状态，现阶段没有 Pet 删除接口；完整 Pet 列表同步时只追加 ID 的行为仍需补齐失效项清理。
 - [ ] 若进入实现，遵循主 checkout 创建 worktree、独立 CodeGraph 索引与分层基线、目录阅读链、必要验证、独立文档审核、manual QA 更新后提交的既有流程。
 
