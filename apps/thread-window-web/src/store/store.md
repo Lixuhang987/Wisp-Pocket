@@ -30,7 +30,7 @@
 | 阶段 | 修改责任 | 结束条件 |
 | --- | --- | --- |
 | 等待创建返回 | [输入控制器](../thread/thread.md) 调用 `enqueueInitialPrompt`，按 `clientRequestId` 唯一登记 payload | started 移交到所属 Thread；同 commandId 的 error 删除登记 |
-| 首轮待确认展示 | `pendingInitialPrompt` 保存关联；输入模块生成 `pending-` 摘要占位，snapshot 后由投影合成可见消息 | 正式 user record 移除本地摘要，保留其他已保存待处理输入；首轮关联仍在 `turn.completed` 清空 |
+| 首轮待确认展示 | `pendingInitialPrompt` 保存关联；输入模块生成带结构化 Input Item 的 `pending-` 占位，snapshot 后由投影合成可见消息 | 正式 user record 移除本地摘要，保留其他已保存待处理输入；首轮关联仍在 `turn.completed` 清空 |
 
 本地摘要不代表持久接收，真实输入以服务端通知为准。关联尚未清空时再次 snapshot 仍可能按原规则合成摘要；这不是输入重发或恢复保证。
 
@@ -39,5 +39,5 @@ ThreadWindow 草稿仍在 `ThreadPetPane` 内按 Thread 保存，切换保留、
 ## 协议边界
 
 - 本次 renderer 存续期内按 notificationId 忽略重复通知，assistant delta 追加到稳定 item；这不提供断线重放或跨页面去重保证。
-- live 与 snapshot 保留规范化 Input Item、图片/PDF Blob、建议和等待标记。用户输入记录或新 Turn 清理旧 assistant 等待展示。
+- live 与 snapshot 保留规范化 Input Item、图片 Blob 与原路径文件引用、建议和等待标记。用户输入记录或新 Turn 清理旧 assistant 等待展示。
 - 协议与传输见 [thread](../thread/thread.md)，验证沿 [测试入口](../../tests/tests.md) 进入。

@@ -13,7 +13,7 @@
 
 - rollout 使用 session_meta、response_item、turn_context、event_msg；compacted 仍是预留类型。正常执行只追加本轮产物，避免覆盖执行期间新接收的输入。
 - 第一次 persist 创建数据库 Thread，resume 从最大 sequence 后继续追加；同一 Thread 的写入在包内串行化。
-- User response item 保存稳定输入 ID、结构化 Input Item；图片/PDF 使用 Blob 引用。附件文件生命周期属于 BlobStore，数据库不复制原始 bytes。
+- User response item 保存稳定输入 ID、结构化 Input Item；图片使用 Blob 引用，`file_reference` 只保存原路径元数据。图片副本生命周期属于 BlobStore，原文件生命周期由用户管理，数据库不复制原始 bytes。
 - 以用户输入 ID 与 `turn.started.turnId` 区分已接收和已开始；未匹配开始事件的输入派生为 pendingInputs。没有开始事件的输入不能误报为重启丢失中的执行。
 - 未闭合 Turn 的修复与可见失败说明由 [agent-server 持久化 adapter](../../../apps/agent-server/src/thread/thread.md)追加，恢复数据交给 [core Thread](../../core/src/thread/thread.md)处理。
 

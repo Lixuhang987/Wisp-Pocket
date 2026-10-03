@@ -13,7 +13,7 @@
 - 主流程优先写 use-case test，避免只断言组件内部实现。
 - Thread 选择回归用 JSDOM 挂载真实 App，仅隔离 WebSocket、布局和 preload 边界；观察正文、结构化草稿、选中行和实际提交目标。后台广播、本窗口创建与原生目标打开必须分别验证，store 单测不能证明 App 本地选择行为。
 - 协议 fixture 从 core DTO 语义出发，不复制另一套消息模型。
-- 覆盖 live/snapshot 的图片/PDF Blob 引用、建议回复、输入 pending、`request.resolved` 与同一请求去重；两界面共用 store 合约，不能恢复 renderer 自有执行队列。
+- 覆盖 live/snapshot 的图片 Blob 与原路径文件引用、建议回复、输入 pending、`request.resolved` 与同一请求去重；两界面共用 store 合约，不能恢复 renderer 自有执行队列。
 - Vitest 同时收集 `.test.ts` 与 `.test.tsx`，避免消息组件用例被遗漏。
 - 涉及真实 Electron 窗口、焦点或视口避让的行为保留到 manual QA。
 - 首轮创建验证状态/UI 回调先于 resume 与首轮提交；Composer 同时观察忙碌/等待回复时的实际发送、服务端确认后的 pending 投影与跨 Thread 隔离，不测试内部集合或文件布局。

@@ -75,12 +75,15 @@ function PetMessage({ message, latest, threadURL }: { message: ThreadItem; lates
   if (message.type === "tool_call") return null;
   if (message.type === "error") return <p className="pet-message pet-error" data-pet-interactive>{message.message}</p>;
   const user = message.type === "user_message";
+  const text = user && message.inputItems.length
+    ? message.inputItems.flatMap(item => item.type === "text" || item.type === "text_selection" ? [item.text] : item.type === "skill" ? [item.prompt] : []).join("\n\n")
+    : message.text;
   return <article className="pet-message" data-pet-interactive data-author={user ? "user" : "assistant"}>
     {user && message.inputItems.map((item) => item.type === "image"
       ? <img key={item.id} src={attachmentUrl(item, threadURL)} alt={item.name ?? "交给桌宠的图片"} draggable={false} />
-      : item.type === "pdf" ? <span className="pet-attachment" key={item.id}>PDF · {item.name}</span> : null)}
-    {message.text && <p className={latest ? "pet-latest" : undefined} data-testid={latest ? "pet-latest" : undefined}
-      aria-live={latest ? "polite" : undefined}>{message.text}</p>}
+      : item.type === "file_reference" ? <span className="pet-attachment" key={item.id}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></svg>{item.name}</span> : null)}
+    {text && <p className={latest ? "pet-latest" : undefined} data-testid={latest ? "pet-latest" : undefined}
+      aria-live={latest ? "polite" : undefined}>{text}</p>}
     {user && message.pending && <small>待处理</small>}
   </article>;
 }

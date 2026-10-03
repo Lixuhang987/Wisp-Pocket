@@ -37,5 +37,5 @@
 - 点击历史与宿主明确打开目标共用 `openHistoryThread`：先确保本地 state、设置选中项，再发送 resume 等待 snapshot。两者不创建 Thread 或重发首轮输入。
 - 宿主通过 [Electron preload](../../electron-shell/src/preload/preload.md) 的 `handAgentReceiveThreadOpen(threadId)` 交付目标；React 安装 receiver 时按序消费并清空早到请求，卸载只移除本次 receiver。该缓冲只跨 preload 与 React 初始化，不保存消息或执行队列。
 - 组件通过 props、store action 或根 callback 发起行为，不直接操作 WebSocket。
-- 图片与 PDF 使用互斥的 base64/blobId Input Item；live 与 snapshot 都按规范化附件渲染。Blob 读取服务见 [agent-server server](../../agent-server/src/server/server.md)。
+- 图片使用互斥的 base64/blobId Input Item；文件引用 `file_reference` 只保存原路径，live、pending 与 snapshot 均显示文件名卡片，不加载原文件或渲染路径正文。Blob 读取服务见 [agent-server server](../../agent-server/src/server/server.md)。
 - 建议回复与自由输入共用 UserInput；用户回复或新 Turn 会清除旧 assistant 等待展示，不引入专用建议回执。

@@ -20,7 +20,7 @@
 | Q8 | 直接破坏性替换，不需要旧 API 兼容或旧开发数据迁移；旧开发 schema 明确拒绝打开，不自动清理用户数据 |
 | Q9 | 删除相关键盘 / VoiceOver 设计与验收内容，保留点击 / hover 合约 |
 
-共享输入 / 默认读取与 [ADR 0004](../../../adr/0004-context-history-default-tools.md)统一，取消 inspect/reply 和后端自动预读。原文件路径通过现有文本 Input Item 提交；桌宠角色图片仍复制到受管媒体，它与模型资料的原路径输入是两种用途。
+共享输入 / 默认读取与 [ADR 0004](../../../adr/0004-context-history-default-tools.md)统一，取消 inspect/reply 和后端自动预读。原文件路径通过结构化 `file_reference` Input Item 提交，两端显示文件名卡片，模型取得路径文字；桌宠角色图片仍复制到受管媒体，它与模型资料的原路径输入是两种用途。
 
 ## 工程补齐边界
 

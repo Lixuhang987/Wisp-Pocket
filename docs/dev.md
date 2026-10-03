@@ -17,7 +17,7 @@
 - agent-server 按文件戳热加载模型与 Tool 设置；正常修改无需重启。
 - 图片输入要求支持多模态的 API；`completion` 路径不支持图片。
 - `web_search` 需要 agent-server 环境中的 `TAVILY_API_KEY`；`fetch_page` 会请求目标公共 URL。
-- 桌宠拖入的 PDF 先保存副本并在本地提取文字，再交给模型；扫描版、加密或损坏文档会说明读取障碍，不承诺 OCR。
+- 桌宠拖入的 PDF 只交付原路径引用，由模型按需调用 file.read 读取当时内容，不保存原文件副本；扫描版、加密或损坏文档会说明读取障碍，不承诺 OCR。
 
 ## 验证入口
 

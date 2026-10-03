@@ -15,5 +15,6 @@ export async function readDroppedItems(data: DataTransfer, getPath: (file: File)
 }
 
 export function pathInput(path: string, name?: string, mimeType?: string): InputItem {
-  return { type: "text", id: crypto.randomUUID(), text: `本地文件路径（尚未读取）：${JSON.stringify(path)}${name ? `\n文件名：${name}` : ""}${mimeType ? `\n媒体类型：${mimeType}` : ""}` };
+  return { type: "file_reference", id: crypto.randomUUID(), path,
+    name: name || path.split("/").pop() || "本地文件", ...(mimeType ? { mimeType } : {}) };
 }

@@ -83,11 +83,12 @@ describe("Composer input items", () => {
     });
   });
 
-  it("submits persisted image and PDF attachments without requiring inline bytes", () => {
+  it("submits persisted images and original file references without requiring inline bytes", () => {
     const items: InputItem[] = [
       { type: "image", id: "image", mimeType: "image/png", blobId: "blob-image" },
-      { type: "pdf", id: "pdf", name: "资料.pdf", mimeType: "application/pdf", blobId: "blob-pdf" },
+      { type: "file_reference", id: "file", name: "资料.pdf", path: "/tmp/资料.pdf" },
     ];
+    expect(isComposerInputSubmittable([items[1]!])).toBe(true);
     expect(isComposerInputSubmittable(items)).toBe(true);
     expect(toUserInput(items).items.slice(0, 2)).toEqual(items);
   });

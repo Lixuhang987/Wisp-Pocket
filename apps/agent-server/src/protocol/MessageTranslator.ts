@@ -251,14 +251,15 @@ export async function composeUserInputContent(
       case "text_selection":
         if (item.text.length > 0) parts.push(`[选区]\n${item.text}`);
         break;
-      case "image":
-      case "pdf": {
+      case "file_reference":
+        parts.push(`本地文件路径（尚未读取）：${JSON.stringify(item.path)}\n文件名：${item.name}${item.mimeType ? `\n媒体类型：${item.mimeType}` : ""}`);
+        break;
+      case "image": {
         const record = item.blobId
           ? await blobStore.get(item.blobId)
-          : await blobStore.put({ kind: item.type, bytes: Buffer.from(item.base64!, "base64"),
-            extension: item.type === "pdf" ? "pdf" : imageExtension(item.mimeType) });
+          : await blobStore.put({ kind: "image", bytes: Buffer.from(item.base64!, "base64"),
+            extension: imageExtension(item.mimeType) });
         if (!record) throw new Error(`附件副本不存在：${item.name ?? item.id}`);
-        if (item.type === "pdf") parts.push(`PDF：${item.name}`);
         parts.push(renderStub({
           id: record.id,
           kind: record.kind,
@@ -272,11 +273,11 @@ export async function composeUserInputContent(
   return parts.join("\n\n");
 }
 
-/** The history and every renderer refer to the saved copy, never the original file. */
+/** Images use saved copies; file references retain their original path without reading it. */
 export async function storeUserInput(input: UserInput, blobStore: BlobStore): Promise<UserInput> {
   const items: InputItem[] = [];
   for (const item of input.items) {
-    if (item.type !== "image" && item.type !== "pdf") { items.push({ ...item }); continue; }
+    if (item.type !== "image") { items.push({ ...item }); continue; }
     if (item.blobId) {
       if (!/^blob-[a-zA-Z0-9-]+$/.test(item.blobId)) throw new Error("无效的附件引用");
       const record = await blobStore.get(item.blobId);
@@ -285,8 +286,8 @@ export async function storeUserInput(input: UserInput, blobStore: BlobStore): Pr
       continue;
     }
     const record = await blobStore.put({
-      kind: item.type, bytes: Buffer.from(item.base64!, "base64"),
-      extension: item.type === "pdf" ? "pdf" : imageExtension(item.mimeType),
+      kind: "image", bytes: Buffer.from(item.base64!, "base64"),
+      extension: imageExtension(item.mimeType),
     });
     const { base64: _bytes, ...metadata } = item;
     items.push({ ...metadata, blobId: record.id } as InputItem);
@@ -305,8 +306,8 @@ export function summarizeUserInput(userInput: UserInput): string {
         return `[选区]\n${item.text}`;
       case "image":
         return item.name ?? "图片附件";
-      case "pdf":
-        return `PDF：${item.name}`;
+      case "file_reference":
+        return item.name;
     }
   }).filter((part) => part.trim().length > 0);
   return parts.join("\n\n");

@@ -339,8 +339,11 @@ function isInputItem(value: unknown): value is InputItem {
     case "image":
       return (value.mimeType === "image/png" || value.mimeType === "image/jpeg" || value.mimeType === "image/webp")
         && isBinaryInputSource(value);
-    case "pdf":
-      return value.mimeType === "application/pdf" && typeof value.name === "string" && isBinaryInputSource(value);
+    case "file_reference":
+      return typeof value.path === "string" && value.path.startsWith("/") && value.path.length > 1
+        && !value.path.includes("\0") && typeof value.name === "string" && value.name.trim().length > 0
+        && (value.mimeType === undefined || typeof value.mimeType === "string")
+        && Object.keys(value).every(key => ["type", "id", "path", "name", "mimeType"].includes(key));
     case "skill":
       return typeof value.actionId === "string"
         && typeof value.title === "string"

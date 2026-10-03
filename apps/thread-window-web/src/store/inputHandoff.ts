@@ -53,7 +53,7 @@ export function pendingInitialMessage(thread: ThreadInputState): UserMessageItem
     type: "user_message",
     id: `pending-${prompt.clientRequestId}`,
     text: summarizeInputItems(prompt.userInput.items),
-    inputItems: [],
+    inputItems: prompt.userInput.items.map(item => ({ ...item })),
     pending: true,
   };
 }
@@ -68,8 +68,8 @@ function summarizeInputItems(items: InputItem[]): string {
         return item.title || item.prompt;
       case "image":
         return "图片附件";
-      case "pdf":
-        return `PDF：${item.name}`;
+      case "file_reference":
+        return item.name;
     }
   }).filter((value) => value.length > 0).join("\n\n");
 }

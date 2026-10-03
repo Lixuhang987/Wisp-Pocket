@@ -6,7 +6,7 @@
 
 - `threadSocketClient.ts`：socket 生命周期、收发和连接未就绪时的 FIFO 缓冲。
 - `threadInputController.ts`：首轮创建关联及 ThreadWindow Composer 提交，使用 store 公共入口和传输能力。
-- `attachmentUrl.ts`：以同一服务地址构造图片/PDF Blob 读取 URL。
+- `attachmentUrl.ts`：以同一服务地址构造图片 Blob 读取 URL；原路径文件引用不经过该入口。
 
 ## 交接边界
 

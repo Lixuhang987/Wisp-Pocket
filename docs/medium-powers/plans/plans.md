@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [2026-10-03-file-reference-input.md](./2026-10-03-file-reference-input.md)：桌宠原路径结构化引用、两端文件卡片及按需读取。
+
 - [2026-10-02-pets-default-reading.md](./2026-10-02-pets-default-reading.md)：Issue #6/#7 合并实施与不可修改 Pet 文件根决定。
 
 - [2026-09-14-thread-window-selection.md](./2026-09-14-thread-window-selection.md)：后台创建不抢选与 Swift 明确目标 Thread 的窗口交付回归。

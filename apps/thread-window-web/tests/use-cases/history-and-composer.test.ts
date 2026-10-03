@@ -72,7 +72,7 @@ describe("threadWindowStore", () => {
     });
 
     expect(store.getState().threadsById["thread-1"].messages).toEqual([
-      { type: "user_message", id: "pending-prompt-1", text: "hello", inputItems: [], pending: true },
+      { type: "user_message", id: "pending-prompt-1", text: "hello", inputItems: [{ type: "text", id: "text-1", text: "hello" }], pending: true },
     ]);
   });
 

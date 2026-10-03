@@ -6,10 +6,10 @@
 
 - `thread-lifecycle.test.ts`：socket 分派、通知、请求回流、Activity 与 Dynamic Tool 声明刷新。
 - `thread-ownership.test.ts`：Thread 状态所有权、持久化、断连、删除、运行隔离及真实 Thread/Bridge 的中断与晚到结果。
-- `pet-conversation.test.ts`：真实 Thread/SQLite/Blob 与桌宠入口，覆盖首次文字、原路径输入、普通回复、持久 pending、跨界面请求、删除及恢复。
+- `pet-conversation.test.ts`：真实 Thread/SQLite/Blob 与桌宠入口，覆盖首次文字、结构化原路径引用（无副本、重建保留）、普通回复、持久 pending、跨界面请求、删除及恢复。
 
 - `pet-identity.test.ts`：两个新增主路径：公开 socket 创建同根多宠并验证图片、角色隔离和服务重建；删除后的创建 ACK 重试跨重启保持幂等。
-- `default-reading.test.ts`：首轮默认读取、权限策略、真实文件/历史与工具结果进入模型。
+- `default-reading.test.ts`：首轮结构化文件引用经 socket/SQLite 后按需读到最新内容、权限策略、真实文件/历史与工具结果进入模型。
 
 ## 验证边界
 
