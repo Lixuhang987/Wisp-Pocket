@@ -6,24 +6,10 @@ describe("threadWindowStore workspace expansion persistence", () => {
     vi.resetModules();
   });
 
-  it("loads persisted workspace expansion ids when the store initializes", async () => {
-    vi.stubGlobal("window", {
-      localStorage: {
-        getItem: vi.fn(() => JSON.stringify(["default", "qa-workspace"])),
-        setItem: vi.fn(),
-      },
-    });
-
-    const { createThreadWindowStore } = await import("../src/store/threadWindowStore.ts");
-
-    expect(Array.from(createThreadWindowStore.getState().expandedWorkspaceIds)).toEqual([
-      "default",
-      "qa-workspace",
+  it("loads existing workspace expansion, round-trips changes and rebuilds transient thread and input state", async () => {
+    const storedValues = new Map<string, string>([
+      ["handAgent.threadWindow.expandedWorkspaceIds", JSON.stringify(["default", "qa-workspace"])],
     ]);
-  });
-
-  it("round-trips workspace expansion while rebuilding transient thread and input state", async () => {
-    const storedValues = new Map<string, string>();
     vi.stubGlobal("window", {
       localStorage: {
         getItem: (key: string) => storedValues.get(key) ?? null,
@@ -33,9 +19,10 @@ describe("threadWindowStore workspace expansion persistence", () => {
     });
     const timestamp = "2026-06-06T00:00:00.000Z";
     const { createThreadWindowStore: store } = await import("../src/store/threadWindowStore.ts");
+    expect(Array.from(store.getState().expandedWorkspaceIds)).toEqual(["default", "qa-workspace"]);
     store.getState().toggleWorkspaceExpanded("default");
     store.getState().toggleWorkspaceExpanded("qa-workspace");
-    store.getState().toggleWorkspaceExpanded("default");
+    store.getState().toggleWorkspaceExpanded("qa-workspace");
     store.getState().setSearchQuery("unfinished search");
     store.getState().setConnectionState("connected");
     store.getState().setWorkspaces([{ id: "qa-workspace", name: "QA", rootPath: "/qa" }]);

@@ -6,6 +6,13 @@
 
 先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
 
+## 测试清理（2026-10-03）
+
+- **范围**：删除文档措辞、源码 / CSS 写法、空 smoke、已移除入口的低价值测试；合并展开偏好加载 / 保存与历史侧栏重复断言，历史选择由已有真实 App 用例承接。详见[清理记录](./medium-powers/plans/2026-10-03-test-cleanup.md)。
+- **保留验证**：Settings 控件 / 颜色规则继续由 SwiftLint 检查，主题生成 / 同步由现有生成器测试负责；桌宠 renderer、Electron 窗口、真实 Thread/Runtime/SQLite 的独有边界保留。
+- **自动检查**：基线与清理后的 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均通过。新增测试 0；测试声明 846 → 806，测试及辅助代码减少 855 行（静态统计，参数化未展开）。
+- **实机边界**：本轮没有产品行为变更，不新增实机验收项或通过结论；滚动、控件颜色、焦点与窗口布局继续按现有 QA 条目验收，静态 class / 源码断言不作为其通过证据。
+
 ## 默认读取工具规格发布（2026-10-02）
 
 - **状态**：中文规格已发布为 [Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6)，标签为 `ready-for-agent`；本轮仅交付规格与 [ADR 0004](./adr/0004-context-history-default-tools.md)，尚未实现，不计为产品实机验收通过。

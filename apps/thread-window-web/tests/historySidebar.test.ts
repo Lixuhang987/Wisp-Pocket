@@ -48,20 +48,6 @@ describe("HistorySidebar", () => {
     mockState.threadsById = {};
   });
 
-  it("provides Radix Accordion context for workspace groups", () => {
-    const html = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: null,
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain("Project workspace");
-    // rootPath is no longer displayed for simplified UI
-  });
-
   it("renders workspace groups alphabetically before the default conversation group", () => {
     mockState.workspaces = [
       { id: "default", name: "default", rootPath: "/default" },
@@ -103,37 +89,7 @@ describe("HistorySidebar", () => {
     expect(defaultIndex).toBeGreaterThan(tmpIndex);
   });
 
-  it("marks the active thread without selected border or background styling", () => {
-    mockState.history = [
-      {
-        id: "thread-default",
-        preview: "default conversation",
-        workspaceId: null,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        messageCount: 1,
-      },
-    ];
-
-    const html = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: "thread-default",
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain('aria-current="page"');
-    const activeThreadRow = html.match(/<div role="button"[^>]*aria-current="page"[^>]*>/)?.[0] ?? "";
-    expect(activeThreadRow).not.toContain("bg-app-canvas");
-    expect(activeThreadRow).not.toContain("border-app-accent");
-    expect(activeThreadRow).toContain("bg-app-accent-subtle");
-    expect(activeThreadRow).not.toContain("focus:ring-4");
-    expect(activeThreadRow).toContain("focus-visible:ring-4");
-  });
-
-  it("renders the shared running thread indicator in workspace and default groups", () => {
+  it("marks the selected thread and renders running indicators in workspace and default groups", () => {
     mockState.threadsById = {
       "thread-workspace": {
         threadId: "thread-workspace",
@@ -177,7 +133,7 @@ describe("HistorySidebar", () => {
 
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        activeThreadId: null,
+        activeThreadId: "thread-default",
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
         onNewThread: vi.fn(),
@@ -185,43 +141,8 @@ describe("HistorySidebar", () => {
     );
 
     expect(html.match(/aria-label="运行中"/g)).toHaveLength(2);
-    expect(html).toContain("animate-ping");
-  });
-
-  it("switches folder icon shapes between collapsed and expanded workspace states", () => {
-    mockState.history = [
-      {
-        id: "thread-workspace",
-        preview: "workspace conversation",
-        workspaceId: "workspace-1",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        messageCount: 1,
-      },
-    ];
-
-    mockState.expandedWorkspaceIds = new Set(["workspace-1"]);
-    const expandedHtml = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: null,
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    mockState.expandedWorkspaceIds = new Set();
-    const collapsedHtml = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: null,
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    expect(expandedHtml).toContain("lucide-folder-open");
-    expect(collapsedHtml).not.toContain("lucide-folder-open");
-    expect(collapsedHtml).toContain("lucide-folder");
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).toContain("default conversation");
+    expect(html).toContain("workspace conversation");
   });
 });

@@ -6,7 +6,7 @@
 
 - `use-cases/`：通过真实 App、store、输入控制器与 socket 验证选择、首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期。
 - `boundaries/`：协议 guard、preload 配置和主题边界。
-- 目录根测试：组件、布局、滚动、持久化和 design token 的局部回归。
+- 目录根测试：结构化输入、消息附件呈现、历史分组 / 运行指示及展开偏好的持久化。
 
 ## 约束
 
@@ -19,3 +19,5 @@
 - 首轮创建验证状态/UI 回调先于 resume 与首轮提交；Composer 同时观察忙碌/等待回复时的实际发送、服务端确认后的 pending 投影与跨 Thread 隔离，不测试内部集合或文件布局。
 - 原生目标打开须覆盖 React 安装前的请求、resume 的传输缓冲及 receiver 清理；[Electron 测试](../../electron-shell/tests/tests.md) 负责 command 的目标交付、preload 缓冲与回执，双方合起来仍不证明 macOS 焦点。
 - 偏好 round-trip 只证明展开集合保存；JSDOM 交互覆盖选择、草稿切换与提交，页面重建和原生窗口行为仍需人工 QA，静态组件渲染不代替实机验收。
+
+历史选择的目标、草稿与消息由真实 App 用例验证，不重复测试 helper 的 mock 调用。主题生成与文件同步由根 `scripts/generate-theme-tokens.test.mjs` 负责；滚动、样式和图标的视觉结果以实机 QA 为准，不以 class 或源码字符串代替。
