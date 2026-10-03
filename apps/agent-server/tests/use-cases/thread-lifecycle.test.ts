@@ -528,51 +528,6 @@ describe("startServer", () => {
       await once(server, "close");
     }
   });
-
-  it("does not expose the legacy agent trigger fire HTTP entrypoint", async () => {
-    const eventPublisher = new ThreadNotificationPublisher();
-    const commandRouter = {
-      receive: vi.fn(async () => {}),
-      interruptThread: vi.fn(),
-      handleResponse: vi.fn(),
-    } as unknown as ThreadCommandRouter;
-
-    const server = await startServer({
-      commandRouter,
-      eventPublisher,
-      port: 0,
-    });
-    const address = server.address() as AddressInfo;
-
-    try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/api/agent-trigger/fire`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          triggerInstanceId: "trigger-1",
-          threadTitleHint: "Digest",
-          userInput: {
-            items: [{ type: "text", id: "item-1", text: "summarize this" }],
-          },
-          notificationPolicy: { mode: "on_attention" },
-          sourceEvent: {
-            triggerInstanceId: "trigger-1",
-            providerKind: "system.clock",
-            occurredAt: "2026-06-18T00:00:00.000Z",
-            summary: "scheduled digest",
-            payload: {},
-          },
-        }),
-      });
-
-      expect(response.status).toBe(404);
-    } finally {
-      server.close();
-      await once(server, "close");
-    }
-  });
 });
 
 describe("resolveLLMMode", () => {

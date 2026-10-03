@@ -18,6 +18,7 @@ describe("theme token generator", () => {
     expect(outputs.css.content).toContain(':root[data-theme="light"]');
     expect(outputs.css.content).toContain(':root[data-theme="dark"]');
     expect(outputs.css.content).toContain("--color-app-canvas: var(--ha-color-canvas)");
+    expect(outputs.css.content).toContain("--color-app-text-primary: var(--ha-color-text-primary)");
   });
 
   it("keeps generated files in sync with design/tokens.json", () => {

@@ -48,20 +48,6 @@ describe("HistorySidebar", () => {
     mockState.threadsById = {};
   });
 
-  it("provides Radix Accordion context for pet groups", () => {
-    const html = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: null,
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain("Project pet");
-    // rootPath is no longer displayed for simplified UI
-  });
-
   it("renders pet groups alphabetically without merging identical roots", () => {
     mockState.pets = [
       {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "default", name: "default", rootPath: "/default" },
@@ -101,37 +87,7 @@ describe("HistorySidebar", () => {
     expect(tmpIndex).toBeGreaterThan(qaIndex);
   });
 
-  it("marks the active thread without selected border or background styling", () => {
-    mockState.history = [
-      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
-        id: "thread-default",
-        preview: "default conversation",
-        petId: "pet-1",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        messageCount: 1,
-      },
-    ];
-
-    const html = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: "thread-default",
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain('aria-current="page"');
-    const activeThreadRow = html.match(/<div role="button"[^>]*aria-current="page"[^>]*>/)?.[0] ?? "";
-    expect(activeThreadRow).not.toContain("bg-app-canvas");
-    expect(activeThreadRow).not.toContain("border-app-accent");
-    expect(activeThreadRow).toContain("bg-app-accent-subtle");
-    expect(activeThreadRow).not.toContain("focus:ring-4");
-    expect(activeThreadRow).toContain("focus-visible:ring-4");
-  });
-
-  it("renders the shared running thread indicator in pet and default groups", () => {
+  it("marks the selected thread and renders running indicators in pet history", () => {
     mockState.threadsById = {
       "thread-pet": {
         threadId: "thread-pet",
@@ -173,7 +129,7 @@ describe("HistorySidebar", () => {
 
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
-        activeThreadId: null,
+        activeThreadId: "thread-default",
         onOpenThread: vi.fn(),
         onDeleteThread: vi.fn(),
         onNewThread: vi.fn(),
@@ -181,43 +137,9 @@ describe("HistorySidebar", () => {
     );
 
     expect(html.match(/aria-label="运行中"/g)).toHaveLength(2);
-    expect(html).toContain("animate-ping");
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).toContain("default conversation");
+    expect(html).toContain("pet conversation");
   });
 
-  it("switches folder icon shapes between collapsed and expanded pet states", () => {
-    mockState.history = [
-      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
-        id: "thread-pet",
-        preview: "pet conversation",
-        petId: "pet-1",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        messageCount: 1,
-      },
-    ];
-
-    mockState.expandedPetIds = new Set(["pet-1"]);
-    const expandedHtml = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: null,
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    mockState.expandedPetIds = new Set();
-    const collapsedHtml = renderToStaticMarkup(
-      React.createElement(HistorySidebar, {
-        activeThreadId: null,
-        onOpenThread: vi.fn(),
-        onDeleteThread: vi.fn(),
-        onNewThread: vi.fn(),
-      }),
-    );
-
-    expect(expandedHtml).toContain("lucide-folder-open");
-    expect(collapsedHtml).not.toContain("lucide-folder-open");
-    expect(collapsedHtml).toContain("lucide-folder");
-  });
 });

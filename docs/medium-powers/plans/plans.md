@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [2026-10-03-test-cleanup.md](./2026-10-03-test-cleanup.md)：低价值与重复测试的删除依据、保留边界和验证结果。
+
 - [2026-10-03-pet-markdown.md](./2026-10-03-pet-markdown.md)：桌宠 Markdown 正文、窄气泡及外部链接边界。
 
 - [2026-10-03-file-reference-input.md](./2026-10-03-file-reference-input.md)：桌宠原路径结构化引用、两端文件卡片及按需读取。

@@ -14,7 +14,6 @@
 | `serverSupervisor/` | [serverSupervisor/serverSupervisor.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/serverSupervisor/serverSupervisor.md) | supervisor entry 选择、Node fallback、utilityProcess 语义、readiness、restart 和 stop |
 | `swiftBridge/` | [swiftBridge/swiftBridge.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/swiftBridge/swiftBridge.md) | newline-delimited JSON bridge 与 command socket 的 chunk 切行和 event 写出 |
 | `windows/` | [windows/windows.md](/Users/mu9/proj/handAgent/apps/electron-shell/tests/windows/windows.md) | ThreadWindow hidden prewarm、initial prompt 注入、桌宠主题与加载边界 |
-| `smoke.test.ts` | 无独立文档 | Electron shell test runtime 基础 smoke |
 
 ## 运行方式
 

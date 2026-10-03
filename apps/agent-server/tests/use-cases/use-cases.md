@@ -18,3 +18,5 @@
 - Dynamic Tool 用例使用真实 `WebSocketDynamicToolBridge` 与 `DynamicToolAdapter`，以 socket 传输替身输入 hello/request/response。相同连接的声明刷新须保留在途调用并更新新 Thread 的默认集合，旧 Thread metadata 保持不变；显式空集合仍为空，旧连接不能刷新新身份的集合。默认长操作等待实际结果，真正关闭连接后才 offline。显式超时另由 bridge 边界测试覆盖。
 - Thread 中断用例保留真实 ThreadTools、DynamicToolAdapter、Runtime 与 Bridge；中断返回后晚到的 Provider 响应不得改写已保存历史、恢复旧 Turn 或触发下一次模型调用。它不证明宿主任务被远程取消。
 - 修改 Provider 身份语义时同时核对 [server](../../src/server/server.md) 和 Swift 的连接用例；传输测试不替代 Context History / Automation 的业务用例或 macOS 实机验收。
+
+HTTP / socket 测试验证受支持的路由、静态资源与连接合约；已移除的 AgentTrigger HTTP 入口不保留专门的 404 回归。

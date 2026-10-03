@@ -6,24 +6,10 @@ describe("threadWindowStore pet expansion persistence", () => {
     vi.resetModules();
   });
 
-  it("loads persisted pet expansion ids when the store initializes", async () => {
-    vi.stubGlobal("window", {
-      localStorage: {
-        getItem: vi.fn(() => JSON.stringify(["default", "qa-pet"])),
-        setItem: vi.fn(),
-      },
-    });
-
-    const { createThreadWindowStore } = await import("../src/store/threadWindowStore.ts");
-
-    expect(Array.from(createThreadWindowStore.getState().expandedPetIds)).toEqual([
-      "default",
-      "qa-pet",
+  it("loads existing pet expansion, round-trips changes and rebuilds transient thread and input state", async () => {
+    const storedValues = new Map<string, string>([
+      ["handAgent.threadWindow.expandedPetIds", JSON.stringify(["default", "qa-pet"])],
     ]);
-  });
-
-  it("round-trips pet expansion while rebuilding transient thread and input state", async () => {
-    const storedValues = new Map<string, string>();
     vi.stubGlobal("window", {
       localStorage: {
         getItem: (key: string) => storedValues.get(key) ?? null,
@@ -33,9 +19,10 @@ describe("threadWindowStore pet expansion persistence", () => {
     });
     const timestamp = "2026-06-06T00:00:00.000Z";
     const { createThreadWindowStore: store } = await import("../src/store/threadWindowStore.ts");
+    expect(Array.from(store.getState().expandedPetIds)).toEqual(["default", "qa-pet"]);
     store.getState().togglePetExpanded("default");
     store.getState().togglePetExpanded("qa-pet");
-    store.getState().togglePetExpanded("default");
+    store.getState().togglePetExpanded("qa-pet");
     store.getState().setSearchQuery("unfinished search");
     store.getState().setConnectionState("connected");
     store.getState().setPets([{description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "qa-pet", name: "QA", rootPath: "/qa" }]);
