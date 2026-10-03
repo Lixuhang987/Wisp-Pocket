@@ -33,6 +33,7 @@
 - `beginMove`、`move`、`endMove` 只使用 main 读取的系统光标。拖动期间保留鼠标事件，让 renderer 的 pointer capture 跨窗口边界继续工作；结束后保存位置并恢复局部命中。
 - 鼠标和焦点直接进入桌宠 renderer，保留输入、滚动和原生 drop；窗口控制器不把这些事件转换为 ThreadWindow 聚焦请求。
 - 窗口只 load `dist/activity-window/index.html`；preload 注入固定 petId、Thread endpoint 和 host theme。加载期间收到的新 theme 在 loaded 后补发，后续通过 `handagent:theme-changed` 推送。
+- [桌宠正文](../../activity-window/activity-window.md)的网页链接使用新窗口意图；controller 始终拒绝创建 Electron 子窗口，校验绝对 HTTP/HTTPS 后交给组合根的 `shell.openExternal`，页面内导航一律阻止。renderer 不取得任意协议或本地文件打开权限。
 - renderer crash 仍上报 `renderer.crashed window: "activity"`；它不代表 agent-server 不可用。
 
 ## 修改约束

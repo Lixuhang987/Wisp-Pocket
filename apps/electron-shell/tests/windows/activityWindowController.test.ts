@@ -96,7 +96,7 @@ function createHarness(options: {
 }
 
 class FakeBrowserWindow extends EventEmitter {
-  webContents = Object.assign(new EventEmitter(), { send: vi.fn() });
+  webContents = Object.assign(new EventEmitter(), { send: vi.fn(), setWindowOpenHandler: vi.fn() });
   options: BrowserWindowConstructorOptions = {};
   bounds: Rectangle = { x: 0, y: 0, width: 1, height: 1 };
   loadedFile: string | null = null;
