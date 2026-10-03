@@ -2,7 +2,7 @@
 
 状态：已确认的目标设计，尚未实现。实施规格见 [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)，迁移及 MCP 后续刷新待办见 [TODO](../TODO.md)。
 
-新增 Electron 设置不等于把所有配置交给后端：主题、Append Prompt 等原生界面配置仍可由 Swift 直接修改；模型、Tool、MCP、永久 Permission 和 Pet 等后端使用的数据，必须由后端提供读写接口。前端不直接修改这些配置文件，已有 JSON 持久化可以保留；Pet 沿用既有后端管理接口与存储。
+新增 Electron 设置不等于把所有配置交给后端：主题、Append Prompt 等原生界面配置仍可由 Swift 直接修改；模型、Tool、MCP、永久 Permission、Workspace 和 Pet 等后端使用的数据，必须由后端提供读写接口。前端不直接修改这些配置文件，已有 JSON 持久化可以保留；Workspace/Pet 沿既有后端管理入口和存储扩展，拆分边界见 [ADR 0006](./0006-workspace-pet-separation.md)。
 
 选择依据是数据的使用与生效归属，而非设置窗口采用的技术。这样后端能校验和保存自己使用的配置，Swift 的原生偏好也无需绕经后端。Append Prompt 指模板定义及其入口配置；展开后提交给后端的输入不改变模板定义的归属。
 

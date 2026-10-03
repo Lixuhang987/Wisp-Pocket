@@ -1,6 +1,6 @@
 # Workspace 与 Pet 分离，Thread 保留两种归属
 
-状态：领域设计已确认，尚未实现；实施待办见 [TODO](../TODO.md)。本决策重新讨论多桌宠历史规格中“Pet 直接替换 Workspace”的选择，不表示当前代码已经拆分。
+状态：领域设计已确认，尚未实现；已纳入 [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)，实施待办见 [TODO](../TODO.md)。本决策重新讨论多桌宠历史规格中“Pet 直接替换 Workspace”的选择，不表示当前代码已经拆分；配置读写归属沿 [ADR 0005](./0005-settings-data-ownership.md)。
 
 用户需要多个伙伴共享项目目录及项目指令，同时保持伙伴角色、Thread 和界面偏好独立。将项目上下文作为独立 Workspace，由多个 Pet 引用；Pet 的所属 Workspace 与 Workspace 的 rootPath 创建后均不可更换。同一实际目录只对应一个 Workspace，选择已有目录时复用该身份。规范术语见 [Conversation Runtime](../../packages/core/CONTEXT.md)。
 
@@ -8,7 +8,7 @@ Thread 仍直接归属 Pet，同时持久保存 petId 与 workspaceId。后端�
 
 新建 Thread 只允许使用目标 Workspace 内的 Pet；明确指定时验证归属，未指定时由后端随机选择该项目的一只 Pet，基础 Pet 也参与候选。可见性是前端状态，不参与后端候选筛选。同一次创建的 commandId 重试必须返回原 Thread 及已选 Pet，不能重新随机选择；角色快照仍在 Thread 创建时固定。
 
-项目指令仅来自 Workspace 根目录的 AGENTS.md，不加载祖先或子目录指令，不另存一份可编辑的数据库指令文本。每个 Turn 开始读取一次，该 Turn 的后续模型调用使用同一份内容，下一 Turn 再读取当前文件。用户本次明确要求优先于项目指令，项目指令优先于 Pet 角色习惯；后端工具边界与 Permission 不由这些文本改变。文件缺失与读取失败的具体反馈作为实现建议在最终规格中明确，不能写成已经验收的行为。
+项目指令仅来自 Workspace 根目录的 AGENTS.md，不加载祖先或子目录指令，不另存一份可编辑的数据库指令文本。每个 Turn 开始读取一次，该 Turn 的后续模型调用使用同一份内容，下一 Turn 再读取当前文件。用户本次明确要求优先于项目指令，项目指令优先于 Pet 角色习惯；后端工具边界与 Permission 不由这些文本改变。最终规格补齐的技术默认是：根目录存在但 AGENTS.md 缺失视为空项目指令，读取失败使该 Turn 明确失败；这些是目标行为，尚未验收。
 
 Workspace 首期由创建 Pet 时选择目录自动创建或复用，不新增独立 Workspace 管理页；项目展示名用目录名，AGENTS.md 经现有文件编辑器修改。每次真正创建 Workspace 都额外生成一只基础 Pet，再独立保存用户表单中的 Pet，不把当前表单充当基础 Pet；从 Pet 表单创建新项目会得到“基础 Pet + 用户 Pet”两只，复用已有项目只增加用户 Pet。
 
