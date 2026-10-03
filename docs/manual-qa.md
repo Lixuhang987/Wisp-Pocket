@@ -6,6 +6,15 @@
 
 先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
 
+## 桌宠 Markdown 正文（2026-10-03）
+
+- **已实现**：助手正文支持 Markdown / GFM，用户原文保持；代码和表格折行，任务复选框只读，常态约三行高度预览与 hover 完整历史继续共用消息区。仅绝对 HTTP/HTTPS 链接交给系统浏览器，原始 HTML 与 Markdown 图片显示文字，不自动加载资源；用户主动交付的图片附件仍按原流程展示。
+- **自动化检查**：`bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 与 Electron build 均通过；扩展既有 renderer / 原生窗口流程，专项 29 项通过，新增测试 0。规格与测试范围见 [实施计划](./medium-powers/plans/2026-10-03-pet-markdown.md)。
+- **受控渲染证据**：真实 Electron renderer / CSS / preload / ActivityWindow controller 加载协议 snapshot，长代码与表格宽度受气泡约束；hover 前后角色和 composer 屏幕位移均为 0。网页链接交给受控外部打开回调，页面仍为原始 file URL。截图、几何与临时夹具在 `.worktrees/pet-markdown/.cache/pet-markdown-{compact.png,expanded.png,geometry.json,harness.cjs}`；后端、屏幕 / 光标与外部打开使用 fixture，不代表完整宿主或真实系统浏览器验收。
+- [ ] 真实模型流式生成标题、列表、强调、引用、代码、表格与任务列表；未闭合围栏继续输出后正文自然恢复，无重复消息或焦点丢失。hover 浏览旧消息时新增量不抢回底部，移出保留草稿。
+- [ ] 明暗主题与紧凑预览清晰；短正文、长代码、宽表格和长链接不撑破气泡，回复框 / 角色底部稳定。块间距占用常态三行高度预算，列表或代码可能只显示部分块；窄栏折行导致复杂表格变长属于已知阅读边界，hover 可查看全文。
+- [ ] 网页链接只在明确点击后打开系统浏览器，桌宠仍可回复；本地、相对、脚本与其他协议保留标签。HTML 按文字呈现、Markdown 图片只显示替代文字；用户输入中的路径、下划线和星号保持原文。
+
 ## 桌宠右键入口与悬停定位回归（2026-10-03）
 
 - **合并前验证**：修复分支扩展既有 renderer 用例，23 项通过；真实 Electron renderer / CSS / preload / 原生控制器复现修复前标题上跳约 470px，修复后空对话连续五次移入 / 移出，标题、角色及回复框的屏幕坐标变化均为 0，路径 title 为 null；菜单截图已核对四个入口。系统屏幕 / 光标与后端采用受控 fixture，此结果不代表完整宿主实机验收。随后合入维护提交 `452c027` 只调整测试；本轮输入工具行已删除身份标题，当前 composer 坐标以以下新证据为准。

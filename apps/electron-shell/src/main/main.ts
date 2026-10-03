@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog, ipcMain, screen, utilityProcess } from "electron";
+import { BrowserWindow, app, dialog, ipcMain, screen, shell, utilityProcess } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
 import { PetWindowCollection } from "./windows/petWindowCollection.js";
@@ -78,6 +78,10 @@ const createPetWindow = (petId: string, index: number) => new ActivityWindowCont
   petId, initialOffset: (index % 6) * 110,
   activityWindowHTMLPath,
   preloadPath: activityPreloadPath,
+  openExternal: async (url) => {
+    try { await shell.openExternal(url); }
+    catch (error) { process.stderr.write(`[electron-shell] open link: ${errorMessage(error)}\n`); }
+  },
   threadWebSocketURL: process.env.HANDAGENT_PET_THREAD_WEBSOCKET_URL,
   initialTheme,
   positionStore: new PetPositionStore(

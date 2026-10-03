@@ -3,6 +3,7 @@ import type { ThreadState } from "../../../thread-window-web/src/store/threadWin
 import type { AssistantMessageItem, ThreadItem } from "../../../thread-window-web/src/store/threadItems.ts";
 import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentUrl.ts";
 import type { PetThreadController } from "./petThreadController.ts";
+import { PetMarkdown } from "./PetMarkdown.tsx";
 
 export function PetConversation({ thread, latestAssistant, expanded, status, error, controller, attempt, onRespond, threadURL }: {
   thread?: ThreadState;
@@ -79,8 +80,8 @@ function PetMessage({ message, latest, threadURL }: { message: ThreadItem; lates
     {user && message.inputItems.map((item) => item.type === "image"
       ? <img key={item.id} src={attachmentUrl(item, threadURL)} alt={item.name ?? "交给桌宠的图片"} draggable={false} />
       : item.type === "pdf" ? <span className="pet-attachment" key={item.id}>PDF · {item.name}</span> : null)}
-    {message.text && <p className={latest ? "pet-latest" : undefined} data-testid={latest ? "pet-latest" : undefined}
-      aria-live={latest ? "polite" : undefined}>{message.text}</p>}
+    {message.text && (user ? <p>{message.text}</p> : <div className={`pet-markdown${latest ? " pet-latest" : ""}`} data-testid={latest ? "pet-latest" : undefined}
+      aria-live={latest ? "polite" : undefined}><PetMarkdown text={message.text} /></div>)}
     {user && message.pending && <small>待处理</small>}
   </article>;
 }

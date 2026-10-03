@@ -45,6 +45,26 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 .pet-conversation.is-drop-target .pet-reply { outline: 2px solid var(--pet-accent); outline-offset: -2px; }
 .pet-latest { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pet-conversation:not(.is-expanded) .pet-latest { max-height: 4.95em; overflow: hidden; }
+.pet-markdown { min-width: 0; max-width: 100%; white-space: normal; }
+.pet-markdown > * { margin: 0; }
+.pet-markdown > * + * { margin-top: var(--ha-spacing-xs); }
+.pet-markdown h1, .pet-markdown h2, .pet-markdown h3, .pet-markdown h4, .pet-markdown h5, .pet-markdown h6 {
+  font-size: inherit; line-height: inherit; font-weight: 500;
+}
+.pet-markdown ul, .pet-markdown ol { padding-left: var(--ha-spacing-lg); }
+.pet-markdown li + li { margin-top: var(--ha-spacing-xxs); }
+.pet-markdown li > p { white-space: normal; }
+.pet-markdown blockquote { padding-left: var(--ha-spacing-sm); border-left: 2px solid var(--pet-border); color: var(--pet-muted); }
+.pet-markdown code { font-family: var(--ha-typography-code-family); font-size: inherit; background: var(--pet-soft); border-radius: var(--ha-radius-xs); }
+.pet-markdown pre { padding: var(--ha-spacing-xs); border-radius: var(--ha-radius-sm); background: var(--pet-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.pet-markdown pre code { background: transparent; }
+.pet-markdown table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.pet-markdown th, .pet-markdown td { padding: var(--ha-spacing-xxs); border: 1px solid var(--pet-border); overflow-wrap: anywhere; }
+.pet-markdown th { font-weight: 500; }
+.pet-markdown hr { border: 0; border-top: 1px solid var(--pet-border); }
+.pet-markdown a { color: var(--pet-accent); text-decoration: underline; }
+.pet-markdown a:focus-visible { outline: 2px solid var(--pet-accent); outline-offset: 2px; }
+.pet-markdown input[type="checkbox"] { accent-color: var(--pet-accent); }
 .pet-history {
   flex: 0 1 auto; min-height: 0; overflow: hidden;
   overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--pet-border) transparent;

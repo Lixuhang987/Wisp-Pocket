@@ -339,16 +339,44 @@ describe("桌宠的轻量交互", () => {
     act(() => Socket.latest.receive(note("thread.snapshot", { threadId: "a", payload: {
       status: "idle", petSnapshot: { petId: "pet-default", revision: 2, name: "原名称", rolePrompt: "原角色" },
       messages: [
-        { id: "input", role: "user", text: "我的资料", status: "completed", createdAt: "2026", updatedAt: "2026" },
-        { id: "answer", role: "assistant", text: "前一条桌宠回复", status: "completed", createdAt: "2026", updatedAt: "2026" },
+        { id: "input", role: "user", text: "我的资料 /tmp/file_name.md **原文**", status: "completed", createdAt: "2026", updatedAt: "2026" },
+        { id: "answer", role: "assistant", text: "# 前一条桌宠回复", status: "completed", createdAt: "2026", updatedAt: "2026" },
       ],
     } })));
     expect(controller.store.getState().threadsById.a.petSnapshot).toMatchObject({ name: "原名称", revision: 2 });
+    const markdown = [
+      "最新的回复留在角色头上", "", "**重点**与~~删除~~，`行内代码`", "",
+      "- 阅读正文", "- [x] 已完成", "", "> 引用内容", "",
+      "| 项目 | 结果 |", "| --- | --- |", "| 解析 | 成功 |", "",
+      "[查看网页](https://example.com/docs)", "[本地标签](file:///tmp/private)",
+      "[相对标签](./notes.md)", "[脚本标签](javascript:alert%281%29)",
+      "![图示](https://example.com/tracking.png)", "",
+      '<script>alert("raw")</script>', "", "```ts", "const value = 1;",
+    ].join("\n");
     act(() => Socket.latest.receive(note("assistant.delta", {
       threadId: "a", turnId: "second-turn", itemId: "latest-answer",
-      payload: { text: "最新的回复留在角色头上", suggestedReplies: ["继续阅读"], awaitingReply: true },
+      payload: { text: markdown, suggestedReplies: ["继续阅读"], awaitingReply: true },
     })));
     const input = screen.getByRole("textbox", { name: "回复当前对话" });
+    fireEvent.change(input, { target: { value: "保留 Markdown 草稿" } });
+    const latest = screen.getByTestId("pet-latest");
+    expect(latest.querySelector("strong")?.textContent).toBe("重点");
+    expect(latest.querySelector("del")?.textContent).toBe("删除");
+    expect(latest.querySelector("li")?.textContent).toBe("阅读正文");
+    expect(latest.querySelector('input[type="checkbox"]')?.hasAttribute("disabled")).toBe(true);
+    expect(latest.querySelector("blockquote")?.textContent).toContain("引用内容");
+    expect(latest.querySelector("table")?.textContent).toContain("成功");
+    const link = screen.getByRole("link", { name: "查看网页" });
+    expect(link.getAttribute("href")).toBe("https://example.com/docs");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(latest.querySelector("a[href^='file:'], a[href^='javascript:'], img, script")).toBeNull();
+    expect(screen.queryByRole("link", { name: "相对标签" })).toBeNull();
+    expect(latest.textContent).toContain("图示");
+    expect(latest.textContent).toContain('<script>alert("raw")</script>');
+    act(() => Socket.latest.receive(note("assistant.delta", {
+      threadId: "a", turnId: "second-turn", itemId: "latest-answer", payload: { text: "\nconst next = 2;\n```" },
+    })));
+    expect(latest.querySelector("pre code")?.textContent).toBe("const value = 1;\nconst next = 2;\n");
     fireEvent.mouseEnter(screen.getByTestId("pet-conversation"));
     expect(screen.getAllByText("最新的回复留在角色头上")).toHaveLength(1);
     const history = screen.getByRole("log");
@@ -356,15 +384,16 @@ describe("桌宠的轻量交互", () => {
     expect(history.contains(screen.getByRole("button", { name: "继续阅读" }))).toBe(true);
     expect(history.contains(input)).toBe(false);
     expect(screen.getByTestId("pet-conversation").querySelectorAll("[data-pet-scroll-viewport]")).toHaveLength(1);
-    expect(history.querySelector('[data-author="assistant"]')?.textContent).toContain("前一条桌宠回复");
-    expect(history.querySelector('[data-author="user"]')?.textContent).toContain("我的资料");
+    expect(history.querySelector('[data-author="assistant"] h1')?.textContent).toBe("前一条桌宠回复");
+    expect(history.querySelector('[data-author="user"]')?.textContent).toContain("我的资料 /tmp/file_name.md **原文**");
     fireEvent.click(screen.getByRole("button", { name: "继续阅读" }));
     expect(Socket.latest.sent.at(-1)).toMatchObject({
       type: "op.submit", threadId: "a", payload: { op: { payload: { items: [{ type: "text", text: "继续阅读" }] } } },
     });
     fireEvent.mouseLeave(screen.getByTestId("pet-conversation"));
     expect(screen.getByRole("textbox", { name: "回复当前对话" })).toBe(input);
-    expect(screen.getByTestId("pet-latest").textContent).toBe("最新的回复留在角色头上");
+    expect(screen.getByTestId("pet-latest").querySelector("pre code")?.textContent).toContain("const next = 2;");
+    expect((input as HTMLTextAreaElement).value).toBe("保留 Markdown 草稿");
   });
 
   it("每次悬停回到底部，单次展开中阅读旧消息时新内容不抢位置", () => {

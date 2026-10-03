@@ -37,7 +37,8 @@ afterEach(() => {
 
 describe("桌宠原生窗口用例", () => {
   it("非激活显示后展开、接收点击滚动与外部 drop，并从透明空白恢复命中", async () => {
-    const harness = await createHarness({ collection: true });
+    const openExternal = vi.fn(async (_url: string) => {});
+    const harness = await createHarness({ collection: true, openExternal });
     const { window, bridge, screen } = harness;
 
     expect(window.options).toMatchObject({
@@ -56,6 +57,16 @@ describe("桌宠原生窗口用例", () => {
     expect(Object.keys(bridge).sort()).toEqual([
       "beginMove", "chooseFiles", "endMove", "getPathForFile", "hidePet", "move", "onReveal", "setInteractiveRegions", "setLayout", "setReceiving", "showPet",
     ]);
+
+    const open = window.webContents.setWindowOpenHandler.mock.lastCall![0];
+    expect(open({ url: "https://example.com/docs" })).toEqual({ action: "deny" });
+    expect(openExternal).toHaveBeenCalledExactlyOnceWith("https://example.com/docs");
+    expect(open({ url: "file:///tmp/private" })).toEqual({ action: "deny" });
+    expect(openExternal).toHaveBeenCalledTimes(1);
+    const preventDefault = vi.fn();
+    window.webContents.emit("will-navigate", { preventDefault }, "https://example.com/docs");
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(window.loadFileCount).toBe(1);
 
     bridge.setLayout("compact");
     expect(window.bounds).toEqual({ x: 990, y: 540, width: 426, height: 336 });
@@ -261,7 +272,7 @@ describe("桌宠原生窗口用例", () => {
   });
 });
 
-async function createHarness(options: { positionPath?: string; screen?: FakeScreen; collection?: boolean; secondPet?: boolean } = {}) {
+async function createHarness(options: { positionPath?: string; screen?: FakeScreen; collection?: boolean; secondPet?: boolean; openExternal?: (url: string) => Promise<void> } = {}) {
   const positionPath = options.positionPath ?? createPositionPath();
   const screen = options.screen ?? new FakeScreen();
   let window!: FakeBrowserWindow;
@@ -272,6 +283,7 @@ async function createHarness(options: { positionPath?: string; screen?: FakeScre
     positionStore: new PetPositionStore(positionPath),
     petId: options.collection ? "pet-a" : undefined,
     screenProvider: screen,
+    openExternal: options.openExternal,
     createWindow: (windowOptions) => {
       window = new FakeBrowserWindow(windowOptions);
       liveWindows.push(window);
@@ -345,7 +357,7 @@ class FakeScreen extends EventEmitter {
 }
 
 class FakeBrowserWindow extends EventEmitter {
-  webContents = Object.assign(new EventEmitter(), { send: vi.fn() });
+  webContents = Object.assign(new EventEmitter(), { send: vi.fn(), setWindowOpenHandler: vi.fn<(handler: (details: { url: string }) => { action: "deny" }) => void>() });
   bounds: Rectangle = { x: 0, y: 0, width: 1, height: 1 };
   showInactiveCount = 0;
   hideCount = 0;

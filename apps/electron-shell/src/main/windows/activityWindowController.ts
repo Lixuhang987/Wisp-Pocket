@@ -8,6 +8,8 @@ export type { PetLayout } from "../../petWindowLayout.js";
 export type BrowserWindowLike = {
   webContents: {
     on(event: "render-process-gone", listener: (event: unknown, details: { reason: string }) => void): unknown;
+    on(event: "will-navigate", listener: (event: { preventDefault(): void }, url: string) => void): unknown;
+    setWindowOpenHandler(handler: (details: { url: string }) => { action: "deny" }): void;
     send(channel: string, theme?: HostTheme): void;
   };
   on(event: "closed", listener: () => void): unknown;
@@ -37,6 +39,7 @@ type Options = {
   initialOffset?: number;
   initialTheme?: HostTheme;
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
+  openExternal?: (url: string) => Promise<void>;
   screenProvider: ScreenProvider;
   positionStore: PetPositionStore;
   onRendererCrashed?: (reason: string) => void;
@@ -171,6 +174,16 @@ export class ActivityWindowController {
       },
     });
     this.window = window;
+    window.webContents.setWindowOpenHandler(({ url }) => {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+          void this.options.openExternal?.(parsed.href);
+        }
+      } catch { /* 无效 URL 不交付系统浏览器。 */ }
+      return { action: "deny" };
+    });
+    window.webContents.on("will-navigate", (event) => event.preventDefault());
     this.place(this.position, this.workAreaForPosition(this.position));
     this.savePosition();
     window.on("closed", () => {
