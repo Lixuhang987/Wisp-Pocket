@@ -4,6 +4,7 @@
 
 ## 直接子节点
 
+- [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)：待实现的 Electron 设置迁移；menu bar 单一入口、AI / Tools / MCP / Permissions / Pets 完整迁移，后端配置经接口修改，Append Prompt 留在 Swift，MCP 运行刷新另列 TODO。
 - [multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md](./multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)：已实现、待实机验收的多桌宠 A「口袋对话」规格，已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)；本次仅多宠同屏，Pet 直接替代 Workspace、自由创建、角色 / 图片绑定、可重复 rootPath 和按宠分区；读取免确认、原路径交付，不做宠归档或旧数据迁移。
 - `2026-06-24-agenttrigger-thread-path-migration-spec.md`
 - `2026-06-24-chrome-bookmarks-folder-picker-spec.md`

@@ -7,13 +7,15 @@
 
 最后核对日期：2026-10-03。
 
-## Electron 设置迁移（设计讨论中，2026-10-03）
+## Electron 设置迁移（规格已发布，2026-10-03）
+
+实施规格：[Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)，已标记 `ready-for-agent`。规格正文以 Issue 为准。
 
 - [ ] 新增 menu bar 入口，菜单暂时只有“设置”，点击打开新增的 Electron 设置页面。
 - [ ] 第一阶段目标：原生保留 Appearance、快捷键、Host 功能（Context History 状态、Automation）、AgentTrigger 与 Append Prompt；Electron 完整迁移 AI、Agent 的 Tools / MCP / Permissions 与 Pets 现有功能，暂不建立 Prompts 页。
 - 已确认：原生设置暂时继续使用 PromptPanel 入口，不新增 Electron 跳转入口；Electron 设置采用独立窗口与 AI / Agent / Pets 分组，每次打开默认 AI，不记住页面，重复打开聚焦已有窗口。
 - 已确认：后端使用的数据由后端提供配置接口，现有 JSON 存储可以保留；主题与 Append Prompt 由 Swift 修改。边界理由见 [ADR 0005](./adr/0005-settings-data-ownership.md)。
-- [ ] 完成设计追问并由用户确认共同理解：未保存表单的切页 / 关闭行为。
+- [x] 完成设计决策并发布规格：表单使用显式保存按钮；未确认的离页阻拦弹窗不纳入验收。测试边界已确认使用后端公开接口主路径、Electron 窗口 / React 交互及 macOS 实机验收。
 - [x] 读取共享产品文档、Settings surface 与跨上下文架构，调查现有设置和入口；本轮仅讨论设计，不修改代码。
 - [ ] 确认范围后，从主 checkout 执行 `scripts/create-worktree.sh` 创建 `.worktrees/<task-name>/`，确认独立 CodeGraph 索引与显式 projectPath。
 - [ ] 在 worktree 先执行 `scripts/test.sh` 与 `scripts/swiftw build` 分层基线，再沿目标目录指南及父目录读到 `handAgent.md`，开始实现。
