@@ -7,6 +7,17 @@
 
 最后核对日期：2026-10-03。
 
+## Electron 设置迁移（设计讨论中，2026-10-03）
+
+- [ ] 新增 menu bar 入口，菜单暂时只有“设置”，点击打开新增的 Electron 设置页面。
+- [ ] 第一阶段目标：原生设置收敛为 Appearance、系统快捷键（唤起 Wisp、捕获选区、截图）、Host 功能（Context History 状态、Automation）与 AgentTrigger；Electron 承载 AI、Agent 与 Pets 设置。
+- [ ] 完成设计追问并由用户确认共同理解：原生设置的访问路径、首期范围、配置读写与生效归属、非系统快捷键的归属，以及 Prompts 的含义。
+- [x] 读取共享产品文档、Settings surface 与跨上下文架构，调查现有设置和入口；本轮仅讨论设计，不修改代码。
+- [ ] 确认范围后，从主 checkout 执行 `scripts/create-worktree.sh` 创建 `.worktrees/<task-name>/`，确认独立 CodeGraph 索引与显式 projectPath。
+- [ ] 在 worktree 先执行 `scripts/test.sh` 与 `scripts/swiftw build` 分层基线，再沿目标目录指南及父目录读到 `handAgent.md`，开始实现。
+- [ ] 完成迁移与必要验证，运行 TypeScript/Web、Swift test/build 提交前检查，更新相关模块文档。
+- [ ] spec 实现后由不继承上下文的独立子 agent 审核 spec、代码与文档；确认审核结论，将已实现项移入 `manual-qa.md` 后提交。
+
 ## 重启后的排队消息策略
 
 - [ ] 单独确定未开始输入在应用重启后的继续、取消及展示策略；Issue #6/#7 未新增队列控制协议，现有恢复行为与实机回归见 [manual QA](./manual-qa.md)。
