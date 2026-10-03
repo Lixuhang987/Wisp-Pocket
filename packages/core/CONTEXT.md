@@ -41,7 +41,7 @@ _Avoid_: Host Tool、Plugin Tool（指代通用机制时）
 _Avoid_: LLM Provider、Tool Registry
 
 **Workspace**:
-具有独立身份、项目目录和项目指令的工作上下文；同一实际目录复用同一个 Workspace，项目指令来自 AGENTS.md。
+具有独立身份、固定项目目录和项目指令的工作上下文；同一实际目录复用同一个 Workspace，项目指令来自根目录 AGENTS.md。
 _Avoid_: Pet、Profile（指代项目上下文时）
 
 **Pet**:
