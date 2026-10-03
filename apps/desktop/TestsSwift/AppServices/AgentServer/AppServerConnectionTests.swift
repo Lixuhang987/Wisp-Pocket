@@ -208,7 +208,7 @@ final class SwiftThreadClientTests: XCTestCase {
         transport.tasks[0].succeedReceive(String(decoding: try JSONSerialization.data(withJSONObject: [
             "type": "pet.listed", "commandId": list["commandId"]!, "payload": ["pets": [[
                 "id": "default-pet", "name": "默认", "description": "", "rolePrompt": "协助", "revision": 1,
-                "imageRef": ["type": "builtin", "id": "yachiyo"], "rootPath": "/tmp/default", "isDefault": true
+                "imageRef": ["type": "builtin", "id": "yachiyo"], "workspaceId": "workspace-default", "rootPath": "/tmp/default", "isDefault": true
             ]]]
         ]), as: UTF8.self))
         for _ in 0..<20 where transport.tasks[0].sentObjects.count < 2 { await Task.yield() }

@@ -34,7 +34,7 @@
 
 ## 当前实现特点
 
-- **LLM 模型配置热加载 + mtime cache**：`SettingsBackedLLMClient.stream` / `complete` 每次先读取 `settings.json` 的 `mtimeMs + size` stamp；stamp 未变时复用上次解析出的有效配置与 `LLMClientFactory` 创建的 client，不调用 `loadModelSettings()`；stamp 变化后同步重读，若 `provider / model / apiKey / baseUrl / api`（摘要路径为 `summarizerModel`）等有效 client 配置变化才重建 client。配合 desktop 端 `AgentSettingsStore` 写盘，模型设置在下一次 LLM 请求可见。
+- **LLM 模型配置热加载 + mtime cache**：`SettingsBackedLLMClient.stream` / `complete` 每次先读取 `settings.json` 的 `mtimeMs + size` stamp；stamp 未变时复用上次解析出的有效配置与 `LLMClientFactory` 创建的 client，不调用 `loadModelSettings()`；stamp 变化后同步重读，若 `provider / model / apiKey / baseUrl / api`（摘要路径为 `summarizerModel`）等有效 client 配置变化才重建 client。配合 agent-server 设置接口写盘，模型设置在下一次 LLM 请求可见。
 - **tool settings 热加载 + mtime cache**：`SettingsBackedToolRegistry.refresh()` 每次新一轮 user message 进入 runtime 前读取 `settings.json` stamp；stamp 未变时跳过，stamp 变化后重读 `tools.allowlist / tools.denylist` 并原地刷新同一个 `ToolRegistry` 实例，后续 LLM 请求立即看到最新 builtin tool 列表。
 - **`ModelSettings` vs `ToolSettings` 错误处理不一致**：前者 JSON 解析失败抛错（让用户看到明确反馈），后者静默回默认（避免阻塞启动）。当前是有意为之但未在文档中明示，本文件起统一约定。
 - **默认 api 不一致**：`defaultModelSettings.api = "responses"`，`VercelClient` 构造默认 `api = "chat"`。生产路径全程透传 settings 故无冲突，但留下了一个潜在 footgun。
@@ -50,5 +50,5 @@
 ## 相关文档
 
 - 调用方：[apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)（`SettingsBackedLLMClient` + `SettingsBackedToolRegistry`）
-- 设置 UI：[apps/desktop/Sources/AppServices/AgentSettings/agent-settings.md](/Users/mu9/proj/handAgent/apps/desktop/Sources/AppServices/AgentSettings/agent-settings.md)
+- 配置读写：[agent-server 设置接口](../../../../apps/agent-server/src/settings/settings.md)；Swift 原生主题使用独立偏好文件，不写后端配置。
 - LLM 适配：[llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md)

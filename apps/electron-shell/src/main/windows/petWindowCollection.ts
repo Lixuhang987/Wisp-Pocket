@@ -13,7 +13,7 @@ export class PetWindowCollection {
   private reconnect?: ReturnType<typeof setTimeout>;
   private stopped=false;
   private theme?:HostTheme;
-  constructor(private readonly options:{url:string;createController(petId:string,index:number):WindowController;preferences:{load():Record<string,boolean>;save(value:Record<string,boolean>):void};onError?(error:unknown):void}) {this.visibility=options.preferences.load();}
+  constructor(private readonly options:{url:string;createController(petId:string,index:number):WindowController;preferences:{load():Record<string,boolean>;save(value:Record<string,boolean>):void};onError?(error:unknown):void;onPetRemoved?(petId:string):void}) {this.visibility=options.preferences.load();}
   async show():Promise<void> {this.stopped=false;this.connect();await Promise.all([...this.petIds].filter(id=>this.visibility[id]!==false).map(id=>this.showPet(id)));}
   private connect():void {
     if(this.socket && this.socket.readyState<2)return;
@@ -26,14 +26,31 @@ export class PetWindowCollection {
   }
   private send(type:string,payload?:object,threadId?:string):void {if(this.socket?.readyState===1)this.socket.send(JSON.stringify({type,commandId:crypto.randomUUID(),timestamp:new Date().toISOString(),...(payload?{payload}:{}),...(threadId?{threadId}:{})}));}
   async accept(event:any):Promise<void> {
-    if(event.type==="pet.listed") {for(const pet of event.payload.pets){this.petIds.add(pet.id);if(this.visibility[pet.id]!==false)await this.showPet(pet.id);}}
-    else if(event.type==="pet.created") {this.petIds.add(event.payload.pet.id);await this.showPet(event.payload.pet.id);}
+    if(event.type==="pet.listed") {
+      const nextIds = new Set<string>(event.payload.pets.map((pet: {id:string}) => pet.id));
+      // A scoped reply may add facts, but cannot invalidate another project's identities.
+      if (!event.payload.workspaceId && !event.payload.petId) {
+        for (const id of new Set([...this.petIds, ...Object.keys(this.visibility)])) if (!nextIds.has(id)) {
+          const controller = this.controllers.get(id);
+          controller?.hide();
+          if (!this.receiving.has(id)) { controller?.close(); this.controllers.delete(id); }
+          this.options.onPetRemoved?.(id);
+        }
+        this.petIds.clear();
+        for (const id of Object.keys(this.visibility)) if (!nextIds.has(id)) delete this.visibility[id];
+        for (const [threadId, petId] of this.owners) if (!nextIds.has(petId)) this.owners.delete(threadId);
+        this.options.preferences.save(this.visibility);
+      }
+      for (const id of nextIds) this.petIds.add(id);
+      for (const id of nextIds) if (this.visibility[id]!==false) await this.showPet(id);
+    }
+    else if(event.type==="pet.created") {const id=event.payload.pet.id;this.petIds.add(id);if(this.visibility[id]!==false)await this.showPet(id);}
     else if(event.type==="thread.listed") {for(const thread of event.payload.threads){this.owners.set(thread.id,thread.petId);}if(event.payload.nextCursor)this.send("thread.list",{limit:100,cursor:event.payload.nextCursor});}
     else if(event.type==="thread.started") {this.owners.set(event.threadId,event.payload.petId);}
     else if(event.type==="thread.deleted") this.owners.delete(event.payload.targetThreadId);
     else if(event.type==="permission.requested") {
       const petId=this.owners.get(event.threadId);
-      if(petId && Date.now()-Date.parse(event.timestamp)<60_000){await this.showPet(petId);this.controllers.get(petId)?.reveal();}
+      if(petId && this.petIds.has(petId) && Date.now()-Date.parse(event.timestamp)<60_000){await this.showPet(petId);this.controllers.get(petId)?.reveal();}
     }
   }
   async showPet(petId:string):Promise<void> {
@@ -41,15 +58,23 @@ export class PetWindowCollection {
     this.visibility[petId]=true;this.options.preferences.save(this.visibility);
     let controller=this.controllers.get(petId);
     if(!controller){controller=this.options.createController(petId,[...this.petIds].indexOf(petId));this.controllers.set(petId,controller);if(this.theme)await controller.updateTheme(this.theme);}
+    // Theme loading can yield while a newer snapshot removes or hides this identity.
+    if (!this.isVisible(petId) || this.controllers.get(petId) !== controller) return;
     await controller.show();
+    if (!this.isVisible(petId)) {
+      controller.hide();
+      if (!this.receiving.has(petId)) controller.close();
+    }
   }
   async hidePet(petId:string):Promise<void> {
     if(!this.petIds.has(petId))throw new Error("桌宠不存在。");
     this.visibility[petId]=false;this.options.preferences.save(this.visibility);
     const controller=this.controllers.get(petId);controller?.hide();if(!this.receiving.has(petId))controller?.close();
   }
-  async recover(petId:string):Promise<void> { this.receiving.delete(petId); if (this.visibility[petId] !== false) await this.showPet(petId); }
-  setReceiving(petId:string,value:boolean):void {if(value)this.receiving.add(petId);else {this.receiving.delete(petId);if(this.visibility[petId]===false)this.controllers.get(petId)?.close();}}
+  async recover(petId:string):Promise<void> { this.receiving.delete(petId); if (this.petIds.has(petId) && this.visibility[petId] !== false) await this.showPet(petId); }
+  setReceiving(petId:string,value:boolean):void {if(value)this.receiving.add(petId);else {this.receiving.delete(petId);if(this.visibility[petId]===false || !this.petIds.has(petId)){this.controllers.get(petId)?.close();if(!this.petIds.has(petId))this.controllers.delete(petId);}}}
+  getVisibility():Record<string,boolean> { return Object.fromEntries([...this.petIds].map(id => [id, this.visibility[id] !== false])); }
+  private isVisible(petId:string):boolean {return this.petIds.has(petId) && this.visibility[petId]!==false;}
   controllerForSender(sender:unknown):WindowController|undefined {return [...this.controllers.values()].find(c=>c.currentWebContents()!==null&&c.currentWebContents()===sender);}
   petIdForSender(sender:unknown):string|undefined {return [...this.controllers.entries()].find(([,c])=>c.currentWebContents()!==null&&c.currentWebContents()===sender)?.[0];}
   async updateTheme(theme:HostTheme):Promise<void> {this.theme=theme;await Promise.all([...this.controllers.values()].map(c=>c.updateTheme(theme)));}

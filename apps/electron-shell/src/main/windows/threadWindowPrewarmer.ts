@@ -147,6 +147,10 @@ export class ThreadWindowPrewarmer {
     this.showAndFocus(window);
   }
 
+  ownsSender(sender: unknown): boolean {
+    return this.window !== null && this.window.webContents === sender;
+  }
+
   focus(): boolean {
     if (!this.window || !this.visible) {
       return false;

@@ -1,0 +1,23 @@
+.settings-app { display:grid; grid-template-columns:calc(var(--ha-spacing-xxl) * 3) minmax(0,1fr); height:100vh; overflow:hidden; color:var(--ha-color-text-primary);background:var(--ha-color-canvas);font:var(--ha-typography-body-size)/1.5 var(--ha-typography-body-family); }
+.settings-nav {padding:var(--ha-spacing-md);background:var(--ha-color-surface);border-right:1px solid var(--ha-color-hairline);display:flex;flex-direction:column;gap:var(--ha-spacing-xs)}
+.settings-nav h1,.settings-page h2 {font-size:var(--ha-typography-title-size);font-weight:500;margin:0 0 var(--ha-spacing-md)}
+.settings-nav button {text-align:left}.settings-nav button[aria-current=page],.settings-tabs button[aria-selected=true]{background:var(--ha-color-accent-subtle);color:var(--ha-color-accent)}
+.settings-page {padding:var(--ha-spacing-lg);overflow:auto;min-width:0}.settings-page-inner {max-width:calc(var(--ha-spacing-xxl) * 13);margin:auto}
+.settings-tabs,.settings-actions {display:flex;gap:var(--ha-spacing-xs);margin-bottom:var(--ha-spacing-md);flex-wrap:wrap}
+.settings-form {border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:var(--ha-spacing-md)}
+.settings-field {display:flex;flex-direction:column;gap:var(--ha-spacing-xxs);font-size:var(--ha-typography-caption-size)}
+.settings-field input,.settings-field select,.settings-field textarea,.pet-management > input {border:1px solid var(--ha-color-hairline);border-radius:var(--ha-radius-sm);background:var(--ha-color-surface-soft);color:var(--ha-color-text-primary);padding:var(--ha-spacing-xs);font:inherit;width:100%;box-sizing:border-box}
+.settings-field textarea {min-height:calc(var(--ha-spacing-xl) * 3);resize:vertical}.settings-field input[readonly] {color:var(--ha-color-text-secondary)}
+.settings-app button,.pet-management button {border:1px solid var(--ha-color-hairline);border-radius:var(--ha-radius-sm);padding:var(--ha-spacing-xs) var(--ha-spacing-sm);background:var(--ha-color-surface-soft);color:var(--ha-color-text-primary);font:inherit;cursor:pointer}
+.settings-app button.primary,.pet-management button.primary {background:var(--ha-color-accent);border-color:var(--ha-color-accent);color:var(--ha-color-on-accent)}
+.settings-app button:hover,.pet-management button:hover {filter:brightness(.97)}.settings-app button:disabled,.pet-management button:disabled {opacity:.5;cursor:default}
+.settings-app :focus-visible,.pet-management :focus-visible {outline:2px solid var(--ha-color-accent);outline-offset:2px}
+.settings-note {font-size:var(--ha-typography-caption-size);color:var(--ha-color-text-secondary)}
+.settings-error {color:var(--ha-color-error);font-size:var(--ha-typography-caption-size)}.settings-success {color:var(--ha-color-success);font-size:var(--ha-typography-caption-size)}
+.settings-row,.pet-management-row {display:flex;align-items:center;gap:var(--ha-spacing-sm);padding:var(--ha-spacing-sm) 0;border-bottom:1px solid var(--ha-color-hairline-soft);flex-wrap:wrap}
+.settings-row > span,.pet-management-name {flex:1;min-width:0}.settings-row small,.pet-management-row small {display:block;color:var(--ha-color-text-secondary);font-size:var(--ha-typography-caption-size);overflow-wrap:anywhere}
+.pet-management {font:var(--ha-typography-caption-size)/1.5 var(--ha-typography-body-family);color:var(--ha-color-text-primary)}
+.pet-management header {display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--ha-spacing-sm)}
+.pet-management-row img,.pet-management-preview img {width:var(--ha-spacing-xxl);height:var(--ha-spacing-xxl);object-fit:contain}.pet-management-preview {display:flex;align-items:center;gap:var(--ha-spacing-md)}
+.settings-app .pet-management {font-size:var(--ha-typography-body-size)}
+@media (max-width:560px) {.settings-app {grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.settings-nav {flex-direction:row;align-items:center;border-right:0;border-bottom:1px solid var(--ha-color-hairline)}.settings-nav h1 {margin:0 auto 0 0}.settings-page {padding:var(--ha-spacing-md)}}

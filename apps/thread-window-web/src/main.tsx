@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { SettingsApp } from "./SettingsApp.tsx";
 import { App } from "./App.tsx";
 import "./styles/tailwind.css";
 // import "./styles/thread-window.css";  // 旧样式，Phase 4 后移除
@@ -11,6 +12,6 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <React.StrictMode>
-    <App />
+    {new URLSearchParams(window.location.search).get("surface")==="settings"?<SettingsApp/>:<App />}
   </React.StrictMode>,
 );

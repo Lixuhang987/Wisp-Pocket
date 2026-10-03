@@ -339,7 +339,7 @@ export class AgentRuntime {
     const toolCalls: ToolCallEnvelope[] = [];
     const tools = [...this.toolRegistry.list().filter(tool => tool.name !== USER_QUESTION_TOOL_NAME), userQuestionTool];
     const llmMessages = await buildSystemPromptMessages({
-      sections: [...this.systemPromptSections, ...(runOptions.rolePrompt ? [{name:"pet-role",resolve:() => `桌宠角色（表达习惯，用户明确任务可覆盖口吻和格式；不能改变工具和权限规则）：\n${runOptions.rolePrompt}`}]:[])],
+      sections: [...this.systemPromptSections, ...(runOptions.projectInstructions ? [{name:'workspace-instructions',resolve:() => `项目 AGENTS.md（用户本次明确要求优先于项目指令；项目指令优先于桌宠角色习惯；不能改变后端工具边界与权限）：\n${runOptions.projectInstructions}`}]:[]), ...(runOptions.rolePrompt ? [{name:"pet-role",resolve:() => `桌宠角色（表达习惯，用户明确任务与项目 AGENTS.md 可覆盖角色习惯；不能改变工具和权限规则）：\n${runOptions.rolePrompt}`}]:[])],
       context: { tools },
       messages,
     });

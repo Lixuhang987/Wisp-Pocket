@@ -6,7 +6,7 @@
 
 | 文件 | 职责 |
 |------|------|
-| `threadWindowPrewarmer.ts` | 全局唯一 ThreadWindow `BrowserWindow` 的 hidden prewarm、首轮输入与目标 Thread 交付、show/focus、close 状态、host theme 下发与只读 `availableSkills` 注入 |
+| `threadWindowPrewarmer.ts` | ThreadWindow 单实例以及独立设置实例的 hidden loading、首轮输入与目标 Thread 交付、show/focus、close 状态、host theme 下发与只读 `availableSkills` 注入 |
 | `petWindowCollection.ts` | N 个绑定 petId 的窗口集合、可见偏好、接收期间延后回收及轻量请求召回 |
 | `activityWindowController.ts` | 单宠 ActivityWindow 的非激活展示、布局、拖动、透明命中、host theme 下发和 renderer crash 回调 |
 | `petPositionStore.ts` | 角色右下角屏幕坐标的原子保存与恢复；文件路径由 main 注入 |
@@ -48,3 +48,9 @@
 - main 使用 `/api/thread?observeRequests=1` 分页读取轻量身份与有效 Permission 事实，仅保存 threadId→petId 路由。不 resume 全部历史，不持有消息、不回答请求；完整投影只在各 renderer 明确打开 Thread 时恢复。
 - 隐藏角色先取消显示；若 renderer 仍在等待接收 ACK，则延后 close。接收结果不因隐藏丢失，后端执行也不随窗口关闭停止。
 - 有效 Permission 恢复角色窗口并发送无焦点的展示意图，renderer 保持原选择；普通后台消息不能解除主动隐藏。
+
+## 设置与完整身份对账
+
+- 设置窗口加载 `?surface=settings`，复用 `ThreadWindowPrewarmer` 的独立实例，只用 focus/openHistory/updateTheme，不向 renderer 注入 Thread 或清空表单。关闭后实例清空，下一次重新加载默认 AI；窗口没有 ThreadWindow gate 回调，也不停止 supervisor。
+- 管理桥能选目录/PNG、JPEG、WebP图片，返回 picker 原始目录或不超过20MiB的图片bytes；不接受 renderer 指定任意磁盘路径，不直写业务文件。sender 合约见 [preload](../../preload/preload.md)。
+- 观察连接的完整 Pet 快照替换身份集合，删除失效 Thread 路由与 visible/位置偏好，保留有效项。失效窗口立即隐藏，接收在途时等 ACK 后回收；局部 scope 只增加身份，不能清理其他项目。新身份默认显示，幂等 created 重投保留已隐藏的有效身份；异步加载完成后须重新核验身份与显示偏好，目录不可访问不等于身份失效。

@@ -1,6 +1,6 @@
 # electron-shell
 
-`apps/electron-shell` 是 [Electron UI Shell](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md)：承载 ThreadWindow、桌宠，并作为 agent-server 的唯一 supervisor。
+`apps/electron-shell` 是 [Electron UI Shell](/Users/mu9/proj/handAgent/apps/desktop/CONTEXT.md)：承载 ThreadWindow、独立设置、桌宠，并作为 agent-server 的唯一 supervisor。
 
 ## 直接子节点
 
@@ -15,13 +15,13 @@
 - agent-server ready 后由 Electron main 预热 hidden ThreadWindow；Swift 不发送 prepare command。
 - ThreadWindow 的 open/focus/close 与桌宠窗口的显示、位置和命中由 Electron main 管理；桌宠的回复、历史和气泡显隐由 renderer 管理。
 - 关闭 UI 窗口不停止 agent-server；Electron shutdown 才停止 supervisor。
-- 主题初值来自 `HANDAGENT_INITIAL_THEME`，后续 `theme.changed` 同步到两个 renderer；renderer 不持久化主题偏好。角色大小是[桌宠 renderer](./src/src.md)独立保存的本地界面偏好。
+- 主题初值来自 `HANDAGENT_INITIAL_THEME`，后续 `theme.changed` 同步到全部 renderer；renderer 不持久化主题偏好。角色大小是[桌宠 renderer](./src/src.md)独立保存的本地界面偏好。
 
 ## 安全边界
 
 - renderer 使用 `contextIsolation: true`、`nodeIntegration: false`；preload 只暴露受控配置与回调。
 - React ThreadWindow 和桌宠直接连接 `/api/thread?acceptServerRequests=1`，共享后端历史与请求。Electron main 不 mirror Thread 消息。
-- Swift Host 继续拥有 PromptPanel、Settings、AgentTrigger、焦点恢复和 Dynamic Tool Provider；本包不实现 macOS 能力或管理内置业务模块生命周期。
+- Swift Host 继续拥有 PromptPanel、原生宿主 Settings、AgentTrigger、焦点恢复和 Dynamic Tool Provider；本包不实现 macOS 能力或管理内置业务模块生命周期。
 - ThreadWindow 当前不做断线恢复；桌宠重连后按 petId 重新列出历史并恢复主动选择，保持草稿和隐藏状态。
 
 ## Supervisor 与构建

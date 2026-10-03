@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, ActivityWindowCommanding {
+final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, ActivityWindowCommanding, SettingsWindowCommanding {
     private let shell: any ElectronShellProcessing
     private let dynamicToolClient: DynamicToolProviderConnectionClient?
     private let swiftThreadClient: (any SwiftThreadSubmitting)?
@@ -11,6 +11,8 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
     private var isRunning = false
     private var agentServerErrorMessage: String?
     private var threadWindowErrorMessage: String?
+    private var pendingSettingsCommands = Set<String>()
+    var onSettingsCommandFailure: ((String) -> Void)?
     private var pendingCommandKinds: [String: ThreadWindowCommandKind] = [:]
     private var pendingActivityCommandKinds: [String: ActivityWindowCommandKind] = [:]
 
@@ -68,7 +70,9 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         onHostTerminationRequest = nil
         onThreadWindowClosed = nil
         onCommandResult = nil
+        onSettingsCommandFailure = nil
         onActivityWindowCommandResult = nil
+        pendingSettingsCommands.removeAll()
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
         dynamicToolClient?.disconnect()
@@ -89,6 +93,15 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
                 payload: ElectronInitialPromptPayload(prompt: prompt)
             )
         }
+    }
+
+    @discardableResult
+    func openSettingsWindow() throws -> String {
+        let id = UUID().uuidString
+        pendingSettingsCommands.insert(id)
+        do { try shell.send(.openSettings(commandId: id)) }
+        catch { pendingSettingsCommands.remove(id); throw error }
+        return id
     }
 
     @discardableResult
@@ -194,7 +207,8 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             hasPreparedThreadWindow = false
             dynamicToolClient?.disconnect()
             swiftThreadClient?.disconnect()
-            pendingCommandKinds.removeAll()
+            pendingSettingsCommands.removeAll()
+        pendingCommandKinds.removeAll()
             pendingActivityCommandKinds.removeAll()
             publishAvailability(force: lastPublishedAvailability)
             onHostTerminationRequest?()
@@ -206,6 +220,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         hasPreparedThreadWindow = false
         dynamicToolClient?.disconnect()
         swiftThreadClient?.disconnect()
+        pendingSettingsCommands.removeAll()
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
         onFatalError?(message)
@@ -219,6 +234,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         threadWindowErrorMessage = nil
         lastPublishedAvailability = false
         isRunning = false
+        pendingSettingsCommands.removeAll()
         pendingCommandKinds.removeAll()
         pendingActivityCommandKinds.removeAll()
     }
@@ -247,6 +263,10 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
     }
 
     private func handleCommandAck(commandId: String, ok: Bool, error: String?) {
+        if pendingSettingsCommands.remove(commandId) != nil {
+            if !ok { onSettingsCommandFailure?(error ?? "设置窗口打开失败") }
+            return
+        }
         if let kind = pendingCommandKinds.removeValue(forKey: commandId) {
             ThreadWindowDiagnostics.emit(
                 "electron.command_ack kind=\(String(describing: kind)) ok=\(ok) error=\(error ?? "nil")"

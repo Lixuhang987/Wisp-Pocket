@@ -16,18 +16,19 @@
 
 ## Thread 合约
 
-- `thread.start(petId)` 只创建 Thread，角色快照由服务端取得；稳定 commandId 关联重试；对应 Thread 已删除时返回 not_found，不重新创建，客户端不能提交快照。初始与后续输入均经 `op.submit(UserInput)`；公开 Op 只接受 UserInput 或 Interrupt。
+- `thread.start({petId?,workspaceId?})` 只创建 Thread：指定 Pet 推导或校验项目，仅指定项目则随机选该项目所有 Pet，无目标失败。角色快照由服务端取得；稳定 commandId 关联重试；对应 Thread 已删除时返回 not_found，不重新创建，客户端不能提交快照。初始与后续输入均经 `op.submit(UserInput)`；公开 Op 只接受 UserInput 或 Interrupt。
 - 新建 Thread 会通知所有已连接客户端并建立普通通知订阅。声明 `acceptServerRequests=1` 的订阅者才能接收并回答交互请求；桌宠和 ThreadWindow 可同时呈现同一请求。
 - ClientResponse 独立传输，由 agent-server 检查连接与订阅资格后交给所属 Thread 的待答表；core 只消费一次有效回执，并发布 `request.resolved`。内部 Op 类型不改变此接入规则；snapshot 的 `pendingRequests` 恢复当前待答表。
 - `thread.resume` 返回 snapshot；恢复历史与断线后的重新订阅由各客户端明确发起。
-- `thread.list` 按 petId 分组，以更新时间和 id 的稳定次序分页；身份、角色 revision 与派生 rootPath 在列表、started、snapshot 中一致。界面按主动选择恢复，后台 started 不决定当前选择。
+- `thread.list` 支持 petId / workspaceId 的交集查询，以更新时间和 id 稳定分页，游标绑定范围。双归属、角色 revision 与派生 rootPath 在列表、started、snapshot 中一致；ThreadWindow 按项目一级展示，桌宠仅按本宠查询。后台 started 不决定当前选择。
 - `user.message.recorded.pending` 表示输入已接收但尚未开始。输入的 `messageId` 与其 `turn.started.turnId` 对应，开始后清除 pending。
 - `pet.listed` 与 `thread.listed` 是不带 `threadId` 的连接级响应；带 `threadId` 的消息按订阅路由。
 - `thread.deleted` 携带目标 ID：删除成功广播全部连接，`not_found` 只回发起连接。客户端收到成功结果或重连后的权威列表时清理被删 Thread。
 
 ## Pet 与轻量观察
 
-- Pet 管理命令、图片导入与 Thread 共用 `/api/thread`；创建/更新广播配置，列表/图片导入结果/错误定向回复。expectedRevision 防止覆盖并发修改，rootPath 不允许更新。
+- workspace.list 返回全部项目，workspace.create 创建或复用实际目录并返回基础 Pet；项目创建结果广播。pet.list 可按 workspaceId 局部查询，返回必须回显该字段，完整权威列表则省略，以区分身份对账范围。
+- Pet 管理命令、图片导入与 Thread 共用 `/api/thread`；创建/更新广播配置，列表/图片导入结果/错误定向回复。expectedRevision 防止覆盖并发修改，Pet 的 Workspace 引用不允许更新，rootPath 从项目派生。
 - `observeRequests=1` 连接仅观察身份变化和 Permission；`thread.list` 每页后补发该页有效待答请求，不加载 Thread 历史。它不获得回答资格，正常交互连接仍使用 `acceptServerRequests=1`。双端约定见 [server](../../../../apps/agent-server/src/server/server.md)。
 
 ## 输入与附件

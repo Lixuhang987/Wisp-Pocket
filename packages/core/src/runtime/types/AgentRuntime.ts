@@ -68,6 +68,7 @@ export type AgentRuntimeRunOptions = {
   signal?: AbortSignal;
   rootPath?: string;
   rolePrompt?: string;
+  projectInstructions?: string;
 };
 
 export type AgentRuntimeEventSink = (event: AgentRuntimeEvent) => void;

@@ -11,7 +11,7 @@
 - [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md)：Thread-scoped Tool registry 与 MCP 激活。
 - [bridges/bridges.md](/Users/mu9/proj/handAgent/apps/agent-server/src/bridges/bridges.md)：Dynamic Tool Provider bridge。
 - [activity/activity.md](/Users/mu9/proj/handAgent/apps/agent-server/src/activity/activity.md)：Agent Activity 投影。
-- [settings/settings.md](/Users/mu9/proj/handAgent/apps/agent-server/src/settings/settings.md)：设置驱动的 LLM 与 Tool 热加载。
+- [settings/settings.md](/Users/mu9/proj/handAgent/apps/agent-server/src/settings/settings.md)：后端配置 HTTP 管理与设置驱动的 LLM / Tool 热加载。
 
 ## 依赖方向
 

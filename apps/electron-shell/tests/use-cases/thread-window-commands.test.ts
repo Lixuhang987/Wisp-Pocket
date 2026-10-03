@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { ElectronShellRuntime } from "../../src/main/electronShellRuntime.js";
 import { parseCommand, type ElectronToSwiftEvent } from "../../src/main/protocol/electronShellProtocol.js";
+import { registerSettingsManagementIpc } from "../../src/main/settingsManagementIpc.js";
 import { ThreadWindowPrewarmer } from "../../src/main/windows/threadWindowPrewarmer.js";
 
 describe("Swift targeted ThreadWindow focus", () => {
@@ -127,6 +128,69 @@ describe("Swift targeted ThreadWindow focus", () => {
     expect(events).toEqual(Array(2).fill({
       channel: "electron_shell", type: "command.ack", commandId: "focus-window", ok: true,
     }));
+  });
+});
+
+describe("Settings window command", () => {
+  it("opens one independent settings renderer, focuses it unchanged and recreates after close", async () => {
+    const windows = [new FakeBrowserWindow(), new FakeBrowserWindow()];
+    const created: unknown[] = [];
+    let index = 0;
+    const settingsWindow = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html?surface=settings",
+      preloadPath: "/preload.cjs", availableSkills: [],
+      createWindow: options => { created.push(options); return windows[index++]; },
+    });
+    const threadWindow = new ThreadWindowPrewarmer({
+      threadWindowURL: "http://127.0.0.1:4317/thread-window/index.html",
+      preloadPath: "/preload.cjs", availableSkills: [],
+      createWindow: () => { throw new Error("Settings must own a separate window"); },
+    });
+    const events: ElectronToSwiftEvent[] = [];
+    let stopped = false;
+    const runtime = new ElectronShellRuntime({
+      prewarmer: threadWindow, settingsWindow,
+      activityWindow: { show: async () => {}, updateTheme: async () => {} },
+      send: event => events.push(event), now: () => "now",
+      stopSupervisor: () => { stopped = true; }, quit: () => {},
+    });
+    const command = parseCommand(JSON.stringify({channel:"electron_shell",type:"settings.open",commandId:"settings-1"}));
+    const opening = runtime.handleCommand(command);
+    windows[0].webContents.emit("did-finish-load");
+    await opening;
+    await runtime.handleCommand(command);
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({webPreferences:{contextIsolation:true,nodeIntegration:false,preload:"/preload.cjs"}});
+    expect(windows[0].loadCount).toBe(1);
+    expect(windows[0].showCount).toBe(1);
+    expect(windows[0].focusCount).toBe(2);
+    expect(windows[0].executedJavaScript).toEqual([]);
+    const handlers = new Map<string, (event: {sender:unknown}, ...args: unknown[]) => unknown>();
+    const visibility: Record<string, boolean> = { "pet-a": true };
+    registerSettingsManagementIpc({handle:(channel, handler) => {handlers.set(channel, handler);}}, {
+      isManagementSender: sender => settingsWindow.ownsSender(sender),
+      chooseDirectory: async () => "/project", chooseImage: async () => ({name:"pet.png",mimeType:"image/png",bytesBase64:"cG5n"}),
+      showPet: async id => {visibility[id] = true;}, hidePet: async id => {visibility[id] = false;},
+      getPetVisibility: () => ({...visibility}),
+    });
+    const event = {sender: windows[0].webContents};
+    expect(await handlers.get("settings:choose-directory")!(event)).toBe("/project");
+    expect(await handlers.get("settings:choose-image")!(event)).toMatchObject({mimeType:"image/png",bytesBase64:"cG5n"});
+    await handlers.get("settings:hide-pet")!(event, "pet-a");
+    expect(handlers.get("settings:pet-visibility")!(event)).toEqual({"pet-a": false});
+    await handlers.get("settings:show-pet")!(event, "pet-a");
+    expect(handlers.get("settings:pet-visibility")!(event)).toEqual({"pet-a": true});
+    expect(() => handlers.get("settings:choose-directory")!({sender:{}})).toThrow("Invalid settings window sender");
+
+    windows[0].emit("closed");
+    expect(stopped).toBe(false);
+    expect(() => handlers.get("settings:choose-directory")!(event)).toThrow("Invalid settings window sender");
+    const reopening = runtime.handleCommand(command);
+    windows[1].webContents.emit("did-finish-load");
+    await reopening;
+    expect(created).toHaveLength(2);
+    expect(windows[1].loadCount).toBe(1);
+    expect(events).toEqual(Array(3).fill({channel:"electron_shell",type:"command.ack",commandId:"settings-1",ok:true}));
   });
 });
 

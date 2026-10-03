@@ -37,6 +37,7 @@ export class ThreadSocketClient {
   constructor(private readonly options: {
     url: string;
     petId?: string;
+    listWorkspaces?: boolean;
     WebSocketImpl?: WebSocketConstructor;
     now?: () => string;
     id?: () => string;
@@ -111,6 +112,7 @@ export class ThreadSocketClient {
         commandId: this.nextId(),
         timestamp: this.now(),
       }));
+      if (this.options.listWorkspaces) this.sendRaw(JSON.stringify({type:"workspace.list", commandId:this.nextId(),timestamp:this.now()}));
       this.listThreads();
     };
 

@@ -40,27 +40,19 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
     private var presentations: [ObjectIdentifier: SettingsPresentation] = [:]
 
     func present(
-        settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
         agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
-        mcpSettingsViewModel: MCPSettingsViewModel,
-        permissionRulesViewModel: PermissionRulesViewModel,
-        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
     ) -> NSWindow? {
         let presentation = SettingsPresentation(
-            settingsViewModel: settingsViewModel,
             appearanceViewModel: appearanceViewModel,
             toolSettingsViewModel: toolSettingsViewModel,
             agentTriggerSettingsViewModel: agentTriggerSettingsViewModel,
             appendPromptSettingsViewModel: appendPromptSettingsViewModel,
-            mcpSettingsViewModel: mcpSettingsViewModel,
-            permissionRulesViewModel: permissionRulesViewModel,
-            petViewModel: petViewModel,
             shortcutActions: shortcutActions
         )
         let hosting = NSHostingController(
@@ -114,14 +106,10 @@ final class ProductionSettingsWindowPresenter: SettingsWindowPresenting {
     ) -> AnyView {
         AnyView(
             SettingsView(
-                settingsViewModel: presentation.settingsViewModel,
                 appearanceViewModel: presentation.appearanceViewModel,
                 toolSettingsViewModel: presentation.toolSettingsViewModel,
                 agentTriggerSettingsViewModel: presentation.agentTriggerSettingsViewModel,
                 appendPromptSettingsViewModel: presentation.appendPromptSettingsViewModel,
-                mcpSettingsViewModel: presentation.mcpSettingsViewModel,
-                permissionRulesViewModel: presentation.permissionRulesViewModel,
-                petViewModel: presentation.petViewModel,
                 shortcutActions: presentation.shortcutActions
             )
             .environment(\.appTheme, appTheme)
@@ -159,14 +147,10 @@ private struct SendableClosure: @unchecked Sendable {
 }
 
 private struct SettingsPresentation {
-    let settingsViewModel: AgentSettingsViewModel
     let appearanceViewModel: AppearanceSettingsViewModel
     let toolSettingsViewModel: ToolSettingsViewModel
     let agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel
     let appendPromptSettingsViewModel: AppendPromptSettingsViewModel
-    let mcpSettingsViewModel: MCPSettingsViewModel
-    let permissionRulesViewModel: PermissionRulesViewModel
-    let petViewModel: PetSettingsViewModel
     let shortcutActions: [ActionDefinition]
 }
 

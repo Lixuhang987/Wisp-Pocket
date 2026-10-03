@@ -8,20 +8,21 @@ const timestamp = "2026-06-09T00:00:00.000Z";
 
 const mockState: Pick<
   ThreadWindowState,
-  "history" | "pets" | "expandedPetIds" | "searchQuery" | "setSearchQuery" | "togglePetExpanded" | "threadsById"
+  "history" | "workspaces" | "pets" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded" | "threadsById"
 > = {
   history: [],
+  workspaces: [{id:"workspace-1",name:"Project",rootPath:"/tmp/project",createdAt:timestamp}],
   pets: [
-    {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+    {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
       id: "pet-1",
       name: "Project pet",
       rootPath: "/tmp/project",
     },
   ],
-  expandedPetIds: new Set(["pet-1"]),
+  expandedWorkspaceIds: new Set(["workspace-1"]),
   searchQuery: "",
   setSearchQuery: vi.fn(),
-  togglePetExpanded: vi.fn(),
+  toggleWorkspaceExpanded: vi.fn(),
   threadsById: {},
 };
 
@@ -34,30 +35,32 @@ const { HistorySidebar } = await import("../src/components/HistorySidebar.tsx");
 describe("HistorySidebar", () => {
   beforeEach(() => {
     mockState.history = [];
+    mockState.workspaces = [{id:"workspace-1",name:"Project",rootPath:"/tmp/project",createdAt:timestamp}];
     mockState.pets = [
-      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
         id: "pet-1",
         name: "Project pet",
         rootPath: "/tmp/project",
       },
     ];
-    mockState.expandedPetIds = new Set(["pet-1"]);
+    mockState.expandedWorkspaceIds = new Set(["workspace-1"]);
     mockState.searchQuery = "";
     mockState.setSearchQuery = vi.fn();
-    mockState.togglePetExpanded = vi.fn();
+    mockState.toggleWorkspaceExpanded = vi.fn();
     mockState.threadsById = {};
   });
 
-  it("renders pet groups alphabetically without merging identical roots", () => {
+  it("renders all projects alphabetically and groups different pets under one project", () => {
     mockState.pets = [
-      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "default", name: "default", rootPath: "/default" },
-      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "tmp", name: "tmp", rootPath: "/tmp" },
-      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "qa-pet", name: "qa-pet", rootPath: "/qa" },
-      {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
+      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "default", name: "default", rootPath: "/default" },
+      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "tmp", name: "tmp", rootPath: "/tmp" },
+      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "qa-pet", name: "qa-pet", rootPath: "/qa" },
+      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
     ];
-    mockState.expandedPetIds = new Set(["tmp", "qa-pet", "handagent-test"]);
+    mockState.workspaces = mockState.pets.map(p => ({id:p.id,name:p.name,rootPath:p.rootPath,createdAt:timestamp}));
+    mockState.expandedWorkspaceIds = new Set(["tmp", "qa-pet", "handagent-test"]);
     mockState.history = [
-      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
+      {workspaceId:"workspace-1",petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-default",
         preview: "default conversation",
         petId: "pet-1",
@@ -65,7 +68,9 @@ describe("HistorySidebar", () => {
         updatedAt: timestamp,
         messageCount: 1,
       },
+      {workspaceId:"tmp",petId:"another-pet",petRevision:1,rootPath:"/tmp",status:"idle",id:"thread-second",preview:"another partner conversation",createdAt:timestamp,updatedAt:timestamp,messageCount:1},
     ];
+    mockState.history[0].workspaceId="tmp";
 
     const html = renderToStaticMarkup(
       React.createElement(HistorySidebar, {
@@ -85,9 +90,11 @@ describe("HistorySidebar", () => {
     expect(handagentIndex).toBeGreaterThan(petDefaultIndex);
     expect(qaIndex).toBeGreaterThan(handagentIndex);
     expect(tmpIndex).toBeGreaterThan(qaIndex);
+    expect(html).toContain("default conversation");
+    expect(html).toContain("another partner conversation");
   });
 
-  it("marks the selected thread and renders running indicators in pet history", () => {
+  it("marks the selected thread and renders running indicators in workspace history", () => {
     mockState.threadsById = {
       "thread-pet": {
         threadId: "thread-pet",
@@ -109,7 +116,7 @@ describe("HistorySidebar", () => {
       },
     };
     mockState.history = [
-      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
+      {workspaceId:"workspace-1",petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-pet",
         preview: "pet conversation",
         petId: "pet-1",
@@ -117,7 +124,7 @@ describe("HistorySidebar", () => {
         updatedAt: timestamp,
         messageCount: 1,
       },
-      {petRevision:1, rootPath:"/tmp/pet", status:"idle",
+      {workspaceId:"workspace-1",petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-default",
         preview: "default conversation",
         petId: "pet-1",

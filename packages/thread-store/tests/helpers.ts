@@ -53,4 +53,4 @@ export async function messageTexts(store: ThreadStore, threadId: string): Promis
     .filter((content): content is string => typeof content === "string");
 }
 
-export function seedPet(store: ThreadStore): string { return (store.listPets()[0] ?? store.createPet({name:'测试宠',rolePrompt:'测试助手',imageRef:{type:'builtin',id:'yachiyo'},rootPath:'/tmp'})).id; }
+export function seedPet(store: ThreadStore): string { return (store.listPets().find(pet=>pet.name === '测试宠') ?? store.createPet({name:'测试宠',rolePrompt:'测试助手',imageRef:{type:'builtin',id:'yachiyo'},rootPath:'/tmp'})).id; }

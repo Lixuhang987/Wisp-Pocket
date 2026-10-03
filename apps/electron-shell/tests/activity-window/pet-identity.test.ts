@@ -24,7 +24,7 @@ const note = (type: string, payload: object, extra: object = {}) => ({
   type, payload, ...extra, notificationId: String(++sequence), timestamp,
 });
 const entry = (id: string, petId = "pet-a") => ({
-  id, petId, petRevision: 1, rootPath: "/tmp", status: "idle",
+  id, petId, workspaceId: "workspace-shared", petRevision: 1, rootPath: "/tmp", status: "idle",
   createdAt: timestamp, updatedAt: timestamp, preview: id, messageCount: 0,
 });
 afterEach(() => { controller?.disconnect(); otherControllers.splice(0).forEach(item => item.disconnect()); localStorage.clear(); });
@@ -81,8 +81,20 @@ it("五宠的两段历史与新话题草稿在 renderer 重建后分别恢复", 
     if (i % 2 === 0) pet.revealBubble(); else pet.hideBubble();
     pet.disconnect();
   }
+  localStorage.setItem("handagent.pet-ui.v1.removed-pet", JSON.stringify({drafts:{new:"过期草稿"}}));
+  localStorage.setItem("handagent.pet-size.removed-pet", "125");
+  localStorage.setItem("handagent.pet-size.pet-0", "115");
+  localStorage.setItem("unrelated-setting", "保留");
+  const pets = Array.from({length:5}, (_,i) => ({id:`pet-${i}`,workspaceId:"workspace-shared",name:`伙伴${i}`,description:"",rolePrompt:"角色",revision:1,rootPath:"/tmp",imageRef:{type:"builtin",id:"yachiyo"},isDefault:i===0,createdAt:timestamp,updatedAt:timestamp}));
   for (let i = 0; i < 5; i++) {
     const pet = openPet(`pet-${i}`, [`a-${i}`, `b-${i}`]);
+    Socket.latest.receive(note("pet.listed", {pets:[pets[i]],workspaceId:"workspace-shared"}));
+    expect(localStorage.getItem("handagent.pet-ui.v1.pet-4")).not.toBeNull();
+    Socket.latest.receive(note("pet.listed", {pets}));
+    expect(localStorage.getItem("handagent.pet-ui.v1.removed-pet")).toBeNull();
+    expect(localStorage.getItem("handagent.pet-size.removed-pet")).toBeNull();
+    expect(localStorage.getItem("handagent.pet-size.pet-0")).toBe("115");
+    expect(localStorage.getItem("unrelated-setting")).toBe("保留");
     expect(pet.getSnapshot()).toMatchObject({ threadId: null, draft: `New${i}`, bubbleVisible: i % 2 === 0 });
     expect(pet.getSnapshot().files.map(file => file.path)).toEqual([`/tmp/New${i}.pdf`]);
     pet.selectThread(`a-${i}`);

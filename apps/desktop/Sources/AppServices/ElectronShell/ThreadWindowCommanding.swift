@@ -30,3 +30,10 @@ protocol ThreadWindowCommanding: AnyObject {
     @discardableResult
     func sendThemeChanged(_ theme: HostThemePayload) throws -> String
 }
+
+@MainActor
+protocol SettingsWindowCommanding: AnyObject {
+    var onSettingsCommandFailure: ((String) -> Void)? { get set }
+    @discardableResult
+    func openSettingsWindow() throws -> String
+}

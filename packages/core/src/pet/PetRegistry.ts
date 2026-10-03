@@ -1,22 +1,32 @@
-import { mkdir, realpath, stat } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
-import { PetError, type PetCreateInput, type PetPatch, type PetStorage, type PetImageRef } from './Pet.ts';
+import { WorkspaceRegistry } from '../workspace/WorkspaceRegistry.ts';
+import type { WorkspaceStorage } from '../workspace/Workspace.ts';
+import { PetError, type Pet, type PetCreateInput, type PetPatch, type PetStorage, type PetImageRef } from './Pet.ts';
 export class PetRegistry {
-  constructor(private readonly storage: PetStorage) {}
+  private readonly creating = new Map<string,Promise<Pet>>();
+  readonly workspaces: WorkspaceRegistry;
+  constructor(private readonly storage: PetStorage & WorkspaceStorage) { this.workspaces = new WorkspaceRegistry(storage); }
   async list() { return this.storage.listPets(); }
   async get(id: string) { return this.storage.getPet(id); }
   async ensureDefault(rootPath: string) {
     const existing = this.storage.listPets().find(p => p.isDefault);
     if (existing) return existing;
-    return this.create({name:'八千代', description:'默认桌宠', rolePrompt:'你是用户的桌面助手，根据用户的实际任务提供清晰、可靠的帮助。', imageRef:{type:'builtin', id:'yachiyo'},rootPath,isDefault:true}, 'builtin-default-pet');
+    return (await this.workspaces.create(rootPath, 'builtin-default-workspace')).basePet;
   }
   async create(input: PetCreateInput, commandId?: string) {
+    if (!commandId) return this.createNew(input);
+    const existing = this.storage.getPetByCommand(commandId);
+    if (existing) return existing;
+    const pending = this.creating.get(commandId);
+    if (pending) return pending;
+    const task = this.createNew(input,commandId);
+    this.creating.set(commandId,task);
+    try { return await task; }
+    finally { if (this.creating.get(commandId) === task) this.creating.delete(commandId); }
+  }
+  private async createNew(input: PetCreateInput, commandId?: string) {
     this.validate(input);
-    if (!isAbsolute(input.rootPath)) throw new PetError('invalid_input','文件根必须是绝对目录');
-    let rootPath: string;
-    try { await mkdir(input.rootPath,{recursive:true}); rootPath = await realpath(input.rootPath); if (!(await stat(rootPath)).isDirectory()) throw new Error('不是目录'); }
-    catch (error) { throw new PetError('invalid_input',`无法使用文件根：${error instanceof Error ? error.message : error}`); }
-    return this.storage.createPet({...input,name:input.name.trim(),rolePrompt:input.rolePrompt.trim(),description:input.description?.trim() ?? '',rootPath},commandId);
+    const {workspace} = await this.workspaces.create(input.rootPath);
+    return this.storage.createPet({...input,name:input.name.trim(),rolePrompt:input.rolePrompt.trim(),description:input.description?.trim() ?? '',rootPath:workspace.rootPath,workspaceId:workspace.id},commandId);
   }
   async update(id: string, expectedRevision: number, patch: PetPatch) {
     if (Object.keys(patch).some(k => !['name','description','rolePrompt','imageRef','isDefault'].includes(k))) throw new PetError('invalid_input','桌宠文件根和身份创建后不可修改');

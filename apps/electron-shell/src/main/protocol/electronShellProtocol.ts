@@ -52,6 +52,7 @@ export type ShutdownCommand = {
 
 export type SwiftToElectronCommand =
   | OpenInitialPromptCommand
+  | { channel: "electron_shell"; type: "settings.open"; commandId: string }
   | OpenHistoryCommand
   | FocusThreadWindowCommand
   | { channel:"electron_shell"; type:"pet.show"|"pet.hide"; commandId:string; petId:string }
@@ -176,6 +177,7 @@ const BaseCommandSchema = z.object({
 });
 
 const SwiftToElectronCommandSchema = z.discriminatedUnion("type", [
+  BaseCommandSchema.extend({ type: z.literal("settings.open") }),
   BaseCommandSchema.extend({
     type: z.literal("thread_window.open_initial_prompt"),
     payload: z.object({

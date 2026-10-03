@@ -9,6 +9,7 @@ export type ThreadMetadata = {
   updatedAt: string;
   messageCount: number;
   petId: string;
+  workspaceId: string;
   petSnapshot: import("../../pet/Pet.ts").PetSnapshot;
   rootPath: string;
   dynamicTools?: DynamicToolSpec[];
@@ -16,7 +17,7 @@ export type ThreadMetadata = {
 
 export type ThreadSummary = Pick<
   ThreadMetadata,
-  "id" | "preview" | "createdAt" | "updatedAt" | "messageCount" | "petId" | "petSnapshot" | "rootPath"
+  "id" | "preview" | "createdAt" | "updatedAt" | "messageCount" | "petId" | "workspaceId" | "petSnapshot" | "rootPath"
 > & {status?: import("../../protocol/types/ThreadProtocolShared.ts").RunStatus};
 
 export type PersistedThread = {

@@ -42,3 +42,7 @@ preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`�
 
 - `getPathForFile` 只调用 Electron `webUtils.getPathForFile`；`chooseFiles` 返回原路径。renderer 没有任意磁盘读取能力，资料以结构化 `file_reference` 交给后端，模型转换见 [protocol](../../../agent-server/src/protocol/protocol.md)。
 - `showPet` 是明确管理意图；`hidePet`、`setReceiving`、布局和拖动总从 sender 解析本窗，不接受其他窗口 ID。`onReveal` 只交付 Permission 触发的显示意图，不携带消息或选择。
+
+## 设置和伙伴管理桥
+
+ThreadWindow/Settings 与 ActivityWindow preload 暴露 `handAgentSettings` 的 chooseDirectory、chooseImage、showPet、hidePet、getPetVisibility。main 只允许当前设置窗口或已登记 ActivityWindow sender 使用；普通 ThreadWindow 即使得到桥函数也没有管理权限。图片 picker 只返回 name/mimeType/bytesBase64，目录 picker 返回用户选择的路径，renderer 通过后端公开接口提交；没有任意文件读取或配置写入能力。`handAgentPet.hidePet()` 仍只操作 sender 自己的宠窗。

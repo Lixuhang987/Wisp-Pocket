@@ -24,6 +24,10 @@ final class ElectronShellProtocolTests: XCTestCase {
     }
 
     func testEncodesThemeChangedCommand() throws {
+        let settingsData = try JSONEncoder().encode(ElectronShellCommand.openSettings(commandId: "settings"))
+        let settingsJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: settingsData) as? [String: Any])
+        XCTAssertEqual(settingsJSON["type"] as? String, "settings.open")
+
         let command = ElectronShellCommand.themeChanged(
             commandId: "theme-1",
             theme: HostThemePayload(preference: .system, resolved: .dark)

@@ -6,6 +6,21 @@
 
 先完成依赖安装，并通过 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test` 和 `bash ./scripts/swiftw build`。
 
+## Issue #8 Electron 设置与 Workspace/Pet（2026-10-04）
+
+- **状态**：menu bar、独立 Electron 设置、后端配置接口、Workspace/Pet 拆分与项目历史已实现；完整宿主、真实模型与系统交互尚未验收。最终检查与独立文档审核状态见 [实施记录](./medium-powers/plans/2026-10-03-issue-8-settings-workspace.md)，本文不把替身用例视为实机证据。
+- **规格与边界**：[Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)、[设置 surface](./surfaces/settings.md)、[ThreadWindow surface](./surfaces/thread-window.md)。MCP 仅配置读写，运行刷新仍在 TODO；不兼容旧开发 Workspace/Pet schema，不自动清理用户数据。
+- **浏览器已验范围**：临时真实后端上的模型草稿跨页与保存、MCP 示例保存、伙伴描述保存、项目组内随机创建，设置桌面/窄屏布局已检查；证据路径见实施记录。该范围不覆盖原生 menu bar、焦点、picker、真实桌宠显隐与完整宿主。
+- [ ] **常驻入口与草稿**：menu bar 只有“设置”，点击打开独立 Electron 窗口，首次进入 AI；切到其他页并编辑，重复点击仅聚焦并保留页与草稿，关闭后重开回 AI。普通 ThreadWindow 不获得目录、图片及全宠显隐管理权限。
+- [ ] **模型与持久化**：分别保存 OpenAI-compatible 的接口模式及 Anthropic；明确看到成功/失败/校验反馈，失败保留输入。未点保存、切页不改运行配置；保存后下次真实请求生效，未展示的 summarizerModel 保留，API Key 不进入日志和错误详情。
+- [ ] **Tools / MCP / Permission**：工具开关即时保存，默认文件/历史读取无禁用开关；stdio 全字段、streamableHttp headers、示例、编辑/删除后显式保存并重启读取，原始环境变量占位保留，反馈不称连接已刷新；永久允许/拒绝及时间显示正确，撤销后在其他 Pet 按原策略处理。
+- [ ] **原生保留与主题隔离**：PromptPanel 进入原生外观、Host、触发器、Append Prompt 与全部快捷键；两种设置交错保存后主题与模型/Tool 配置均保留。亮色/暗色/跟随系统同步 ThreadWindow、设置和每宠，新建窗口使用当前主题；关闭窗口后 Context History、Automation 与 Agent 继续运行。
+- [ ] **创建与同根复用**：新目录保存 Pet 后恰有一个 Workspace、一个基础 Pet 与一个用户 Pet；已有目录及符号链接别名复用同一项目，只增用户 Pet。丢 ACK 后重试与同目录并发不重复播种；重启身份一致，基础宠不替换全局默认。
+- [ ] **两处伙伴管理**：设置与桌宠右键伙伴页均可编辑名称、描述、角色、图片、默认项、显示隐藏；创建目录 picker 可用，已有项目位置只读。并发 revision 冲突保留字段并明确错误，旧 Thread 保留旧角色；各宠显示、位置、大小、草稿独立。
+- [ ] **项目历史与创建**：全部 Workspace 一级分组，组内含所有 Pet 历史且无 Pet 筛选/二级组；通用新建选项目，组内新建预选本组项目，可选本项目 Pet，不指定由后端分配。基础/隐藏 Pet 也为候选，重试不换 Pet；后台创建不抢选，桌宠仍只查询本宠。
+- [ ] **逐 Turn 项目规则**：两宠共项目读取根 AGENTS.md，同轮流式/多次工具调用不因文件编辑改变规则，下一轮读取新内容；祖先/嵌套文件不注入。用户明确要求优先于项目规则、项目规则优先于角色；缺失为空、目录不可用或读取失败明确失败，身份与历史仍保留；同项目文件共享、不同 Thread 上下文不合并。
+- [ ] **身份对账与原生窗口**：重连完整 Pet 快照清理失效窗口/路由/偏好，有效显隐/草稿保留；局部项目查询不清全局，目录故障不当删除。回归隐藏 Permission 非激活召回、接收期间延后回收，以及中文 IME、多屏、焦点、透明命中和长字段布局。
+
 ## 测试清理（2026-10-03）
 
 - **范围**：删除文档措辞、源码 / CSS 写法、空 smoke、已移除入口的低价值测试；合并展开偏好加载 / 保存与历史侧栏重复断言，历史选择由已有真实 App 用例承接。详见[清理记录](./medium-powers/plans/2026-10-03-test-cleanup.md)。
@@ -60,7 +75,7 @@
 ## Issue #6 / #7 默认读取与多桌宠（2026-10-02）
 
 - **状态**：实现已落地；M01–M07、原生输入与真实模型理解均待验。2026-10-02 整合未启动完整宿主 App；2026-10-03 的 Electron 受控渲染证据见上节，不作为本组实机通过结论。自动化最终检查和独立审核结果见 [实施计划](./medium-powers/plans/2026-10-02-pets-default-reading.md)。
-- **规格**：[Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6)、[多桌宠验收](./medium-powers/specs/multi-pet-pocket-dialogue/acceptance.md)。用户最新决定覆盖原 Issue #7：Pet 创建后 rootPath 不可修改；Thread 只保存角色快照，执行根由所属 Pet 派生。
+- **规格**：[Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6)、[多桌宠验收](./medium-powers/specs/multi-pet-pocket-dialogue/acceptance.md)。原 Issue #7 的固定目录决定已由 Issue #8 拆分为固定 Workspace 根与 Pet.workspaceId；Thread 保存双归属与角色快照，执行根从 Workspace 派生。旧证据仍只适用于原构建，当前项目模型回归见上方 Issue #8。
 - **自动化边界**：主路径使用真实 Thread / Runtime / SQLite、临时文件及 Swift 保存格式；模型 / 系统替身证明编排、图片承载、权限和恢复，不证明真实模型理解、TCC、窗口焦点或跨 App 拖放。最终通过状态以实施计划中的实际命令结果为准。
 - **历史发布记录**：同日两个规格曾分别完成文档核对与三项提交检查；该记录只证明当时文档交付，不计为本次实现验证。原 Issue #1/#5 证据只适用于原构建；以下待验项已采用当前路径输入、Pet 归属和统一首轮语义。
 

@@ -59,7 +59,7 @@
 - stdio server 可配置 `elicitation.autoAcceptEmptyForm: true`。该选项只自动接受 `requestedSchema` 为空对象且无必填字段的 form-mode `elicitation/create`，用于 Computer Use 这类本地 App 授权握手；带字段表单或 URL mode 仍返回 decline，不代替用户填写敏感信息或打开外部 URL。
 - stdio 与 Streamable HTTP 的 JSON-RPC 编码、初始化握手、session header、SSE 响应处理和 transport lifecycle 由官方 `@modelcontextprotocol/sdk` 承担；本模块只保留 Wisp Pocket 配置、DTO 转换和 timeout 文案。
 - `MCPConfig.ts` 只解析配置；client 生命周期、capability 缓存与 prompt/resource 调用由 agent-server 的 `MCPServerRegistry` 管理。
-- Streamable HTTP headers 支持 `${ENV_NAME}` 插值，未设置的环境变量会替换为空字符串。
+- Streamable HTTP headers 在运行解析时支持 `${ENV_NAME}` 插值，未设置的环境变量会替换为空字符串。管理接口以 `interpolateEnvironment: false` 校验原始配置，不能回写或展示展开后的环境变量凭据；见 [设置接口](../../../../apps/agent-server/src/settings/settings.md)。
 - stdio 与 Streamable HTTP 的 description 归一化必须复用 `MCPDescriptions.ts`，避免 prompt/resource/tool 字段默认值漂移。
 
 ## 测试

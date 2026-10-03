@@ -32,6 +32,7 @@ type ActivityWindowHost = {
 
 type Options = {
   prewarmer: ThreadWindowHost;
+  settingsWindow?: Pick<ThreadWindowHost, "openHistory" | "focus" | "updateTheme">;
   activityWindow: ActivityWindowHost;
   send: (event: ElectronToSwiftEvent) => void;
   now: () => string;
@@ -74,6 +75,13 @@ export class ElectronShellRuntime {
 
   async handleCommand(command: SwiftToElectronCommand): Promise<void> {
     switch (command.type) {
+      case "settings.open":
+        await this.runCommand(command, async () => {
+          const settings = this.options.settingsWindow;
+          if (!settings) throw new Error("Settings window unavailable");
+          if (!settings.focus()) await settings.openHistory();
+        });
+        return;
       case "thread_window.open_initial_prompt":
         await this.runCommand(command, () => this.options.prewarmer.openInitialPrompt(command.payload));
         return;
@@ -106,6 +114,7 @@ export class ElectronShellRuntime {
         await this.runCommand(command, async () => {
           await this.options.prewarmer.updateTheme(command.theme);
           await this.options.activityWindow.updateTheme(command.theme);
+          await this.options.settingsWindow?.updateTheme(command.theme);
         });
         return;
       case "shutdown":

@@ -137,7 +137,7 @@ final class BuiltinContextHistoryUseCaseTests: XCTestCase {
         await fixture.module.sample(now: fixture.start)
         XCTAssertTrue(try fixture.store.loadActivities().isEmpty)
         let message = try XCTUnwrap(fixture.module.lastErrorMessage)
-        let settingsViewModel = ToolSettingsViewModel(store: AgentSettingsStore(homeDirectoryURL: fixture.home), builtinFeatures: fixture.features)
+        let settingsViewModel = ToolSettingsViewModel(builtinFeatures: fixture.features)
         XCTAssertTrue(settingsViewModel.contextHistoryStatus.contains("采集失败"))
         XCTAssertTrue(message.contains("accessibility"), message)
         XCTAssertTrue(message.contains("permission_denied"), message)

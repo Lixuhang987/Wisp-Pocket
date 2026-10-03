@@ -28,6 +28,7 @@ export type ThreadListEntry = {
   updatedAt: string;
   messageCount: number;
   petId: string;
+  workspaceId: string;
   petRevision: number;
   rootPath: string;
   status: RunStatus;
@@ -35,6 +36,7 @@ export type ThreadListEntry = {
 
 export type ThreadSnapshotPayload = {
   petId: string;
+  workspaceId: string;
   petRevision: number;
   rootPath: string;
   petSnapshot: PetSnapshot;

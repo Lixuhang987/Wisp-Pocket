@@ -1,10 +1,11 @@
 import { BrowserWindow, app, dialog, ipcMain, screen, shell, utilityProcess } from "electron";
-import { dirname, join, resolve } from "node:path";
-import { mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { basename, dirname, extname, join, resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { PetWindowCollection } from "./windows/petWindowCollection.js";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { ElectronShellRuntime, errorMessage } from "./electronShellRuntime.js";
+import { registerSettingsManagementIpc } from "./settingsManagementIpc.js";
 import { registerPetWindowIpc } from "./petWindowIpc.js";
 import {
   parseCommand,
@@ -74,6 +75,19 @@ const prewarmer = new ThreadWindowPrewarmer({
   },
 });
 
+const settingsURL = new URL(threadWindowURL);
+settingsURL.searchParams.set("surface", "settings");
+const settingsWindow = new ThreadWindowPrewarmer({
+  threadWindowURL: settingsURL.toString(), preloadPath: threadPreloadPath,
+  availableSkills: [], initialTheme,
+  createWindow: options => {
+    const window = new BrowserWindow({ ...options, title: "设置" });
+    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    window.webContents.on("will-navigate", event => event.preventDefault());
+    return window;
+  },
+});
+
 const createPetWindow = (petId: string, index: number) => new ActivityWindowController({
   petId, initialOffset: (index % 6) * 110,
   activityWindowHTMLPath,
@@ -126,6 +140,10 @@ const activityWindow = new PetWindowCollection({
     save: value => { mkdirSync(dirname(visibilityPath),{recursive:true});writeFileSync(`${visibilityPath}.tmp`,JSON.stringify(value));renameSync(`${visibilityPath}.tmp`,visibilityPath); },
   },
   onError: error => process.stderr.write(`[electron-shell] pet windows: ${errorMessage(error)}\n`),
+  onPetRemoved: petId => {
+    const positionPath = process.env.HANDAGENT_PET_POSITION_PATH ? `${process.env.HANDAGENT_PET_POSITION_PATH}.${petId}` : join(homedir(), ".spotAgent/pet-positions", `${petId}.json`);
+    rmSync(positionPath, { force: true });
+  },
 });
 
 let hasStartedSupervisor = false;
@@ -174,6 +192,7 @@ function stopSupervisor(): void {
 
 const runtime = new ElectronShellRuntime({
   prewarmer,
+  settingsWindow,
   activityWindow,
   send,
   now,
@@ -189,6 +208,28 @@ ipcMain.handle("pet-window:show-pet", async (event, petId: unknown) => {
 ipcMain.handle("pet-window:choose-files", async event => {
   if (!activityWindow.controllerForSender(event.sender)) throw new Error("Invalid pet window sender");
   const result = await dialog.showOpenDialog({properties:["openFile","multiSelections"]});return result.canceled ? [] : result.filePaths;
+});
+
+registerSettingsManagementIpc(ipcMain, {
+  isManagementSender: sender => settingsWindow.ownsSender(sender) || !!activityWindow.controllerForSender(sender),
+  chooseDirectory: async () => {
+    const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  },
+  chooseImage: async () => {
+    const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp"] }] });
+    const path = result.canceled ? undefined : result.filePaths[0];
+    if (!path) return null;
+    const mimeTypes: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
+    const mimeType = mimeTypes[extname(path).toLowerCase()];
+    if (!mimeType) throw new Error("不支持的图片格式");
+    const bytes = readFileSync(path);
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error("图片必须介于 1 byte 与 20 MiB");
+    return { name: basename(path), mimeType, bytesBase64: bytes.toString("base64") };
+  },
+  showPet: petId => activityWindow.showPet(petId),
+  hidePet: petId => activityWindow.hidePet(petId),
+  getPetVisibility: () => activityWindow.getVisibility(),
 });
 
 async function handleCommandLine(line: string): Promise<void> {

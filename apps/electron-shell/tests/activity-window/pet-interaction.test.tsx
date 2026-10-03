@@ -20,7 +20,7 @@ class Socket {
 
 let controller: PetThreadController;
 let sequence = 0;
-const note = (type: string, extra: any = {}) => ({ type, notificationId: String(++sequence), timestamp: "2026-09-13T01:00:00.000Z", ...extra, ...(extra.payload ? {payload: {petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},petId:"pet-default",petRevision:1,rootPath:"/tmp",...extra.payload}} : {}) });
+const note = (type: string, extra: any = {}) => ({ type, notificationId: String(++sequence), timestamp: "2026-09-13T01:00:00.000Z", ...extra, ...(extra.payload ? {payload: {petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},petId:"pet-default",workspaceId:"workspace-default",petRevision:1,rootPath:"/tmp",...extra.payload}} : {}) });
 beforeEach(() => {
   localStorage.clear();
   Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
@@ -190,7 +190,7 @@ describe("桌宠的轻量交互", () => {
     controller = new PetThreadController({ petId: "pet-default", url: "ws://local/api/thread", WebSocketImpl: Socket });
     mount();
     act(() => Socket.latest.receive(note("thread.listed", { payload: { threads: created ? [{
-      id: "first", petId: "pet-default", petRevision: 1, rootPath: "/tmp", status: "idle",
+      id: "first", petId: "pet-default", workspaceId: "workspace-default", petRevision: 1, rootPath: "/tmp", status: "idle",
       preview: "首条", messageCount: 0, createdAt: "2026", updatedAt: "2026",
     }] : [] } })));
     input = screen.getByRole("textbox", { name: "回复当前对话" }) as HTMLTextAreaElement;
@@ -283,7 +283,7 @@ describe("桌宠的轻量交互", () => {
     });
   });
 
-  it("右键菜单进入伙伴、对话、隐藏和大小调节，刷新命中并恢复偏好，回复节点与草稿保持不变", () => {
+  it("右键菜单进入伙伴、对话、隐藏和大小调节，刷新命中并恢复偏好，回复节点与草稿保持不变", async () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       if (!this.classList.contains("pet-character")) return new DOMRect();
       const width = Number.parseFloat(this.style.width);
@@ -308,6 +308,22 @@ describe("桌宠的轻量交互", () => {
     fireEvent.contextMenu(pet);
     fireEvent.click(screen.getByRole("menuitem", { name: "伙伴" }));
     expect(screen.getByRole("region", { name: "伙伴管理" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "添加桌宠" }));
+    fireEvent.change(screen.getByLabelText("名称"), {target:{value:"保存中的伙伴"}});
+    fireEvent.change(screen.getByLabelText("描述"), {target:{value:"超时仍保留"}});
+    fireEvent.change(screen.getByLabelText("项目目录"), {target:{value:"/tmp"}});
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", {name:"保存伙伴"}));
+    const managementId = Socket.latest.sent.at(-1)!.commandId;
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    expect(screen.getByRole("alert").textContent).toContain("超时");
+    expect(screen.getByLabelText<HTMLInputElement>("名称").value).toBe("保存中的伙伴");
+    expect(screen.getByLabelText<HTMLInputElement>("描述").value).toBe("超时仍保留");
+    fireEvent.click(screen.getByRole("button", {name:"保存伙伴"}));
+    expect(Socket.latest.sent.at(-1)!.commandId).toBe(managementId);
+    act(() => Socket.latest.receive(note("pet.error", {commandId:managementId,payload:{code:"storage_failed",message:"请重试"}})));
+    await act(async () => {});
+    vi.useRealTimers();
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.contextMenu(pet);
     fireEvent.click(screen.getByRole("menuitem", { name: "隐藏" }));

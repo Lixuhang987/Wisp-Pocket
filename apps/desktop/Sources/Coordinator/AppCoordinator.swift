@@ -10,6 +10,7 @@ final class AppCoordinator {
         case hidePromptPanel
         case togglePromptPanel
         case submitPrompt([PromptPanelComposerItem], attachments: [PromptAttachmentResult])
+        case openElectronSettings
         case openSettings
         case openHistory
         case settingsWindowClosed
@@ -90,6 +91,8 @@ final class AppCoordinator {
             promptPanelController.toggle()
         case .submitPrompt(let inputItems, let attachments):
             handleSubmitPrompt(inputItems, attachments: attachments)
+        case .openElectronSettings:
+            handleOpenElectronSettings()
         case .openSettings:
             handleOpenSettings()
         case .openHistory:
@@ -101,16 +104,12 @@ final class AppCoordinator {
         }
     }
 
-    func makeSettingsViewModel() -> AgentSettingsViewModel {
-        AgentSettingsViewModel(store: services.settingsStore)
-    }
-
     func makeAppearanceSettingsViewModel() -> AppearanceSettingsViewModel {
         AppearanceSettingsViewModel(themeService: services.appearanceThemeService)
     }
 
     func makeToolSettingsViewModel() -> ToolSettingsViewModel {
-        ToolSettingsViewModel(store: services.settingsStore, builtinFeatures: services.builtinFeatures)
+        ToolSettingsViewModel(builtinFeatures: services.builtinFeatures)
     }
 
     func makeAgentTriggerSettingsViewModel() -> AgentTriggerSettingsViewModel {
@@ -123,14 +122,6 @@ final class AppCoordinator {
 
     func makeAppendPromptSettingsViewModel() -> AppendPromptSettingsViewModel {
         AppendPromptSettingsViewModel()
-    }
-
-    func makeMCPSettingsViewModel() -> MCPSettingsViewModel {
-        MCPSettingsViewModel()
-    }
-
-    func makePermissionRulesViewModel() -> PermissionRulesViewModel {
-        PermissionRulesViewModel()
     }
 
     private func setupPromptPanel() {
@@ -260,18 +251,30 @@ final class AppCoordinator {
         )
     }
 
+    private func handleOpenElectronSettings() {
+        promptPanelController.hide(restoringFocus: false)
+        guard let client = services.appServer as? any SettingsWindowCommanding else {
+            showSettingsOpenError("Electron 设置窗口不可用")
+            return
+        }
+        client.onSettingsCommandFailure = { [weak self] message in self?.showSettingsOpenError(message) }
+        do { try client.openSettingsWindow() }
+        catch { showSettingsOpenError(error.localizedDescription) }
+    }
+
+    private func showSettingsOpenError(_ message: String) {
+        guard services.showsFatalAlert else { return }
+        services.fatalAlertPresenter.showFatal(title: "无法打开设置", message: message, primaryButtonTitle: "确定", secondaryButtonTitle: nil, onSecondary: nil)
+    }
+
     private func handleOpenSettings() {
         let actions = buildActionDefinitions()
         registerActionShortcuts(actions)
         settingsLifecycle.openOrFocus(
-            settingsViewModel: makeSettingsViewModel(),
             appearanceViewModel: makeAppearanceSettingsViewModel(),
             toolSettingsViewModel: makeToolSettingsViewModel(),
             agentTriggerSettingsViewModel: makeAgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: makeAppendPromptSettingsViewModel(),
-            mcpSettingsViewModel: makeMCPSettingsViewModel(),
-            permissionRulesViewModel: makePermissionRulesViewModel(),
-            petViewModel: PetSettingsViewModel(client: services.swiftThreadClient as? any PetManaging, visibility: activityWindowCommandClient),
             shortcutActions: actions,
             appTheme: services.appearanceThemeService.appTheme,
             onClosed: { [weak self] in self?.send(.settingsWindowClosed) }

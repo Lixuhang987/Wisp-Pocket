@@ -1,3 +1,4 @@
+import { SettingsAPI } from "../settings/SettingsAPI.ts";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { extname, join, resolve } from "node:path";
@@ -278,12 +279,15 @@ const PetImageRefSchema = z.discriminatedUnion('type',[
   z.object({type:z.literal('imported'),blobId:z.string(),mimeType:z.enum(['image/png','image/jpeg','image/webp']),width:z.number().int().min(1).max(4096),height:z.number().int().min(1).max(4096)}).strict(),
 ]);
 const ThreadCommandSchema = z.discriminatedUnion("type", [
+  z.object({type:z.literal('workspace.list'),commandId:z.string(),timestamp:z.string()}),
+  z.object({type:z.literal('workspace.create'),commandId:z.string(),timestamp:z.string(),payload:z.object({rootPath:z.string().min(1)}).strict()}),
   z.object({
     type: z.literal("thread.start"),
     commandId: z.string(),
     timestamp: z.string(),
     payload: z.object({
-      petId: z.string().min(1),
+      petId: z.string().min(1).optional(),
+      workspaceId: z.string().min(1).optional(),
       dynamicTools: DynamicToolsSchema.optional(),
     }).strict(),
   }),
@@ -297,7 +301,7 @@ const ThreadCommandSchema = z.discriminatedUnion("type", [
     type: z.literal("thread.list"),
     commandId: z.string(),
     timestamp: z.string(),
-    payload: z.object({petId:z.string().optional(),limit:z.number().int().min(1).max(100).optional(),cursor:z.string().optional()}).strict().optional(),
+    payload: z.object({workspaceId:z.string().optional(),petId:z.string().optional(),limit:z.number().int().min(1).max(100).optional(),cursor:z.string().optional()}).strict().optional(),
   }),
   z.object({
     type: z.literal("thread.delete"),
@@ -312,7 +316,7 @@ const ThreadCommandSchema = z.discriminatedUnion("type", [
     timestamp: z.string(),
     payload: z.object({ op: RuntimeOpSchema }),
   }),
-  z.object({type:z.literal('pet.list'),commandId:z.string(),timestamp:z.string()}),
+  z.object({type:z.literal('pet.list'),commandId:z.string(),timestamp:z.string(),payload:z.object({workspaceId:z.string().min(1).optional()}).strict().optional()}),
   z.object({type:z.literal('pet.create'),commandId:z.string(),timestamp:z.string(),payload:z.object({name:z.string().trim().min(1),description:z.string().optional(),rolePrompt:z.string().trim().min(1),imageRef:PetImageRefSchema,rootPath:z.string().min(1),isDefault:z.boolean().optional()}).strict()}),
   z.object({type:z.literal('pet.update'),commandId:z.string(),timestamp:z.string(),payload:z.object({id:z.string(),expectedRevision:z.number().int().min(1),patch:z.object({name:z.string().trim().min(1).optional(),description:z.string().optional(),rolePrompt:z.string().trim().min(1).optional(),imageRef:PetImageRefSchema.optional(),isDefault:z.boolean().optional()}).strict()}).strict()}),
   z.object({type:z.literal('pet.image.import'),commandId:z.string(),timestamp:z.string(),payload:z.object({mimeType:z.enum(['image/png','image/jpeg','image/webp']),base64:z.string().max(28*1024*1024)}).strict()}),
@@ -380,6 +384,7 @@ export async function startServer({
   dynamicToolBridge,
   staticFilesDir,
   blobStore,
+  settingsAPI,
   port = 4317,
 }: {
   commandRouter: ThreadCommandRouter;
@@ -388,6 +393,7 @@ export async function startServer({
   dynamicToolBridge?: WebSocketDynamicToolBridge;
   staticFilesDir?: string;
   blobStore?: BlobStore;
+  settingsAPI?: SettingsAPI;
   port?: number;
 }) {
   const { createServer } = await import("node:http");
@@ -396,7 +402,7 @@ export async function startServer({
   const dynamicToolWebSocketServer = new WebSocketServer({ noServer: true });
   const activityWebSocketServer = new WebSocketServer({ noServer: true });
   const server = createServer((request, response) => {
-    void handleHTTPRequest(request, response, { staticFilesDir, blobStore });
+    void handleHTTPRequest(request, response, { staticFilesDir, blobStore, settingsAPI });
   });
 
   threadWebSocketServer.on("connection", (socket, request) => {
@@ -577,7 +583,8 @@ export async function startDefaultServer(port = 4317) {
   });
   const commandRouter = new ThreadCommandRouter(threads, eventPublisher, petRegistry, undefined, () => dynamicToolBridge.availableTools(), blobStore);
   const server = await startServer({ commandRouter, eventPublisher, activityPublisher, dynamicToolBridge,
-    staticFilesDir: resolveThreadWindowWebDistDir(), blobStore, port });
+    staticFilesDir: resolveThreadWindowWebDistDir(), blobStore,
+    settingsAPI: new SettingsAPI({settingsPath:join(paths.spotDir,"settings.json"),mcpPath:paths.mcpConfigPath,permissionPolicy}),port });
   let shutdown: Promise<void> | undefined;
   const close = () => shutdown ??= (async () => {
     const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
@@ -676,8 +683,10 @@ async function handleHTTPRequest(
   options: {
     staticFilesDir?: string;
     blobStore?: BlobStore;
+    settingsAPI?: SettingsAPI;
   },
 ): Promise<void> {
+  if (options.settingsAPI && await options.settingsAPI.handle(request,response)) return;
   const blobId = /^\/api\/blobs\/(blob-[A-Za-z0-9-]+)$/.exec(request.url ?? "")?.[1];
   if (blobId && options.blobStore && request.method === "GET") {
     try {

@@ -1,61 +1,20 @@
 # AgentSettings 模块
 
-LLM 模型配置、tool allowlist / denylist、外观主题与内置功能启用选择的持久化。两类配置使用独立 Store，模型设置供 agent-server 读取，内置功能只由 Swift Host 管理。
+此目录只持久化 Swift 原生偏好与宿主内置功能开关。模型、Agent builtin Tool、MCP、永久 Permission、Workspace 与 Pet 归后端；原生不保存这些业务配置的镜像。
 
-## 文件
+## 直接文件
 
-| 文件 | 职责 |
-|------|------|
-| `AgentSettingsStore.swift` | `@Observable` + `@MainActor`，从 `~/.spotAgent/settings.json` 读写外观主题、LLM 配置与 tool allowlist / denylist，500ms 轮询热加载 |
-| `BuiltinFeatureSettingsStore.swift` | Automation 默认关闭配置、原子写入与错误反馈 |
-| `AgentSettingsView.swift` | 模型设置的 SwiftUI 表单（provider / model / api / baseURL / apiKey），provider / api 使用 token 化 `SettingsSegmentedControl`，文本输入使用 `SettingsTextField` / `SettingsSecureField`，由 [Settings/SettingsView](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 嵌入 |
+- `AgentSettingsStore.swift`：Observation/MainActor 的原生外观 Store，默认 `~/.spotAgent/native-preferences.json`，500ms 比较 raw Data 轮询外部修改。
+- `BuiltinFeatureSettingsStore.swift`：独立 `~/.spotAgent/builtin-features.json`，只拥有默认关闭的 Automation 开关及 IO 错误。
 
-## 数据模型
+## 跨模块合约
 
-```jsonc
-// ~/.spotAgent/settings.json
-{
-  "appearance": {
-    "themePreference": "system" // system | light | dark；只由 Swift 宿主写入和解析
-  },
-  "llm": {
-    "provider": "openai-compatible", // openai-compatible | anthropic；缺失时默认 openai-compatible
-    "model": "gpt-5-mini",
-    "apiKey": "sk-...",
-    "baseUrl": "https://api.openai.com/v1",
-    "api": "responses"   // responses | chat | completion
-  },
-  "tools": {
-    "allowlist": ["file.write"], // 可选；为 null 时表示不启用白名单模式
-    "denylist": ["file.write"]                // 已禁用 builtin 工具
-  }
-}
-```
+- 原生偏好格式为 `{appearance:{themePreference:"system"|"light"|"dark"}}`。独立文件边界防止 Swift 的旧镜像覆盖后端 `settings.json` 模型/Tools；不存在兼容迁移或双写路径。
+- 外观更新以 JSONEncoder prettyPrinted/sortedKeys 原子写入，成功后才更新内存与 lastLoadedData；失败保留有效偏好并显示错误。主题解析和 Electron 下发由 [Appearance](../Appearance/appearance.md) 拥有。
+- Automation 仅在成功原子写入后通知 [BuiltinFeatures](../PlatformBridge/platform-bridge.md)，不随设置窗口关闭而停止。Context History 常驻，没有可持久化的启用开关。
+- `HANDAGENT_HOST_DATA_HOME` 只隔离内置功能配置及业务存储，不重定向原生外观、模型、Thread 或 AgentTrigger，见 [开发说明](../../../../../docs/dev.md)。
+- [Settings](../../Settings/settings.md) 通过 ViewModel 调用 Store；不要在 Store 引入模型请求或工具运行状态。
 
-## 设计备注
+## 验证
 
-- 文件路径固定为 `~/.spotAgent/settings.json`（`AgentSettingsStore.settingsFileURL(homeDirectoryURL:)`）。
-- `AgentLLMProvider` 与 core 的 `ModelSettings.provider` 字符串保持一致；新增 provider 时需要同步 core factory、agent-server 设置读取与桌面 settings UI。
-- 写入用 `JSONEncoder([.prettyPrinted, .sortedKeys])` + `Data.write(.atomic)`，避免半截文件。
-- 500ms 轮询比较 raw `Data` 字节，避免相同内容触发无意义刷新。
-- `updateAppearance(_:)` / `update(_:)` / `updateToolSettings(_:)` 是写入入口，写后立即 persist 并刷新 `lastLoadedData`；任一入口都必须保留另外两个顶层字段。
-
-## 内置功能配置
-
-- `BuiltinFeatureSettingsStore` 拥有 `~/.spotAgent/builtin-features.json`，字段为 `automationEnabled`，初始值为 `false`；Context History 常驻，不持久化启用选择。正常入口是 [Settings 工具页](../../Settings/settings.md)。
-- 仅在文件成功原子写入后更新内存状态并通知 [BuiltinFeatures](../PlatformBridge/platform-bridge.md)；写入失败保留原有效选择并显示错误。文件缺失使用默认值，其他读取错误也必须可见。
-- 宿主启动时读取配置，工具页改变选择后立即生效；此 Store 不轮询外部文件，也不从旧 Plugin manifest 派生启用状态。
-- `HANDAGENT_HOST_DATA_HOME` 隔离配置与业务数据的开发用法见 [开发说明](../../../../../docs/dev.md)，业务目录归 [Host Automation](../../../../host-automation/host-automation.md) 所有。
-
-## 编辑此目录的约束
-
-- **写入路径只走 Store update 方法**：`updateAppearance { ... }` / `update { ... }` / `updateToolSettings { ... }` → `persist()`；不要绕过这些入口直接改状态。
-- **轮询间隔修改需配套测试**：当前 500ms 是 UX/IO 折中值，改动须更新 `AgentSettingsStoreTests`。
-- **AgentSettingsView 不直接持有 Store**：通过 [AgentSettingsViewModel](/Users/mu9/proj/handAgent/apps/desktop/Sources/Settings/settings.md) 代理；Store 只作为 ViewModel 的依赖。
-- **不要在 Store 里加 LLM 调用 / runtime 状态**：Store 只是 settings.json 的配置镜像；agent-server 侧自行 `readFileSync` 读同一个文件。tool allowlist/denylist 由桌面 Settings UI 接入；默认历史和文件读取不在可禁用工具目录中，tool 热加载在 agent-server 侧按文件戳刷新。
-- **测试**：[AgentSettingsStoreTests](/Users/mu9/proj/handAgent/apps/desktop/TestsSwift/AppServices/AgentSettings/AgentSettingsStoreTests.swift) 必须通过临时 home 目录验证 IO + 轮询。
-
-## 与其他模块的关系
-
-- [Coordinator](/Users/mu9/proj/handAgent/apps/desktop/Sources/Coordinator/coordinator.md) 持有 `AgentSettingsStore` 单例，并通过 `makeSettingsViewModel()` 暴露给 Settings 窗口。
-- agent-server（TypeScript 侧）每次 LLM 请求会按文件戳读取同一个 JSON 文件里的模型配置；每次新一轮 LLM 请求前也会按文件戳刷新 tool registry。
+`AgentSettingsStoreTests` 使用临时 home 验证外观保存、读取与后台模型配置交错写入后的独立性。内置功能公开主路径在 PlatformBridge 用例验证。

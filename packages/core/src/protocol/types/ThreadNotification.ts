@@ -14,6 +14,7 @@ export type ThreadStartedNotification = {
   timestamp: string;
   payload: {
     petId: string;
+    workspaceId: string;
     petRevision: number;
     rootPath: string;
     preview: string | null;
@@ -150,7 +151,7 @@ export type ThreadErrorNotification = {
 };
 
 type PetNotificationBase = {notificationId:string;commandId?:string;timestamp:string};
-export type PetListedNotification = PetNotificationBase & {type:'pet.listed';payload:{pets:Pet[]}};
+export type PetListedNotification = PetNotificationBase & {type:'pet.listed';payload:{pets:Pet[];workspaceId?:string}};
 export type PetCreatedNotification = PetNotificationBase & {type:'pet.created';payload:{pet:Pet}};
 export type PetUpdatedNotification = PetNotificationBase & {type:'pet.updated';payload:{pet:Pet}};
 export type PetImageImportedNotification = PetNotificationBase & {type:'pet.image.imported';payload:{imageRef:PetImageRef}};
@@ -165,6 +166,8 @@ export type RequestResolvedNotification = {
   payload: { requestId: string };
 };
 
+export type WorkspaceNotification = PetNotificationBase & ({type:'workspace.listed';payload:{workspaces:import('../../workspace/Workspace.ts').Workspace[]}} | {type:'workspace.created';payload:import('../../workspace/Workspace.ts').WorkspaceCreation} | {type:'workspace.error';payload:{code:PetErrorCode;message:string}});
+
 export type ThreadNotification =
   | ThreadStartedNotification
   | ThreadSnapshotNotification
@@ -178,5 +181,6 @@ export type ThreadNotification =
   | ThreadListedNotification
   | ThreadDeletedNotification
   | ThreadErrorNotification
+  | WorkspaceNotification
   | PetNotification
   | RequestResolvedNotification;

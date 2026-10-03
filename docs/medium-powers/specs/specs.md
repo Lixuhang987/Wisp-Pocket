@@ -4,8 +4,8 @@
 
 ## 直接子节点
 
-- [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)：待实现的 Electron 设置与 Workspace/Pet 拆分；menu bar 入口、后端配置接口、固定项目根、逐 Turn 读取 AGENTS.md、自动基础 Pet 与 ThreadWindow 项目一级分组；Append Prompt 留在 Swift，MCP 运行刷新另列 TODO。
-- [multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md](./multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)：已实现、待实机验收的多桌宠 A「口袋对话」规格，已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)；本次仅多宠同屏，Pet 直接替代 Workspace、自由创建、角色 / 图片绑定、可重复 rootPath 和按宠分区；读取免确认、原路径交付，不做宠归档或旧数据迁移。
+- [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)：Electron 设置、后端配置接口与 Workspace/Pet 拆分已实现，完整实机待验；固定项目根、逐 Turn AGENTS.md、基础 Pet 与项目一级历史采用当前 owning 模块合约，MCP 运行刷新另列 TODO。
+- [multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md](./multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)：Issue #7 的多桌宠 A「口袋对话」历史规格，轻量交互仍保留；Pet 直接替代 Workspace 与按宠分组的设计已由 Issue #8 替代，当前项目模型不以本子树为准。
 - `2026-06-24-agenttrigger-thread-path-migration-spec.md`
 - `2026-06-24-chrome-bookmarks-folder-picker-spec.md`
 - `2026-06-24-websearch-tool-spec.md`

@@ -14,11 +14,13 @@
 - 在 `agent_server.health available=true` 与 `thread_window.prepared` 同时成立后，向 `AgentServerHealth` 暴露可提交状态。
 - 作为 `ThreadWindowCommanding` 实现，只接收 Coordinator 的 openInitialPrompt/openHistory/focus/themeChanged 意图；`theme.changed` 不参与 ThreadWindow 可用性 gate。启动初值由 `HANDAGENT_INITIAL_THEME` 提供，运行中变化仍由 `theme.changed` command 提供。
 - PromptPanel 经 Swift Thread client 提交后，既有 `focus(threadId:)` 将目标 ID 交给 Electron，再由 renderer 选择并 resume；Swift 不等待 snapshot 或持有当前选择。无目标 focus/openHistory 只操作窗口。字段与失败回执以 [Electron 协议](../../../../electron-shell/src/main/protocol/protocol.md) 为准，成功 ack 不表示目标内容已渲染。
-- 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`；Settings 用 `pet.show` / `pet.hide` 携带顶层 petId，经 commandId 回执控制窗口。
+- 作为 `ActivityWindowCommanding` 实现，接收 Coordinator 的 showActivityWindow 意图，并编码为 `activity_window.show`；`pet.show` / `pet.hide` 携带顶层 petId，经 commandId 回执控制窗口；React 管理入口通过受控 preload 操作同一窗口集合。
 - 在 agent-server available 后连接 `/api/dynamic-tools`，由 Swift `DynamicToolProviderService` 执行原生工具，并直接分派到已启用的 Automation。业务模块生命周期归 [AppServices](../app-services.md)，不随 server health 或窗口关闭而停机。
 - visible Electron ThreadWindow 关闭时，通过 `onThreadWindowClosed` 通知 Coordinator 清理打开状态；隐藏预热窗口关闭只影响可提交 gate。
 - 桌宠的点击、拖入、回复与历史由 Electron renderer 处理；Swift 只负责显示窗口的 command，不接管桌宠交互。
 - `bash ./scripts/swiftw run HandAgentDesktop` 会先构建 `handagent-electron-shell`，确保开发态 `dist/main/main.js` 存在；不要依赖旧 worktree 残留产物。
+
+- `SettingsWindowCommanding` 向 shell 发送 `settings.open`，由 Electron 独立单例承载；不计入 ThreadWindow gate 或 Swift 原生 Settings activation policy，失败 ack 回到宿主提示。menu bar 使用此入口，PromptPanel 仍用原生设置。
 
 ## 文件
 
@@ -28,7 +30,7 @@
 | `ElectronShellProtocol.swift` | Swift 端 command/event DTO，必须与 TS `electronShellProtocol.ts` 字段一致 |
 | `ElectronBackedAppServer.swift` | app-server health gate、ThreadWindow command client、ActivityWindow command client、dynamic tool provider client 和 Swift thread client 连接管理 |
 | `ThreadWindowDiagnostics.swift` | 仅供宿主侧排查 ThreadWindow 首次打开/关闭竞态的 stderr 诊断开关；`HANDAGENT_THREADWINDOW_TRACE=1` 时输出 `openHistory`、`hide(restoringFocus:false)`、`command.ack`、`thread_window_closed` 等关键时序 |
-| `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 的 command 抽象：open initial prompt、open history、focus、theme changed |
+| `ThreadWindowCommanding.swift` | Coordinator 面向 ThreadWindow 的 command 抽象，及独立 SettingsWindowCommanding 窄接口 |
 | `ActivityWindowCommanding.swift` | Coordinator 面向 Electron ActivityWindow 的 show command 抽象 |
 | `UserMessageAttachmentPayload.swift` | 旧 attachment DTO 兼容辅助；当前 initial prompt command 主载荷是 `PromptUserInput.items` |
 
@@ -47,7 +49,7 @@
 - 不解析 `/api/thread` 的 `ThreadNotification`。
 - 不消费完整 `/api/thread` 状态；AgentTrigger 命中由 SwiftThreadClient 直连，权限请求由 ThreadWindow 和桌宠的交互式连接呈现，core 仲裁唯一回执。
 - 新增 host dynamic tool 时，先在 `MacHostDynamicTools` 与 `MacPlatformProvider` 同步 spec / method 映射。
-- 不承载 PromptPanel、Settings、Hotkey 或焦点恢复；这些仍由 Swift 宿主负责。
+- 不承载 PromptPanel、原生宿主设置、Hotkey 或原生焦点恢复；这些仍由 Swift 宿主负责。独立 Electron 设置只通过 SettingsWindowCommanding 管窗口，业务读写由 renderer 直接连接后端。
 
 ## 修改约束
 

@@ -6,13 +6,13 @@
 
 1. 安装依赖：`pnpm install`。
 2. 运行 Wisp Pocket Swift Host：`bash ./scripts/swiftw run HandAgentDesktop`（Swift 内部 executable target 名称暂保留）。
-3. 在 Settings 配置模型 provider、model、API key 和可选 base URL。
+3. 从 menu bar 的“设置”打开 Electron 窗口，在 AI 显式保存模型 provider、model、API Key 和可选 Base URL；原生宿主设置仍从 PromptPanel 进入。
 
 `swiftw run` 会按需安装依赖、生成主题 token，并构建 ThreadWindow 与 Electron UI Shell。成功路径保持安静，失败时回放对应子命令输出。
 
 ## 模型设置
 
-- 设置文件是 `~/.spotAgent/settings.json`，优先通过 Settings 修改。
+- 后端模型/Tool 文件是 `~/.spotAgent/settings.json`，Electron 设置通过 `/api/settings/*` 修改。Swift 外观独立写 `~/.spotAgent/native-preferences.json`，不镜像后端配置；MCP 配置写 `mcp.json`，保存后重启 App 加载，尚无运行刷新。
 - provider 支持 `openai-compatible` 与 `anthropic`；OpenAI-compatible API 支持 `responses`、`chat`、`completion`。
 - agent-server 按文件戳热加载模型与 Tool 设置；正常修改无需重启。
 - 图片输入要求支持多模态的 API；`completion` 路径不支持图片。
@@ -53,7 +53,7 @@ env CFFIXED_USER_HOME="$qa_home" HOME="$qa_home" bash ./scripts/swiftw test
 
 ## 内置功能实机数据
 
-- 正常入口为 Settings → 工具，两个开关保存到 `~/.spotAgent/builtin-features.json`；Context History 与 Automation 业务数据分别保存在同级 `context-history/`、`automation/`，详见 [Host Automation](../apps/host-automation/host-automation.md)。
+- 正常入口为 PromptPanel → 原生 Settings → Host；Context History 常驻、Automation 默认关闭，其单独启用开关保存到 `~/.spotAgent/builtin-features.json`。两者业务数据分别保存在同级 `context-history/`、`automation/`，详见 [Host Automation](../apps/host-automation/host-automation.md)。
 - 启动 Swift Host 时设置 `HANDAGENT_HOST_DATA_HOME=/绝对路径/qa-home`，只将上述配置和两个业务目录放在该路径的 `.spotAgent/` 下。它不改变模型设置、Thread 数据库、AgentTrigger、Append Prompt 或其他设置的 home。
 - 记录实际启动的 bundle、版本、进程与 TCC 权限，验收动作见 [人工说明入口](./human/human.md)。新构建测试与旧实例隔离，不能从工作区路径推断运行的二进制来源。
 

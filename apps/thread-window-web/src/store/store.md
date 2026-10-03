@@ -7,7 +7,7 @@
 - `threadWindowStore.ts`：公共 Zustand 入口、store factory 与完整 Thread 缓存的原子组装。
 - `threadProjection.ts`：协议通知、请求到消息、状态、历史摘要及请求面板的投影。
 - `inputHandoff.ts`：首轮创建关联与本地待确认摘要。
-- `windowPreferences.ts`：搜索、Pet 展开操作及展开偏好的本地保存。
+- `windowPreferences.ts`：搜索、项目展开操作及展开偏好的本地保存。
 - `threadItems.ts`：可见消息的 UI 类型；跨进程 DTO 从 core 导入。
 
 ## 修改责任
@@ -17,9 +17,9 @@
 | 消息、状态、历史摘要、错误 | `handleNotification` 交给投影模块；snapshot 替换历史显示，delta 追加到同一 item | 删除 Thread 时移除缓存；不持久化为运行事实 |
 | 已保存输入的 pending | `user.message.recorded` 与 snapshot 投影后端待处理状态 | 对应 `turn.started` 按输入身份清除；其他输入的 pending 保留 |
 | Permission 面板 | `handleRequest` 与 snapshot 投影到所属 Thread，按 requestId 避免重复 | `request.resolved`、终态和错误清理；显式 resolve action 只移除本地面板，后端判断回执有效性 |
-| Pet 列表 | `pet.listed/created/updated` 或公共 `setPets` 替换 | 页面内缓存 |
+| Workspace / Pet 列表 | Workspace 完整列表替换；Pet 完整列表替换，含 workspaceId 的局部列表只替换对应项目 | 页面内缓存 |
 | 连接状态 | socket 事件经 `setConnectionState` 写入 | 展示传输状态，重连策略归各界面控制器 |
-| 搜索与分组展开 | 偏好模块的公共 action | 只有展开集合写入 localStorage；搜索随页面重建清空 |
+| 搜索与分组展开 | 偏好模块的公共 action | 只有项目展开集合写入 localStorage；完整项目列表清理失效展开身份；搜索随页面重建清空 |
 
 历史摘要的运行状态随后端 Turn 开始 / 完成和状态通知同步，列表不能停留在创建时状态；状态更新只改投影，不改变当前选择。
 

@@ -204,7 +204,7 @@ describe("thread protocol helpers", () => {
     expect(isThreadNotification({
       ...base,
       payload: {
-        pets: [{description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+        pets: [{workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
           id: "docs",
           name: "Docs",
           rootPath: "/repo/docs",
@@ -215,7 +215,7 @@ describe("thread protocol helpers", () => {
     expect(isThreadNotification({
       ...base,
       payload: {
-        pets: [{description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+        pets: [{workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
           id: "docs",
           name: "Docs",
           rootPath: 123,

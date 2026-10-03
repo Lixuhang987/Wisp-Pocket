@@ -1,41 +1,44 @@
-// apps/thread-window-web/src/components/PetGroup.tsx
+// apps/thread-window-web/src/components/WorkspaceGroup.tsx
 import * as Accordion from '@radix-ui/react-accordion';
-import { Folder, FolderOpen, MoreHorizontal, X } from 'lucide-react';
+import { Folder, FolderOpen, Plus } from 'lucide-react';
 import type { ThreadListEntry } from '../protocol/threadProtocol.ts';
 import { ThreadItem } from './ThreadItem.tsx';
 
-interface PetGroupProps {
-  pet: { id: string; name: string; rootPath: string };
+interface WorkspaceGroupProps {
+  workspace: { id: string; name: string; rootPath: string };
   threads: ThreadListEntry[];
   activeThreadId: string | null;
   isExpanded: boolean;
+  onNewThread: () => void;
   onToggle: () => void;
   onOpenThread: (threadId: string) => void;
   onDeleteThread: (threadId: string) => void;
 }
 
-export function PetGroup({
-  pet,
+export function WorkspaceGroup({
+  workspace,
   threads,
   activeThreadId,
   isExpanded,
   onToggle,
+  onNewThread,
   onOpenThread,
   onDeleteThread,
-}: PetGroupProps) {
+}: WorkspaceGroupProps) {
   return (
-    <Accordion.Item value={pet.id} className="mb-xs">
-      <Accordion.Header>
+    <Accordion.Item value={workspace.id} className="mb-xs">
+      <Accordion.Header className="flex items-center">
         <Accordion.Trigger
           onClick={onToggle}
           className="group flex w-full items-center gap-2 rounded-lg px-sm py-1.5 text-left text-xs text-app-text-primary transition-colors duration-200 hover:text-app-text-primary focus:outline-none"
         >
           <FolderIcon isExpanded={isExpanded} />
 
-          <span className="min-w-0 flex-1 truncate font-medium">{pet.name}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
 
-          <span className="text-app-text-muted">{pet.id.slice(-6)}</span>
+          <span className="text-app-text-muted">{threads.length}</span>
         </Accordion.Trigger>
+        <button aria-label={`在 ${workspace.name} 新建对话`} onClick={onNewThread} className="rounded-md p-xs text-app-text-secondary hover:bg-app-surface-muted"><Plus size={14}/></button>
       </Accordion.Header>
       <Accordion.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
         <div className="flex flex-col gap-xs pt-xs pl-6">

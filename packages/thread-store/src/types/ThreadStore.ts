@@ -36,6 +36,7 @@ export type CreateThreadParams = {
   agentPath?: string | null;
   dynamicTools?: DynamicToolSpec[];
   petId: string;
+  workspaceId?: string;
   petSnapshot?: import("@handagent/core/pet/Pet.ts").PetSnapshot;
   commandId?: string;
   timestamp?: string;
@@ -55,6 +56,7 @@ export type SessionMeta = {
   agentPath?: string;
   dynamicTools?: DynamicToolSpec[];
   petId: string;
+  workspaceId: string;
   petSnapshot?: import("@handagent/core/pet/Pet.ts").PetSnapshot;
   commandId?: string;
 };

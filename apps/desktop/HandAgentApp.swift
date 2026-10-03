@@ -14,13 +14,20 @@ struct WispPocketApp: App {
     }
 
     var body: some Scene {
+        MenuBarExtra("Wisp Pocket", systemImage: "sparkles") {
+            Button("设置") {
+                coordinator.send(.openElectronSettings)
+            }
+        }
+        .menuBarExtraStyle(.menu)
+
         Settings {
             EmptyView()
         }
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("设置…") {
-                    coordinator.send(.openSettings)
+                    coordinator.send(.openElectronSettings)
                 }
             }
         }

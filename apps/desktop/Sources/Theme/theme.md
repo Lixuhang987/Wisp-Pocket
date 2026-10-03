@@ -35,4 +35,4 @@
 
 - SwiftUI 原生模块的 `*View.swift` 与 `*Styles.swift` 优先通过 `@Environment(\.appTheme)` 消费 token；少量局部 layout 数值按模块后续收敛。
 - Common 是 token 的跨模块 UI 封装层；SettingsStyles 只保留 Settings 语义薄包装，PromptPanelStyles 只保留 PromptPanel 专用交互样式。
-- **Settings 主题封装层**：`apps/desktop/Sources/Common/CommonComponents.swift` 是 Settings 常用组件绘制逻辑的主入口。`SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor` / `SettingsActionButton` / `SettingsEmptyState` / `SettingsErrorFooter` / `SettingsPage` 通过 `SettingsStyles.swift` 指向 Common；其他 Settings / `AgentSettingsView` 源文件必须使用上述封装组件，由 `.swiftlint.yml` custom rule 静态拦截。
+- **Settings 主题封装层**：`apps/desktop/Sources/Common/CommonComponents.swift` 是 Settings 常用组件绘制逻辑的主入口。`SettingsTextField` / `SettingsSecureField` / `SettingsTextEditor` / `SettingsActionButton` / `SettingsEmptyState` / `SettingsErrorFooter` / `SettingsPage` 通过 `SettingsStyles.swift` 指向 Common；其他 Settings 源文件必须使用上述封装组件，由 `.swiftlint.yml` custom rule 静态拦截。

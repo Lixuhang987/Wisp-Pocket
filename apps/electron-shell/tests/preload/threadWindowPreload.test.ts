@@ -50,11 +50,17 @@ describe("threadWindowPreload", () => {
       executeInMainWorld: vi.fn(),
       exposeInMainWorld: vi.fn(),
     };
-    withElectronMock({ contextBridge, ipcRenderer: createIpcRendererMock() }, () => {
+    const ipc = createIpcRendererMock();
+    withElectronMock({ contextBridge, ipcRenderer: ipc }, () => {
       nodeRequire(preloadPath);
     });
 
     expect(contextBridge.executeInMainWorld).toHaveBeenCalledTimes(1);
+    const management = contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === "handAgentSettings")![1] as {chooseDirectory():unknown;hidePet(id:string):unknown};
+    management.chooseDirectory();
+    management.hidePet("pet-a");
+    expect(ipc.invoke).toHaveBeenCalledWith("settings:choose-directory");
+    expect(ipc.invoke).toHaveBeenCalledWith("settings:hide-pet", "pet-a");
     const script = contextBridge.executeInMainWorld.mock.calls[0]?.[0] as MainWorldScript;
     const mainWorld: ThreadWindowGlobals = {};
     (globalThis as { window?: ThreadWindowGlobals }).window = mainWorld;
@@ -118,7 +124,7 @@ describe("threadWindowPreload", () => {
     expect(mainWorld.handAgentPendingThreadOpens).toBe(pending);
     expect(receiver).toHaveBeenCalledExactlyOnceWith("thread-live");
     expect(contextBridge.exposeInMainWorld.mock.calls.map(([name]) => name)).toEqual([
-      "handAgentSubscribeThemeChange", "handAgentElectron",
+      "handAgentSubscribeThemeChange", "handAgentElectron", "handAgentSettings",
     ]);
   });
 
@@ -246,6 +252,7 @@ describe("threadWindowPreload", () => {
 function createIpcRendererMock() {
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
   return {
+    invoke: vi.fn(async () => null),
     on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
       listeners.set(channel, listeners.get(channel) ?? new Set());
       listeners.get(channel)?.add(listener);

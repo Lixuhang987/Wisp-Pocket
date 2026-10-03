@@ -1,6 +1,6 @@
 # src
 
-本目录拥有同一 SQLite 中的 Pet 配置、Thread rollout 与派生视图。调用方通过公开 API 读写，不直接操作表。
+本目录拥有同一 SQLite 中的 Workspace / Pet 配置、Thread rollout 与派生视图。调用方通过公开 API 读写，不直接操作表。
 
 ## 直接子节点
 
@@ -17,8 +17,8 @@
 - 以用户输入 ID 与 `turn.started.turnId` 区分已接收和已开始；未匹配开始事件的输入派生为 pendingInputs。没有开始事件的输入不能误报为重启丢失中的执行。
 - 未闭合 Turn 的修复与可见失败说明由 [agent-server 持久化 adapter](../../../apps/agent-server/src/thread/thread.md)追加，恢复数据交给 [core Thread](../../core/src/thread/thread.md)处理。
 
-- Pet 与 Thread 同库；默认宠切换、revision 更新和创建 commandId 去重在事务内完成。受管图片 bytes 留在 BlobStore，仅图片引用与校验信息入库。
-- Thread 元数据保存 petId 与服务端创建的角色快照，不保存 rootPath；查询时从所属 Pet 派生文件根。Thread 不可转移归属。
-- 旧 Workspace 开发 schema 明确拒绝打开，不做自动迁移或数据清除；新数据库按 Pet schema 创建。
+- Workspace、Pet 与 Thread 同库；实际项目目录有唯一约束，Workspace 和基础 Pet 在同一事务内创建。Workspace / 用户 Pet 的 commandId 去重、默认宠切换和 revision 更新沿同库事务完成。受管图片 bytes 留在 BlobStore，仅图片引用与校验信息入库。
+- Pet 权威配置保存固定 workspaceId，不保存 rootPath；Thread 元数据保存一致的 petId / workspaceId 与服务端创建的角色快照。查询 rootPath 从 Workspace 派生，任何身份都不可改投其他目录。
+- 旧开发 schema 明确拒绝打开，不做自动迁移或数据清除；新数据库使用 Workspace / Pet 引用和 Thread 双归属 schema。
 
 - 删除 Thread 时在同一 SQLite 事务内保存 threadId 墓碑并删除历史，墓碑不随级联删除清除。创建身份由稳定 commandId 派生，同身份重试在进程重建后仍返回 not_found；新的 commandId 可正常创建。

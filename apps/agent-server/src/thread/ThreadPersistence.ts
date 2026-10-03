@@ -1,3 +1,4 @@
+import { PetError } from '@handagent/core/pet/Pet.ts';
 import { createHash } from "node:crypto";
 import { ThreadNotFoundError } from "@handagent/core/thread/ThreadRegistry.ts";
 import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
@@ -26,7 +27,8 @@ import {
 
 export type CreatePersistedThreadInput = {
   preview?: string | null;
-  petId: string;
+  petId?: string;
+  workspaceId?: string;
   commandId?: string;
   dynamicTools?: DynamicToolSpec[];
 };
@@ -43,11 +45,20 @@ export class ThreadPersistence {
   async createThread(input: CreatePersistedThreadInput): Promise<PersistedThread> {
     const id = input.commandId ? `thread-${createHash("sha256").update(input.commandId).digest("hex")}` : generateThreadId();
     const existing = await this.getThread(id);
-    if (existing) { if (existing.metadata.petId !== input.petId) throw new Error("commandId already belongs to another Pet"); return existing; }
+    if (existing) { if (input.petId && existing.metadata.petId !== input.petId || input.workspaceId && existing.metadata.workspaceId !== input.workspaceId) throw new PetError('invalid_input','commandId 已属于另一个 Pet 或项目'); return existing; }
+    if (!input.petId && !input.workspaceId) throw new PetError('invalid_input','必须提供目标 Pet 或项目');
+    if (input.workspaceId && !this.store.getWorkspace(input.workspaceId)) throw new PetError('not_found','目标项目不存在');
+    const pet = input.petId ? this.store.getPet(input.petId) : input.workspaceId ? (() => {
+      const candidates = this.store.listPets().filter(pet => pet.workspaceId === input.workspaceId);
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    })() : null;
+    if (!pet) throw new PetError(input.petId ? 'not_found' : 'invalid_input',input.petId ? '目标 Pet 不存在' : '目标项目没有可用伙伴');
+    if (input.workspaceId && pet.workspaceId !== input.workspaceId) throw new PetError('invalid_input','Pet 与项目归属不一致');
     const current = await this.createCurrentThread({
       threadId: id,
       preview: input.preview,
-      petId: input.petId,
+      petId: pet.id,
+      workspaceId: pet.workspaceId,
       dynamicTools: input.dynamicTools,
       timestamp: this.now(),
       threadSource: "user",

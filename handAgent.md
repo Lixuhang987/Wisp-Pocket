@@ -7,13 +7,14 @@
 ```mermaid
 flowchart TD
   D[apps/desktop<br/>Swift Host] -->|command bridge| E[apps/electron-shell<br/>Electron UI Shell]
-  E --> W[apps/thread-window-web<br/>ThreadWindow]
+  E --> W[apps/thread-window-web<br/>ThreadWindow / Settings]
   E --> A[桌宠]
   E -->|supervise| S[apps/agent-server]
   D -->|/api/thread| S
   D -->|/api/dynamic-tools| S
   W -->|/api/thread| S
   A -->|/api/thread| S
+  W -->|/api/settings| S
   S --> C[packages/core<br/>Conversation Runtime]
   S --> T[packages/thread-store<br/>Thread rollout]
   D --> H[apps/host-automation<br/>Context History / Automation]
@@ -23,10 +24,10 @@ flowchart TD
 
 | 层 | 唯一职责 |
 | --- | --- |
-| `apps/desktop` | macOS 生命周期、PromptPanel、Settings、AgentTrigger、宿主能力与 Electron 启停 |
-| `apps/electron-shell` | 常驻 UI 容器、agent-server supervisor、ThreadWindow 预热、桌宠与原生窗口生命周期 |
-| `apps/thread-window-web` | ThreadWindow 界面，以及供两种 React 界面复用的 Thread 协议、消息投影与连接 |
-| `apps/agent-server` | WebSocket 路由、协议翻译、依赖组合与持久化适配 |
+| `apps/desktop` | macOS 生命周期、menu bar、PromptPanel、原生宿主设置、AgentTrigger、宿主能力与 Electron 启停 |
+| `apps/electron-shell` | 常驻 UI 容器、agent-server supervisor、ThreadWindow 预热、独立设置、桌宠与原生窗口生命周期 |
+| `apps/thread-window-web` | ThreadWindow / 设置界面，以及供 React 界面复用的 Thread 协议、消息投影与连接 |
+| `apps/agent-server` | HTTP 设置接口、WebSocket 路由、协议翻译、依赖组合与持久化适配 |
 | `packages/core` | Conversation Runtime、协议 DTO、LLM/Tool/Pet/Permission 抽象 |
 | `packages/thread-store` | SQLite rollout 与 Thread 派生视图 |
 | `apps/host-automation` | 应用进程内的 Context History、Automation 业务状态与持久化 |
@@ -40,6 +41,7 @@ flowchart TD
 - `/api/thread` 承载 `ThreadCommand`、`ThreadNotification`、`ServerRequest` 与 `ClientResponse`。ThreadWindow 和桌宠分别连接并共享后端 Thread；Swift 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`。
 - `/api/activity` 只发送 Agent Activity，不承载 Thread 消息或历史。
 - `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 暴露原生能力与已启用的 Automation，并向两个业务模块提供共享 macOS 实现；Context History 的已保存记录由 agent-server 普通工具直接读取。
+- `/api/settings/*` 管理模型、builtin Tool、MCP 配置与永久 Permission；Workspace/Pet 管理仍走 `/api/thread`。Electron 只持表单草稿，后端校验与持久化；MCP 保存不刷新运行连接。
 - Electron UI Shell 是 agent-server 的唯一 supervisor，也是 ThreadWindow 与桌宠的唯一宿主；关闭 UI 窗口不停止 agent-server。
 - 桌宠以结构化 `file_reference` 交付原文件路径，模型收到路径文字，持久接收后才确认；模型按需调用默认开放、免 Permission 的 file.read / Context History 工具。各入口使用统一的首轮执行规则与按需 user.ask；PromptPanel 图片仍经 Blob / 多模态链路。输入队列由 core Thread 持久化协调。
 - 建议按钮发送普通 UserInput；Permission 保持 ClientResponse。core 请求表只接受一次有效回执，`request.resolved` 同步清理两端展示。
@@ -49,10 +51,11 @@ flowchart TD
 
 ## 状态源
 
-- Swift Host 持久化模型设置、主题偏好、AgentTrigger 与 Automation 的启用选择；React 只消费解析后的主题。
+- 后端持久化模型、Tool、MCP 与永久 Permission；Swift Host 持久化主题偏好、Append Prompt、快捷键、AgentTrigger 与 Automation 启用选择。原生外观使用独立 `native-preferences.json`，不重写后端 `settings.json`；React 只消费解析后的主题。
 - Context History 的采集与 Automation 的录制、执行由 Swift Host 应用生命周期管理。关闭窗口继续运行，Automation 禁用时或应用完全退出时清理对应任务；长期业务数据由各模块持久化。正常退出等待 Automation 取消结果落盘后再答复 AppKit。
 - 两种 React 界面各持 store 和输入控制器，分别管理后端事实投影、首轮关联和界面偏好；权威历史共用同一个 Thread。桌宠的可见集合、逐宠位置 / 大小、当前 Thread、对话隐藏和逐 Thread 回复草稿是界面状态；Swift 与 Electron main 不 mirror 消息或历史。
-- core PetRegistry 通过同一 SQLite 拥有配置；Pet 固定文件根创建后不可修改。Thread 归属不可转移，只保存角色快照，执行文件根由所属 Pet 派生；同根共享文件但不共享历史。
+- core Workspace / Pet 注册表通过同一 SQLite 拥有配置；实际目录唯一且固定，新项目与基础 Pet 同事务创建，用户 Pet 独立保存。Pet 固定引用 Workspace，Thread 固定保存一致的 petId / workspaceId 与角色快照，执行根由 Workspace 派生；同项目共享文件但不合并历史。
+- Thread 实际 Turn 开始读取项目根 AGENTS.md 一次，同轮固定、下一轮重读；缺失为空，其他读取错误明确失败。ThreadWindow 展示全部项目一级历史分组，按项目新建且可选本项目 Pet，省略时后端随机分配；桌宠仍仅查询自己的 Thread。
 - core ThreadRegistry / Thread 持有运行中的 Thread、历史、Turn、请求和工具状态；agent-server 仅持有订阅、连接和请求路由。Electron main 的请求观察连接仅消费召回所需身份 / Permission 通知，不持消息或历史。
 - Thread 历史主文件是 `~/.spotAgent/threads.sqlite`；其他本地配置和数据路径由 owning 模块文档说明。
 

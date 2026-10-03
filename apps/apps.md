@@ -4,9 +4,9 @@
 
 ## 直接子节点
 
-- [desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md)：Swift Host，拥有 macOS 生命周期、PromptPanel、Settings 和宿主能力。
-- [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md)：Electron UI Shell、桌宠与 agent-server supervisor。
-- [thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：React ThreadWindow 与两界面共用的 Thread 客户端。
+- [desktop/desktop.md](/Users/mu9/proj/handAgent/apps/desktop/desktop.md)：Swift Host，拥有 macOS 生命周期、menu bar、PromptPanel、原生宿主设置和宿主能力。
+- [electron-shell/electron-shell.md](/Users/mu9/proj/handAgent/apps/electron-shell/electron-shell.md)：Electron UI Shell、独立设置、桌宠与 agent-server supervisor。
+- [thread-window-web/thread-window-web.md](/Users/mu9/proj/handAgent/apps/thread-window-web/thread-window-web.md)：React ThreadWindow / 设置与各界面共用的 Thread 客户端。
 - [agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)：Conversation Runtime 的本地服务组合根。
 - [host-automation/host-automation.md](./host-automation/host-automation.md)：应用内 Context History、Automation 与业务持久化。
 - [chrome-bookmarks-extension/chrome-bookmarks-extension.md](/Users/mu9/proj/handAgent/apps/chrome-bookmarks-extension/chrome-bookmarks-extension.md)：Chrome 书签事件采集端。

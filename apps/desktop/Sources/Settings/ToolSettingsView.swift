@@ -37,11 +37,6 @@ struct ToolSettingsView: View {
                 if let error = viewModel.builtinSettingsError {
                     SettingsErrorFooter(message: error)
                 }
-                SettingsSectionSeparator()
-                SettingsSectionHeader("Agent 工具")
-            }
-            SettingsListSection(items: viewModel.tools) { tool in
-                toolRow(tool)
             }
 
             Spacer(minLength: 0)
@@ -49,40 +44,4 @@ struct ToolSettingsView: View {
         .overlayScrollbar()
     }
 
-    private func toolRow(_ tool: BuiltinToolSetting) -> some View {
-        SettingsRow(tool.title) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(tool.description)
-                        .font(theme.typography.captionFont)
-                        .foregroundStyle(theme.colors.textPrimary)
-                        .lineLimit(2)
-                    Spacer()
-                    Text(tool.riskLabel)
-                        .font(theme.typography.captionFont)
-                        .foregroundStyle(riskColor(tool.risk))
-                }
-                HStack(spacing: 8) {
-                    Text(tool.name)
-                        .font(theme.typography.captionFont)
-                        .foregroundStyle(theme.colors.textSecondary)
-                    Spacer()
-                    Toggle("启用", isOn: Binding(
-                        get: { viewModel.isEnabled(tool.name) },
-                        set: { viewModel.setEnabled(tool.name, enabled: $0) }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                }
-            }
-        }
-    }
-
-    private func riskColor(_ risk: BuiltinToolSetting.Risk) -> Color {
-        switch risk {
-        case .low: return theme.colors.accentTeal
-        case .medium: return theme.colors.warning
-        case .high: return theme.colors.error
-        }
-    }
 }

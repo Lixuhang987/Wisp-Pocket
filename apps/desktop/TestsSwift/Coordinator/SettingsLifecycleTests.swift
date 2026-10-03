@@ -15,14 +15,10 @@ final class SettingsLifecycleTests: XCTestCase {
         )
 
         lifecycle.openOrFocus(
-            settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
-            toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            toolSettingsViewModel: ToolSettingsViewModel(),
             agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
-            mcpSettingsViewModel: MCPSettingsViewModel(),
-            permissionRulesViewModel: PermissionRulesViewModel(),
-            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
@@ -43,27 +39,19 @@ final class SettingsLifecycleTests: XCTestCase {
         )
 
         lifecycle.openOrFocus(
-            settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
-            toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            toolSettingsViewModel: ToolSettingsViewModel(),
             agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
-            mcpSettingsViewModel: MCPSettingsViewModel(),
-            permissionRulesViewModel: PermissionRulesViewModel(),
-            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
         )
         lifecycle.openOrFocus(
-            settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
-            toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            toolSettingsViewModel: ToolSettingsViewModel(),
             agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
-            mcpSettingsViewModel: MCPSettingsViewModel(),
-            permissionRulesViewModel: PermissionRulesViewModel(),
-            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
@@ -82,14 +70,10 @@ final class SettingsLifecycleTests: XCTestCase {
         )
 
         lifecycle.openOrFocus(
-            settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
-            toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            toolSettingsViewModel: ToolSettingsViewModel(),
             agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
-            mcpSettingsViewModel: MCPSettingsViewModel(),
-            permissionRulesViewModel: PermissionRulesViewModel(),
-            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .default,
             onClosed: {}
@@ -109,14 +93,10 @@ final class SettingsLifecycleTests: XCTestCase {
         )
 
         lifecycle.openOrFocus(
-            settingsViewModel: AgentSettingsViewModel(store: AgentSettingsStore()),
             appearanceViewModel: AppearanceSettingsViewModel(store: AgentSettingsStore()),
-            toolSettingsViewModel: ToolSettingsViewModel(store: AgentSettingsStore()),
+            toolSettingsViewModel: ToolSettingsViewModel(),
             agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel(),
             appendPromptSettingsViewModel: AppendPromptSettingsViewModel(),
-            mcpSettingsViewModel: MCPSettingsViewModel(),
-            permissionRulesViewModel: PermissionRulesViewModel(),
-            petViewModel: PetSettingsViewModel(),
             shortcutActions: [],
             appTheme: .light,
             onClosed: {}
@@ -134,26 +114,18 @@ private final class ThemeRefreshingSettingsWindowPresenter: SettingsWindowPresen
     private let window = NSWindow()
 
     func present(
-        settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
         agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
-        mcpSettingsViewModel: MCPSettingsViewModel,
-        permissionRulesViewModel: PermissionRulesViewModel,
-        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
     ) -> NSWindow? {
-        _ = settingsViewModel
         _ = appearanceViewModel
         _ = toolSettingsViewModel
         _ = agentTriggerSettingsViewModel
         _ = appendPromptSettingsViewModel
-        _ = mcpSettingsViewModel
-        _ = permissionRulesViewModel
-        _ = petViewModel
         _ = shortcutActions
         _ = onClose
         return window

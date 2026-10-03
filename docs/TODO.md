@@ -5,37 +5,11 @@
 - **完成即迁移**：当本文中的待办项被代码实现并通过测试覆盖后，必须将该项**从本文移除**，并按主题分组追加到 manual-qa
 - **同步更新模块文档**：若条目跨多个模块，迁移时同步更新对应 `<dir>.md` 索引。
 
-最后核对日期：2026-10-03。
-
-## Electron 设置与 Workspace/Pet 拆分（规格已发布，2026-10-03）
-
-实施规格：[Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)，已标记 `ready-for-agent`；2026-10-03 已合并 Workspace/Pet 拆分、项目指令与项目历史分组，规格正文以 Issue 为准。
-
-- [ ] 新增 menu bar 入口，菜单暂时只有“设置”，点击打开新增的 Electron 设置页面。
-- [ ] 第一阶段目标：原生保留 Appearance、快捷键、Host 功能（Context History 状态、Automation）、AgentTrigger 与 Append Prompt；Electron 完整迁移 AI、Agent 的 Tools / MCP / Permissions 与 Pets 现有功能，暂不建立 Prompts 页。
-- 已确认：原生设置暂时继续使用 PromptPanel 入口，不新增 Electron 跳转入口；Electron 设置采用独立窗口与 AI / Agent / Pets 分组，每次打开默认 AI，不记住页面，重复打开聚焦已有窗口。
-- 已确认：后端使用的数据由后端提供配置接口，现有 JSON 存储可以保留；主题与 Append Prompt 由 Swift 修改。边界理由见 [ADR 0005](./adr/0005-settings-data-ownership.md)。
-- [x] 完成设计决策并发布规格：表单使用显式保存按钮；未确认的离页阻拦弹窗不纳入验收。测试边界已确认使用后端公开接口主路径、Electron 窗口 / React 交互及 macOS 实机验收。
-- [x] 读取共享产品文档、Settings surface 与跨上下文架构，调查现有设置和入口；本轮仅讨论设计，不修改代码。
-- [ ] 确认范围后，从主 checkout 执行 `scripts/create-worktree.sh` 创建 `.worktrees/<task-name>/`，确认独立 CodeGraph 索引与显式 projectPath。
-- [ ] 在 worktree 先执行 `scripts/test.sh` 与 `scripts/swiftw build` 分层基线，再沿目标目录指南及父目录读到 `handAgent.md`，开始实现。
-- [ ] 完成迁移与必要验证，运行 TypeScript/Web、Swift test/build 提交前检查，更新相关模块文档。
-- [ ] spec 实现后由不继承上下文的独立子 agent 审核 spec、代码与文档；确认审核结论，将已实现项移入 `manual-qa.md` 后提交。
+最后核对日期：2026-10-04。
 
 ## MCP 配置运行刷新（设置迁移之后）
 
 - [ ] 后端配置接口修改 MCP 后，由后端自行刷新连接与工具状态；前端不编排刷新。设置迁移本轮仅交付配置读写接口，保存成功不等于运行连接已更新。
-
-## Workspace 与 Pet 拆分（已纳入 Issue #8，2026-10-03）
-
-- [x] 确认 Workspace 一对多 Pet、Pet 一对多 Thread；Pet 的 workspaceId 不可变；同一实际目录复用 Workspace，项目指令来自 AGENTS.md。已同步词表与 [ADR 0006](./adr/0006-workspace-pet-separation.md)，已纳入 Issue #8、尚未实现。
-- [x] 确认 Thread 直接归属 Pet，同时保存 petId 与 workspaceId；桌宠按 petId 查询，ThreadWindow 按 workspaceId 查询，后端必须保证两种归属一致。
-- [x] 确认 Workspace 根不可修改，根目录 AGENTS.md 每个 Turn 开始读取一次；用户明确任务 > 项目规则 > Pet 角色，工具与 Permission 边界保持；本轮不新增 Workspace / Pet 删除。
-- [x] 确认 ThreadWindow 展示全部 Workspace，只用 workspaceId 一级分组，不按 petId 筛选；新建只选目标 Workspace 内的 Pet，未指定则后端随机选一只，幂等重试保持首次选择。
-- [x] 确认创建 Pet 时选择目录自动创建 / 复用 Workspace，不新增独立 Workspace 管理页；新项目额外生成基础 Pet，再保存用户 Pet，一次产生两只；复用、重试与并发目录去重不重复生成基础 Pet，随机分配包含基础 Pet。
-- [x] 已更新 Issue #8 的完整规格、用户故事、实现 / 测试决策与排除范围；根目录存在但 AGENTS.md 缺失按空指令处理，读取失败明确使该 Turn 失败，作为规格技术默认。
-- 当前事实：Pet 可见集合已是前端按 petId 保存的状态，现阶段没有 Pet 删除接口；完整 Pet 列表同步时只追加 ID 的行为仍需补齐失效项清理。
-- [ ] 与 Electron 设置按同一 Issue 实现，沿上方 worktree、基线、验证与文档审核流程推进；实现前先完成后端项目模型与双归属。
 
 ## 重启后的排队消息策略
 

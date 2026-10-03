@@ -7,7 +7,8 @@ export type ThreadStartCommand = {
   commandId: string;
   timestamp: string;
   payload: {
-    petId: string;
+    petId?: string;
+    workspaceId?: string;
     dynamicTools?: DynamicToolSpec[];
   };
 };
@@ -20,7 +21,7 @@ export type ThreadResumeCommand = {
 };
 
 export type ThreadListCommand = {
-  payload?: {petId?: string; limit?: number; cursor?: string};
+  payload?: {workspaceId?: string; petId?: string; limit?: number; cursor?: string};
   type: "thread.list";
   commandId: string;
   timestamp: string;
@@ -46,11 +47,13 @@ export type OpSubmitCommand = {
 };
 
 type PetCommandBase = {commandId:string; timestamp:string};
-export type PetListCommand = PetCommandBase & {type:'pet.list'};
+export type PetListCommand = PetCommandBase & {type:'pet.list';payload?:{workspaceId?:string}};
 export type PetCreateCommand = PetCommandBase & {type:'pet.create'; payload:PetCreateInput};
 export type PetUpdateCommand = PetCommandBase & {type:'pet.update'; payload:{id:string;expectedRevision:number;patch:PetPatch}};
 export type PetImageImportCommand = PetCommandBase & {type:'pet.image.import';payload:{mimeType:'image/png'|'image/jpeg'|'image/webp';base64:string}};
 export type PetCommand = PetListCommand | PetCreateCommand | PetUpdateCommand | PetImageImportCommand;
+
+export type WorkspaceCommand = PetCommandBase & ({type:'workspace.list'} | {type:'workspace.create';payload:{rootPath:string}});
 
 export type ThreadCommand =
   | ThreadStartCommand
@@ -58,4 +61,5 @@ export type ThreadCommand =
   | ThreadListCommand
   | ThreadDeleteCommand
   | OpSubmitCommand
-  | PetCommand;
+  | PetCommand
+  | WorkspaceCommand;

@@ -1,6 +1,6 @@
 # Appearance 模块
 
-Swift 宿主的主题偏好模型。`AppearanceThemePreference` 只允许 `system` / `light` / `dark`，由 `AgentSettingsStore` 持久化到 `~/.spotAgent/settings.json` 的 `appearance.themePreference`。
+Swift 宿主的主题偏好模型。`AppearanceThemePreference` 只允许 `system` / `light` / `dark`，由 `AgentSettingsStore` 持久化到 `~/.spotAgent/native-preferences.json` 的 `appearance.themePreference`。
 
 ## 文件
 
@@ -15,5 +15,5 @@ Swift 宿主的主题偏好模型。`AppearanceThemePreference` 只允许 `syste
 - Swift 是主题偏好的唯一写入端；React 只接收宿主传入的 resolved theme，不自行持久化主题。
 - `system` 只表示用户偏好，跨进程传递时必须同时带上 Swift 解析后的 `light` 或 `dark`。
 - `system` 模式下 macOS 外观变化由 `SystemAppearanceChangeObserver` 监听；Coordinator 只把事件转给 `AppearanceThemeService`，不自行解析颜色 token。
-- `AppearanceSettings` 与 LLM / tool 设置共享 `~/.spotAgent/settings.json`，更新其中任一字段必须保留其他顶层字段。
+- `AppearanceSettings` 使用独立原生偏好文件，后端模型/Tools 使用 `settings.json`，两者没有共享写入镜像；持久化合约见 [AgentSettings](../AgentSettings/agent-settings.md)。
 - `AppearanceThemeService.resolveSystemTheme()` 在 app 启动早期必须能安全返回；如果 `NSApplication` 尚未就绪，直接回退为 `light`，避免 `AppServices.defaultRuntime()` 在初始化 `HANDAGENT_INITIAL_THEME` 时崩溃。

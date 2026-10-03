@@ -52,6 +52,7 @@ describe("electronShellProtocol", () => {
     }));
 
     expect(command.type).toBe("activity_window.show");
+    expect(parseCommand(JSON.stringify({channel:"electron_shell",type:"settings.open",commandId:"cmd-settings"})).type).toBe("settings.open");
   });
 
   it("accepts theme.changed commands with preference and resolved theme", () => {

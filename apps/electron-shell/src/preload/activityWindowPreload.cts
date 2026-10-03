@@ -110,3 +110,12 @@ function isHostTheme(value: unknown): value is HostTheme {
     && ["light", "dark", "system"].includes((value as HostTheme).preference)
     && ["light", "dark"].includes((value as HostTheme).resolved);
 }
+
+// Management intent only; main validates the settings or registered pet sender.
+contextBridge.exposeInMainWorld("handAgentSettings", {
+  chooseDirectory: () => ipcRenderer.invoke("settings:choose-directory"),
+  chooseImage: () => ipcRenderer.invoke("settings:choose-image"),
+  showPet: (petId: string) => ipcRenderer.invoke("settings:show-pet", petId),
+  hidePet: (petId: string) => ipcRenderer.invoke("settings:hide-pet", petId),
+  getPetVisibility: () => ipcRenderer.invoke("settings:pet-visibility"),
+});

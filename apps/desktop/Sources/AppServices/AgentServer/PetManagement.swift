@@ -18,6 +18,7 @@ struct PetEntry: Codable, Identifiable, Equatable {
     var rolePrompt: String
     var revision: Int
     var imageRef: PetImageReference
+    let workspaceId: String
     let rootPath: String
     var isDefault: Bool
 }
@@ -33,4 +34,11 @@ extension PetManaging {
         let data = try JSONSerialization.data(withJSONObject: payload["pets"] ?? [])
         return try JSONDecoder().decode([PetEntry].self, from: data)
     }
+}
+
+struct WorkspaceEntry: Codable, Identifiable, Equatable {
+    let id: String
+    let rootPath: String
+    let name: String
+    let createdAt: String
 }

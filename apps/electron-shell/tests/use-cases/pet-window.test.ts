@@ -111,6 +111,21 @@ describe("桌宠原生窗口用例", () => {
     expect(recalled.showInactiveCount).toBe(1);
     expect(recalled.focusedSurface).toBe("other-app");
     expect(recalled.webContents.send).toHaveBeenCalledWith("pet-window:reveal");
+    const retained = recalled;
+    await harness.collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-a" }, { id: "pet-b" }] } });
+    await harness.collection.hidePet("pet-b");
+    await harness.collection.accept({ type: "pet.created", payload: { pet: { id: "pet-b" } } });
+    expect(harness.collection.getVisibility()["pet-b"]).toBe(false);
+    expect(harness.petWindows.get("pet-b")!.destroyed).toBe(true);
+    harness.collection.setReceiving("pet-a", true);
+    await harness.collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-b" }] } });
+    expect(retained.destroyed).toBe(false);
+    expect(harness.collection.getVisibility()).toEqual({ "pet-b": false });
+    harness.collection.setReceiving("pet-a", false);
+    expect(retained.destroyed).toBe(true);
+    await harness.collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-b" }, { id: "pet-c" }] } });
+    expect(harness.collection.getVisibility()).toEqual({ "pet-b": false, "pet-c": true });
+
   });
 
   it("角色拖动保持捕获，记住位置，关闭 ThreadWindow 后继续使用同一桌宠，再次启动恢复", async () => {

@@ -13,6 +13,7 @@
 | `main.ts` | 无独立文档 | Electron process 入口，组装 bridge、runtime、supervisor、window controllers 和 IPC；读取 `HANDAGENT_INITIAL_THEME` 和 action manifest 以初始化 renderer 必需 UI 配置，不读取或转发默认 dynamic tools |
 | `electronShellRuntime.ts` | 无独立文档 | 可测试的 command / health / prewarm 状态机 |
 | `initialHostTheme.ts` | 无独立文档 | 解析 `HANDAGENT_INITIAL_THEME`，为 Electron window controllers 提供启动期 host theme 初值 |
+| `settingsManagementIpc.ts` | 无独立文档 | 设置/桌宠管理 sender 校验、目录/图片 picker 与全宠显示意图；业务写入仍走后端 |
 | `petWindowIpc.ts` | 无独立文档 | 校验当前桌宠 sender 和布局、可选内容高度、命中区域、拖动 IPC |
 | `macosDockApp.ts` | 无独立文档 | macOS regular activation policy 与 Dock 显示 |
 | `availableSkills.ts` | 无独立文档 | 读取本地 action manifest 根目录（`~/.spotAgent/actions`），解析启用项的 `action.json`，输出只读 `AvailableSkill[]` 供 ThreadWindow preload 注入 |
@@ -28,7 +29,7 @@
 ## 状态机前提
 
 - `agent_server.health available=true` 到达后，runtime 才主动调用 `prewarmer.prepare()`；Swift 不发送 `thread_window.prepare`。
-- `theme.changed` command 必须同时调用 ThreadWindow prewarmer 和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。启动期同样使用 Swift 传入的 `{ preference, resolved }`，不要在 Electron main 固定 dark/light 或自行解析系统外观。
+- `theme.changed` command 必须同时调用 ThreadWindow、独立设置窗口和 ActivityWindow controller 的 `updateTheme()`；Electron main 保存并下发的是 Swift 已解析的 host theme，不在 renderer 侧持久化偏好。启动期同样使用 Swift 传入的 `{ preference, resolved }`，不要在 Electron main 固定 dark/light 或自行解析系统外观。
 - ThreadWindow 预热时只把当前 host theme 与只读 `availableSkills` 传给 prewarmer；skills 由本地 action manifest 根目录（默认 `HANDAGENT_ACTIONS_DIR ?? ~/.spotAgent/actions`）读取。Dynamic Tool 的声明、调用与内置模块生命周期由 Swift Host 管理，Electron 不向 ThreadWindow preload 传递默认 dynamic tools。
 - `prewarmAfterServerReadyPromise` 用来合并并发预热；改动预热流程时必须保持只发一次对应的 prepared / prepare_failed 结果。
 - ThreadWindow 关闭后发送 `thread_window.closed`；如果窗口曾 prepared 且 agent-server 仍 available，runtime 会再次主动预热。各可见宠独立保留 renderer；隐藏角色在接收确认后回收窗口。
@@ -39,3 +40,5 @@
 
 - stdout 只写给 Swift 的 JSON event line；普通日志写 stderr。
 - agent-server stdout/stderr 会被 supervisor 加前缀后写 stderr，不能混入 stdout，否则 Swift decoder 会尝试当作事件解析。
+
+- `settings.open` 复用窗口加载控制器的独立实例，加载 ThreadWindow Web 的 `surface=settings`；不预热，不参与 ThreadWindow availability，不经 renderer 注入改页。已有窗口只 focus，关闭重建默认 AI。管理 IPC 只接受当前设置窗口或登记桌宠 sender，普通 ThreadWindow 无权限。

@@ -1,30 +1,30 @@
 import type { PersistOptions, PersistStorage, StorageValue } from "zustand/middleware";
 
-const EXPANDED_WORKSPACE_IDS_STORAGE_KEY = "handAgent.threadWindow.expandedPetIds";
+const EXPANDED_WORKSPACE_IDS_STORAGE_KEY = "handAgent.threadWindow.expandedWorkspaceIds";
 
 export type WindowPreferences = {
-  expandedPetIds: Set<string>;
+  expandedWorkspaceIds: Set<string>;
   searchQuery: string;
-  togglePetExpanded(petId: string): void;
+  toggleWorkspaceExpanded(workspaceId: string): void;
   setSearchQuery(query: string): void;
 };
 
-type PersistedWindowPreferences = { expandedPetIds: string[] };
+type PersistedWindowPreferences = { expandedWorkspaceIds: string[] };
 type PreferenceUpdate = Partial<WindowPreferences> | ((state: WindowPreferences) => Partial<WindowPreferences>);
 
 export function createWindowPreferences(set: (update: PreferenceUpdate) => void): WindowPreferences {
   return {
-    expandedPetIds: new Set(),
+    expandedWorkspaceIds: new Set(),
     searchQuery: "",
-    togglePetExpanded(petId) {
+    toggleWorkspaceExpanded(workspaceId) {
       set((state) => {
-        const expandedPetIds = new Set(state.expandedPetIds);
-        if (expandedPetIds.has(petId)) {
-          expandedPetIds.delete(petId);
+        const expandedWorkspaceIds = new Set(state.expandedWorkspaceIds);
+        if (expandedWorkspaceIds.has(workspaceId)) {
+          expandedWorkspaceIds.delete(workspaceId);
         } else {
-          expandedPetIds.add(petId);
+          expandedWorkspaceIds.add(workspaceId);
         }
-        return { expandedPetIds };
+        return { expandedWorkspaceIds };
       });
     },
     setSearchQuery(query) {
@@ -36,14 +36,14 @@ export function createWindowPreferences(set: (update: PreferenceUpdate) => void)
 export function windowPreferencePersistence<T extends WindowPreferences>(): PersistOptions<T, PersistedWindowPreferences> {
   return {
     name: EXPANDED_WORKSPACE_IDS_STORAGE_KEY,
-    storage: createExpandedPetIdsStorage(),
-    partialize: (state) => ({ expandedPetIds: Array.from(state.expandedPetIds) }),
+    storage: createExpandedWorkspaceIdsStorage(),
+    partialize: (state) => ({ expandedWorkspaceIds: Array.from(state.expandedWorkspaceIds) }),
     merge: (persistedState, currentState) => {
       const persisted = persistedState as Partial<PersistedWindowPreferences> | undefined;
       return {
         ...currentState,
-        expandedPetIds: new Set(
-          persisted?.expandedPetIds?.filter((value): value is string => typeof value === "string") ?? [],
+        expandedWorkspaceIds: new Set(
+          persisted?.expandedWorkspaceIds?.filter((value): value is string => typeof value === "string") ?? [],
         ),
       };
     },
@@ -59,7 +59,7 @@ function getLocalStorage(): Storage | undefined {
   }
 }
 
-function createExpandedPetIdsStorage(): PersistStorage<PersistedWindowPreferences> {
+function createExpandedWorkspaceIdsStorage(): PersistStorage<PersistedWindowPreferences> {
   return {
     getItem(name) {
       const storage = getLocalStorage();
@@ -69,7 +69,7 @@ function createExpandedPetIdsStorage(): PersistStorage<PersistedWindowPreference
         if (!rawValue) return null;
         const parsed = JSON.parse(rawValue) as unknown;
         if (Array.isArray(parsed)) {
-          return { state: { expandedPetIds: parsed.filter((value): value is string => typeof value === "string") } };
+          return { state: { expandedWorkspaceIds: parsed.filter((value): value is string => typeof value === "string") } };
         }
         return isStorageValue(parsed) ? parsed : null;
       } catch {
@@ -94,5 +94,5 @@ function createExpandedPetIdsStorage(): PersistStorage<PersistedWindowPreference
 function isStorageValue(value: unknown): value is StorageValue<PersistedWindowPreferences> {
   if (typeof value !== "object" || value === null || !("state" in value)) return false;
   const state = (value as { state?: unknown }).state;
-  return typeof state === "object" && state !== null && "expandedPetIds" in state;
+  return typeof state === "object" && state !== null && "expandedWorkspaceIds" in state;
 }

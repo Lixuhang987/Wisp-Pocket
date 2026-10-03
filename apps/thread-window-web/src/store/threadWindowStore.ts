@@ -49,6 +49,7 @@ return create<ThreadWindowState>()(persist((set) => ({
   pendingInitialPrompts: {},
   processedNotificationIds: {},
   pets: [],
+  workspaces: [],
   ...createWindowPreferences(set),
 
   setConnectionState(state) {
@@ -72,11 +73,16 @@ return create<ThreadWindowState>()(persist((set) => ({
   },
 
   handleNotification(notification) {
+    if(notification.type === "workspace.listed") {
+      const ids=new Set(notification.payload.workspaces.map(workspace=>workspace.id));
+      set(state=>({expandedWorkspaceIds:new Set([...state.expandedWorkspaceIds].filter(id=>ids.has(id)))}));
+    }
     set(produce<ThreadWindowState>((draft) => {
       if (!projection.acceptNotification(draft, notification)) return;
       let thread: ThreadState | undefined;
       if (notification.type === "thread.started") {
         thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId, notification.payload.preview);
+        thread.workspaceId = notification.payload.workspaceId;
         thread.petId = notification.payload.petId; thread.petRevision = notification.payload.petRevision; thread.rootPath = notification.payload.rootPath;
       } else if (notification.type === "request.resolved") {
         thread = draft.threadsById[notification.threadId];

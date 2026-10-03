@@ -85,10 +85,12 @@ describe("Thread input and socket flows", () => {
     const events: string[] = [];
     const { client } = createInputClient({
       url: "ws://127.0.0.1:4317/api/thread",
+      listWorkspaces:true,
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
         .mockReturnValueOnce("pet-list-1")
+        .mockReturnValueOnce("workspace-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("page-2")
         .mockReturnValue("resume-51"),
@@ -112,12 +114,13 @@ describe("Thread input and socket flows", () => {
     expect(events).toEqual(["state:connecting", "state:connected", "thread.listed"]);
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
       { type: "pet.list", commandId: "pet-list-1" },
+      { type: "workspace.list", commandId: "workspace-list-1" },
       { type: "thread.list", commandId: "list-1" },
     ]);
     expect(socket.sent.map((raw) => JSON.parse(raw)).some((command) => command.type === "thread.resume")).toBe(false);
 
     const entry = (id: string) => ({
-      id, petId: "pet-a", petRevision: 1, rootPath: "/tmp", status: "idle" as const,
+      id, workspaceId:"workspace-default", petId: "pet-a", petRevision: 1, rootPath: "/tmp", status: "idle" as const,
       preview: id, messageCount: 1, createdAt: timestamp, updatedAt: timestamp,
     });
     socket.receive({ type: "thread.listed", notificationId: "page-1", timestamp, payload: {
@@ -163,7 +166,7 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
+        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
       }),
     });
 
@@ -218,14 +221,14 @@ describe("Thread input and socket flows", () => {
       notificationId: "started-b",
       commandId: "prompt-b",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "another question" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "another question" },
     });
     socket.receive({
       type: "thread.snapshot",
       threadId: "thread-b",
       notificationId: "snapshot-b",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
     });
     socket.receive({
       type: "thread.started",
@@ -233,14 +236,14 @@ describe("Thread input and socket flows", () => {
       notificationId: "started-a",
       commandId: "prompt-a",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "focus on regressions" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "focus on regressions" },
     });
     socket.receive({
       type: "thread.snapshot",
       threadId: "thread-a",
       notificationId: "snapshot-a",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
     });
 
     expect(observedPrompts).toEqual([
@@ -449,7 +452,7 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello before open" },
+        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello before open" },
       }),
     });
 
@@ -716,7 +719,7 @@ describe("Thread input and socket flows", () => {
         notificationId: "n-other-started",
         commandId: "prompt-other",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "other" },
+        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "other" },
       }),
     });
     socket.onmessage?.({
@@ -744,7 +747,7 @@ describe("Thread input and socket flows", () => {
         notificationId: "n-late-started",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
+        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
       }),
     });
 
@@ -797,7 +800,7 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "first" },
+        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "first" },
       }),
     });
 

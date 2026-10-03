@@ -33,6 +33,7 @@ struct ElectronInitialPromptPayload: Encodable, Equatable {
 
 enum ElectronShellCommand: Encodable, Equatable {
     case openInitialPrompt(commandId: String, payload: ElectronInitialPromptPayload)
+    case openSettings(commandId: String)
     case openHistory(commandId: String)
     case focus(commandId: String, threadId: String?)
     case showActivityWindow(commandId: String)
@@ -52,6 +53,9 @@ enum ElectronShellCommand: Encodable, Equatable {
             try container.encode("thread_window.open_initial_prompt", forKey: .type)
             try container.encode(commandId, forKey: .commandId)
             try container.encode(payload, forKey: .payload)
+        case .openSettings(let commandId):
+            try container.encode("settings.open", forKey: .type)
+            try container.encode(commandId, forKey: .commandId)
         case .openHistory(let commandId):
             try container.encode("thread_window.open_history", forKey: .type)
             try container.encode(commandId, forKey: .commandId)

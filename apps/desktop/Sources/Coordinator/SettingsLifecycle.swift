@@ -19,14 +19,10 @@ final class SettingsLifecycle {
     }
 
     func openOrFocus(
-        settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
         agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
-        mcpSettingsViewModel: MCPSettingsViewModel,
-        permissionRulesViewModel: PermissionRulesViewModel,
-        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClosed: @escaping @MainActor () -> Void
@@ -40,14 +36,10 @@ final class SettingsLifecycle {
         }
 
         window = windowPresenter.present(
-            settingsViewModel: settingsViewModel,
             appearanceViewModel: appearanceViewModel,
             toolSettingsViewModel: toolSettingsViewModel,
             agentTriggerSettingsViewModel: agentTriggerSettingsViewModel,
             appendPromptSettingsViewModel: appendPromptSettingsViewModel,
-            mcpSettingsViewModel: mcpSettingsViewModel,
-            permissionRulesViewModel: permissionRulesViewModel,
-            petViewModel: petViewModel,
             shortcutActions: shortcutActions,
             appTheme: appTheme,
             onClose: { Task { @MainActor in onClosed() } }

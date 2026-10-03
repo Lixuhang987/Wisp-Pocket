@@ -1,13 +1,13 @@
 # tools
 
-本目录定义 AgentTool、注册与激活边界。Thread / Pet 拥有身份和执行上下文；工具不能通过模型参数改变所属 Pet。
+本目录定义 AgentTool、注册与激活边界。Thread 固定保存 Pet / Workspace 归属，执行目录来自 Workspace；工具不能通过模型参数改变归属。
 
 ## 直接子节点
 
 - `types/`：Tool 入参与调用上下文；后端注入 threadId、turnId、toolCallId、rootPath 和 AbortSignal。
 - `defineTool.ts`：同一 Zod schema 派生 JSON Schema、校验输入；身份敏感输入使用 strict object，不能忽略多余归属字段。
 - `ToolRegistry.ts`、`registerBuiltins.ts`、`registerTools.ts`：注册与设置过滤；可配置 builtin 只包含 file.write。
-- `builtins/`：文件读取端口、固定 Pet 根写入及路径验证。
+- `builtins/`：文件读取端口、固定 Workspace 根写入及路径验证。
 - `MetaToolUseTool.ts`：懒激活 use_tools；激活完整集合后从目录移除，晚到调用幂等。
 - `DynamicToolAdapter.ts`：外部 Provider 的动态工具适配。
 - [web/web.md](./web/web.md)：默认 Web 查询与抓取。
@@ -17,9 +17,9 @@
 | Tool | 输入与执行边界 |
 | --- | --- |
 | file.read | `{ path }`；绝对路径可任意读取，相对路径从后端上下文 rootPath 解析；默认开放、免 Permission，不受 builtin 设置控制 |
-| file.write | `{ relativePath, content }`；只写当前 Thread 所属 Pet 的固定目录；继续经过 Permission 与 builtin 设置过滤 |
+| file.write | `{ relativePath, content }`；只写当前 Thread 所属 Workspace 的固定目录；继续经过 Permission 与 builtin 设置过滤 |
 
-Pet 创建后 rootPath 不可修改，Thread 不保存文件根快照。Tool 上下文由 Thread owner 根据 petId 取得，不能接受 workspaceId、petId 或 rootPath 参数重绑定。角色快照不承担文件边界。
+Workspace.rootPath 与 Pet.workspaceId 创建后不可修改，Thread 不保存文件根快照。Tool 上下文由 Thread owner 根据固定 Workspace 取得，不能接受 workspaceId、petId 或 rootPath 参数重绑定。角色快照不承担文件边界；归属合约见 [Workspace](../workspace/workspace.md) 与 [Thread](../thread/thread.md)。
 
 file.read 的具体文本/PDF/图片解码由 [agent-server actions](../../../../apps/agent-server/src/actions/actions.md) 实现并注入端口；每次读原文件当前内容，不用缓存替代真实读取。读取结果仍保存为 Thread 历史。
 

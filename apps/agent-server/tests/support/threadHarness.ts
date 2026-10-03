@@ -16,7 +16,7 @@ import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest
 
 export function threadHarness(client: LLMClientLike, options: Partial<ThreadServices> = {}, dbPath = ":memory:") {
   const store = new ThreadStore({ dbPath });
-  const pet = store.listPets()[0] ?? store.createPet({name:"测试宠",rolePrompt:"测试助手",imageRef:{type:"builtin",id:"yachiyo"},rootPath:"/tmp"});
+  const pet = store.listPets().find(pet => pet.name === "测试宠") ?? store.createPet({name:"测试宠",rolePrompt:"测试助手",imageRef:{type:"builtin",id:"yachiyo"},rootPath:"/tmp"});
   const pets = new PetRegistry(store);
   const persistence = new ThreadPersistence(store, undefined, new MemoryBlobStore());
   const events: (ThreadNotification | ServerRequest)[] = [];

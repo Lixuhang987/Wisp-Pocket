@@ -1,3 +1,4 @@
+import type { Workspace } from "@handagent/core/workspace/Workspace.ts";
 import type { Pet } from "@handagent/core/pet/Pet.ts";
 import type {
   RunStatus,
@@ -24,6 +25,7 @@ export type PermissionRequestState = {
 export type ThreadProjection = {
   threadId: string;
   petId?: string;
+  workspaceId?: string;
   petRevision?: number;
   rootPath?: string;
   petSnapshot?: ThreadSnapshotPayload["petSnapshot"];
@@ -40,6 +42,7 @@ export type ThreadWindowProjection = {
   threadsById: Record<string, ThreadProjection>;
   processedNotificationIds: Record<string, true>;
   pets: Pet[];
+  workspaces: Workspace[];
 };
 
 export function emptyThreadProjection(threadId: string, title: string | null): ThreadProjection {
@@ -80,6 +83,7 @@ export function projectNotification(
     case "thread.snapshot": {
       const thread = state.threadsById[notification.threadId];
       thread.petId = notification.payload.petId;
+      thread.workspaceId = notification.payload.workspaceId;
       thread.petSnapshot = notification.payload.petSnapshot;
       thread.petRevision = notification.payload.petSnapshot.revision;
       thread.rootPath = notification.payload.rootPath;
@@ -189,8 +193,19 @@ export function projectNotification(
     case "thread.listed":
       state.history = notification.payload.threads;
       break;
+    case "workspace.listed":
+      state.workspaces = notification.payload.workspaces;
+      break;
+    case "workspace.created":
+      state.workspaces = [...state.workspaces.filter(workspace => workspace.id !== notification.payload.workspace.id),notification.payload.workspace];
+      break;
+    case "workspace.error":
+      state.windowErrorMessage = notification.payload.message;
+      break;
     case "pet.listed":
-      state.pets = notification.payload.pets;
+      state.pets = notification.payload.workspaceId
+        ? [...state.pets.filter(pet=>pet.workspaceId!==notification.payload.workspaceId),...notification.payload.pets]
+        : notification.payload.pets;
       break;
     case "pet.created":
     case "pet.updated":
@@ -292,6 +307,7 @@ function upsertHistoryEntry(
     createdAt,
     updatedAt,
     messageCount: update.messageCount ?? existing?.messageCount ?? 0,
+    workspaceId: update.workspaceId ?? existing?.workspaceId ?? state.threadsById[threadId]?.workspaceId ?? "",
     petId: update.petId ?? existing?.petId ?? state.threadsById[threadId]?.petId ?? "",
     petRevision: update.petRevision ?? existing?.petRevision ?? 1,
     rootPath: update.rootPath ?? existing?.rootPath ?? "",

@@ -6,14 +6,10 @@ import KeyboardShortcuts
 @MainActor
 protocol SettingsWindowPresenting {
     func present(
-        settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
         agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
-        mcpSettingsViewModel: MCPSettingsViewModel,
-        permissionRulesViewModel: PermissionRulesViewModel,
-        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
@@ -420,26 +416,18 @@ final class NopAppearanceChangeObserver: AppearanceChangeObserving {
 @MainActor
 final class NopSettingsWindowPresenter: SettingsWindowPresenting {
     func present(
-        settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
         agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
-        mcpSettingsViewModel: MCPSettingsViewModel,
-        permissionRulesViewModel: PermissionRulesViewModel,
-        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
     ) -> NSWindow? {
-        _ = settingsViewModel
         _ = appearanceViewModel
         _ = toolSettingsViewModel
         _ = agentTriggerSettingsViewModel
         _ = appendPromptSettingsViewModel
-        _ = mcpSettingsViewModel
-        _ = permissionRulesViewModel
-        _ = petViewModel
         _ = shortcutActions
         _ = appTheme
         _ = onClose

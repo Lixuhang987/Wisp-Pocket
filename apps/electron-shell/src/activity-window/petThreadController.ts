@@ -32,7 +32,7 @@ export class PetThreadController {
   private error?: string;
   private nextCursor?: string | null;
   private readonly submissions = new Map<string, Submission>();
-  private readonly management = new Map<string, { resolve(value: ThreadNotification): void; reject(error: Error): void }>();
+  private readonly management = new Map<string, { resolve(value: ThreadNotification): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();
   private restoring = true;
   private navigation = 0;
   private loadingMore = false;
@@ -47,7 +47,7 @@ export class PetThreadController {
         this.store.getState().setConnectionState(state);
         if (state === "disconnected") {
           for (const submission of this.submissions.values()) this.finish(submission, new Error("连接中断，尚未确认接收。重试会沿用原提交身份。"));
-          for (const request of this.management.values()) request.reject(new Error("连接已断开，请重新保存。"));
+          for (const request of this.management.values()) { clearTimeout(request.timer); request.reject(new Error("连接已断开，请重新保存。")); }
           this.management.clear();
           if (!this.closed) { clearTimeout(this.reconnectTimer); this.reconnectTimer = setTimeout(() => { this.restoring = true; this.socket.connect(); }, 1000); }
         }
@@ -116,8 +116,17 @@ export class PetThreadController {
   answerPermission(requestId: string, decision: "allow" | "deny", scope: "once" | "always" = "once"): void {
     this.requireConnection(); this.socket.sendRaw(encodePermissionAnswer({requestId,decision,scope,timestamp:new Date().toISOString()}));
   }
-  command(type: "pet.image.import" | "pet.create" | "pet.update", payload: Record<string, unknown>, commandId = crypto.randomUUID()): Promise<ThreadNotification> {
-    this.requireConnection(); return new Promise((resolve,reject)=> { this.management.set(commandId,{resolve,reject}); this.socket.sendRaw(JSON.stringify({type,payload,commandId,timestamp:new Date().toISOString()})); });
+  command(type: "pet.image.import" | "pet.create" | "pet.update", payload: Record<string, unknown>, commandId: string = crypto.randomUUID()): Promise<ThreadNotification> {
+    this.requireConnection();
+    return new Promise((resolve,reject)=> {
+      const timer = setTimeout(() => {
+        this.management.delete(commandId);
+        reject(new Error("保存回执超时，请重试；伙伴创建会沿用原提交身份。"));
+      }, 30000);
+      this.management.set(commandId,{resolve,reject,timer});
+      try { this.socket.sendRaw(JSON.stringify({type,payload,commandId,timestamp:new Date().toISOString()})); }
+      catch (error) { clearTimeout(timer); this.management.delete(commandId); reject(error); }
+    });
   }
   private submit(items: InputItem[], threadId?: string, id = crypto.randomUUID(), draft?: Pick<Submission, "draftKey" | "draftText" | "files">): Promise<void> {
     this.requireConnection();
@@ -134,9 +143,22 @@ export class PetThreadController {
     this.save(); this.changed(); return accepted;
   }
   private receive(notification: ThreadNotification): void {
+    if (notification.type === "pet.listed" && !("workspaceId" in notification.payload)) {
+      const knownIds = new Set(notification.payload.pets.map(pet => pet.id));
+      try {
+        const staleKeys: string[] = [];
+        const prefixes = ["handagent.pet-ui.v1.", "handagent.pet-size."];
+        for (let index = 0; index < localStorage.length; index++) {
+          const key = localStorage.key(index);
+          const prefix = prefixes.find(value => key?.startsWith(value));
+          if (key && prefix && !knownIds.has(key.slice(prefix.length))) staleKeys.push(key);
+        }
+        for (const key of staleKeys) localStorage.removeItem(key);
+      } catch { this.error = "无法清理失效伙伴偏好，有效草稿仍保留。"; }
+    }
     const commandId = "commandId" in notification ? notification.commandId : undefined;
     const request = commandId ? this.management.get(commandId) : undefined;
-    if (request && notification.type.startsWith("pet.")) { this.management.delete(commandId!); if (notification.type === "pet.error") request.reject(new Error(notification.payload.message)); else request.resolve(notification); }
+    if (request && notification.type.startsWith("pet.")) { clearTimeout(request.timer); this.management.delete(commandId!); if (notification.type === "pet.error") request.reject(new Error(notification.payload.message)); else request.resolve(notification); }
     if (notification.type === "thread.started") {
       const submission = notification.commandId ? this.submissions.get(notification.commandId) : undefined;
       if (submission) {

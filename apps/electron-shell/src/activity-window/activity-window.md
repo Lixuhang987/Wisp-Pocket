@@ -5,7 +5,7 @@
 ## 直接子节点
 
 - `App.tsx`：角色点击、hover、两处 drop、当前回复、历史弹层与原生窗口桥接。
-- `PetManager.tsx`：伙伴列表、添加/编辑表单与角色图片导入；复用 `/api/thread` Pet 管理命令。
+- `PetManager.tsx`：接入 [共享伙伴表单](../../../thread-window-web/src/src.md)，与 Electron 设置使用同一名称、描述、角色、图片、默认项、显示隐藏与 revision 规则。
 - `PetConversation.tsx`：紧凑最新正文/建议、hover 全部当前 Thread 消息与 Permission。
 - `PetMarkdown.tsx`：助手 Markdown 正文与资源/链接展示边界。
 - `PetReply.tsx`：固定输入、文件 chip、底部图标行、发送/停止与 IME Enter 边界。
@@ -18,7 +18,8 @@
 
 ## 身份、导航和接收
 
-- 配置从 `pet.listed/created/updated` 投影；不把业务配置写入 localStorage。Pet 根创建后固定，Thread 保留角色快照；实际目录消费后端身份字段，不能从前端路径猜归属。
+- 配置从 `pet.listed/created/updated` 投影；不把业务配置写入 localStorage。Pet 固定归属 Workspace，目录由项目派生，Thread 保留角色快照；实际目录消费后端身份字段，不能从前端路径猜归属。
+- 完整 `pet.listed` 清理失效 Pet 的本地草稿和大小偏好，保留有效项；带 workspaceId 的局部列表不能清理全局身份。窗口与路由的对账由 main 管理，目录访问失败不等于身份删除。
 - 启动恢复本宠上次选择，首次无偏好时选本宠最近更新的历史且仅显示角色；后续只有明确选择、新话题或本界面主动创建确认能改变选择。后台 Thread 不抢草稿/焦点。选择可能在后续分页中，第一页缺失不能视为删除；resume 明确返回 not_found 后才清理其草稿并回到本宠历史或空态。
 - 文字与待发送文件路径按 `(petId, threadId 或 new)` 保存，大小、选择与点击显隐也按 petId 隔离。保存失败显示原因并保留内存输入；这些偏好不是后端消息或执行队列。
 - 打开空回复框不创建历史，第一次发送才创建 Thread。`thread.started` 仅确认创建；`user.message.recorded` 或 snapshot 中相同 opId 的真实记录才确认接收。创建/接收失败保留输入，确认不清除后来编辑的草稿。

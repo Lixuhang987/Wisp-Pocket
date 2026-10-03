@@ -84,7 +84,7 @@ const MCPConfigSchema = z.object({
   ),
 }, { error: "mcp config must be an object" });
 
-export function parseMCPConfig(value: unknown): MCPConfig {
+export function parseMCPConfig(value: unknown, options: { interpolateEnvironment?: boolean } = {}): MCPConfig {
   const result = MCPConfigSchema.safeParse(value);
   if (!result.success) {
     throw new Error(result.error.issues[0]?.message ?? "invalid mcp config");
@@ -92,7 +92,7 @@ export function parseMCPConfig(value: unknown): MCPConfig {
   return {
     version: 1,
     servers: result.data.servers.map((server) =>
-      server.transport === "streamableHttp" && server.headers
+      options.interpolateEnvironment !== false && server.transport === "streamableHttp" && server.headers
         ? { ...server, headers: interpolateHeaders(server.headers) }
         : server,
     ),

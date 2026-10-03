@@ -33,14 +33,16 @@ export type AvailableSkill = {
 export function encodeThreadStart(input: {
   commandId: string;
   timestamp: string;
-  petId: string;
+  petId?: string;
+  workspaceId?: string;
 }): string {
   const command: ThreadCommand = {
     type: "thread.start",
     commandId: input.commandId,
     timestamp: input.timestamp,
     payload: {
-      petId: input.petId,
+      ...(input.petId ? {petId: input.petId} : {}),
+      ...(input.workspaceId ? {workspaceId: input.workspaceId} : {}),
     },
   };
   return encode(command);
@@ -63,12 +65,13 @@ export function encodeThreadList(input: {
   commandId: string;
   timestamp: string;
   petId?: string;
+  workspaceId?: string;
   limit?: number;
   cursor?: string;
 }): string {
   return encode({
     type: "thread.list",
-    ...(input.petId || input.limit || input.cursor ? { payload: { petId: input.petId, limit: input.limit, cursor: input.cursor } } : {}),
+    ...(input.petId || input.workspaceId || input.limit || input.cursor ? { payload: { petId: input.petId, workspaceId:input.workspaceId, limit: input.limit, cursor: input.cursor } } : {}),
     commandId: input.commandId,
     timestamp: input.timestamp,
   });
@@ -216,6 +219,12 @@ export function isThreadNotification(value: unknown): value is ThreadNotificatio
         && isOptionalString(value.commandId)
         && typeof value.payload.targetThreadId === "string"
         && isThreadDeletedStatus(value.payload.status);
+    case "workspace.listed":
+      return hasNotificationBase(value) && isRecord(value.payload) && Array.isArray(value.payload.workspaces) && value.payload.workspaces.every(isWorkspace);
+    case "workspace.created":
+      return hasNotificationBase(value) && isRecord(value.payload) && isWorkspace(value.payload.workspace) && isPetListEntry(value.payload.basePet);
+    case "workspace.error":
+      return hasNotificationBase(value) && isRecord(value.payload) && typeof value.payload.message === "string";
     case "pet.listed":
       return hasNotificationBase(value) && isRecord(value.payload) && Array.isArray(value.payload.pets) && value.payload.pets.every(isPetListEntry);
     case "pet.created":
@@ -363,11 +372,16 @@ function isOptionalReplies(value: unknown): boolean {
   return value === undefined || (Array.isArray(value) && value.length <= 4 && value.every((item) => typeof item === "string"));
 }
 
+function isWorkspace(value: unknown): boolean {
+  return isRecord(value) && typeof value.id === "string" && typeof value.name === "string" && typeof value.rootPath === "string" && typeof value.createdAt === "string";
+}
+
 function isPetListEntry(value: unknown): boolean {
   return isRecord(value)
     && !Array.isArray(value)
     && typeof value.id === "string"
     && typeof value.name === "string"
+    && typeof value.workspaceId === "string"
     && typeof value.rootPath === "string";
 }
 

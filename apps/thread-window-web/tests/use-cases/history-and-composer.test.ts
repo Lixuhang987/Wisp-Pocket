@@ -26,7 +26,7 @@ describe("threadWindowStore", () => {
       notificationId: "n1",
       commandId: "prompt-1",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
     });
 
     expect(store.getState().threadsById["thread-1"].pendingInitialPrompt?.userInput.items[0].type).toBe("text");
@@ -60,7 +60,7 @@ describe("threadWindowStore", () => {
       notificationId: "n1",
       commandId: "prompt-1",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
     });
     store.getState().handleNotification({
       type: "thread.snapshot",
@@ -68,7 +68,7 @@ describe("threadWindowStore", () => {
       notificationId: "n2",
       commandId: "resume-1",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
     });
 
     expect(store.getState().threadsById["thread-1"].messages).toEqual([
@@ -92,7 +92,7 @@ describe("threadWindowStore", () => {
       threadId: "thread-1",
       notificationId: "snapshot-1",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},
         status: "idle",
         messages: [{
           id: "msg-1",
@@ -140,7 +140,7 @@ describe("threadWindowStore", () => {
       notificationId: "started-1",
       commandId: "start-1",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: null },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: null },
     });
     store.getState().handleNotification({
       type: "user.message.recorded",
@@ -172,7 +172,7 @@ describe("threadWindowStore", () => {
     });
 
     expect(store.getState().history).toHaveLength(1);
-    expect(store.getState().history[0]).toMatchObject({petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", status:"idle",
+    expect(store.getState().history[0]).toMatchObject({workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", status:"idle",
       id: "thread-1",
       preview: "[mock:assistant-ok] live history",
       messageCount: 1,
@@ -227,7 +227,7 @@ describe("threadWindowStore", () => {
       threadId: "thread-1",
       notificationId: "snapshot-tools",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},
         status: "running",
         messages: statuses.map((status) => ({
           id: `saved-${status}`,
@@ -312,7 +312,7 @@ describe("threadWindowStore", () => {
     const store = createThreadWindowStore;
     store.getState().handleNotification({
       type: "thread.snapshot", threadId: "thread-1", notificationId: "restored", timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  status: "idle", messages: [
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  status: "idle", messages: [
         { id: "question", role: "assistant", text: "怎么处理？", suggestedReplies: ["整理摘要"], awaitingReply: true, status: "completed", createdAt: timestamp, updatedAt: timestamp },
         { id: "queued", role: "user", text: "补充", pending: true, status: "completed", createdAt: timestamp, updatedAt: timestamp },
       ] },
@@ -353,7 +353,7 @@ describe("threadWindowStore", () => {
   it("only removes history and thread state when delete status is deleted", () => {
     const store = createThreadWindowStore;
     store.setState({
-      history: [{petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", status:"idle",
+      history: [{workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", status:"idle",
         id: "thread-1",
         preview: "hello",
         createdAt: timestamp,
@@ -396,8 +396,8 @@ describe("threadWindowStore", () => {
       timestamp,
       payload: {
         pets: [
-          {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "tmp", name: "tmp", rootPath: "/tmp" },
-          {description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
+          {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "tmp", name: "tmp", rootPath: "/tmp" },
+          {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
         ],
       },
     });
@@ -408,29 +408,29 @@ describe("threadWindowStore", () => {
     ]);
   });
 
-  it("toggles pet expansion ids", () => {
+  it("toggles workspace expansion ids", () => {
     const store = createThreadWindowStore;
 
-    expect(store.getState().expandedPetIds.has("default")).toBe(false);
+    expect(store.getState().expandedWorkspaceIds.has("default")).toBe(false);
 
-    store.getState().togglePetExpanded("default");
-    expect(store.getState().expandedPetIds.has("default")).toBe(true);
+    store.getState().toggleWorkspaceExpanded("default");
+    expect(store.getState().expandedWorkspaceIds.has("default")).toBe(true);
 
-    store.getState().togglePetExpanded("default");
-    expect(store.getState().expandedPetIds.has("default")).toBe(false);
+    store.getState().toggleWorkspaceExpanded("default");
+    expect(store.getState().expandedWorkspaceIds.has("default")).toBe(false);
   });
 
-  it("persists pet expansion ids when they change", () => {
+  it("persists workspace expansion ids when they change", () => {
     const setItem = vi.fn();
     vi.stubGlobal("window", { localStorage: { setItem } });
 
     const store = createThreadWindowStore;
-    store.getState().togglePetExpanded("default");
+    store.getState().toggleWorkspaceExpanded("default");
 
     expect(setItem).toHaveBeenCalledWith(
-      "handAgent.threadWindow.expandedPetIds",
+      "handAgent.threadWindow.expandedWorkspaceIds",
       JSON.stringify({
-        state: { expandedPetIds: ["default"] },
+        state: { expandedWorkspaceIds: ["default"] },
         version: 0,
       }),
     );
@@ -489,7 +489,7 @@ describe("threadWindowStore", () => {
       notificationId: "thread-started",
       commandId: "prompt-1",
       timestamp,
-      payload: {petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
+      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
     });
     for (const threadId of ["thread-1", "thread-2"]) {
       store.getState().handleNotification({

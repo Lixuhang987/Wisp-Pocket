@@ -4,16 +4,6 @@ import XCTest
 
 final class AgentSettingsStoreTests: XCTestCase {
     @MainActor
-    func testLoadsDefaultsWhenSettingsFileDoesNotExist() {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-
-        let store = AgentSettingsStore(homeDirectoryURL: homeURL)
-
-        XCTAssertEqual(store.settings, .defaultValue)
-    }
-
-    @MainActor
     func testLoadsDefaultAppearanceWhenSettingsFileDoesNotExist() {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
@@ -21,113 +11,6 @@ final class AgentSettingsStoreTests: XCTestCase {
         let store = AgentSettingsStore(homeDirectoryURL: homeURL)
 
         XCTAssertEqual(store.appearance.themePreference, .system)
-    }
-
-    @MainActor
-    func testPersistsSettingsToDotSpotAgentSettingsJSON() throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-
-        let store = AgentSettingsStore(homeDirectoryURL: homeURL)
-        store.update { settings in
-            settings.provider = .anthropic
-            settings.model = "gpt-4.1"
-            settings.apiKey = "test-key"
-            settings.baseURL = "https://example.com/v1"
-            settings.api = .chat
-        }
-
-        let fileURL = homeURL
-            .appendingPathComponent(".spotAgent", isDirectory: true)
-            .appendingPathComponent("settings.json")
-        let data = try Data(contentsOf: fileURL)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let llm = json?["llm"] as? [String: Any]
-
-        XCTAssertEqual(llm?["provider"] as? String, "anthropic")
-        XCTAssertEqual(llm?["model"] as? String, "gpt-4.1")
-        XCTAssertEqual(llm?["apiKey"] as? String, "test-key")
-        XCTAssertEqual(llm?["baseUrl"] as? String, "https://example.com/v1")
-        XCTAssertEqual(llm?["api"] as? String, "chat")
-    }
-
-    @MainActor
-    func testUpdatingModelSettingsPreservesToolSettings() throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-
-        let fileURL = TestFiles.settingsFileURL(homeURL)
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data(
-            """
-            {
-              "llm": {
-                "model": "gpt-5-mini",
-                "apiKey": "old-key",
-                "baseUrl": "https://old.example/v1",
-                "api": "responses"
-              },
-              "tools": {
-                "allowlist": ["file.read", "clipboard.read"],
-                "denylist": ["screen.capture"]
-              }
-            }
-            """.utf8
-        ).write(to: fileURL)
-
-        let store = AgentSettingsStore(homeDirectoryURL: homeURL)
-        store.update { settings in
-            settings.model = "gpt-4.1"
-        }
-
-        let json = try TestFiles.readJSON(fileURL)
-        let tools = json["tools"] as? [String: Any]
-        XCTAssertEqual(tools?["allowlist"] as? [String], ["file.read", "clipboard.read"])
-        XCTAssertEqual(tools?["denylist"] as? [String], ["screen.capture"])
-    }
-
-    @MainActor
-    func testUpdatingToolSettingsPreservesModelSettings() throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-
-        let fileURL = TestFiles.settingsFileURL(homeURL)
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data(
-            """
-            {
-              "llm": {
-                "provider": "anthropic",
-                "model": "gpt-4.1",
-                "apiKey": "test-key",
-                "baseUrl": "https://example.com/v1",
-                "api": "chat"
-              }
-            }
-            """.utf8
-        ).write(to: fileURL)
-
-        let store = AgentSettingsStore(homeDirectoryURL: homeURL)
-        store.updateToolSettings { tools in
-            tools.denylist = ["file.write"]
-        }
-
-        let json = try TestFiles.readJSON(fileURL)
-        let llm = json["llm"] as? [String: Any]
-        let tools = json["tools"] as? [String: Any]
-        XCTAssertEqual(llm?["provider"] as? String, "anthropic")
-        XCTAssertEqual(llm?["model"] as? String, "gpt-4.1")
-        XCTAssertEqual(llm?["apiKey"] as? String, "test-key")
-        XCTAssertEqual(llm?["baseUrl"] as? String, "https://example.com/v1")
-        XCTAssertEqual(llm?["api"] as? String, "chat")
-        XCTAssertEqual(tools?["denylist"] as? [String], ["file.write"])
-        XCTAssertNil(tools?["allowlist"] as? [String])
     }
 
     @MainActor
@@ -163,93 +46,27 @@ final class AgentSettingsStoreTests: XCTestCase {
         }
 
         let json = try TestFiles.readJSON(fileURL)
-        XCTAssertEqual((json["appearance"] as? [String: Any])?["themePreference"] as? String, "dark")
+        let nativeFile = homeURL.appendingPathComponent(".spotAgent/native-preferences.json")
+        XCTAssertEqual((try TestFiles.readJSON(nativeFile)["appearance"] as? [String: Any])?["themePreference"] as? String, "dark")
         XCTAssertEqual((json["llm"] as? [String: Any])?["model"] as? String, "claude-sonnet")
         XCTAssertEqual((json["tools"] as? [String: Any])?["denylist"] as? [String], ["screen.capture"])
-    }
-
-    @MainActor
-    func testLoadsToolDenylistFromDisk() throws {
-        let homeURL = TestFiles.makeTemporaryHomeDirectory()
-        defer { try? FileManager.default.removeItem(at: homeURL) }
-
-        let fileURL = TestFiles.settingsFileURL(homeURL)
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data(
-            """
-            {
-              "tools": {
-                "denylist": ["screen.capture", "file.write"]
-              }
-            }
-            """.utf8
-        ).write(to: fileURL)
-
-        let store = AgentSettingsStore(homeDirectoryURL: homeURL)
-
-        XCTAssertEqual(store.toolSettings.denylist, ["screen.capture", "file.write"])
-        XCTAssertNil(store.toolSettings.allowlist)
-        XCTAssertEqual(store.settings, .defaultValue)
+        try Data(#"{"llm":{"model":"updated","summarizerModel":"summary"},"tools":{"denylist":["file.write"]}}"#.utf8).write(to: fileURL)
+        store.updateAppearance { $0.themePreference = .light }
+        let reread = try TestFiles.readJSON(fileURL)
+        XCTAssertEqual((reread["llm"] as? [String: Any])?["summarizerModel"] as? String, "summary")
+        XCTAssertEqual((reread["llm"] as? [String: Any])?["model"] as? String, "updated")
+        XCTAssertEqual((try TestFiles.readJSON(nativeFile)["appearance"] as? [String: Any])?["themePreference"] as? String, "light")
     }
 
     @MainActor
     func testReloadsSettingsFromDiskAfterExternalChange() throws {
         let homeURL = TestFiles.makeTemporaryHomeDirectory()
         defer { try? FileManager.default.removeItem(at: homeURL) }
-
-        let fileURL = homeURL
-            .appendingPathComponent(".spotAgent", isDirectory: true)
-            .appendingPathComponent("settings.json")
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data(
-            """
-            {
-              "llm": {
-                "provider": "anthropic",
-                "model": "gpt-5-mini",
-                "apiKey": "old-key",
-                "baseUrl": "https://old.example/v1",
-                "api": "responses"
-              }
-            }
-            """.utf8
-        ).write(to: fileURL)
-
+        let fileURL = AgentSettingsStore.settingsFileURL(homeDirectoryURL: homeURL)
         let store = AgentSettingsStore(homeDirectoryURL: homeURL)
-        XCTAssertEqual(store.settings.apiKey, "old-key")
-
-        try Data(
-            """
-            {
-              "llm": {
-                "provider": "openai-compatible",
-                "model": "gpt-4.1",
-                "apiKey": "new-key",
-                "baseUrl": "https://new.example/v1",
-                "api": "chat"
-              }
-            }
-            """.utf8
-        ).write(to: fileURL)
-
+        store.updateAppearance { $0.themePreference = .dark }
+        try Data(#"{"appearance":{"themePreference":"light"}}"#.utf8).write(to: fileURL)
         store.reloadFromDisk()
-
-        XCTAssertEqual(
-            store.settings,
-            AgentSettings(
-                provider: .openAICompatible,
-                model: "gpt-4.1",
-                apiKey: "new-key",
-                baseURL: "https://new.example/v1",
-                api: .chat
-            )
-        )
+        XCTAssertEqual(store.appearance.themePreference, .light)
     }
-
 }

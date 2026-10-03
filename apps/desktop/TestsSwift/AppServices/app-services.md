@@ -6,7 +6,7 @@
 
 - [AgentServer/agent-server.md](./AgentServer/agent-server.md)：Provider 连接与 Swift Thread 首轮提交。
 - [PlatformBridge/platform-bridge.md](./PlatformBridge/platform-bridge.md)：原生能力、两个内置功能与用户事件边界。
-- `AgentSettings/`：模型、Tool 和主题设置持久化。
+- `AgentSettings/`：独立原生外观偏好持久化与后端配置交错保存。
 - `Appearance/`、`Hotkey/`、`Lifecycle/`：外观、快捷键和激活策略边界。
 - `ElectronShell/`：Electron 进程、command/event 与可用性 gate。
 - 当前目录的 `AppServicesTests.swift`、AgentTrigger 与窗口相关测试：生产服务组合、触发器来源和窗口生命周期。

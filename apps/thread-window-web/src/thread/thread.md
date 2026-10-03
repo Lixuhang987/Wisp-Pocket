@@ -18,7 +18,7 @@
 
 ## 传输与恢复
 
-- socket FIFO 只保存连接未就绪时已编码的命令与回执；open 时先报告 connected，再刷新 FIFO，随后发送 Pet / Thread list（桌宠带 petId 筛选）。主动 disconnect 清空 FIFO。
+- socket FIFO 只保存连接未就绪时已编码的命令与回执；open 时先报告 connected，再刷新 FIFO，随后发送 Pet / Thread list；ThreadWindow 额外请求完整 Workspace 列表（桌宠带 petId 筛选）。主动 disconnect 清空 FIFO。
 - socket 意外关闭只上报 disconnected，本客户端不自行重连。ThreadWindow 保持无自动恢复；[桌宠控制器](../../../electron-shell/src/activity-window/activity-window.md)额外安排重连，重新列出 Thread 并 resume 当前选择。
 - 显式 `thread.resume` 取得 snapshot 及当前待答请求。连接恢复不等于通知重放，也不会把已开始的输入重新执行。
 - Blob URL 只携带服务端 Blob ID，不使用用户源文件路径；服务端读取边界见 [server](../../../agent-server/src/server/server.md)。

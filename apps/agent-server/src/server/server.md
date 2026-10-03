@@ -9,6 +9,7 @@
 ## 路径分派
 
 - `/thread-window/*` 提供构建后的静态资源。
+- `/api/settings/*` 由 [settings](../settings/settings.md) 处理模型、builtin Tool、MCP 与永久 Permission 的 HTTP 读写；Workspace/Pet 管理保持 Thread socket 入口。
 - `/api/thread` 接受 Thread client；`acceptServerRequests=1` 允许已订阅连接接收并回答 Permission。桌宠与 ThreadWindow 使用同一入口，请求生命周期归 core Thread。
 - `/api/activity` 先发 snapshot，再发轻量状态变化；桌宠完整内容走 Thread 通道。
 - `/api/dynamic-tools` 要求首帧 `provider_hello`，保存声明的 Tool spec，后续调用按 `clientId` 与 token 路由。
@@ -21,7 +22,7 @@
 - `ThreadPersistence` 和协议转换函数注入 core 已有端口；组合根不平行持有历史或 Turn 状态。
 - 默认 file.read 和四个历史读取工具直接注入 ThreadTools，不依赖 use_tools 或 Swift Provider 在线；Context History 从已保存记录读取，宿主继续负责采集。输入不自动预读，图片 Item 仍沿既有 Blob 合约；`file_reference` 校验绝对路径、非空文件名并拒绝额外字段，不按存在性预读。协议字段以 [core](../../../../packages/core/src/protocol/protocol.md) 为准。
 - `/api/thread?observeRequests=1` 用于 [Electron 窗口集合](../../../electron-shell/src/main/windows/windows.md) 的隐藏宠召回，仅消费身份/列表与有效 Permission；不订阅消息正文、不获得回执资格。每页列表后从已加载 Thread 请求表补发当前请求，不 resume 全量历史。
-- Pet 创建后文件根不可更改，启动空库播种唯一默认宠；Pet 配置与角色快照由同一 ThreadStore 持久化，旧开发 schema 明确报错且不自动清理。
+- Workspace 注册先规范化实际目录，同库事务创建项目与基础 Pet；启动空库沿此流程形成默认项目与全局默认宠。Pet 固定引用 Workspace，Thread 持久保存双归属与角色快照；旧开发 schema 明确报错且不自动清理。
 - socket handler 只负责 decode、身份/资格校验、订阅与路由；命令错误由 router 定向回写。publisher 持有订阅而非 WebSocket 或请求真源。
 - Provider 断开必须拒绝其 pending call 并移除连接身份；Thread 的已保存历史不随 UI 连接关闭。
 - 同一 socket、相同 `clientId` 再次 hello 只刷新当前 token 的工具声明，保留在途调用；新连接或身份变化才替换/解绑。旧 token 不能刷新新连接的声明。双端合约见 [宿主连接](../../../desktop/Sources/AppServices/AgentServer/agent-server.md) 与 [bridge](../bridges/bridges.md)。

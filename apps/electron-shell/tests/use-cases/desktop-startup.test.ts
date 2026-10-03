@@ -79,6 +79,7 @@ describe("ElectronShellRuntime", () => {
 
     expect(harness.prewarmer.updateTheme).toHaveBeenCalledWith({ preference: "system", resolved: "dark" });
     expect(harness.activityWindow.updateTheme).toHaveBeenCalledWith({ preference: "system", resolved: "dark" });
+    expect(harness.settingsWindow.updateTheme).toHaveBeenCalledWith({ preference: "system", resolved: "dark" });
     expect(harness.events).toContainEqual({
       channel: "electron_shell",
       type: "command.ack",
@@ -207,6 +208,7 @@ function createHarness(options: { focusResult?: boolean; prepareError?: Error } 
     focus: vi.fn(() => options.focusResult ?? true),
     updateTheme: vi.fn(async () => {}),
   };
+  const settingsWindow = { focus: vi.fn(() => true), openHistory: vi.fn(async () => {}), updateTheme: vi.fn(async () => {}) };
   const activityWindow = {
     show: vi.fn(async () => {}),
     updateTheme: vi.fn(async () => {}),
@@ -215,6 +217,7 @@ function createHarness(options: { focusResult?: boolean; prepareError?: Error } 
   const quit = vi.fn();
   const runtime = new ElectronShellRuntime({
     prewarmer,
+    settingsWindow,
     activityWindow,
     send: (event) => events.push(event),
     now: () => "2026-06-08T00:00:00.000Z",
@@ -222,5 +225,5 @@ function createHarness(options: { focusResult?: boolean; prepareError?: Error } 
     quit,
   });
 
-  return { runtime, prewarmer, activityWindow, events, stopSupervisor, quit };
+  return { runtime, prewarmer, settingsWindow, activityWindow, events, stopSupervisor, quit };
 }

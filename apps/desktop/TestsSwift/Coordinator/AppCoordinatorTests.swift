@@ -17,6 +17,14 @@ final class AppCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(builtWindowCount, 1)
         XCTAssertEqual(appliedPolicies.last, .regular)
+
+        let shellServer = TriggerableAppServer()
+        let commandClient = RecordingThreadWindowCommandClient()
+        let electronCoordinator = AppCoordinator(services: electronServices(appServer: shellServer, commandClient: commandClient))
+        electronCoordinator.send(.openElectronSettings)
+        electronCoordinator.send(.openElectronSettings)
+        XCTAssertEqual(shellServer.settingsOpenCount, 2)
+        XCTAssertEqual(builtWindowCount, 1)
     }
 
     @MainActor
@@ -561,13 +569,20 @@ private final class RecordingActivityWindowCommandClient: ActivityWindowCommandi
 }
 
 @MainActor
-private final class TriggerableAppServer: AppServerManaging {
+private final class TriggerableAppServer: AppServerManaging, SettingsWindowCommanding {
     var isAvailable = true
     var startupErrorMessage: String?
     var onAvailabilityChange: ((Bool) -> Void)?
     var onFatalError: ((String) -> Void)?
     var onHostTerminationRequest: (() -> Void)?
     private(set) var startCount = 0
+    private(set) var settingsOpenCount = 0
+    var onSettingsCommandFailure: ((String) -> Void)?
+
+    func openSettingsWindow() throws -> String {
+        settingsOpenCount += 1
+        return "settings-\(settingsOpenCount)"
+    }
 
     func start() { startCount += 1 }
     func stop() {}
@@ -706,26 +721,18 @@ final class StubSettingsWindowPresenter: SettingsWindowPresenting {
     }
 
     func present(
-        settingsViewModel: AgentSettingsViewModel,
         appearanceViewModel: AppearanceSettingsViewModel,
         toolSettingsViewModel: ToolSettingsViewModel,
         agentTriggerSettingsViewModel: AgentTriggerSettingsViewModel,
         appendPromptSettingsViewModel: AppendPromptSettingsViewModel,
-        mcpSettingsViewModel: MCPSettingsViewModel,
-        permissionRulesViewModel: PermissionRulesViewModel,
-        petViewModel: PetSettingsViewModel,
         shortcutActions: [ActionDefinition],
         appTheme: AppTheme,
         onClose: @escaping () -> Void
     ) -> NSWindow? {
-        _ = settingsViewModel
         _ = appearanceViewModel
         _ = toolSettingsViewModel
         _ = agentTriggerSettingsViewModel
         _ = appendPromptSettingsViewModel
-        _ = mcpSettingsViewModel
-        _ = permissionRulesViewModel
-        _ = petViewModel
         _ = appTheme
         _ = onClose
         lastShortcutActions = shortcutActions
