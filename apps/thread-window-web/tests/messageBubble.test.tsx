@@ -4,16 +4,17 @@ import { describe, expect, it, vi } from "vitest";
 import { ThreadItemBubble } from "../src/components/ThreadItemBubble.tsx";
 
 describe("ThreadItemBubble", () => {
-  it("renders persisted image copies, PDF names and pending input from the shared history", () => {
+  it("renders persisted image copies, file names and pending input from the shared history", () => {
     const html = renderToStaticMarkup(React.createElement(ThreadItemBubble, {
-      item: { type: "user_message", id: "saved", text: "", pending: true, inputItems: [
+      item: { type: "user_message", id: "saved", text: "/tmp/保存的报告.pdf", pending: true, inputItems: [
         { type: "image", id: "image", mimeType: "image/png", blobId: "blob-saved-image" },
-        { type: "pdf", id: "pdf", mimeType: "application/pdf", name: "保存的报告.pdf", blobId: "blob-saved-pdf" },
+        { type: "file_reference", id: "file", name: "保存的报告.pdf", path: "/tmp/保存的报告.pdf" },
       ] }, onCopy: vi.fn(),
     }));
     expect(html).toContain('src="http://127.0.0.1:4317/api/blobs/blob-saved-image"');
-    expect(html).toContain("PDF · 保存的报告.pdf");
+    expect(html).toContain("保存的报告.pdf");
     expect(html).toContain("待处理");
+    expect(html).not.toContain("/tmp/保存的报告.pdf");
     expect(html).not.toContain("base64,undefined");
   });
 

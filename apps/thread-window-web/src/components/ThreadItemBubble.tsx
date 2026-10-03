@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronRight, Copy, Loader2, Pencil, RefreshCw } from 'lucide-react';
+import { Check, ChevronRight, Copy, FileText, Loader2, Pencil, RefreshCw } from 'lucide-react';
 import type {
   AssistantMessageItem,
   ErrorItem,
@@ -198,9 +198,9 @@ function UserMessageBubble({ item, onCopy }: { item: UserMessageItem; onCopy: (t
                   {sections.text}
                 </p>
               ) : null}
-              {sections.pdfs.map((pdf) => (
-                <div key={pdf.id} className="rounded-lg border border-app-hairline bg-app-surface-muted px-sm py-xs text-sm">
-                  PDF · {pdf.name}
+              {sections.files.map((file) => (
+                <div key={file.id} className="rounded-lg border border-app-hairline bg-app-surface-muted px-sm py-xs text-sm">
+                  <FileText size={14} strokeWidth={1.5} className="inline-block mr-xs" aria-hidden="true" />{file.name}
                 </div>
               ))}
             </div>
@@ -328,7 +328,7 @@ function ErrorBubble({ item }: { item: ErrorItem }) {
 
 function splitUserMessageSections(items: InputItem[]): {
   images: Array<{ id: string; previewUrl: string }>;
-  pdfs: Array<{ id: string; name: string }>;
+  files: Array<{ id: string; name: string }>;
   chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }>;
   text: string | null;
 } | null {
@@ -337,7 +337,7 @@ function splitUserMessageSections(items: InputItem[]): {
   }
 
   const images: Array<{ id: string; previewUrl: string }> = [];
-  const pdfs: Array<{ id: string; name: string }> = [];
+  const files: Array<{ id: string; name: string }> = [];
   const chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }> = [];
   const textParts: string[] = [];
 
@@ -345,8 +345,8 @@ function splitUserMessageSections(items: InputItem[]): {
     if (item.type === "image") {
       const url = typeof window === "undefined" ? "ws://127.0.0.1:4317/api/thread" : getThreadWebSocketURL();
       images.push({ id: item.id, previewUrl: attachmentUrl(item, url) });
-    } else if (item.type === "pdf") {
-      pdfs.push({ id: item.id, name: item.name });
+    } else if (item.type === "file_reference") {
+      files.push({ id: item.id, name: item.name });
     } else if (item.type === "skill") {
       chips.push({ id: item.id, type: "skill", label: item.title });
     } else if (item.type === "text_selection") {
@@ -358,7 +358,7 @@ function splitUserMessageSections(items: InputItem[]): {
 
   return {
     images,
-    pdfs,
+    files,
     chips,
     text: textParts.length > 0 ? textParts.join("\n\n") : null,
   };

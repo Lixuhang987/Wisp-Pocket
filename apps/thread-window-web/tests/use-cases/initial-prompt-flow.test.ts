@@ -188,6 +188,7 @@ describe("Thread input and socket flows", () => {
           { type: "image", id: "image-a", mimeType: "image/png", base64: "aW1hZ2UtYQ==" },
           { type: "skill", id: "skill-a", actionId: "review/code", title: "Review", prompt: "Review this code" },
           { type: "text_selection", id: "selection-a", text: "selected code" },
+          { type: "file_reference", id: "file-a", name: "资料.pdf", path: "/tmp/资料.pdf" },
         ],
       },
     };
@@ -257,8 +258,8 @@ describe("Thread input and socket flows", () => {
     expect(store.getState().threadsById["thread-a"].messages).toEqual([{
       type: "user_message",
       id: "pending-prompt-a",
-      text: "focus on regressions\n\n图片附件\n\nReview\n\nselected code",
-      inputItems: [],
+      text: "focus on regressions\n\n图片附件\n\nReview\n\nselected code\n\n资料.pdf",
+      inputItems: promptA.userInput.items,
       pending: true,
     }]);
     const pendingMessagesB = store.getState().threadsById["thread-b"].messages;
@@ -266,7 +267,7 @@ describe("Thread input and socket flows", () => {
       type: "user_message",
       id: "pending-prompt-b",
       text: "another question",
-      inputItems: [],
+      inputItems: promptB.userInput.items,
       pending: true,
     }]);
 

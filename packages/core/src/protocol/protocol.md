@@ -32,8 +32,8 @@
 
 ## 输入与附件
 
-- Input Item 支持 text、image、pdf、skill、text_selection；`skill` 是 Append Prompt 的协议表示，链接沿 text 保存。
-- PromptPanel 等既有图片/PDF Input Item 在 `base64` 上传与 `blobId` 引用之间互斥；持久化层保存副本，live 与 snapshot 返回同一规范化项。桌宠文件仅通过 text 交付原路径，不读取或上传原文件。
+- Input Item 支持 text、image、file_reference、skill、text_selection；`skill` 是 Append Prompt 的协议表示，链接沿 text 保存。
+- PromptPanel 等图片 Input Item 在 `base64` 上传与 `blobId` 引用之间互斥；持久化层保存副本，live 与 snapshot 返回同一规范化项。桌宠 PDF、图片等原文件使用 `file_reference`，仅保存绝对原路径、文件名和可选媒体类型，不读取或上传文件内容；无 bytes/Blob 字段。两端显示文件名，模型转换边界见 [agent-server protocol](../../../../apps/agent-server/src/protocol/protocol.md)。
 - UserInput 没有 mode；后端不自动预读或强制追问。模型首轮即可调用默认文件/历史读取工具，其余工具继续既有 Permission。
 - assistant 的建议回复与等待标记在 live、snapshot 和持久消息间保持一致。建议按钮发送普通 UserInput；Permission 仍发送 ClientResponse。
 - Blob HTTP 读取边界见 [agent-server server](../../../../apps/agent-server/src/server/server.md)，两端附件 URL 共用 [Web 客户端](../../../../apps/thread-window-web/src/src.md)。

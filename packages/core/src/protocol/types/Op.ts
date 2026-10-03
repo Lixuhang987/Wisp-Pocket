@@ -35,7 +35,7 @@ export type ClientResponseOp = {
 export type InputItem =
   | TextInputItem
   | ImageInputItem
-  | PDFInputItem
+  | FileReferenceInputItem
   | SkillInputItem
   | TextSelectionInputItem;
 
@@ -56,12 +56,13 @@ export type ImageInputItem = {
   name?: string;
 } & BinaryInputSource;
 
-export type PDFInputItem = {
-  type: "pdf";
+export type FileReferenceInputItem = {
+  type: "file_reference";
   id: string;
-  mimeType: "application/pdf";
+  path: string;
   name: string;
-} & BinaryInputSource;
+  mimeType?: string;
+};
 
 export type SkillInputItem = {
   type: "skill";

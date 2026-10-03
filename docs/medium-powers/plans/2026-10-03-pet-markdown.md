@@ -31,3 +31,5 @@
 实现已完成。`scripts/test.sh`、`scripts/swiftw test`、`scripts/swiftw build` 与 Electron build 均通过；上述两套专项共 29 项通过，新增 0 项。受控 Electron 使用真实 renderer / CSS / preload / 原生控制器与协议 snapshot：长代码、表格无横向溢出，hover 前后角色与 composer 屏幕位移均为 0；链接仅交给外部打开回调，原页面未导航。截图、几何及临时夹具在 worktree `.cache/pet-markdown-*`。
 
 独立文档审核已完成：审核者未继承主 agent 上下文，阅读本规格、全部改动文件的 owning 目录文档及父级链（`use-cases/` 无独立指南，使用 `tests/tests.md`），核对源码、测试、受控夹具与几何证据。助手与用户正文边界、HTML/图片限制、绝对 HTTP/HTTPS 外部打开与阻止页面导航、紧凑裁剪和流式/窄栏约束均与实现一致；已补齐 renderer / 测试指南、surface 和 [manual QA](../../manual-qa.md)，未发现阻断的文档或实现不一致。真实系统浏览器、中文输入法、多屏、透明命中和长流式内容仍需人工验收，受控夹具不等于完整宿主实机通过。
+
+2026-10-03 文件引用合入后的边界补充：原文件从普通文字交付更新为结构化 `file_reference`，文件名卡片与用户正文分开；用户主动输入的路径和 Markdown 符号仍按原文显示，助手保持 Markdown / GFM。合并已由独立审核者核对修改目录文档链、协议、渲染与既有 hover 用例，详细记录见 [文件引用计划](./2026-10-03-file-reference-input.md)；既有实机证据仍只在原验证范围内有效。

@@ -24,7 +24,7 @@
 - ThreadRegistry / Thread 是运行中及空闲 Thread 的唯一 owner；公开输入经 `op.submit`，UI 回执经连接资格检查后交给所属 Thread 的待答请求。
 - 本包注入协议翻译与持久化适配，由 core Thread 决定何时翻译、保存和发布运行结果；UI 不直接看到 runtime event。
 - Dynamic Tool spec 可随 Thread 持久化，实际调用按 `clientId` 转发给在线 Provider。
-- 所有入口提交普通 UserInput；桌宠文件仅交付原路径文本，模型按需调用默认 file.read。PromptPanel 图片仍使用 Blob 副本与多模态链路。
+- 所有入口提交普通 UserInput；桌宠文件通过 `file_reference` 交付原路径元数据，由翻译层转换为模型路径文字；两端附件显示文件名，模型按需调用默认 file.read。PromptPanel 图片仍使用 Blob 副本与多模态链路。
 
 ## 本地数据
 

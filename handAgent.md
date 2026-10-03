@@ -41,7 +41,7 @@ flowchart TD
 - `/api/activity` 只发送 Agent Activity，不承载 Thread 消息或历史。
 - `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 暴露原生能力与已启用的 Automation，并向两个业务模块提供共享 macOS 实现；Context History 的已保存记录由 agent-server 普通工具直接读取。
 - Electron UI Shell 是 agent-server 的唯一 supervisor，也是 ThreadWindow 与桌宠的唯一宿主；关闭 UI 窗口不停止 agent-server。
-- 桌宠交付原文件路径文字，持久接收后才确认；模型按需调用默认开放、免 Permission 的 file.read / Context History 工具。各入口使用统一的首轮执行规则与按需 user.ask；PromptPanel 图片仍经 Blob / 多模态链路。输入队列由 core Thread 持久化协调。
+- 桌宠以结构化 `file_reference` 交付原文件路径，模型收到路径文字，持久接收后才确认；模型按需调用默认开放、免 Permission 的 file.read / Context History 工具。各入口使用统一的首轮执行规则与按需 user.ask；PromptPanel 图片仍经 Blob / 多模态链路。输入队列由 core Thread 持久化协调。
 - 建议按钮发送普通 UserInput；Permission 保持 ClientResponse。core 请求表只接受一次有效回执，`request.resolved` 同步清理两端展示。
 - `thread.snapshot` 是既有 Thread 的状态入口。ThreadWindow 当前不做断线恢复；桌宠重连后查询 Pet 与本宠 Thread，恢复本机主动选择；选择失效时只回到本宠最近更新的历史或空态。后台新建不改变选择。
 

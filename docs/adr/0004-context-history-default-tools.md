@@ -10,7 +10,7 @@
 
 [多桌宠规格](../medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)直接采用本读取 / 输入规则：Pet 的 rootPath 是相对路径基准和内置写入边界，不限制 file.read 的任意路径读取；角色快照按 Thread 保存，Pet 文件根创建后不可修改，Thread 不存文件根快照。桌宠本期不接收截图或剪贴板图片，不增加原文件变更监控或失效恢复。这些边界已落地；原生行为及真实模型理解仍须实机验证。
 
-前端彼此独立，本次只调整桌宠输入前端。桌宠路径使用现有文本 Input Item 表达，避免新增要求其他前端适配的文件类型。Issue #6 保持其他输入前端交付方式；合并实现的 Issue #7 同步必要 Pet 协议、Settings 管理和 AgentTrigger 目标归属。PromptPanel 的截图仍按当前图片 bytes/Blob 链路进入模型，保留其现有输入协议和临时文件生命周期。共享后端统一工具规则不意味着统一所有前端的资料交付方式。宿主设置呈现真实采集状态，Pet 管理范围由 Issue #7 规定。
+2026-10-03 用户修订覆盖原先桌宠路径使用 text 的决定：`InputItem.pdf` 替换为 `file_reference`，桌宠用结构化原路径引用，两端历史按文件名卡片呈现；持久化不存副本，模型输入仍是路径文字。此身份贯穿 pending、live 与恢复，避免把展示文案当协议。其他输入前端的资料交付方式保持；合并实现的 Issue #7 同步必要 Pet 协议、Settings 管理和 AgentTrigger 目标归属。PromptPanel 的截图仍按当前图片 bytes/Blob 链路进入模型，保留其现有输入协议和临时文件生命周期。共享后端统一工具规则不意味着统一所有前端的资料交付方式。宿主设置呈现真实采集状态，Pet 管理范围由 Issue #7 规定。
 
 移除 Context History 的采集开关，采集随 Swift Host 应用生命周期常驻运行。保留期限和自动删除后续单独设计，不在本次实现。常驻描述应用运行期间的采集生命周期，不改变 macOS 系统权限要求。采集失败或缺少权限时保留已有历史查询能力，在设置中明确展示失败与缺失权限。
 

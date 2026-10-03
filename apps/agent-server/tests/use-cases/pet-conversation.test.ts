@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -25,6 +25,7 @@ import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
 import { PetRegistry } from "@handagent/core/pet/PetRegistry.ts";
+import { pathInput } from "../../../electron-shell/src/activity-window/readDroppedItems.ts";
 import * as projection from "../../src/protocol/MessageTranslator.ts";
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -281,16 +282,20 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     const source=join(h.directory,kind==='image'?'original.png':'original.pdf');
     const bytes=kind==='image'?png:textPdf('Content must remain unread'); await writeFile(source,bytes);
     const content=kind==='text'?'旅行草稿':kind==='url'?'https://example.org/announcement':`本地文件路径：${source}`;
-    await h.pet.drop([textItem(content)],"conversation");
+    const item = kind === "text" || kind === "url" ? textItem(content) : pathInput(source);
+    await h.pet.drop([item],"conversation");
     await until(()=>expect(current(h).snapshot().messages.filter(m=>m.role==='user')).toHaveLength(2));await settled(h);expect(current(h).id).toBe(a);
-    await h.pet.drop([textItem(content)],"pet");await until(()=>expect(current(h).id).not.toBe(a));await settled(h);
+    await h.pet.drop([item],"pet");await until(()=>expect(current(h).id).not.toBe(a));await settled(h);
     const b=current(h).id;const saved=await h.persistence.getThread(b);
-    expect(saved!.messages.find(m=>m.role==='user')!.inputItems).toEqual([expect.objectContaining({type:'text',text:content})]);
+    expect(saved!.messages.find(m=>m.role==='user')!.inputItems).toEqual([item]);
+    expect(await readdir(join(h.directory, 'blobs')).catch(() => [])).toEqual([]);
+    if (item.type === 'file_reference') expect(JSON.stringify(contexts)).toContain(source);
     expect(JSON.stringify(contexts)).not.toContain('Content must remain unread');expect(h.reads).toEqual([]);
     expect(await readFile(source)).toEqual(bytes);
     await h.close();const restored=await harness(decisionClient(),{directory:h.directory});
     await until(()=>expect(restored.pet.getSnapshot().threadId).toBe(b));
-    expect((await restored.persistence.getThread(b))?.messages.find(m=>m.role==='user')?.content).toBe(content);
+    expect((await restored.persistence.getThread(b))?.messages.find(m=>m.role==='user')?.inputItems).toEqual([item]);
+    expect(restored.pet.store.getState().threadsById[b].messages[0]).toMatchObject({ type: 'user_message', inputItems: [item] });
   });
 
   it("点选建议与输入同一句话采用同一输入路径，等待不会自动执行", async () => {

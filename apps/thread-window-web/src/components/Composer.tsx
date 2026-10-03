@@ -279,6 +279,7 @@ export function isComposerInputSubmittable(inputItems: InputItem[]): boolean {
     if (item.type === "text") return item.text.trim().length > 0;
     if (item.type === "text_selection") return item.text.trim().length > 0;
     if (item.type === "skill") return item.prompt.trim().length > 0;
+    if (item.type === "file_reference") return item.path.startsWith("/") && item.path.length > 1;
     return !!(item.base64 || item.blobId);
   });
 }
@@ -343,8 +344,8 @@ function chipLabel(item: Exclude<InputItem, { type: "text" }>): string {
       return `Skill · ${item.title || item.actionId}`;
     case "image":
       return "Image region";
-    case "pdf":
-      return `PDF · ${item.name}`;
+    case "file_reference":
+      return item.name;
     case "text_selection":
       return "Text selection";
   }

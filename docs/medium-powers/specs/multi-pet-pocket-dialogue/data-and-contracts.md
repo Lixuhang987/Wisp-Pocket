@@ -40,7 +40,7 @@
 
 `file.read` 直接替换旧 Workspace 读取工具，沿 [ADR 0004](../../../adr/0004-context-history-default-tools.md) 默认开放且免 Permission；读取允许任意路径，绝对路径直接读取，相对路径以 Thread 所属 Pet 的固定 rootPath 解析。每次读取取得当前文件内容，不缓存替代真实读取。`file.write` 保留 relativePath / content，移除 workspaceId，不新增模型可自由指定的 petId / rootPath 参数；执行文件上下文从 Thread 所属 Pet 取得，不能复用另一 Thread 的绑定工具实例。
 
-file.write 继续拒绝绝对 relativePath、`..` 越界、符号链接越界和写入目标符号链接，保留大小限制与临时文件原子替换；缺失 Thread 上下文或旧归属参数明确失败。rootPath 是相对路径基准和内置写入边界，不能描述成读取或整个进程 / OS 的沙箱。桌宠原文件路径作为文本 Input Item 交付，不自动预读、不复制原文件、不增加文件变更监控或失效恢复；实际读取失败由工具如实返回。MCP / Dynamic Tool 仍遵守各自策略。
+file.write 继续拒绝绝对 relativePath、`..` 越界、符号链接越界和写入目标符号链接，保留大小限制与临时文件原子替换；缺失 Thread 上下文或旧归属参数明确失败。rootPath 是相对路径基准和内置写入边界，不能描述成读取或整个进程 / OS 的沙箱。桌宠原文件路径作为 `file_reference` Input Item 交付（字段真相见 [core protocol](../../../../packages/core/src/protocol/protocol.md)），模型只收到路径文字，不自动预读、不复制原文件、不增加文件变更监控或失效恢复；实际读取失败由工具如实返回。MCP / Dynamic Tool 仍遵守各自策略。
 
 同进程 file.write 对规范化真实目标路径串行化，同一文件根的不同 petId 不得获得不同的文件锁。先完成的内容可以被后一个已授权写入按既有覆盖语义替换；不承诺版本合并或检测 App 外部修改。两个不同文件的写入不受彼此阻塞。等待锁的调用在实际写入前检查 Turn 中断；已完成的磁盘写入不能声称回滚。
 

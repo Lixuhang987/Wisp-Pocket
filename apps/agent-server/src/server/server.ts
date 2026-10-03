@@ -203,8 +203,10 @@ const InputItemSchema = z.union([
     name: z.string().optional(),
   }).and(BinaryInputSourceSchema),
   z.object({
-    type: z.literal("pdf"), id: z.string(), mimeType: z.literal("application/pdf"), name: z.string(),
-  }).and(BinaryInputSourceSchema),
+    type: z.literal("file_reference"), id: z.string(),
+    path: z.string().startsWith("/").min(2).refine(path => !path.includes("\0")),
+    name: z.string().trim().min(1), mimeType: z.string().optional(),
+  }).strict(),
   z.object({
     type: z.literal("skill"),
     id: z.string(),

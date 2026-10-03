@@ -17,7 +17,7 @@
 - 首轮流程扩展图标选择文件、暂存、统一发送、ACK 保留新增文件与新编辑文字、仅文件发送及新建对话；失败重建仍可恢复资料并沿用提交身份。切历史流程覆盖异步选择的固定草稿目标与移除。执行中回复流程覆盖按钮 Interrupt 保留草稿、IME Enter 与普通 Enter 排队。
 - JSDOM 不计算 CSS 布局，仍需实际 Electron 渲染验证消息、角色、composer 与工具行的屏幕坐标。
 - 几何 fixture 只验证逐气泡命中、统一浏览视口裁剪与滚动后重新上报，不证明常态三行裁剪、真实 CSS 位置或系统穿透。
-- 文件拖入用preload File/DataTransfer 边界取得原路径，不读取图片/PDF bytes。异步接收 分别覆盖角色和对话区：松手后主动隐藏，接收与提交完成、Thread 创建通知均保持隐藏，同时仍按松手目标提交；再次点击才恢复并聚焦。
+- 文件拖入用preload File/DataTransfer 边界取得原路径，不读取图片/PDF bytes，提交结构化 `file_reference`；既有 hover 用例同时核对助手 Markdown、用户原文及恢复后的文件卡片；附件路径不进入 DOM，用户主动输入的路径仍保留原文。异步接收 分别覆盖角色和对话区：松手后主动隐藏，接收与提交完成、Thread 创建通知均保持隐藏，同时仍按松手目标提交；再次点击才恢复并聚焦。
 - 保存失败覆盖带 threadId 与连接级错误两种路径；错误受主动隐藏控制，恢复后不能留下过期提示。
 - 后端真实读取、SQLite/Blob 保存、独占回执与队列恢复由 [agent-server 用例](../../../agent-server/tests/tests.md)验证。
 - 原生跨应用 drag/drop、透明命中、输入焦点、屏幕边缘和滚动手感保留到 [manual QA](../../../../docs/manual-qa.md)，JSDOM 结果不能替代实机证据。

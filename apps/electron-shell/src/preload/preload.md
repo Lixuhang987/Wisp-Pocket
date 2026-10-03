@@ -40,5 +40,5 @@ preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`�
 
 ## 原路径和多窗窄接口
 
-- `getPathForFile` 只调用 Electron `webUtils.getPathForFile`；`chooseFiles` 返回原路径。renderer 没有任意磁盘读取能力，资料仍以普通文本输入交给后端。
+- `getPathForFile` 只调用 Electron `webUtils.getPathForFile`；`chooseFiles` 返回原路径。renderer 没有任意磁盘读取能力，资料以结构化 `file_reference` 交给后端，模型转换见 [protocol](../../../agent-server/src/protocol/protocol.md)。
 - `showPet` 是明确管理意图；`hidePet`、`setReceiving`、布局和拖动总从 sender 解析本窗，不接受其他窗口 ID。`onReveal` 只交付 Permission 触发的显示意图，不携带消息或选择。
