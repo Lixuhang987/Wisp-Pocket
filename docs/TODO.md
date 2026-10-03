@@ -26,14 +26,14 @@
 
 - [ ] 后端配置接口修改 MCP 后，由后端自行刷新连接与工具状态；前端不编排刷新。设置迁移本轮仅交付配置读写接口，保存成功不等于运行连接已更新。
 
-## Workspace 与 Pet 拆分（设计讨论中，2026-10-03）
+## Workspace 与 Pet 拆分（领域设计已确认，2026-10-03）
 
 - [x] 确认 Workspace 一对多 Pet、Pet 一对多 Thread；Pet 的 workspaceId 不可变；同一实际目录复用 Workspace，项目指令来自 AGENTS.md。已同步词表与 [ADR 0006](./adr/0006-workspace-pet-separation.md)，尚未实现、未变更 Issue #8。
 - [x] 确认 Thread 直接归属 Pet，同时保存 petId 与 workspaceId；桌宠按 petId 查询，ThreadWindow 按 workspaceId 查询，后端必须保证两种归属一致。
 - [x] 确认 Workspace 根不可修改，根目录 AGENTS.md 每个 Turn 开始读取一次；用户明确任务 > 项目规则 > Pet 角色，工具与 Permission 边界保持；本轮不新增 Workspace / Pet 删除。
 - [x] 确认 ThreadWindow 展示全部 Workspace，只用 workspaceId 一级分组，不按 petId 筛选；新建只选目标 Workspace 内的 Pet，未指定则后端随机选一只，幂等重试保持首次选择。
-- [x] 确认创建 Pet 时选择目录自动创建 / 复用 Workspace，不新增独立 Workspace 管理页；创建 Workspace 自动有一只默认 Pet。
-- [ ] 最后确认自动默认 Pet 的含义，以及从 Pet 创建入口产生新 Workspace 时是否将当前 Pet 作为自动成员；在最终规格明确 AGENTS.md 缺失 / 读取失败的反馈。
+- [x] 确认创建 Pet 时选择目录自动创建 / 复用 Workspace，不新增独立 Workspace 管理页；新项目额外生成基础 Pet，再保存用户 Pet，一次产生两只；复用、重试与并发目录去重不重复生成基础 Pet，随机分配包含基础 Pet。
+- [ ] 将已确认模型整理为最终规格，并明确 AGENTS.md 缺失 / 读取失败的技术反馈；当前未发布本轮规格，也未改写 Issue #8。
 - 当前事实：Pet 可见集合已是前端按 petId 保存的状态，现阶段没有 Pet 删除接口；完整 Pet 列表同步时只追加 ID 的行为仍需补齐失效项清理。
 - [ ] 若进入实现，遵循主 checkout 创建 worktree、独立 CodeGraph 索引与分层基线、目录阅读链、必要验证、独立文档审核、manual QA 更新后提交的既有流程。
 

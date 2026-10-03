@@ -48,6 +48,10 @@ _Avoid_: Pet、Profile（指代项目上下文时）
 具有稳定身份和角色设定、固定归属一个 Workspace 的桌面伙伴；多个 Pet 可共享 Workspace，但不合并身份或 Thread。
 _Avoid_: Workspace、Profile（指代伙伴身份时）
 
+**基础 Pet**:
+创建 Workspace 时自动生成的初始伙伴，与用户创建的 Pet 一同参与该项目的任务分配；它不是随机选择时的优先对象。
+_Avoid_: 默认 Pet（指代 Workspace 自动生成的伙伴时）
+
 **Pet Snapshot**:
 Thread 创建时保存的角色版本，供该 Thread 的后续交互持续使用；项目目录属于 Workspace，不属于角色快照。
 _Avoid_: Workspace Snapshot
