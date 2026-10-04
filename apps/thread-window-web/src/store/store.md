@@ -33,7 +33,7 @@
 
 本地摘要不代表持久接收，真实输入以服务端通知为准。只在该 opId 尚无接收 / 开始证据时由 snapshot 合成摘要，不能用“存在任意 pending 用户项”判断首轮身份；不按正文去重。这不是输入重发或恢复保证。
 
-ThreadWindow 草稿仍在 `ThreadPetPane` 内按 Thread 保存，切换保留、提交清空、页面重建丢失。桌宠当前 Workspace / Thread、伙伴显隐、位置 / 大小与资料分配由 Electron main store 唯一拥有，不进入 Thread 事实投影。renderer 只按 petId / Thread 持久保存对话显隐、回复草稿、在途提交与导航代次，不另存 selectedThreadId。
+ThreadWindow 草稿仍在 `ThreadPetPane` 内按 Thread 保存，切换保留、提交清空、页面重建丢失。桌宠当前 Workspace / Thread、伙伴显隐、位置 / 大小与资料分配由 Electron main store 唯一拥有，不进入 Thread 事实投影。renderer 按 petId / Thread 持久保存对话显隐、回复草稿、在途提交、导航代次及已观察到的回复未查看标记，不另存 selectedThreadId。未查看标记只属于[桌宠 UI 偏好](../../../electron-shell/src/activity-window/activity-window.md)，不进入共享历史或后端执行队列。
 
 ## 协议边界
 

@@ -530,15 +530,27 @@ describe("桌宠的轻量交互", () => {
     expect(hitsGap()).toBe(false);
   });
 
-  it("隐藏后后台结果仍隐藏，点击角色恢复；最新用户消息不覆盖桌宠消息", () => {
+  it("隐藏后回复完成才亮红点，重建保留，点击角色查看清除；后台结果不解除隐藏", async () => {
     mount(); startThread("等你决定。");
     fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
     act(() => {
+      Socket.latest.receive(note("turn.started", { threadId: "a", turnId: "turn", payload: {} }));
       Socket.latest.receive(note("assistant.delta", { threadId: "a", turnId: "turn", itemId: "late", payload: { text: "后台的新结果" } }));
       Socket.latest.receive(note("user.message.recorded", { threadId: "a", payload: { messageId: "later", text: "用户补充" } }));
     });
+    expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
     expect(screen.queryByTestId("pet-conversation")).toBeNull();
+    act(() => Socket.latest.receive(note("turn.completed", { threadId: "a", turnId: "turn", payload: { status: "completed" } })));
+    expect(screen.getByLabelText("有已完成的回复")).toBeTruthy();
+    expect(screen.queryByTestId("pet-conversation")).toBeNull();
+    const messages = [{ id: "late", role: "assistant", text: "后台的新结果", status: "completed", createdAt: "2026", updatedAt: "2026" }];
+    cleanup();
+    controller = new PetThreadController({ petId: "pet-default", url: "ws://local/api/thread", WebSocketImpl: Socket });
+    mount();
+    await act(async () => Socket.latest.receive(note("thread.snapshot", { threadId: "a", payload: { messages, status: "idle" } })));
+    expect(screen.getByLabelText("有已完成的回复")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /月见八千代/ }));
+    expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
     expect(screen.getByTestId("pet-latest").textContent).toBe("后台的新结果");
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "当前草稿" } });
@@ -554,7 +566,7 @@ describe("桌宠的轻量交互", () => {
     expect(controller.store.getState().threadsById.b.permissionRequests).toHaveLength(0);
   });
 
-  it("建议按钮和自由输入都提交普通 UserInput，执行中仍可回复并显示待处理", async () => {
+  it("建议与自由输入继续排队，成功完成亮红点，查看后清除", async () => {
     mount(); startThread();
     fireEvent.mouseEnter(screen.getByTestId("pet-conversation"));
     fireEvent.click(screen.getByRole("button", { name: "请整理这份资料" }));
@@ -576,8 +588,50 @@ describe("桌宠的轻量交互", () => {
     fireEvent.contextMenu(screen.getByRole("button", { name: /月见八千代/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: "对话" }));
     expect(screen.getByRole("button", { name: /^补充一条 running/ })).toBeTruthy();
+    act(() => Socket.latest.receive(note("assistant.delta", { threadId: "a", turnId: "executing", itemId: "completed-answer", payload: { text: "已整理好资料" } })));
+    expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
     act(() => Socket.latest.receive(note("turn.completed", { threadId: "a", turnId: "executing", payload: { status: "completed" } })));
     expect(screen.getByRole("button", { name: /^补充一条 idle/ })).toBeTruthy();
+    expect(screen.getByLabelText("有已完成的回复")).toBeTruthy();
+    fireEvent.mouseEnter(screen.getByTestId("pet-conversation"));
+    expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
+  });
+
+  it("完成提示只采用当前 Thread 的成功回复，分片建议在完成后也可查看", () => {
+    mount(); startThread();
+    const pet = screen.getByRole("button", { name: /月见八千代/ });
+    fireEvent.click(pet);
+    for (const [turnId, status] of [["failed", "failed"], ["interrupted", "interrupted"], ["tools", "completed"]]) {
+      act(() => {
+        Socket.latest.receive(note("turn.started", { threadId: "a", turnId, payload: {} }));
+        if (turnId !== "tools") Socket.latest.receive(note("assistant.delta", { threadId: "a", turnId, itemId: turnId, payload: { text: "部分回复" } }));
+        Socket.latest.receive(note("turn.completed", { threadId: "a", turnId, payload: { status } }));
+      });
+      expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
+    }
+    act(() => {
+      Socket.latest.receive(note("thread.started", { threadId: "b", payload: { preview: "后台任务" } }));
+      Socket.latest.receive(note("turn.started", { threadId: "b", turnId: "other", payload: {} }));
+      Socket.latest.receive(note("assistant.delta", { threadId: "b", turnId: "other", itemId: "other", payload: { text: "其他任务结果" } }));
+      Socket.latest.receive(note("turn.completed", { threadId: "b", turnId: "other", payload: { status: "completed" } }));
+      Socket.latest.receive(note("turn.started", { threadId: "a", turnId: "suggestions", payload: {} }));
+      Socket.latest.receive(note("assistant.delta", { threadId: "a", turnId: "suggestions", itemId: "suggestions", payload: { text: "", suggestedReplies: ["下一步"] } }));
+      Socket.latest.receive(note("assistant.delta", { threadId: "a", turnId: "suggestions", itemId: "suggestions", payload: { text: "", awaitingReply: true } }));
+    });
+    expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
+    act(() => Socket.latest.receive(note("turn.completed", { threadId: "a", turnId: "suggestions", payload: { status: "completed" } })));
+    expect(screen.getByLabelText("有已完成的回复")).toBeTruthy();
+    fireEvent.click(pet);
+    expect(screen.getByRole("button", { name: "下一步" })).toBeTruthy();
+    expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
+    act(() => {
+      Socket.latest.receive(note("turn.started", { threadId: "a", turnId: "next", payload: {} }));
+      Socket.latest.receive(note("assistant.delta", { threadId: "a", turnId: "next", itemId: "next", payload: { text: "新的回复" } }));
+      Socket.latest.receive(note("turn.completed", { threadId: "a", turnId: "next", payload: { status: "completed" } }));
+    });
+    expect(screen.getByLabelText("有已完成的回复")).toBeTruthy();
+    fireEvent.focus(screen.getByRole("textbox"));
+    expect(screen.queryByLabelText("有已完成的回复")).toBeNull();
   });
 
   it("拖动经过不提交，最终松手区域决定新建还是追加", async () => {

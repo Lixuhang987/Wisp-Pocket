@@ -5,6 +5,7 @@
 ## 直接子节点
 
 - [2026-10-04-role-attachment-dedup.md](./2026-10-04-role-attachment-dedup.md)：首轮角色一行附件与重复用户气泡诊断修复。
+- [2026-10-04-pet-reply-dot.md](./2026-10-04-pet-reply-dot.md)：删除桌宠独立状态气泡，回复完成后在角色右上角提示未查看结果。
 
 - [2026-10-04-pet-directory-picker.md](./2026-10-04-pet-directory-picker.md)：设置伙伴“选择工作区 / 显示”直接原生选目录并安排。
 

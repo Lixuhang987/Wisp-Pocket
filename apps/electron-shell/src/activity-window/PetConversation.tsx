@@ -6,11 +6,10 @@ import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentU
 import type { PetThreadController } from "./petThreadController.ts";
 import { PetMarkdown } from "./PetMarkdown.tsx";
 
-export function PetConversation({ thread, latestAssistant, expanded, status, error, controller, attempt, onRespond, threadURL }: {
+export function PetConversation({ thread, latestAssistant, expanded, error, controller, attempt, onRespond, threadURL }: {
   thread?: ThreadState;
   latestAssistant?: AssistantMessageItem;
   expanded: boolean;
-  status?: string;
   error?: string | null;
   controller: PetThreadController;
   attempt: (action: () => void) => boolean;
@@ -35,7 +34,7 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
     observer.observe(history);
     observer.observe(contentRef.current!);
     return () => observer.disconnect();
-  }, [expanded, thread?.threadId, thread?.messages, thread?.permissionRequests, status, error]);
+  }, [expanded, thread?.threadId, thread?.messages, thread?.permissionRequests, error]);
 
   const messages = expanded ? thread?.messages ?? [] : latestAssistant ? [latestAssistant] : [];
   const suggestedReplies = latestAssistant && hasSuggestedReplies(latestAssistant) ? latestAssistant.suggestedReplies ?? [] : [];
@@ -49,8 +48,7 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
     <div className="pet-history-content" ref={contentRef}>
       {messages.map((message) => <PetMessage key={message.id} message={message}
         latest={message.id === latestAssistant?.id} threadURL={threadURL} />)}
-      {(status || error) && <div className="pet-message pet-notice" data-pet-interactive>
-        {status && <span className="pet-status" role="status">{status}</span>}
+      {error && <div className="pet-message pet-notice" data-pet-interactive>
         {error && <p className="pet-error" role="alert">{error}</p>}
       </div>}
       {expanded && thread?.permissionRequests.map((request) => <section className="pet-request" data-pet-interactive key={request.id} aria-label="执行权限">

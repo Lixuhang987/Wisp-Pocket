@@ -30,3 +30,9 @@
 - 当前 worktree 的 Electron build 成功；受控 socket / 前端桥运行真实桌宠产物，CUA 确认文件 URL 与 worktree 一致。单次发送后一个气泡、正文独立；长角色标签宽 144px、内容宽 648px、高 21.45px（一行），nowrap/ellipsis 生效，证据在 `.cache/role-qa/evidence.json` 与 `preview.png`。应用已退出。不据此宣称生产数据库、真实模型、完整宿主或两端全部视觉已验。
 - 最终 `bash ./scripts/test.sh`、Swift test/build 与 Electron build 均通过；全量检查发现的三个既有 Turn 终态 fixture 已按真实首轮 opId 校正，专项 39 项和全量复跑通过。
 - 独立空上下文文档审核完成：核对本计划、生产代码、测试及全部修改目录到根的指南；角色附件仅为 UI 投影、原始模型输入 / 存储与同文不同 opId 均一致。已修正旧角色隐藏要求、snapshot 无条件保留摘要的表述和测试新增数，并复读成功 Electron 测量证据；范围内未留文档不一致。完整宿主、真实模型、两端主题与队列实机验收仍见 [manual QA](../../manual-qa.md)。
+
+## 与 main 回复完成红点合并
+
+- 将角色修复 `6f1d4c23` 与 main `f9c4f670`（含红点 `7ea998aa`）合并；`activity-window.md` 与计划索引冲突已整合。共享角色附件及按 opId 首轮收敛保留，桌宠删除独立状态气泡并只在有内容的成功完成后提示红点；历史 pending、停止按钮、错误、Permission 与队列仍保留。
+- 合并后 Pet 交互专项 23 项、`bash ./scripts/test.sh`、Swift test/build、Electron build 与 `git diff --check` 均通过；本次合并新增测试 0。独立无继承上下文文档审核核对两个计划、实际代码及修改目录链至 `handAgent.md`，已更新 renderer 偏好所有权与联合 manual QA，未发现阻断不一致。
+- 上述角色附件受控截图早于红点合入，旧状态气泡仅为历史证据；红点原分支截图同样不证明最终合并产物视觉已验。最终合并产物的两端附件、回复红点、队列、重建及完整宿主 / 真实模型联合验收见 [manual QA](../../manual-qa.md#角色附件与回复红点联合回归2026-10-04)。
