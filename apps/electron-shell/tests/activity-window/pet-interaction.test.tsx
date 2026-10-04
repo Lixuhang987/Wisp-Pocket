@@ -132,6 +132,10 @@ describe("桌宠的轻量交互", () => {
       { type: "file_reference", id: expect.any(String), name: "reading.pdf", path: "/tmp/reading.pdf" },
       {type:"skill",id:expect.any(String),actionId:"initial-role",title:"角色提示",prompt:"Help"},
     ]);
+    act(() => Socket.latest.receive(note("thread.snapshot", { threadId: "first", payload: { status: "idle", messages: [] } })));
+    fireEvent.mouseEnter(document.querySelector(".pet-conversation")!);
+    expect(document.querySelector('[data-author="user"] p')?.textContent).toBe("帮我安排今天的阅读");
+    expect(document.querySelector('[data-attachment-type="role_prompt"]')?.getAttribute("title")).toBe("Help");
     expect(input.value).toBe("帮我安排今天的阅读");
     fireEvent.change(input, { target: { value: "还有另一条补充" } });
     window.handAgentPet!.chooseFiles = async () => ["/tmp/later.txt"];
@@ -142,6 +146,20 @@ describe("桌宠的轻量交互", () => {
     })));
     expect(input.value).toBe("还有另一条补充");
     expect(controller.getSnapshot().files.map(file => file.path)).toEqual(["/tmp/later.txt"]);
+    await act(async () => {
+      Socket.latest.receive(note("turn.started", { threadId: "first", turnId: submitted.payload.op.opId, payload: {} }));
+      Socket.latest.receive(note("thread.snapshot", { threadId: "first", payload: {
+        workspaceId: "workspace-default", status: "running", messages: [{
+          id: submitted.payload.op.opId, role: "user", text: "帮我安排今天的阅读", inputItems: submitted.payload.op.payload.items,
+          status: "completed", createdAt: "2026", updatedAt: "2026",
+        }],
+      } }));
+    });
+    fireEvent.mouseEnter(document.querySelector(".pet-conversation")!);
+    expect(document.querySelectorAll('[data-author="user"]')).toHaveLength(1);
+    expect(controller.store.getState().threadsById.first.messages.filter(item => item.type === "user_message" && item.pending)).toHaveLength(0);
+    expect(document.querySelectorAll('[data-attachment-type="role_prompt"]')).toHaveLength(1);
+    expect(document.querySelector('[data-author="user"] p')?.textContent).toBe("帮我安排今天的阅读");
     fireEvent.keyDown(input, { key: "Enter" });
     expect(Socket.latest.sent.at(-1)).toMatchObject({ type: "op.submit", threadId: "first" });
     expect(Socket.latest.sent.at(-1)?.payload.op.payload.items).toEqual([
@@ -150,6 +168,7 @@ describe("桌宠的轻量交互", () => {
     ]);
     expect(input.value).toBe("还有另一条补充");
     await ackLast();
+    act(() => Socket.latest.receive(note("turn.completed", { threadId: "first", turnId: submitted.payload.op.opId, payload: { status: "completed" } })));
     expect(input.value).toBe("");
     expect(controller.getSnapshot().files).toEqual([]);
     expect(Socket.latest.sent.filter((message) => message.type === "thread.start")).toHaveLength(1);

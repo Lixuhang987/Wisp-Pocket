@@ -78,6 +78,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 .pet-message img { display: block; max-width: 100%; max-height: 160px; border-radius: var(--ha-radius-md); }
 .pet-attachment { display: flex; align-items: center; gap: var(--ha-spacing-xs); padding: var(--ha-spacing-xs); border: 1px solid var(--pet-border); border-radius: var(--ha-radius-sm); font-size: var(--ha-typography-caption-size); overflow-wrap: anywhere; }
 .pet-attachment svg { flex-shrink: 0; }
+.pet-role-attachment { min-width: 0; max-width: 100%; margin-bottom: var(--ha-spacing-xxs); color: var(--pet-muted); background: var(--pet-soft); }
+.pet-role-attachment > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pet-suggestions { display: flex; flex-direction: column; gap: var(--ha-spacing-xs); margin-top: var(--ha-spacing-xs); }
 .pet-current-suggestions { align-items: flex-start; margin: 0; }
 .pet-suggestions button { flex-shrink: 0; max-width: 100%; color: var(--pet-accent); text-align: left; cursor: pointer; overflow-wrap: anywhere; }

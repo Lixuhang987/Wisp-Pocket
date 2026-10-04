@@ -4,9 +4,11 @@
 
 ## 直接子节点
 
-- `threadItems.ts`：按 `type` 区分用户、助手、工具和错误的联合类型，以及助手正文 / 当前建议的共享判断。
+- `threadItems.ts`：按 `type` 区分用户、助手、工具和错误的联合类型，以及助手正文 / 当前建议和角色附件的共享判断。
 
 ## 共用合同
+
+- 前端首轮 `skill/actionId=initial-role` 投影为 `role_prompt` 展示附件；它不是新的后端 Input Item。两端单行省略、title 保留全文，正文不包含该提示；原 skill 仍完整保存并进入模型。其他 Append Prompt 的 skill 展示保持原规则。
 
 - 展示项不等同于模型消息：纯工具调用的 assistant 记录允许没有正文；共享投影不为它制造正文项，原始工具调用与结果仍由后端保存。恢复规则见 [store](../store/store.md)，原始历史转换见 [agent-server](../../../agent-server/src/protocol/protocol.md)。
 - 正文的可见性忽略纯空白，但保留原文；流式前导空白须等待后续增量，不能提前裁掉 Markdown 缩进。

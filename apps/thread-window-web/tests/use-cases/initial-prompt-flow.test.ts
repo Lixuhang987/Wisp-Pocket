@@ -275,12 +275,12 @@ clientRequestId: "prompt-b",
       threadId: "thread-a",
       notificationId: "recorded-a",
       timestamp,
-      payload: { messageId: "message-a", text: "recorded review input", items: promptA.userInput.items },
+      payload: { messageId: "prompt-a", text: "recorded review input", items: promptA.userInput.items },
     });
 
     expect(store.getState().threadsById["thread-a"].messages).toEqual([{
       type: "user_message",
-      id: "message-a",
+      id: "prompt-a",
       text: "recorded review input",
       inputItems: promptA.userInput.items,
     }]);
@@ -291,15 +291,42 @@ clientRequestId: "prompt-b",
       threadId: "thread-b",
       notificationId: "recorded-b",
       timestamp,
-      payload: { messageId: "message-b", text: "another question", items: promptB.userInput.items },
+      payload: { messageId: "prompt-b", text: "another question", items: promptB.userInput.items },
     });
 
     expect(store.getState().threadsById["thread-b"].messages).toEqual([{
       type: "user_message",
-      id: "message-b",
+      id: "prompt-b",
       text: "another question",
       inputItems: promptB.userInput.items,
     }]);
+  });
+
+  it("reconciles the first input by opId through snapshots before its receipt without suppressing other pending inputs", () => {
+    const { client, inputs, socket } = connectStoreClient();
+    socket.open();
+    inputs.startInitialPrompt({ workspaceId: "workspace-default", clientRequestId: "first", userInput: { items: [{ type: "text", id: "text", text: "same text" }] } });
+    socket.receive({ type: "thread.started", notificationId: "start", commandId: "first", threadId: "thread", timestamp,
+      payload: { workspaceId: "workspace-default", rootPath: "/tmp", preview: "same text" } });
+    const queued = { id: "other", role: "user" as const, text: "same text", pending: true, status: "completed" as const, createdAt: timestamp, updatedAt: timestamp };
+    socket.receive({ type: "thread.snapshot", notificationId: "snapshot-other", threadId: "thread", timestamp,
+      payload: { workspaceId: "workspace-default", rootPath: "/tmp", status: "running", messages: [queued] } });
+    expect(createThreadWindowStore.getState().threadsById.thread.messages.map(item => item.id)).toEqual(["pending-first", "other"]);
+    socket.receive({ type: "user.message.recorded", notificationId: "early-receipt-other", threadId: "thread", timestamp,
+      payload: { messageId: "other", text: "same text", pending: true } });
+    expect(createThreadWindowStore.getState().threadsById.thread.messages.map(item => item.id)).toEqual(["pending-first", "other"]);
+    socket.receive({ type: "thread.snapshot", notificationId: "snapshot-first", threadId: "thread", timestamp,
+      payload: { workspaceId: "workspace-default", rootPath: "/tmp", status: "running", messages: [
+        { ...queued, id: "first", pending: false }, queued,
+      ] } });
+    socket.receive({ type: "user.message.recorded", notificationId: "receipt-other", threadId: "thread", timestamp,
+      payload: { messageId: "other", text: "same text", pending: true } });
+    expect(createThreadWindowStore.getState().threadsById.thread.messages.map(item => item.id)).toEqual(["first", "other"]);
+    socket.receive({ type: "thread.snapshot", notificationId: "snapshot-again", threadId: "thread", timestamp,
+      payload: { workspaceId: "workspace-default", rootPath: "/tmp", status: "running", messages: [{ ...queued, id: "first", pending: false }, queued] } });
+    expect(createThreadWindowStore.getState().threadsById.thread.messages).toMatchObject([{ id: "first" }, { id: "other", pending: true }]);
+    expect(socket.sent.map(raw => JSON.parse(raw)).filter(command => command.type === "op.submit")).toHaveLength(1);
+    client.disconnect();
   });
 
   it("does not include dynamic tools when starting an initial prompt thread", () => {

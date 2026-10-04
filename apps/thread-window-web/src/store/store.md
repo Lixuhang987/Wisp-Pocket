@@ -29,9 +29,9 @@
 | 阶段 | 修改责任 | 结束条件 |
 | --- | --- | --- |
 | 等待创建返回 | [输入控制器](../thread/thread.md) 调用 `enqueueInitialPrompt`，按 `clientRequestId` 唯一登记 payload | started 移交到所属 Thread；同 commandId 的 error 删除登记 |
-| 首轮待确认展示 | `pendingInitialPrompt` 保存关联；输入模块生成带结构化 Input Item 的 `pending-` 占位，snapshot 后由投影合成可见消息 | 正式 user record 移除本地摘要，保留其他已保存待处理输入；首轮关联仍在 `turn.completed` 清空 |
+| 首轮待确认展示 | `pendingInitialPrompt` 保存关联；输入模块生成带结构化 Input Item 的 `pending-` 占位，snapshot 后由投影合成可见消息 | 匹配 opId 的正式 user record、Turn 开始 / 完成或 snapshot 用户记录清除首轮关联与摘要；其他输入的 pending 保留 |
 
-本地摘要不代表持久接收，真实输入以服务端通知为准。关联尚未清空时再次 snapshot 仍可能按原规则合成摘要；这不是输入重发或恢复保证。
+本地摘要不代表持久接收，真实输入以服务端通知为准。只在该 opId 尚无接收 / 开始证据时由 snapshot 合成摘要，不能用“存在任意 pending 用户项”判断首轮身份；不按正文去重。这不是输入重发或恢复保证。
 
 ThreadWindow 草稿仍在 `ThreadPetPane` 内按 Thread 保存，切换保留、提交清空、页面重建丢失。桌宠当前 Workspace / Thread、伙伴显隐、位置 / 大小与资料分配由 Electron main store 唯一拥有，不进入 Thread 事实投影。renderer 只按 petId / Thread 持久保存对话显隐、回复草稿、在途提交与导航代次，不另存 selectedThreadId。
 
