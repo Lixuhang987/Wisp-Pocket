@@ -1,6 +1,6 @@
 # Pet 归前端，Thread 仅归属 Workspace
 
-状态：设计汇总待最终确认（2026-10-04），尚未实现。目标拟替代 [ADR 0006](./0006-workspace-pet-separation.md) 的 Pet 后端所有权、固定项目归属及 Thread 双归属；ADR 0006 仍描述当前实现。
+状态：规格已发布（2026-10-04），尚未实现；实施规格见 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，标记 ready-for-agent。目标拟替代 [ADR 0006](./0006-workspace-pet-separation.md) 的 Pet 后端所有权、固定项目归属及 Thread 双归属；ADR 0006 仍描述当前实现。
 
 用户希望桌宠是可以被召到不同工作区的前端伙伴，而不是后端任务身份。后端删除 Pet 概念，Thread 仅关联 Workspace；Pet 列表由前端一级 store 管理，包含角色资料、图片、默认标记、时间与版本、Workspace、当前 Thread，以及可见性、位置和大小等界面状态。代价是角色提示的执行语义、多个窗口的共享状态，以及非桌宠入口的任务上下文必须重新确定，不能沿用后端 Pet 注册表隐式解决。
 
@@ -55,7 +55,7 @@
 
 目标术语由 [Desktop Experience](../../apps/desktop/CONTEXT.md) 的 Pet / 角色提示和 [Conversation Runtime](../../packages/core/CONTEXT.md) 的 Thread / Workspace 分别拥有；词表记录已确定目标，不代表旧实现已迁移。
 
-## 工程方案（随汇总确认，尚未实施）
+## 工程方案（已纳入规格，尚未实施）
 
 - Pet 一级 store 由 Electron UI Shell 的 main 统一持有和持久化，设置与宠窗通过 IPC 操作 / 订阅；Electron main 属于前端宿主，不属于 agent-server。Pet 图片导入与受管文件也归前端，不保留后端 Pet 图片表或导入 API。
 - Pet 列表保留用户要求的身份、名称、描述、rolePrompt、revision、imageRef、isDefault、时间、Workspace / Thread 和显隐 / 位置 / 大小；Workspace / Thread 关联可为空。Thread 消息、运行和请求仍是后端事实，Pet store 不另存权威历史。
@@ -71,4 +71,4 @@
 
 ## 文档与实施边界
 
-当前产品与 surface 文档继续描述已实现行为，目标入口见本文；访谈确认后更新目标术语与决策，实施后再替换现状说明。规格若需发布，按 [issue tracker](../agents/issue-tracker.md) 发布到 GitHub Issues，不能把本 ADR 当作已通过验收的实现规格。
+当前产品与 surface 文档继续描述已实现行为；目标术语、决策及 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9) 均描述待实现行为，实施后再替换现状说明。用户已确认以 Electron 前端公开分配 / 恢复 / 承接操作作为主要测试边界，后端公开协议验证执行和请求仲裁；详细用户故事与验收以 GitHub 规格为准，本 ADR 不代表已经通过验收。

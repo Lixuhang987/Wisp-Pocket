@@ -7,14 +7,14 @@
 
 最后核对日期：2026-10-04。
 
-## Pet 前端所有权破坏性重构（设计汇总待确认）
+## Pet 前端所有权破坏性重构（规格已发布，待实现）
 
-目标与未决边界见 [ADR 0007](./adr/0007-frontend-pet-workspace-threads.md)；尚未实现，不计入已实现 manual QA。
+实施规格见 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，架构决策见 [ADR 0007](./adr/0007-frontend-pet-workspace-threads.md)；尚未实现，不计入已实现 manual QA。
 
 - [x] 读取根架构、领域路由、产品与相关 surface / ADR，核对当前模型并启动只读事实调查。
 - [x] 完成产品边界访谈并形成 ADR 汇总，覆盖后端移除 Pet、独占 / 不可夺取、历史与 Permission 分配、初始库存、独立前端和首版排除范围。
-- [ ] 确认 [ADR 0007](./adr/0007-frontend-pet-workspace-threads.md) 的设计汇总与工程落点已达到共同理解。
-- [ ] 确认实施规格；涉及工程 skill 的 spec 按仓库规则发布到 GitHub Issues。
+- [x] 按用户调用的 to-spec 综合设计汇总、工程落点和已明确确认的测试边界。
+- [x] 发布 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，应用 ready-for-agent 并核对正文和标签。
 - [ ] 从主 checkout 使用 `scripts/create-worktree.sh` 初始化 `.worktrees/<task-name>/`，确认 CodeGraph 独立索引；后续 MCP 调用显式传入输出的绝对 projectPath。
 - [ ] 在 worktree 跑 `scripts/test.sh` 与桌面启动链相关的 `scripts/swiftw build` 基线，再沿 owning 目录文档链读取代码、实施删除与替换。
 - [ ] 完成必要验证及三项提交前检查，同步当前产品、架构和目录文档。
