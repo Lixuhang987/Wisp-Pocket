@@ -14,6 +14,10 @@ _Avoid_: Workspace、Profile（指代伙伴身份时）、基础 Pet（指代工
 某只 Pet 当前选择接续的 Thread，可以运行中、已结束或等待输入；改变这项选择不等于结束旧 Thread 的任务。
 _Avoid_: 正在执行的 Thread（指代前端选择时）
 
+**角色提示**:
+Pet 在新建对话时添加的提示内容；它不建立 Thread 对 Pet 的归属，也不因伙伴之后更换或修改而重新注入既有对话。
+_Avoid_: Pet Snapshot（指代后端伙伴身份快照时）
+
 ## Surfaces
 
 **Swift Host**:
@@ -62,7 +66,7 @@ _Avoid_: Skill（指代该 manifest 能力时）、Action
 _Avoid_: Plugin、AgentTrigger Instance
 
 **AgentTrigger Instance**:
-用户基于 AgentTrigger Package 创建、明确指定目标 Pet 的一条触发规则。
+用户基于 AgentTrigger Package 创建、明确指定目标 Workspace 的一条触发规则。
 _Avoid_: Automation Policy、AgentTrigger Package
 
 **AgentTrigger Event**:

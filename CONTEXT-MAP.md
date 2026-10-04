@@ -4,8 +4,8 @@ Wisp Pocket 由三个领域上下文组成。术语只在一个上下文中定�
 
 ## Contexts
 
-- [Conversation Runtime](./packages/core/CONTEXT.md)：定义 Thread、Turn、输入、协议消息族、Tool、Workspace、角色提示快照与 Permission。
-- [Desktop Experience](./apps/desktop/CONTEXT.md)：定义 Pet、用户入口、常驻交互界面、附件、Append Prompt 与 AgentTrigger。
+- [Conversation Runtime](./packages/core/CONTEXT.md)：定义 Thread、Turn、输入、协议消息族、Tool、Workspace 与 Permission。
+- [Desktop Experience](./apps/desktop/CONTEXT.md)：定义 Pet、角色提示、用户入口、常驻交互界面、附件、Append Prompt 与 AgentTrigger。
 
 Pet / Thread 的词表已按 [ADR 0007](./docs/adr/0007-frontend-pet-workspace-threads.md) 记录确认中的目标模型，尚未实现；当前代码仍采用 [ADR 0006](./docs/adr/0006-workspace-pet-separation.md) 的后端 Pet 模型。
 - [Host Automation](./apps/host-automation/CONTEXT.md)：定义宿主能力、Context History、Automation 及其证据与修复数据。
