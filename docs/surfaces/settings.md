@@ -8,22 +8,22 @@
 ## 当前 surface 合约
 
 - **THESIS**：按数据使用方配置产品依赖与个人选择；任务内即时授权仍在对话 surface 完成。
-- **OWN-WORLD**：Electron/React 与 SwiftUI 共用现有主题；Swift 解析亮色、暗色与跟随系统，下发到全部 renderer。
-- **STORY**：menu bar “设置”或应用菜单“设置…”进入 Electron → 选择 AI / Agent / Pets / Workspaces → 编辑与保存；PromptPanel 的原生设置入口继续管理宿主能力与偏好。
-- **FIRST VIEWPORT**：Electron 左侧为 AI / Agent / Pets / Workspaces，首次与关闭重开默认 AI；已打开时再次进入只聚焦，不重置页面或草稿。Agent 内以 Tools / MCP / Permissions 切换。原生保留 680×560 容器、五个横向 Tab，默认外观。
-- **FORM**：紧凑导航、列表和表单；模型、MCP 与 Pet 显式保存，输入变化、切页不自动提交。Tool 开关、权限撤销、伙伴分配与显示隐藏为即时动作；isDefault 只标记首次初始化伙伴。
+- **OWN-WORLD**：Electron 设置使用 Codex 参考的中性色主题，其他 React surface 与 SwiftUI 保持现有暖色主题；Swift 解析亮色、暗色与跟随系统，下发到全部 renderer。
+- **STORY**：menu bar “设置”或应用菜单“设置…”进入 Electron → 通过个人 / 集成 / 项目分组选取设置 → 编辑与保存；PromptPanel 的原生设置入口继续管理宿主能力与偏好。
+- **FIRST VIEWPORT**：Electron 左侧为搜索和分组入口，直接打开模型服务 / 桌面伙伴 / 内置工具 / MCP 服务器 / 权限 / 工作区，首次与关闭重开默认模型服务；已打开时再次进入只聚焦，不重置页面或草稿。搜索只筛选入口，切页保持表单挂载；窄窗口导航横向滚动。原生保留 680×560 容器、五个横向 Tab，默认外观。
+- **FORM**：左右对齐的模型设置行、工具开关与伙伴预览 / 卡片；卡片选择只改变预览，编辑、显示隐藏和分配保留独立操作；模型、MCP 与 Pet 显式保存，输入变化、切页不自动提交。Tool 开关、权限撤销、伙伴分配与显示隐藏为即时动作；isDefault 只标记首次初始化伙伴。
 - **FINISH**：2026-10-04 对照实现更新所有权与保存合约；真实焦点、布局、亮暗主题、字段溢出和键盘访问仍待 manual QA，没有新增实机通过结论。
 
 ## 设置子页现状
 
 | 窗口 / 子页 | 用户任务与内容 | 关键状态/边界 |
 | --- | --- | --- |
-| Electron / AI | 配置 provider、model、接口模式、Base URL 与 API Key | 显式保存，下次模型请求生效；后端保留未展示字段，凭据为密码输入 |
-| Electron / Agent / Tools | 调整可配置 builtin Tool | 即时保存；默认文件与历史读取没有禁用开关 |
-| Electron / Agent / MCP | 管理 stdio / streamableHttp 及示例 | 编辑加入待保存配置，再显式保存；保存只确认持久化，重启 App 后加载，连接刷新尚未实现 |
-| Electron / Agent / Permissions | 查看永久规则与创建时间并撤销 | 按 Tool 名称全局跨 Pet 生效，不代替任务内即时授权 |
-| Electron / Pets | 管理名称、描述、角色、图片及显示隐藏 | 前端资料与 revision 合同；新建默认隐藏可无项目；一级“选择工作区”再选历史 / 新话题，取消或拒绝不变 |
-| Electron / Workspaces | 选目录创建 / 复用项目，查看历史、准备新话题或随机召来伙伴 | 创建不生成 Pet；历史自动复用已有伙伴，否则分配隐藏库存；无库存只提示 |
+| Electron / 模型服务 | 配置 provider、model、接口模式、Base URL 与 API Key | 显式保存，下次模型请求生效；后端保留未展示字段，凭据为密码输入 |
+| Electron / 内置工具 | 调整可配置 builtin Tool | 即时保存；默认文件与历史读取没有禁用开关 |
+| Electron / MCP 服务器 | 管理 stdio / streamableHttp 及示例 | 编辑加入待保存配置，再显式保存；保存只确认持久化，重启 App 后加载，连接刷新尚未实现 |
+| Electron / 权限 | 查看永久规则与创建时间并撤销 | 按 Tool 名称全局跨 Pet 生效，不代替任务内即时授权 |
+| Electron / 桌面伙伴 | 管理名称、描述、角色、图片及显示隐藏 | 前端资料与 revision 合同；新建默认隐藏可无项目；一级“选择工作区”再选历史 / 新话题，取消或拒绝不变 |
+| Electron / 工作区 | 选目录创建 / 复用项目，查看历史、准备新话题或随机召来伙伴 | 创建不生成 Pet；历史自动复用已有伙伴，否则分配隐藏库存；无库存只提示 |
 | 原生 / 外观 | 选择亮色、暗色或跟随系统 | 独立原生偏好，不覆盖后端模型/Tool 配置 |
 | 原生 / Host | 查看 Context History 状态，启用 Automation | Context History 常驻；Automation 默认关闭，失败不影响已有历史读取 |
 | 原生 / 触发器 | 管理 Chrome Bookmarks / System Clock 规则 | Package → 详情 → 新增表单，明确目标 Workspace；失败保留输入，取消清理本次错误 |

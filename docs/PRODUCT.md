@@ -38,7 +38,7 @@ macos
 - **找回近期线索**：请求涉及桌面环境时按需使用工具；应用运行时 Context History 持续采集，可查询已记录的近期应用与窗口活动。
 - **从事件发起任务**：配置 Chrome Bookmarks 或 System Clock 触发规则，以预设提示词向指定 Workspace 启动任务；书签入口依赖配套扩展与连接配置。
 - **复用操作流程**：启用 Automation 后录制、保存和重跑操作流程，并查看执行历史。
-- **配置伙伴与项目**：menu bar 打开独立 Electron 设置，按 AI / Agent / Pets / Workspaces 配置模型、工具、伙伴和工作区；输入面板仍打开原生外观、Host、触发器、Append Prompt 与快捷键设置。
+- **配置伙伴与项目**：menu bar 打开独立 Electron 设置，通过分组搜索导航配置模型、工具、伙伴和工作区；输入面板仍打开原生外观、Host、触发器、Append Prompt 与快捷键设置。
 
 入口操作与本地体验步骤见 [README.md](../README.md)，真实系统行为的已验范围与待验边界见 [manual-qa.md](./manual-qa.md)。
 

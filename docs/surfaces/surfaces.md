@@ -13,7 +13,7 @@
 
 ## 拆分与使用边界
 
-- 四个主要 surface 都属于同一个桌面产品；Electron 的 AI / Agent / Pets / Workspaces 与原生宿主设置在 Settings brief 内展开，不按工程包拆分产品。
+- 四个主要 surface 都属于同一个桌面产品；Electron 的各配置页与原生宿主设置在 Settings brief 内展开，不按工程包拆分产品。
 - 附件 chip、预览、候选弹层、删除确认与权限请求属于宿主 surface 的组件或状态；共享组件不单独建立视觉身份。
 - 系统快捷键、截图与选区采集接入 PromptPanel；系统菜单“设置…”接入 Settings。系统权限弹窗由 macOS 管理，不是产品自有页面。
 - Chrome 扩展目前只有后台 service worker，未声明 popup 或 options 页面；其连接与规则配置属于原生 Settings → 触发器。

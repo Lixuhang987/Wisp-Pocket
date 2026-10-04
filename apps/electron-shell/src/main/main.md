@@ -42,4 +42,4 @@
 - stdout 只写给 Swift 的 JSON event line；普通日志写 stderr。
 - agent-server stdout/stderr 会被 supervisor 加前缀后写 stderr，不能混入 stdout，否则 Swift decoder 会尝试当作事件解析。
 
-- `settings.open` 复用窗口加载控制器的独立实例，加载 ThreadWindow Web 的 `surface=settings`；不预热，不参与 ThreadWindow availability，不经 renderer 注入改页。已有窗口只 focus，关闭重建默认 AI。管理 IPC 只接受当前设置窗口或登记桌宠 sender，普通 ThreadWindow 无权限。
+- `settings.open` 复用窗口加载控制器的独立实例，加载 ThreadWindow Web 的 `surface=settings`；不预热，不参与 ThreadWindow availability，不经 renderer 注入改页。已有窗口只 focus，关闭重建默认模型服务页。管理 IPC 只接受当前设置窗口或登记桌宠 sender，普通 ThreadWindow 无权限。

@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [2026-10-04-settings-codex.md](./2026-10-04-settings-codex.md)：Codex 风格设置导航、表单与伙伴画廊的实施和验证边界。
+
 - [2026-10-04-issue-9-frontend-pet.md](./2026-10-04-issue-9-frontend-pet.md)：Pet 前端化的实施合同、并行所有权与测试预算。
 
 - [2026-10-03-issue-8-settings-workspace.md](./2026-10-03-issue-8-settings-workspace.md)：Electron 设置、Workspace/Pet 与项目历史的实施合同、检查状态和实机边界。

@@ -6,13 +6,23 @@ import type { ThreadListEntry } from '../protocol/threadProtocol.ts';
 import { WorkspaceThreadPicker } from './WorkspaceThreadPicker.tsx';
 import '../styles/settings.css';
 
-export function PetManager({ pets, workspaces, threads, bridge, onClose }: {
+const spriteURL = new URL('../../../electron-shell/src/activity-window/assets/yachiyo.webp', import.meta.url).href;
+
+function PetPortrait({ image }: { image: PetImageRef }) {
+  return image.type === 'imported' ? <img className="pet-portrait" alt="" src={image.url}/> :
+    <span className="pet-portrait pet-portrait-builtin" aria-hidden="true" style={{backgroundImage:`url(${spriteURL})`}}/>;
+}
+
+export function PetManager({ pets, workspaces, threads, bridge, onClose, layout = 'list' }: {
   pets: Pet[];
   workspaces: Workspace[];
   threads: ThreadListEntry[];
   bridge?: PetManagementBridge;
   onClose?: () => void;
+  layout?: 'list' | 'gallery';
 }) {
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const previewPet = pets.find(pet => pet.id === previewId) ?? pets.find(pet => pet.visible) ?? pets[0];
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Pet | null | undefined>();
   const [assigningPetId, setAssigningPetId] = useState<string | null>(null);
@@ -52,26 +62,42 @@ export function PetManager({ pets, workspaces, threads, bridge, onClose }: {
     }
     if (picked) setImage(await host.importPetImage(picked));
   }); }
-  return <section className="pet-management" aria-label="伙伴管理"><header><span>伙伴</span>{onClose && <button onClick={onClose}>关闭</button>}</header>
+  const filteredPets = pets.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  return <section className={`pet-management ${layout === 'gallery' ? 'pet-gallery' : ''}`} aria-label="伙伴管理">
+    {onClose && <header><span>伙伴</span><button onClick={onClose}>关闭</button></header>}
     {editing === undefined ? <>
-      <div className="settings-actions"><input aria-label="搜索伙伴" placeholder="搜索名称" value={search} onChange={e => setSearch(e.target.value)} /><button className="primary" disabled={busy} onClick={() => edit(null)}>添加桌宠</button></div>
-      {pets.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => <div className="pet-management-row" key={p.id}>
-        {p.imageRef.type === 'imported' ? <img alt="" src={p.imageRef.url} /> : <span aria-hidden>✦</span>}
-        <span className="pet-management-name">{p.name}{p.isDefault ? ' · 默认' : ''}<small>{workspaces.find(workspace => workspace.id === p.workspaceId)?.name ?? '未分配工作区'} · {p.visible ? '已显示' : '隐藏库存'}</small></span>
-        <button disabled={busy} onClick={() => edit(p)}>编辑</button>
-        <button disabled={busy} onClick={() => { setError(''); setAssigningPetId(p.id); }}>选择工作区</button>
-        <button disabled={busy} onClick={() => p.visible ? void action(() => requireBridge().hidePet(p.id)) : p.workspaceId ? void action(() => requireBridge().showPet(p.id)) : setAssigningPetId(p.id)}>{p.visible ? '隐藏' : '显示'}</button>
-      </div>)}
-      {pets.length === 0 && <p className="settings-note">暂无伙伴</p>}
+      {layout === 'gallery' && previewPet && <div className="pet-gallery-preview">
+        <span className="pet-preview-label">伙伴预览</span><PetPortrait image={previewPet.imageRef}/>
+        <strong>{previewPet.name}</strong><span className="settings-note">{previewPet.visible ? '已显示在桌面' : '暂未显示'}</span>
+        <button disabled={busy} onClick={() => edit(previewPet)}>自定义</button>
+      </div>}
+      <div className="pet-gallery-heading"><h3>我的伙伴 <span>{pets.length}</span></h3><button disabled={busy} onClick={() => edit(null)}>添加桌宠</button></div>
+      <div className="settings-actions"><input type="search" aria-label="搜索伙伴" placeholder="搜索伙伴名称" value={search} onChange={e => setSearch(e.target.value)} /></div>
+      {assigningPetId && <p className="settings-note">正在为 {pets.find(pet => pet.id === assigningPetId)?.name} 选择工作区</p>}
       {assigningPetId && <WorkspaceThreadPicker key={assigningPetId} workspaces={workspaces} threads={threads} busy={busy} onCancel={() => { setAssigningPetId(null); setError(''); }} onSelect={(workspaceId, threadId) => void action(async () => {
         await requireBridge().assignPet({ petId: assigningPetId, workspaceId, threadId }); setAssigningPetId(null);
       })} />}
+      <div className={layout === 'gallery' ? 'pet-gallery-grid' : 'pet-management-list'}>
+        {filteredPets.map(p => <article className={`pet-management-row ${previewPet?.id === p.id ? 'is-previewed' : ''}`} key={p.id} aria-label={p.name}>
+          {layout === 'gallery' ? <button className="pet-card-preview" aria-label={`预览 ${p.name}`} aria-pressed={previewPet?.id === p.id} onClick={() => setPreviewId(p.id)}>
+            <span className="pet-card-status">{p.visible ? '已显示' : '未显示'}</span><PetPortrait image={p.imageRef}/>
+            <strong>{p.name}</strong><span className="pet-card-description">{p.description || '准备好陪你开始下一件事。'}</span>
+          </button> : <><PetPortrait image={p.imageRef}/><span className="pet-management-name">{p.name}{p.isDefault ? ' · 默认' : ''}</span></>}
+          <small className="pet-card-workspace">{workspaces.find(workspace => workspace.id === p.workspaceId)?.name ?? '未分配工作区'}{layout === 'list' ? ` · ${p.visible ? '已显示' : '隐藏库存'}` : ''}</small>
+          <div className="pet-card-actions">
+            <button disabled={busy} onClick={() => edit(p)}>编辑</button>
+            <button disabled={busy} onClick={() => { setError(''); setAssigningPetId(p.id); }}>选择工作区</button>
+            <button disabled={busy} onClick={() => p.visible ? void action(() => requireBridge().hidePet(p.id)) : p.workspaceId ? void action(() => requireBridge().showPet(p.id)) : setAssigningPetId(p.id)}>{p.visible ? '隐藏' : '显示'}</button>
+          </div>
+        </article>)}
+      </div>
+      {filteredPets.length === 0 && <p className="settings-note">{pets.length === 0 ? '暂无伙伴，添加一位桌面伙伴开始。' : '没有找到匹配的伙伴'}</p>}
     </> : <form onSubmit={e => { e.preventDefault(); void save(); }}><fieldset className="settings-form" disabled={busy}>
       <label className="settings-field">名称<input required value={name} onChange={e => setName(e.target.value)} /></label>
       <label className="settings-field">描述<input value={description} onChange={e => setDescription(e.target.value)} /></label>
       <label className="settings-field">角色提示<textarea required value={role} onChange={e => setRole(e.target.value)} /></label>
       <p className="settings-note">新伙伴加入隐藏库存；选择工作区与话题后再显示。角色提示只在首次发送新话题时加入普通历史，旧话题不会重新注入。</p>
-      <div className="pet-management-preview">{image.type === 'imported' ? <img alt="角色预览" src={image.url} /> : <span>✦ 内置形象</span>}
+      <div className="pet-management-preview"><PetPortrait image={image}/>
         <button type="button" onClick={() => setImage({ type: 'builtin', id: 'yachiyo' })}>使用内置形象</button></div>
       {bridge?.chooseImage ? <button type="button" onClick={() => void importImage()}>选择角色图片</button> : <label className="settings-field">角色图片<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => void importImage(e.target.files?.[0])} /></label>}
       <div className="settings-actions"><button className="primary" type="submit">{busy ? '正在保存…' : '保存伙伴'}</button><button type="button" onClick={() => { setEditing(undefined); setError(''); }}>取消</button></div>

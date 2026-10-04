@@ -19,8 +19,8 @@ export function WorkspaceManager({ workspaces, threads, bridge, command }: {
     finally { setBusy(false); }
   }
   function host() { if (!bridge) throw new Error('桌宠窗口暂不可用'); return bridge; }
-  return <section aria-label="工作区管理"><h2>Workspaces</h2>
-    <p className="settings-note">同一实际目录只有一个工作区。话题按项目保存，召唤伙伴只安排前端接续。</p>
+  return <section aria-label="工作区管理"><h2>工作区</h2>
+    <p className="settings-page-description">同一实际目录只有一个工作区。话题按项目保存，召唤伙伴只安排前端接续。</p>
     <button className="primary" disabled={busy} onClick={() => void action(async () => {
       const picker = host().chooseDirectory;
       if (!picker) throw new Error('目录选择暂不可用');

@@ -49,7 +49,7 @@ Context History 随应用运行持续采集，关闭窗口继续，退出应用�
 - **从问答到执行**：支持多轮对话、工具调用、流式结果、执行中断和历史查看。应用保持运行时，关闭对话窗口不影响已启动任务继续执行。
 - **按你的需要扩展**：通过 MCP 接入外部工具，通过 Append Prompt 保存可复用的提示模板；内置文件读写、网页搜索与正文抓取能力。
 - **复用保存的操作流程**：启用内置 **Automation** 后，可录制操作、保存流程、按标识重跑并查看执行历史；已有修复数据入口，修复后仍需实际重跑核对结果。开关默认关闭，已保存流程可在重启后复用。
-- **模型由你选择**：从常驻 menu bar 的“设置”打开独立 Electron 窗口，在 AI 配置 OpenAI-compatible / Anthropic 模型、API Key 和服务地址；显式保存后下次模型请求生效。Agent 管理 Tools、MCP、Permissions，Pets 管理伙伴，Workspaces 管理项目与历史；MCP 配置保存后需重启 App。外观、快捷键、Host、触发器和 Append Prompt 继续从输入面板进入原生设置。
+- **模型由你选择**：从常驻 menu bar 的“设置”打开独立 Electron 窗口，在“模型服务”配置 OpenAI-compatible / Anthropic 模型、API Key 和服务地址；显式保存后下次模型请求生效。分组侧栏直接进入桌面伙伴、内置工具、MCP 服务器、权限和工作区；MCP 配置保存后需重启 App。外观、快捷键、Host、触发器和 Append Prompt 继续从输入面板进入原生设置。
 
 ## 关于上下文与数据
 
