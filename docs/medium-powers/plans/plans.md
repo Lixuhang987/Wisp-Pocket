@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [2026-10-04-pet-directory-picker.md](./2026-10-04-pet-directory-picker.md)：设置伙伴“选择工作区 / 显示”直接原生选目录并安排。
+
 - [2026-10-04-settings-titlebar.md](./2026-10-04-settings-titlebar.md)：设置窗口隐藏原生标题条、拖动与原生按钮留白。
 
 - [2026-10-04-time-context.md](./2026-10-04-time-context.md)：系统提示和时间上下文持久化、小时刷新、本地证据时间与范围过滤的已完成实施记录及实机边界。

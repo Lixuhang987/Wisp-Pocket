@@ -13,12 +13,13 @@ function PetPortrait({ image }: { image: PetImageRef }) {
     <span className="pet-portrait pet-portrait-builtin" aria-hidden="true" style={{backgroundImage:`url(${spriteURL})`}}/>;
 }
 
-export function PetManager({ pets, workspaces, threads, bridge, onClose, layout = 'list' }: {
+export function PetManager({ pets, workspaces, threads, bridge, onClose, chooseWorkspace, layout = 'list' }: {
   pets: Pet[];
   workspaces: Workspace[];
   threads: ThreadListEntry[];
   bridge?: PetManagementBridge;
   onClose?: () => void;
+  chooseWorkspace?: () => Promise<Workspace | null>;
   layout?: 'list' | 'gallery';
 }) {
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -47,6 +48,17 @@ export function PetManager({ pets, workspaces, threads, bridge, onClose, layout 
     await requireBridge().savePet({ ...(editing ? { id: editing.id, expectedRevision: editing.revision } : {}), name, description, rolePrompt: role, imageRef: image }, commandId);
     setEditing(undefined);
   }); }
+  function selectWorkspace(pet: Pet) {
+    if (!chooseWorkspace) { setError(''); setAssigningPetId(pet.id); return; }
+    void action(async () => {
+      const workspace = await chooseWorkspace();
+      if (!workspace) return;
+      await requireBridge().assignPet({
+        petId: pet.id, workspaceId: workspace.id,
+        threadId: workspace.id === pet.workspaceId ? pet.threadId : null,
+      });
+    });
+  }
   function importImage(file?: File) { return action(async () => {
     const host = requireBridge();
     let picked: PetImageInput | null;
@@ -86,8 +98,8 @@ export function PetManager({ pets, workspaces, threads, bridge, onClose, layout 
           <small className="pet-card-workspace">{workspaces.find(workspace => workspace.id === p.workspaceId)?.name ?? '未分配工作区'}{layout === 'list' ? ` · ${p.visible ? '已显示' : '隐藏库存'}` : ''}</small>
           <div className="pet-card-actions">
             <button disabled={busy} onClick={() => edit(p)}>编辑</button>
-            <button disabled={busy} onClick={() => { setError(''); setAssigningPetId(p.id); }}>选择工作区</button>
-            <button disabled={busy} onClick={() => p.visible ? void action(() => requireBridge().hidePet(p.id)) : p.workspaceId ? void action(() => requireBridge().showPet(p.id)) : setAssigningPetId(p.id)}>{p.visible ? '隐藏' : '显示'}</button>
+            <button disabled={busy} onClick={() => selectWorkspace(p)}>选择工作区</button>
+            <button disabled={busy} onClick={() => p.visible ? void action(() => requireBridge().hidePet(p.id)) : chooseWorkspace || !p.workspaceId ? selectWorkspace(p) : void action(() => requireBridge().showPet(p.id))}>{p.visible ? '隐藏' : '显示'}</button>
           </div>
         </article>)}
       </div>
@@ -96,7 +108,7 @@ export function PetManager({ pets, workspaces, threads, bridge, onClose, layout 
       <label className="settings-field">名称<input required value={name} onChange={e => setName(e.target.value)} /></label>
       <label className="settings-field">描述<input value={description} onChange={e => setDescription(e.target.value)} /></label>
       <label className="settings-field">角色提示<textarea required value={role} onChange={e => setRole(e.target.value)} /></label>
-      <p className="settings-note">新伙伴加入隐藏库存；选择工作区与话题后再显示。角色提示只在首次发送新话题时加入普通历史，旧话题不会重新注入。</p>
+      <p className="settings-note">新伙伴加入隐藏库存；{chooseWorkspace ? '选择工作区文件夹后即可显示。' : '选择工作区与话题后再显示。'}角色提示只在首次发送新话题时加入普通历史，旧话题不会重新注入。</p>
       <div className="pet-management-preview"><PetPortrait image={image}/>
         <button type="button" onClick={() => setImage({ type: 'builtin', id: 'yachiyo' })}>使用内置形象</button></div>
       {bridge?.chooseImage ? <button type="button" onClick={() => void importImage()}>选择角色图片</button> : <label className="settings-field">角色图片<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => void importImage(e.target.files?.[0])} /></label>}

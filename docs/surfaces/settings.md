@@ -22,7 +22,7 @@
 | Electron / 内置工具 | 调整可配置 builtin Tool | 即时保存；默认文件与历史读取没有禁用开关 |
 | Electron / MCP 服务器 | 管理 stdio / streamableHttp 及示例 | 编辑加入待保存配置，再显式保存；保存只确认持久化，重启 App 后加载，连接刷新尚未实现 |
 | Electron / 权限 | 查看永久规则与创建时间并撤销 | 按 Tool 名称全局跨 Pet 生效，不代替任务内即时授权 |
-| Electron / 桌面伙伴 | 管理名称、描述、角色、图片及显示隐藏 | 前端资料与 revision 合同；新建默认隐藏可无项目；一级“选择工作区”再选历史 / 新话题，取消或拒绝不变 |
+| Electron / 桌面伙伴 | 管理名称、描述、角色、图片及显示隐藏 | 前端资料与 revision 合同；新建默认隐藏可无项目；“选择工作区 / 显示”直接系统选目录，复用或创建项目后显示；同项目保留话题，换项目准备新话题，取消或失败保持伙伴原安排 |
 | Electron / 工作区 | 选目录创建 / 复用项目，查看历史、准备新话题或随机召来伙伴 | 创建不生成 Pet；历史自动复用已有伙伴，否则分配隐藏库存；无库存只提示 |
 | 原生 / 外观 | 选择亮色、暗色或跟随系统 | 独立原生偏好，不覆盖后端模型/Tool 配置 |
 | 原生 / Host | 查看 Context History 状态，启用 Automation | Context History 常驻；Automation 默认关闭，失败不影响已有历史读取 |
@@ -35,7 +35,7 @@
 ## 约束与待决事项
 
 - 后端使用的配置通过公开接口校验与保存，Electron 不直接写这些业务文件；Pet 资料、图片和安排由 Electron main 唯一 store 保存，设置与宠窗只经 IPC 操作和订阅。Swift 外观写 `native-preferences.json`，后端模型/Tools 写 `settings.json`，两端交错保存互不覆盖。
-- 同一实际目录复用 Workspace，根目录创建后固定；Pet 可换工作区。手动指定 Pet 可转移隐藏伙伴的 Thread，可见伙伴占用始终拒绝并提示“Thread 正在运行”；不新增 Pet / Workspace 删除或 AGENTS.md 编辑器。
+- 同一实际目录复用 Workspace，根目录创建后固定；Pet 可换工作区。设置卡片不内嵌历史选择，旧历史从工作区页打开；桌宠紧凑管理明确指定 Pet 时可转移隐藏伙伴的 Thread，可见伙伴占用始终拒绝并提示“Thread 正在运行”；不新增 Pet / Workspace 删除或 AGENTS.md 编辑器。
 - 原生 Host 页是内置能力的启用与状态入口；当前没有独立 Context History 时间线或 Automation 流程编辑 surface。
 - 关闭设置窗口不停止已启用的内置能力。Context History 没有启用开关，历史读取不依赖采集成功或 Swift Provider 在线。
 - 触发器新增失败时保留表单与错误，取消时清理本次错误；书签连接可靠性仍有既有待办与待验边界。
@@ -46,4 +46,4 @@
 
 - [Web 源码约定](../../apps/thread-window-web/src/src.md)、[SettingsApp.tsx](../../apps/thread-window-web/src/SettingsApp.tsx) 与共享伙伴表单确认导航、草稿和保存边界。
 - [原生设置约定](../../apps/desktop/Sources/Settings/settings.md)、[SettingsView.swift](../../apps/desktop/Sources/Settings/SettingsView.swift) 确认保留页与默认外观；[后端设置](../../apps/agent-server/src/settings/settings.md)和 [Electron 窗口](../../apps/electron-shell/src/main/windows/windows.md)分别拥有持久化与单实例窗口合同。
-- [手工验收](../manual-qa.md)：标题栏的隔离 Electron 验证与正式宿主待验项；配置保存、内置模块、触发器、MCP、权限、快捷键与桌宠相关项目沿用各自记录，本轮未复验。
+- [手工验收](../manual-qa.md)：标题栏与直接选目录的隔离 Electron 验证和正式宿主待验项；直接选目录使用真实 bundle / preload / IPC 与原生 dialog，Workspace / 伙伴安排使用 fixture，不证明真实持久化或宠窗出现。其他配置保存、内置模块、触发器、MCP、权限和快捷键沿用各自记录。

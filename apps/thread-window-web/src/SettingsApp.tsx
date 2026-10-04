@@ -50,6 +50,15 @@ export function SettingsApp() {
     pending.current.set(commandId,{resolve,reject,timer});
     try{clientRef.current.sendRaw(JSON.stringify({type,commandId,timestamp:new Date().toISOString(),payload}));}catch(error){clearTimeout(timer);pending.current.delete(commandId);reject(error);}
   });
+  async function chooseWorkspace() {
+    const picker = window.handAgentSettings?.chooseDirectory;
+    if (!picker) throw new Error('目录选择暂不可用');
+    const rootPath = await picker();
+    if (!rootPath) return null;
+    const result = await command('workspace.create', { rootPath });
+    if (result.type !== 'workspace.created') throw new Error('工作区创建回执无效，请重试');
+    return result.payload.workspace;
+  }
   return <main className="settings-app" data-inset-titlebar={insetTitlebar || undefined}>
     {insetTitlebar && <div className="settings-titlebar" aria-hidden="true" />}
     <nav className="settings-nav" aria-label="设置导航">
@@ -74,7 +83,7 @@ export function SettingsApp() {
       <div hidden={page!=='Tools'}><ToolsSettings/></div>
       <div hidden={page!=='MCP'}><MCPSettings/></div>
       <div hidden={page!=='Permissions'}><PermissionsSettings/></div>
-      <div hidden={page!=='Pets'}><h2>桌面伙伴</h2><p className="settings-page-description">选择陪伴你的桌宠，为它设置角色并安排工作区。</p>{petError&&<p className="settings-error" role="alert">{petError}</p>}<PetManager layout="gallery" pets={pets} workspaces={workspaces} threads={threads} bridge={window.handAgentSettings}/></div>
+      <div hidden={page!=='Pets'}><h2>桌面伙伴</h2><p className="settings-page-description">选择陪伴你的桌宠，为它设置角色并安排工作区。</p>{petError&&<p className="settings-error" role="alert">{petError}</p>}<PetManager layout="gallery" pets={pets} workspaces={workspaces} threads={threads} bridge={window.handAgentSettings} chooseWorkspace={chooseWorkspace}/></div>
       <div hidden={page!=='Workspaces'}><WorkspaceManager workspaces={workspaces} threads={threads} bridge={window.handAgentSettings} command={command}/></div>
     </div></section>
   </main>;

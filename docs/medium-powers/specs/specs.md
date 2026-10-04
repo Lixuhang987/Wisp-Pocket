@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)：Pet 前端化已实现、完整实机待验；后端移除 Pet、Thread 仅归 Workspace，前端统一分配伙伴，当前边界见 ADR 0007 与 owning 模块。
+- [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)：Pet 前端化已实现、完整实机待验；后端移除 Pet、Thread 仅归 Workspace，前端统一分配伙伴，当前边界见 ADR 0007 与 owning 模块，设置内嵌两级选择已由后续 [目录选择计划](../plans/2026-10-04-pet-directory-picker.md) 覆盖。
 - [2026-10-04-time-context-draft.md](./2026-10-04-time-context-draft.md)：系统提示与时间注入持久化、小时刷新、本地证据时间及范围过滤的简版规格；已实现、三项检查与独立文档审核完成，实机待验。
 - [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)：Electron 设置、后端配置接口与 Workspace/Pet 拆分已实现，完整实机待验；固定项目根、逐 Turn AGENTS.md 与项目一级历史保留；后端 Pet、双归属与基础 Pet 已由 #9 替代，MCP 运行刷新另列 TODO。
 - [multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md](./multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)：Issue #7 的多桌宠 A「口袋对话」历史规格，轻量交互仍保留；Pet 直接替代 Workspace 与按宠分组的设计已由 Issue #8 替代，当前项目模型不以本子树为准。
