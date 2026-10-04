@@ -23,6 +23,7 @@ const settingsPages = [
 type SettingsPage = typeof settingsPages[number]['id'];
 
 export function SettingsApp() {
+  const insetTitlebar = new URLSearchParams(window.location.search).get('titlebar') === 'hiddenInset';
   const [page,setPage]=useState<SettingsPage>('AI');
   const [search,setSearch]=useState('');
   const filteredPages=settingsPages.filter(item=>`${item.label} ${item.keywords}`.toLowerCase().includes(search.trim().toLowerCase()));
@@ -49,7 +50,8 @@ export function SettingsApp() {
     pending.current.set(commandId,{resolve,reject,timer});
     try{clientRef.current.sendRaw(JSON.stringify({type,commandId,timestamp:new Date().toISOString(),payload}));}catch(error){clearTimeout(timer);pending.current.delete(commandId);reject(error);}
   });
-  return <main className="settings-app">
+  return <main className="settings-app" data-inset-titlebar={insetTitlebar || undefined}>
+    {insetTitlebar && <div className="settings-titlebar" aria-hidden="true" />}
     <nav className="settings-nav" aria-label="设置导航">
       <h1>设置</h1>
       <div className="settings-search"><Search size={16} aria-hidden="true"/>

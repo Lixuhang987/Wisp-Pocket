@@ -357,3 +357,13 @@
 - [ ] 工具开关、MCP 显式保存与权限撤销在真实后端生效；MCP 保存仍需重启 App。
 
 自动化复用现有设置三条用例，扩展搜索切页草稿保留和画廊创建 / 分配；浏览器 fixture 不证明真实 Electron IPC、系统菜单、焦点或持久化。完整宿主验收仍待执行。
+
+## Electron 设置顶部标题条（2026-10-04）
+
+设置在 macOS 使用 hiddenInset，让侧栏与正文背景延伸到窗口顶端，保留原生交通灯按钮，并在宽窄布局预留顶部操作空间。
+
+- [x] 在 `settings-titlebar` worktree 的真实 Electron 42.3.3 窗口加载新构建 renderer，通过生产设置 factory 片段创建窗口；亮暗主题不再出现原生深灰条，920px / 520px 布局留白正确，搜索输入和清除正常。窗口 bounds 与 content bounds 相同；通过原生最小化按钮触发 minimize 事件，并从现有窗口控制器恢复显示。模型 / WebSocket 使用隔离 fixture，本项不证明真实数据保存或系统菜单启动。
+- [ ] 从正式宿主打开设置，人工拖动顶部空白确认移动，检查红黄绿按钮的关闭 / 最小化 / 全屏与还原；重复打开保留页面和草稿，关闭重开默认模型页。此次 Computer Use 拖动未产生窗口 move 事件，不能据此宣称拖动通过。
+- [x] `scripts/test.sh`、`swiftw test`、`swiftw build` 与完整 Electron build 通过，复用窗口单实例用例；累计新增自动化测试 0。
+
+临时原生验证入口、窗口几何和日志保存在本 worktree `.cache/titlebar-qa/`；本轮未替换正式宿主包。

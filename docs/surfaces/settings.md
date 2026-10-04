@@ -10,9 +10,9 @@
 - **THESIS**：按数据使用方配置产品依赖与个人选择；任务内即时授权仍在对话 surface 完成。
 - **OWN-WORLD**：Electron 设置使用 Codex 参考的中性色主题，其他 React surface 与 SwiftUI 保持现有暖色主题；Swift 解析亮色、暗色与跟随系统，下发到全部 renderer。
 - **STORY**：menu bar “设置”或应用菜单“设置…”进入 Electron → 通过个人 / 集成 / 项目分组选取设置 → 编辑与保存；PromptPanel 的原生设置入口继续管理宿主能力与偏好。
-- **FIRST VIEWPORT**：Electron 左侧为搜索和分组入口，直接打开模型服务 / 桌面伙伴 / 内置工具 / MCP 服务器 / 权限 / 工作区，首次与关闭重开默认模型服务；已打开时再次进入只聚焦，不重置页面或草稿。搜索只筛选入口，切页保持表单挂载；窄窗口导航横向滚动。原生保留 680×560 容器、五个横向 Tab，默认外观。
+- **FIRST VIEWPORT**：Electron macOS 窗口隐藏原生标题条、保留交通灯按钮和顶部空白拖动区；左侧为搜索和分组入口，直接打开模型服务 / 桌面伙伴 / 内置工具 / MCP 服务器 / 权限 / 工作区，首次与关闭重开默认模型服务；已打开时再次进入只聚焦，不重置页面或草稿。搜索只筛选入口，切页保持表单挂载；窄窗口导航横向滚动。原生保留 680×560 容器、五个横向 Tab，默认外观。
 - **FORM**：左右对齐的模型设置行、工具开关与伙伴预览 / 卡片；卡片选择只改变预览，编辑、显示隐藏和分配保留独立操作；模型、MCP 与 Pet 显式保存，输入变化、切页不自动提交。Tool 开关、权限撤销、伙伴分配与显示隐藏为即时动作；isDefault 只标记首次初始化伙伴。
-- **FINISH**：2026-10-04 对照实现更新所有权与保存合约；真实焦点、布局、亮暗主题、字段溢出和键盘访问仍待 manual QA，没有新增实机通过结论。
+- **FINISH**：2026-10-04 对照实现更新所有权、保存与 macOS 标题栏合约；隔离真实 Electron 窗口已确认标题条移除、亮暗主题、宽窄布局及搜索命中。正式宿主的拖动、交通灯、焦点与草稿回归，以及字段溢出和键盘访问仍待 [manual QA](../manual-qa.md)。
 
 ## 设置子页现状
 
@@ -46,4 +46,4 @@
 
 - [Web 源码约定](../../apps/thread-window-web/src/src.md)、[SettingsApp.tsx](../../apps/thread-window-web/src/SettingsApp.tsx) 与共享伙伴表单确认导航、草稿和保存边界。
 - [原生设置约定](../../apps/desktop/Sources/Settings/settings.md)、[SettingsView.swift](../../apps/desktop/Sources/Settings/SettingsView.swift) 确认保留页与默认外观；[后端设置](../../apps/agent-server/src/settings/settings.md)和 [Electron 窗口](../../apps/electron-shell/src/main/windows/windows.md)分别拥有持久化与单实例窗口合同。
-- [手工验收](../manual-qa.md)：配置、主题、内置模块、触发器、MCP、权限、快捷键与桌宠相关项目；本轮未复验。
+- [手工验收](../manual-qa.md)：标题栏的隔离 Electron 验证与正式宿主待验项；配置保存、内置模块、触发器、MCP、权限、快捷键与桌宠相关项目沿用各自记录，本轮未复验。

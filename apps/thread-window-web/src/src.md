@@ -44,6 +44,8 @@
 
 ## 设置与伙伴编辑
 
+- macOS 设置的 `titlebar=hiddenInset` URL 提示与 [Electron 设置窗口](../../electron-shell/src/main/windows/windows.md)的原生样式成对变更；顶部空白只用于拖动，交通灯留白在宽窄布局中保留，搜索、导航和表单不进入 drag 区。其他框架 / 浏览器预览不默认增加该区域。
+
 - 设置使用独立中性色 token，按个人 / 集成 / 项目分组，直接导航到模型、伙伴、工具、MCP、权限和工作区；搜索只过滤入口，不卸载当前表单。模型、MCP 和伙伴草稿留在各组件内，切页与输入变化不触发保存。失败保留字段与错误；重复打开的窗口由 Electron 聚焦，不重建 renderer。
 - 设置 HTTP 地址从既有 Thread URL 的 origin 派生，前端只提交可编辑模型字段，后端合并保留未展示字段；API Key 使用密码输入。MCP 保存只表达配置已保存，连接在服务下次启动时读取。
 - 伙伴资料类型与桥在 `native/petTypes.ts` / `native/settingsBridge.ts` 拥有，与后端 Thread DTO 隔离。设置和桌宠通过同一前端桥保存资料与受管图片、订阅伙伴变化；默认标记只用于初始化，不提供编辑入口。新伙伴加入隐藏库存，无需目录。

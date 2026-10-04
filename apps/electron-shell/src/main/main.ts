@@ -77,11 +77,13 @@ const prewarmer = new ThreadWindowPrewarmer({
 
 const settingsURL = new URL(threadWindowURL);
 settingsURL.searchParams.set("surface", "settings");
+const settingsTitleBarStyle = process.platform === "darwin" ? "hiddenInset" : "default";
+settingsURL.searchParams.set("titlebar", settingsTitleBarStyle);
 const settingsWindow = new ThreadWindowPrewarmer({
   threadWindowURL: settingsURL.toString(), preloadPath: threadPreloadPath,
   availableSkills: [], initialTheme,
   createWindow: options => {
-    const window = new BrowserWindow({ ...options, title: "设置" });
+    const window = new BrowserWindow({ ...options, title: "设置", titleBarStyle: settingsTitleBarStyle });
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("will-navigate", event => event.preventDefault());
     return window;
