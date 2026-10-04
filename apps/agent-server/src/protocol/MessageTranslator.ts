@@ -161,7 +161,8 @@ export function toAuditEvent(event: AgentRuntimeEvent, timestamp: string): Threa
 export function agentMessagesToConversation(messages: AgentMessage[]): ConversationMessage[] {
   messages = messages.filter(message => message.role !== "system");
   const latestUser = messages.findLastIndex((message) => message.role === "user");
-  const latestAssistant = messages.findLastIndex((message) => message.role === "assistant" && !!message.content.trim());
+  const latestAssistant = messages.findLastIndex((message) => message.role === "assistant"
+    && (!!message.content.trim() || (!!message.awaitingReply && !!message.suggestedReplies?.length)));
   return messages.map((msg, idx) => {
     const id = ("id" in msg ? msg.id : undefined) ?? `msg-${idx}`;
     const now = new Date(0).toISOString();

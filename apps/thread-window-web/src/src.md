@@ -10,6 +10,7 @@
 - `native/`：读取 preload 配置和主题，接收 fallback initial prompt 与明确目标 Thread 的打开请求。
 - `protocol/`：core 协议的 Web encode 与类型守卫。
 - [store/store.md](./store/store.md)：事实投影、首轮关联、偏好与公共 store factory。
+- [messages/messages.md](./messages/messages.md)：ThreadWindow 与桌宠共用的 UI 消息类型和内容判断。
 - `styles/`：Tailwind 入口与共享生成主题；普通 CSS 变量也供桌宠直接消费。
 - [thread/thread.md](./thread/thread.md)：首轮输入控制器、`/api/thread` 传输缓冲与 Blob 附件 URL。
 - `history/`：用户打开历史 Thread 的加载与选择顺序。

@@ -1,6 +1,8 @@
 # Context History Plugin Spec
 > 历史方案，已被 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4) 替代。本文保留当时设计用于追溯；Context History 的 Plugin 安装、原子进程、生命周期和 RPC 要求不再是当前约束，也不能作为功能通过实机验证的证据。当前所有权与行为从 [Host Automation](../../../apps/host-automation/host-automation.md) 进入。
 
+> 后续 [Issue #6](https://github.com/Lixuhang987/Wisp-Pocket/issues/6) 又明确常驻采集、删除采集开关与服务端普通历史工具；下文默认关闭、显式启用及动态历史查询也不再是当前要求。
+
 ## Background
 
 Wisp Pocket 当前已经有 dynamic tool 机制：Swift desktop 作为默认 provider 连接 `/api/dynamic-tools`，把 `host_macos.*` 能力和 `~/.spotAgent/plugins/<id>/plugin.json` 声明的 plugin tools 合并后暴露给 core。agent-server 只负责保存 tool spec、路由 tool call request、等待 provider response；plugin 生命周期归 Swift desktop 管理。

@@ -2,7 +2,8 @@ import type { Pet } from "@handagent/core/pet/Pet.ts";
 import type { InputItem, ThreadNotification, ThreadListEntry, ThreadCommand } from "../../../thread-window-web/src/protocol/threadProtocol.ts";
 import { encodePermissionAnswer, encodeThreadDelete } from "../../../thread-window-web/src/protocol/threadProtocol.ts";
 import { makeThreadWindowStore } from "../../../thread-window-web/src/store/threadWindowStore.ts";
-import type { AssistantMessageItem } from "../../../thread-window-web/src/store/threadItems.ts";
+import type { AssistantMessageItem } from "../../../thread-window-web/src/messages/threadItems.ts";
+import { hasAssistantContent } from "../../../thread-window-web/src/messages/threadItems.ts";
 import { ThreadSocketClient } from "../../../thread-window-web/src/thread/threadSocketClient.ts";
 import { ThreadInputController } from "../../../thread-window-web/src/thread/threadInputController.ts";
 import { pathInput } from "./readDroppedItems.ts";
@@ -219,7 +220,7 @@ export class PetThreadController {
   private changed(): void {
     const state=this.store.getState(), threadId=this.preferences.selectedThreadId ?? null, thread=threadId ? state.threadsById[threadId] : undefined;
     this.snapshot={threadId,pet:state.pets.find(p=>p.id===this.petId),bubbleVisible:this.visibility==="visible",draft:this.preferences.drafts[threadId??"new"]??"",files:this.preferences.files?.[threadId??"new"]??[],error:this.error,
-      latestAssistant:thread?.messages.findLast((item):item is AssistantMessageItem=>item.type==="assistant_message"&&!!item.text.trim()),connection:state.connectionState,
+      latestAssistant:thread?.messages.findLast((item):item is AssistantMessageItem=>item.type==="assistant_message"&&hasAssistantContent(item)),connection:state.connectionState,
       history:this.history(),nextCursor:this.nextCursor,receiving:[...this.submissions.values()].some(s=>!!s.resolve)};
     for(const listener of this.listeners) listener();
   }

@@ -2,6 +2,8 @@
 
 统一术语从 [CONTEXT-MAP.md](/Users/mu9/proj/handAgent/CONTEXT-MAP.md) 进入；本文只记录跨上下文架构、所有权和不可从单个模块看出的合约。
 
+本文描述当前实现；已确认但尚未实施的 Pet 前端化目标从 [产品背景](./docs/PRODUCT.md) 进入。当前后端 Pet 与固定归属是下一轮迁移对象，不能据此回退目标设计；确认目标也不表示本页中的旧实现已经删除。
+
 ## 分层架构
 
 ```mermaid

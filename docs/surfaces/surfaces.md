@@ -2,6 +2,8 @@
 
 本目录按用户任务记录 Wisp Pocket 的界面现状，作为后续设计的 surface brief。共享产品背景见 [PRODUCT.md](../PRODUCT.md)，视觉权威为根目录 [DESIGN.md](../../DESIGN.md) 与其引用的 token 源。
 
+当前 brief 描述已实现的 Issue #8 模型；Issue #9 的伙伴换工作区、工作区管理与前端分配属于 PRODUCT 中已确认的下一轮方向，尚未实现。不能用本目录的旧现状否定该方向，也不能提前把目标操作写成当前能力；历史覆盖关系见 [对齐记录](../product-alignment.md)。
+
 ## 直接子节点
 
 | Surface | 用户任务 | 文档 |

@@ -24,4 +24,4 @@
 - 原 Issue #3 的 Web/server/core、真实 SQLite、Swift test/build 与独立文档审核均通过；当时的 Swift 测试只校正 PromptPanel 隐藏与窗口回执的观察阶段，没有改变宿主生产行为。
 - 本次合并的自动检查与双功能边界见 [manual-qa](./manual-qa.md) 和合并计划；原分支通过不等于合并产物经过新的桌面实机验收。
 - 草稿、偏好、首轮、流式展示、请求与连接仍需实机回归；旧的前端队列派发/移除验收已由后端 pending 验收替代。
-- Issue #3 原实施保留的后台 `thread.started` 抢选问题，已在 [2026-09-14 独立修复](./medium-powers/plans/2026-09-14-thread-window-selection.md) 中处理；当前选择规则见 [Web App](../apps/thread-window-web/src/src.md)，打包实机回归仍在 [manual-qa](./manual-qa.md#threadwindow-后台创建与主动选择隔离)。桌宠按创建时间选择最新 Thread 的规则不变。
+- Issue #3 原实施保留的后台 `thread.started` 抢选问题，已在 [2026-09-14 独立修复](./medium-powers/plans/2026-09-14-thread-window-selection.md) 中处理；当前选择规则见 [Web App](../apps/thread-window-web/src/src.md)，打包实机回归仍在 [manual-qa](./manual-qa.md#threadwindow-后台创建与主动选择隔离)。桌宠随后由 Issue #7 改为恢复本宠主动选择，无有效选择时只回本宠最近更新历史；后台创建不抢选，见 [桌宠 surface](./surfaces/desktop-pet.md)。

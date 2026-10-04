@@ -3,7 +3,7 @@ import type {
   InputItem,
   ThreadNotification,
 } from "../protocol/threadProtocol.ts";
-import type { UserMessageItem } from "./threadItems.ts";
+import type { UserMessageItem } from "../messages/threadItems.ts";
 
 export type ThreadInputState = {
   pendingInitialPrompt: InitialPromptPayload | null;

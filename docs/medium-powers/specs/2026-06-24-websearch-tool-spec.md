@@ -1,5 +1,7 @@
 # Websearch Tool Spec
 
+状态：默认 `web_search` / `fetch_page` 已实现，下文 Background 是改造前问题。当前能力见 [产品背景](../../PRODUCT.md)，真实 provider 与 SSE 回归仍按 [manual QA](../../manual-qa.md) 验收；自动检查不能代替真实外部服务通过。
+
 ## Background
 
 Agent 当前未激活 thread 默认只暴露 `use_tools`。这降低了普通聊天中的工具噪音，但也让需要最新外部信息的问题必须先由模型激活完整工具集。Web 搜索属于低风险查询能力，应当像 `use_tools` 一样在默认工具集中直接可用。

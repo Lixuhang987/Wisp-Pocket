@@ -1,6 +1,6 @@
 # 数据与协议合约
 
-本文保留[多桌宠规格](./multi-pet-pocket-dialogue.md)的数据验收合约；实现已落地，当前字段以 owning 类型定义为准，实机状态见 manual QA。
+本文保留[多桌宠规格](./multi-pet-pocket-dialogue.md)当时的数据验收合约。历史范围：Pet 替代 Workspace、权威 rootPath 与按宠分组已由 Issue #8 替代；Issue #9 的前端 Pet 与无后端角色快照是已确认、尚未实现的新目标。本文不是当前数据模型或下一轮规格，替代关系从主文档进入；原条款保留用于追溯，不能据此回退后续决定。
 
 ## Pet 替换 Workspace
 

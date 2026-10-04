@@ -213,9 +213,10 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     expect((await h.persistence.getThread(id))!.metadata.dynamicTools?.[0].name).toBe("cli");
     expect(calls).toBe(0);
     const fullView = makeThreadWindowStore();
+    let fullSnapshots = 0;
     const fullSocket = new ThreadSocketClient({ url: "ws://local/api/thread", WebSocketImpl: h.LocalSocket,
       onConnectionState: (value) => fullView.getState().setConnectionState(value),
-      onNotification: (value) => fullView.getState().handleNotification(value),
+      onNotification: (value) => { fullView.getState().handleNotification(value); if (value.type === "thread.snapshot") fullSnapshots += 1; },
       onRequest: (value) => fullView.getState().handleRequest(value),
     });
     fullSocket.connect();
@@ -244,6 +245,27 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     expect(fullView.getState().threadsById[id].permissionRequests).toEqual([]);
     expect(h.pet.store.getState().threadsById[id].permissionRequests).toEqual([]);
     expect(observed.every(frame => ["permission.requested", "thread.listed"].includes(frame.type))).toBe(true);
+    await until(() => expect(current(h).status).toBe("idle"));
+    const saved = await h.persistence.getThread(id);
+    expect(saved!.messages.some(message => message.role === "assistant" && !message.content.trim() && !!message.toolCalls?.length)).toBe(true);
+    const liveAssistantTexts = fullView.getState().threadsById[id].messages.flatMap(message => message.type === "assistant_message" ? [message.text] : []);
+    const previousSnapshots = fullSnapshots;
+    fullSocket.resumeThread(id);
+    h.pet.selectThread(id);
+    await until(() => expect(fullSnapshots).toBeGreaterThan(previousSnapshots));
+    await vi.waitFor(() => {
+      for (const view of [fullView, h.pet.store]) {
+        const messages = view.getState().threadsById[id].messages;
+        expect(messages.flatMap(message => message.type === "assistant_message" ? [message.text] : [])).toEqual(liveAssistantTexts);
+        expect(messages.some(message => message.type === "tool_call" && message.toolName === "host.cli")).toBe(true);
+      }
+    }, { timeout: 1000, interval: 10 });
+    fullSocket.disconnect();
+    await h.close();
+    const restored = await harness(decisionClient(), { directory: h.directory });
+    await until(() => expect(restored.pet.store.getState().threadsById[id]).toBeDefined());
+    expect(restored.pet.store.getState().threadsById[id].messages.flatMap(message => message.type === "assistant_message" ? [message.text] : [])).toEqual(liveAssistantTexts);
+    expect((await restored.persistence.getThread(id))!.messages).toEqual(saved!.messages);
   });
 
   it("PDF 已读完但本轮未完成时，重启会说明中断，且不会重放已开始的输入", async () => {
@@ -296,6 +318,33 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     await until(()=>expect(restored.pet.getSnapshot().threadId).toBe(b));
     expect((await restored.persistence.getThread(b))?.messages.find(m=>m.role==='user')?.inputItems).toEqual([item]);
     expect(restored.pet.store.getState().threadsById[b].messages[0]).toMatchObject({ type: 'user_message', inputItems: [item] });
+  });
+
+  it("只有建议的持久历史重建后仍可恢复等待并沿同一 Thread 回复", async () => {
+    const h = await harness(decisionClient());
+    const { metadata: { id } } = await h.persistence.createThread({ petId: h.petConfig.id });
+    const messages: AgentMessage[] = [
+      { id: "user", role: "user", content: "待处理资料" },
+      { id: "previous-answer", role: "assistant", content: "恢复的正文" },
+      { id: "empty-assistant", role: "assistant", content: "" },
+      { id: "suggestions-only", role: "assistant", content: "", suggestedReplies: ["只按建议继续"], awaitingReply: true },
+    ];
+    await h.persistence.persistRunResult(id, messages, []);
+    await h.close();
+    const restored = await harness(decisionClient(), { directory: h.directory });
+    await until(() => expect(restored.pet.store.getState().threadsById[id]).toBeDefined());
+    expect(restored.pet.getSnapshot().latestAssistant).toMatchObject({
+      id: "suggestions-only", text: "", suggestedReplies: ["只按建议继续"], awaitingReply: true,
+    });
+    expect(restored.pet.getSnapshot().threadId).toBe(id);
+    expect((await restored.persistence.getThread(id))!.messages).toEqual(messages);
+    expect(restored.pet.store.getState().threadsById[id].messages.map(message => message.id)).toEqual([
+      "user", "previous-answer", "suggestions-only",
+    ]);
+    await restored.pet.respond(restored.pet.getSnapshot().latestAssistant!.suggestedReplies![0]);
+    await until(() => expect(restored.pet.getSnapshot().latestAssistant?.text).toBe("收到你的回复：只按建议继续"));
+    expect(restored.pet.getSnapshot().threadId).toBe(id);
+    expect((await restored.persistence.getConversationMessages(id)).some(message => message.awaitingReply)).toBe(false);
   });
 
   it("点选建议与输入同一句话采用同一输入路径，等待不会自动执行", async () => {

@@ -6,6 +6,8 @@
 
 - [2026-10-04-time-context.md](./2026-10-04-time-context.md)：系统提示和时间上下文持久化、小时刷新、本地证据时间与范围过滤的已完成实施记录及实机边界。
 
+- [2026-10-04-shared-message-projection.md](./2026-10-04-shared-message-projection.md)：两端共用消息投影、历史空气泡修复与验证边界。
+
 - [2026-10-03-issue-8-settings-workspace.md](./2026-10-03-issue-8-settings-workspace.md)：Electron 设置、Workspace/Pet 与项目历史的实施合同、检查状态和实机边界。
 
 - [2026-10-03-test-cleanup.md](./2026-10-03-test-cleanup.md)：低价值与重复测试的删除依据、保留边界和验证结果。

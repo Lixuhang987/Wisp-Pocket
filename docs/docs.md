@@ -5,6 +5,7 @@
 ## 直接子节点
 
 - [PRODUCT.md](./PRODUCT.md)：整个 Wisp Pocket 的共享产品背景；产品与界面设计前读取，涵盖目的、使用场景、能力边界及待确认事项。
+- [product-alignment.md](./product-alignment.md)：产品决定与 spec / issue 历史的对齐记录；区分已确认方向、已实现行为及实机验收状态。
 - [surfaces/surfaces.md](./surfaces/surfaces.md)：按用户任务拆分的界面现状与 brief；进入具体界面设计前读取。
 - [issue-2-plan.md](./issue-2-plan.md)：后端所有权重构的已完成实施记录。
 - [issue-3-design.md](./issue-3-design.md)：状态所有权规格入口、后端保留理由与最终验证状态。
@@ -22,7 +23,6 @@
 - [human/human.md](/Users/mu9/proj/handAgent/docs/human/human.md)：面向人工操作和系统能力的补充说明。
 - [research/research.md](./research/research.md)：外部产品与交互研究；区分官方事实、观察和设计建议。
 - [medium-powers/medium-powers.md](/Users/mu9/proj/handAgent/docs/medium-powers/medium-powers.md)：待实现规格与历史 spec / plan 集合。
-- [superpowers/superpowers.md](/Users/mu9/proj/handAgent/docs/superpowers/superpowers.md)：历史视觉 / 输入资料资产。
 
 ## 放置规则
 
@@ -35,3 +35,5 @@
 编写 / 修订涉及界面的 spec 或方案时，先读 PRODUCT，再从 [surface 索引](./surfaces/surfaces.md) 进入对应界面的当前交互合约，随后核对 owning 源码目录文档与代码，最后筛选研究 / 历史设计。当前 surface 是明确已有体验的入口，研究中的推荐布局不能自动替换已实现交互。
 
 spec 应明确哪些现有交互保持、哪些因用户要求改变；未经明确要求改变的点击、hover、聚焦、显隐和草稿语义继续保留。发现 surface 与代码冲突时立即修正现状说明，不能将研究建议补写成当前事实。
+
+先判断文档角色再对齐：已确认但未实现的产品目标、spec / ADR 不按旧代码回退；当前 surface 与模块事实按代码核对。历史规格只在后续明确决定覆盖的范围失效，不根据 issue 开闭状态推断实现或验收完成。

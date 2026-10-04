@@ -6,7 +6,8 @@ import type {
   ThreadItem,
   ToolCallItem,
   UserMessageItem,
-} from '../store/threadItems.ts';
+} from '../messages/threadItems.ts';
+import { hasAssistantText, hasSuggestedReplies } from '../messages/threadItems.ts';
 import type { InputItem } from '../protocol/threadProtocol.ts';
 import { cn } from '../utils/cn.ts';
 import { TypingIndicator } from './TypingIndicator.tsx';
@@ -35,7 +36,7 @@ export function ThreadItemBubble({ item, onCopy, isRunning = false, onRespond }:
     case "user_message":
       return <UserMessageBubble item={item} onCopy={onCopy} />;
     case "assistant_message":
-      if (!item.text && !isRunning) return null;
+      if (!hasAssistantText(item) && !(onRespond && hasSuggestedReplies(item)) && !isRunning) return null;
       return <AssistantMessageBubble item={item} onCopy={onCopy} isRunning={isRunning} onRespond={onRespond} />;
     case "error":
       return <ErrorBubble item={item} />;
@@ -261,11 +262,11 @@ function AssistantMessageBubble({ item, onCopy, isRunning, onRespond }: { item: 
     <article className="group mx-auto w-full">
       <div className="w-full">
         <div className="bg-transparent px-lg py-md text-app-text-primary">
-          <p className="m-0 whitespace-pre-wrap break-words text-[15px] leading-[1.6] text-app-text-primary">
+          {hasAssistantText(item) && <p className="m-0 whitespace-pre-wrap break-words text-[15px] leading-[1.6] text-app-text-primary">
             {item.text}
-          </p>
+          </p>}
           {isRunning && <TypingIndicator />}
-          {item.awaitingReply && onRespond && !!item.suggestedReplies?.length && (
+          {hasSuggestedReplies(item) && onRespond && (
             <div className="mt-sm flex flex-wrap gap-xs">
               {item.suggestedReplies.map((reply) => (
                 <button key={reply} type="button" onClick={() => onRespond(reply)}

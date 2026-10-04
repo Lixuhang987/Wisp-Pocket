@@ -1,5 +1,7 @@
 # Chrome Bookmarks 文件夹选择 Spec
 
+状态：文件夹树选择已实现；下文 Background 描述改造前问题，不表示仍需开发。当前设置见 [Settings surface](../../surfaces/settings.md)，真实扩展连接与收藏触发仍按 [manual QA](../../manual-qa.md) 验收；连接可靠性另列 TODO。
+
 ## Background
 
 Chrome Bookmarks trigger 目前需要用户在 App 设置页手动输入文件夹标识。实际触发时，扩展上报的是 Chrome 内部文件夹 ID，App 也按这个 ID 做匹配；用户输入文件夹显示名时不会命中目标文件夹。

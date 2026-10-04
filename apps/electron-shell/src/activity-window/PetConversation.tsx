@@ -1,6 +1,7 @@
 import { useEffect, useState, useLayoutEffect, useRef } from "react";
 import type { ThreadState } from "../../../thread-window-web/src/store/threadWindowStore.ts";
-import type { AssistantMessageItem, ThreadItem } from "../../../thread-window-web/src/store/threadItems.ts";
+import type { AssistantMessageItem, ThreadItem } from "../../../thread-window-web/src/messages/threadItems.ts";
+import { hasAssistantText, hasSuggestedReplies } from "../../../thread-window-web/src/messages/threadItems.ts";
 import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentUrl.ts";
 import type { PetThreadController } from "./petThreadController.ts";
 import { PetMarkdown } from "./PetMarkdown.tsx";
@@ -37,7 +38,7 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
   }, [expanded, thread?.threadId, thread?.messages, thread?.permissionRequests, status, error]);
 
   const messages = expanded ? thread?.messages ?? [] : latestAssistant ? [latestAssistant] : [];
-  const suggestedReplies = latestAssistant?.awaitingReply ? latestAssistant.suggestedReplies ?? [] : [];
+  const suggestedReplies = latestAssistant && hasSuggestedReplies(latestAssistant) ? latestAssistant.suggestedReplies ?? [] : [];
   return <div className={`pet-history ${expanded ? "is-expanded" : ""}`} data-pet-scroll-viewport
     role={expanded ? "log" : undefined} aria-label={expanded ? "对话历史" : undefined} ref={historyRef} onScroll={() => {
       if (expanded) {
@@ -74,6 +75,7 @@ export function PetConversation({ thread, latestAssistant, expanded, status, err
 
 function PetMessage({ message, latest, threadURL }: { message: ThreadItem; latest: boolean; threadURL: string }) {
   if (message.type === "tool_call") return null;
+  if (message.type === "assistant_message" && !hasAssistantText(message)) return null;
   if (message.type === "error") return <p className="pet-message pet-error" data-pet-interactive>{message.message}</p>;
   const user = message.type === "user_message";
   const text = user && message.inputItems.length
