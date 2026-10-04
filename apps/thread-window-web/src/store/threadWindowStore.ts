@@ -15,8 +15,8 @@ import { createWindowPreferences, windowPreferencePersistence, type WindowPrefer
 
 export type { ConnectionState } from "../thread/threadSocketClient.ts";
 export type { PermissionRequestState } from "./threadProjection.ts";
-export type { ThreadItem } from "./threadItems.ts";
-export { isUserMessage, isAssistantMessage, isToolCall, isError } from "./threadItems.ts";
+export type { ThreadItem } from "../messages/threadItems.ts";
+export { isUserMessage, isAssistantMessage, isToolCall, isError } from "../messages/threadItems.ts";
 
 export type ThreadState = ThreadProjection & ThreadInputState;
 

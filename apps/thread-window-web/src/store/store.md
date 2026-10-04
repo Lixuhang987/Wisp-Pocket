@@ -8,7 +8,6 @@
 - `threadProjection.ts`：协议通知、请求到消息、状态、历史摘要及请求面板的投影。
 - `inputHandoff.ts`：首轮创建关联与本地待确认摘要。
 - `windowPreferences.ts`：搜索、项目展开操作及展开偏好的本地保存。
-- `threadItems.ts`：可见消息的 UI 类型；跨进程 DTO 从 core 导入。
 
 ## 修改责任
 
@@ -37,6 +36,8 @@
 ThreadWindow 草稿仍在 `ThreadPetPane` 内按 Thread 保存，切换保留、提交清空、页面重建丢失。桌宠的当前 Thread、隐藏状态与回复草稿由桌宠控制器按 petId/Thread 持久保存，窗口选择不迁入此 store。
 
 ## 协议边界
+
+- 两端消息类型及内容判断由 [messages](../messages/messages.md) 共用，renderer 只选择呈现方式。snapshot 过滤无正文且无当前有效建议的助手项；正文为空字符串且不含建议 / 等待元数据的 delta 不创建项，分片元数据与流式前导空白保留至后续增量，但不画空正文容器。原始模型记录与工具结果继续留在后端，过滤不改变输入持久确认、附件或工具项。原始转换见 [agent-server](../../../agent-server/src/protocol/protocol.md)。
 
 - 本次 renderer 存续期内按 notificationId 忽略重复通知，assistant delta 追加到稳定 item；这不提供断线重放或跨页面去重保证。
 - live 与 snapshot 保留规范化 Input Item、图片 Blob 与原路径文件引用、建议和等待标记。用户输入记录或新 Turn 清理旧 assistant 等待展示。

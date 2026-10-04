@@ -4,6 +4,8 @@
 
 ## 直接子节点
 
+- [2026-10-04-shared-message-projection.md](./2026-10-04-shared-message-projection.md)：两端共用消息投影、历史空气泡修复与验证边界。
+
 - [2026-10-03-issue-8-settings-workspace.md](./2026-10-03-issue-8-settings-workspace.md)：Electron 设置、Workspace/Pet 与项目历史的实施合同、检查状态和实机边界。
 
 - [2026-10-03-test-cleanup.md](./2026-10-03-test-cleanup.md)：低价值与重复测试的删除依据、保留边界和验证结果。
