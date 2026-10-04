@@ -6,7 +6,7 @@
 
 - [CONTEXT.md](/Users/mu9/proj/handAgent/packages/core/CONTEXT.md)：Conversation Runtime glossary。
 - [src/src.md](/Users/mu9/proj/handAgent/packages/core/src/src.md)：源码模块索引与依赖方向。
-- [tests/tests.md](./tests/tests.md)：Runtime、LLM、Tool、协议、Pet 与 Permission 用例测试。
+- [tests/tests.md](./tests/tests.md)：Runtime、LLM、Tool、协议、Workspace 与 Permission 用例测试。
 - `package.json`：`@handagent/core` exports 与依赖声明。
 
 ## 边界

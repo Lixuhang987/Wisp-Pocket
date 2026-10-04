@@ -27,18 +27,7 @@
 
 - [ ] 单独设计 Wisp MCP、macOS 与 Automation 能力供 Codex 调用的接入方式；目前 Wisp 只有外部 MCP client 与 Swift Dynamic Tool Provider 通道，没有可供 Codex 消费这些宿主能力的 MCP 出口。本期不新增接口、不改动原有能力实现；主 Agent 收敛后，未迁移的能力不能据此声称已被 Codex 接管。
 
-## Pet 前端所有权破坏性重构（规格已发布，待实现）
-
-实施规格见 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，架构决策见 [ADR 0007](./adr/0007-frontend-pet-workspace-threads.md)；尚未实现，不计入已实现 manual QA。
-
-- [x] 读取根架构、领域路由、产品与相关 surface / ADR，核对当前模型并启动只读事实调查。
-- [x] 完成产品边界访谈并形成 ADR 汇总，覆盖后端移除 Pet、独占 / 不可夺取、历史与 Permission 分配、初始库存、独立前端和首版排除范围。
-- [x] 按用户调用的 to-spec 综合设计汇总、工程落点和已明确确认的测试边界。
-- [x] 发布 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，应用 ready-for-agent 并核对正文和标签。
-- [ ] 从主 checkout 使用 `scripts/create-worktree.sh` 初始化 `.worktrees/<task-name>/`，确认 CodeGraph 独立索引；后续 MCP 调用显式传入输出的绝对 projectPath。
-- [ ] 在 worktree 跑 `scripts/test.sh` 与桌面启动链相关的 `scripts/swiftw build` 基线，再沿 owning 目录文档链读取代码、实施删除与替换。
-- [ ] 完成必要验证及三项提交前检查，同步当前产品、架构和目录文档。
-- [ ] 分发不继承上下文的独立文档审核子 agent；确认 spec、代码、文档一致，更新 `manual-qa.md` 并迁出已完成 TODO 后提交。
+## Pet 后续策略
 
 ### 角色提示后续策略（本期之外）
 

@@ -24,12 +24,14 @@ import { encodePermissionAnswer } from "../../../thread-window-web/src/protocol/
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
 import { ThreadNotificationPublisher } from "../../src/thread/ThreadNotificationPublisher.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
-import { PetRegistry } from "@handagent/core/pet/PetRegistry.ts";
+import { WorkspaceRegistry } from "@handagent/core/workspace/WorkspaceRegistry.ts";
+import type { Pet } from "../../../thread-window-web/src/native/petTypes.ts";
 import { pathInput } from "../../../electron-shell/src/activity-window/readDroppedItems.ts";
 import * as projection from "../../src/protocol/MessageTranslator.ts";
 
 const cleanups: Array<() => Promise<void>> = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+const frontendPets = new Map<string, Pet>();
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); frontendPets.clear(); });
 const until = (assertion: () => void) => vi.waitFor(assertion, { timeout: 5000, interval: 10 });
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1XkAAAAASUVORK5CYII=", "base64");
 const textItem = (text: string): InputItem => ({ type: "text", id: crypto.randomUUID(), text });
@@ -68,10 +70,28 @@ async function harness(client: LLMClientLike, options: {
   const blobs = new FilesystemBlobStore({ rootPath: join(directory, "blobs") });
   const store = new ThreadStore({ dbPath: join(directory, "threads.sqlite") });
   const persistence = new ThreadPersistence(store, undefined, blobs);
-  const publisher = new ThreadNotificationPublisher();
   const reads: string[] = [];
-  const pets = new PetRegistry(store);
-  const petConfig = await pets.ensureDefault(join(directory,"files"));
+  const workspaces = new WorkspaceRegistry(store);
+  const {workspace} = await workspaces.create(join(directory,"files"));
+  const petConfig: Pet = frontendPets.get(directory) ?? {id:"test-pet",name:"测试伙伴",description:"",rolePrompt:"",revision:1,imageRef:{type:"builtin",id:"yachiyo"},isDefault:true,createdAt:"now",updatedAt:"now",workspaceId:workspace.id,threadId:null,visible:true,size:100};
+  frontendPets.set(directory,petConfig);
+  const petListeners = new Set<(pets:Pet[])=>void>();
+  const notifyPets = () => { for(const listener of petListeners)listener(structuredClone([petConfig])); };
+  const frontendBridge = {
+    async listPets() {return structuredClone([petConfig]);},
+    onPetsChanged(listener:(pets:Pet[])=>void) {petListeners.add(listener);return ()=>petListeners.delete(listener);},
+    async assignPet(selection:{petId:string;workspaceId:string;threadId:string|null}) {
+      if(selection.petId!==petConfig.id || !await workspaces.get(selection.workspaceId))throw new Error('无效伙伴或项目');
+      if(selection.threadId && (await persistence.getThread(selection.threadId))?.metadata.workspaceId!==selection.workspaceId)throw new Error('Thread 不属于项目');
+      Object.assign(petConfig,{workspaceId:selection.workspaceId,threadId:selection.threadId,visible:true});notifyPets();
+    },
+  };
+  // Electron owns the front-end association; this adapter keeps the protocol test focused on real backend facts.
+  const publisher = new ThreadNotificationPublisher(event=>{
+    if(event.type==='thread.deleted' && event.payload.status==='deleted' && event.payload.targetThreadId===petConfig.threadId) {
+      petConfig.threadId=null;notifyPets();
+    }
+  });
   const executedPath = join(directory, "executed.txt");
   const tools = new ToolRegistry([{
     name: "test.execute", description: "整理用户明确决定处理的资料", inputSchema: { type: "object", properties: {} },
@@ -95,7 +115,7 @@ async function harness(client: LLMClientLike, options: {
     }),
     stopTimeoutMs: 20,
   });
-  const router = new ThreadCommandRouter(threads, publisher, pets, undefined, () => options.dynamicBridge?.availableTools() ?? []);
+  const router = new ThreadCommandRouter(threads, publisher, workspaces, undefined, () => options.dynamicBridge?.availableTools() ?? []);
   const sockets = new Set<LocalSocket>();
   class LocalSocket {
     readyState = 0;
@@ -112,7 +132,7 @@ async function harness(client: LLMClientLike, options: {
     send(data: string) { this.server.emit("message", Buffer.from(data)); }
     close() { this.readyState = 3; this.server.emit("close"); this.onclose?.(); sockets.delete(this); }
   }
-  const pet = new PetThreadController({ petId: petConfig.id, url: "ws://local/api/thread?acceptServerRequests=1", WebSocketImpl: LocalSocket });
+  const pet = new PetThreadController({ petId: petConfig.id, bridge:frontendBridge as never, url: "ws://local/api/thread?acceptServerRequests=1", WebSocketImpl: LocalSocket });
   pet.connect();
   await until(() => expect(pet.getSnapshot().connection).toBe("connected"));
   let closed = false;
@@ -121,7 +141,7 @@ async function harness(client: LLMClientLike, options: {
     closed = true; pet.disconnect(); for (const socket of sockets) socket.close(); await threads.close(); store.close();
   };
   cleanups.push(close);
-  return { petConfig, pets, directory, blobs, store, persistence, threads, publisher, router, pet, reads, executedPath, close, LocalSocket };
+  return { petConfig, frontendBridge, workspace, workspaces, directory, blobs, store, persistence, threads, publisher, router, pet, reads, executedPath, close, LocalSocket };
 }
 
 function decisionClient(contexts: AgentMessage[][] = []): LLMClientLike {
@@ -163,7 +183,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     expect(h.pet.store.getState().history).toHaveLength(1);
   });
 
-  it.each(["online", "reconnect"])("完整窗口删除当前 Thread 后，桌宠 %s 回到仍存在的最新历史", async (connection) => {
+  it.each(["online", "reconnect"])("完整窗口删除当前 Thread 后，桌宠 %s 清理失效关联并能接续仍存在的历史", async (connection) => {
     const h = await harness(decisionClient());
     h.pet.drop([textItem("第一份资料")], "pet"); await settled(h);
     const a = current(h).id;
@@ -176,6 +196,8 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     deletingUI.send(JSON.stringify({ type: "thread.delete", commandId: "delete-from-full-window", timestamp: new Date().toISOString(), payload: { targetThreadId: b } }));
     await vi.waitFor(async () => expect(await h.persistence.getThread(b)).toBeNull());
     if (connection === "reconnect") h.pet.connect();
+    await until(() => expect(h.pet.getSnapshot().threadId).toBeNull());
+    await h.pet.selectThread(a);
     await until(() => expect(h.pet.getSnapshot().threadId).toBe(a));
     expect(h.pet.store.getState().history.map((thread) => thread.id)).not.toContain(b);
     expect(await h.persistence.getThread(b)).toBeNull();
@@ -232,7 +254,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     const requestId = fullView.getState().threadsById[id].permissionRequests[0].id;
     expect(h.pet.store.getState().threadsById[id].permissionRequests[0].id).toBe(requestId);
     expect(observed.filter(frame => frame.type === "permission.requested")).toHaveLength(1);
-    observer.emit("message", JSON.stringify({ type: "thread.list", commandId: "observer-reconnect", timestamp: "now", payload: { petId: h.petConfig.id } }));
+    observer.emit("message", JSON.stringify({ type: "thread.list", commandId: "observer-reconnect", timestamp: "now", payload: { workspaceId: h.workspace.id } }));
     await until(() => expect(observed.filter(frame => frame.type === "permission.requested")).toHaveLength(2));
     observer.emit("message", encodePermissionAnswer({ requestId, decision: "allow", scope: "once", timestamp: new Date().toISOString() }));
     expect(h.threads.get(id)!.requests.snapshot()).toHaveLength(1);
@@ -244,7 +266,11 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     expect(await readFile(executedPath, "utf8")).toBe("CLI completed after user decision");
     expect(fullView.getState().threadsById[id].permissionRequests).toEqual([]);
     expect(h.pet.store.getState().threadsById[id].permissionRequests).toEqual([]);
-    expect(observed.every(frame => ["permission.requested", "thread.listed"].includes(frame.type))).toBe(true);
+    expect(observed.filter(frame=>frame.type==="request.resolved")).toHaveLength(1);
+    expect(observed.every(frame => ["permission.requested", "thread.listed", "request.resolved"].includes(frame.type))).toBe(true);
+    observer.emit("message", JSON.stringify({type:"thread.list",commandId:"after-resolution",timestamp:"now"}));
+    await until(()=>expect(observed.some(frame=>frame.commandId==="after-resolution")).toBe(true));
+    expect(observed.filter(frame=>frame.type==="permission.requested")).toHaveLength(2);
     await until(() => expect(current(h).status).toBe("idle"));
     const saved = await h.persistence.getThread(id);
     expect(saved!.messages.some(message => message.role === "assistant" && !message.content.trim() && !!message.toolCalls?.length)).toBe(true);
@@ -266,12 +292,23 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     await until(() => expect(restored.pet.store.getState().threadsById[id]).toBeDefined());
     expect(restored.pet.store.getState().threadsById[id].messages.flatMap(message => message.type === "assistant_message" ? [message.text] : [])).toEqual(liveAssistantTexts);
     expect((await restored.persistence.getThread(id))!.messages).toEqual(saved!.messages);
+    const restoredObserved: any[] = [];
+    const restoredObserver = new EventEmitter() as EventEmitter & { send(data: string): void };
+    restoredObserver.send = data => restoredObserved.push(JSON.parse(data));
+    attachThreadSocketHandlers(restoredObserver, { commandRouter: restored.router, eventPublisher: restored.publisher, observeRequests: true });
+    cleanups.push(async () => { restoredObserver.emit("close"); });
+    const deletingSocket = new restored.LocalSocket("ws://local/api/thread");
+    await until(() => expect(deletingSocket.readyState).toBe(1));
+    deletingSocket.send(JSON.stringify({type:"thread.delete",commandId:"delete-authorized-thread",timestamp:"now",payload:{targetThreadId:id}}));
+    await until(()=>expect(restoredObserved.some(frame=>frame.type==="thread.deleted" && frame.payload.targetThreadId===id)).toBe(true));
+    expect(restored.threads.get(id)).toBeUndefined();
   });
 
   it("PDF 已读完但本轮未完成时，重启会说明中断，且不会重放已开始的输入", async () => {
     const h = await harness(decisionClient());
-    const thread = await h.persistence.createThread({petId:h.petConfig.id});
+    const thread = await h.persistence.createThread({workspaceId:h.workspace.id});
     const id = thread.metadata.id;
+    await h.frontendBridge.assignPet({petId:h.petConfig.id,workspaceId:h.workspace.id,threadId:id});
     await h.persistence.persistUserInput(id, {items:[textItem("/tmp/report.pdf")]}, "reading");
     await h.persistence.persistNotifications(id, [{ type: "turn.started", threadId: id, turnId: "reading", notificationId: "started", timestamp: new Date().toISOString(), payload: {} }]);
     await h.persistence.persistRunDelta(id,0,[{role:"tool",name:"file.read",toolCallId:"read",content:"Saved PDF body"}],[]);
@@ -286,8 +323,9 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
 
   it("已接收但还没开始的输入在重启后保持待处理，不冒充丢失中的执行", async () => {
     const h = await harness(decisionClient());
-    const thread = await h.persistence.createThread({petId:h.petConfig.id});
+    const thread = await h.persistence.createThread({workspaceId:h.workspace.id});
     const id = thread.metadata.id;
+    await h.frontendBridge.assignPet({petId:h.petConfig.id,workspaceId:h.workspace.id,threadId:id});
     await h.persistence.persistUserInput(id, { items: [textItem("尚未开始的工作")] }, "pending");
     await h.close();
     const restored = await harness(decisionClient(), { directory: h.directory });
@@ -322,7 +360,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
 
   it("只有建议的持久历史重建后仍可恢复等待并沿同一 Thread 回复", async () => {
     const h = await harness(decisionClient());
-    const { metadata: { id } } = await h.persistence.createThread({ petId: h.petConfig.id });
+    const { metadata: { id } } = await h.persistence.createThread({ workspaceId: h.workspace.id });
     const messages: AgentMessage[] = [
       { id: "user", role: "user", content: "待处理资料" },
       { id: "previous-answer", role: "assistant", content: "恢复的正文" },
@@ -330,6 +368,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
       { id: "suggestions-only", role: "assistant", content: "", suggestedReplies: ["只按建议继续"], awaitingReply: true },
     ];
     await h.persistence.persistRunResult(id, messages, []);
+    await h.frontendBridge.assignPet({ petId: h.petConfig.id, workspaceId: h.workspace.id, threadId: id });
     await h.close();
     const restored = await harness(decisionClient(), { directory: h.directory });
     await until(() => expect(restored.pet.store.getState().threadsById[id]).toBeDefined());
@@ -417,6 +456,10 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     } });
     h.pet.drop([textItem("任务 A")], "pet"); await entered.promise;
     const a = current(h).id;
+    await h.pet.newTopic();
+    expect(h.pet.getSnapshot().threadId).toBeNull();
+    expect(h.threads.get(a)?.status).toBe("running");
+    expect(await h.persistence.listThreads()).toHaveLength(1);
     h.pet.drop([textItem("任务 B")], "pet");
     await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toBe("B 的建议"));
     const b = current(h).id;

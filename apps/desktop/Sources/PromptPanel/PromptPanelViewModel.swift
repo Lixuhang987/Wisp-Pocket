@@ -101,6 +101,22 @@ final class PromptPanelViewModel {
     private(set) var submissionDisabledMessage: String?
     private(set) var isSubmissionInputDisabled = false
 
+    private(set) var workspaces: [WorkspaceEntry] = []
+    private(set) var workspaceErrorMessage: String?
+    var selectedWorkspaceId: String {
+        didSet {
+            guard !selectedWorkspaceId.isEmpty else { return }
+            if let preferences, !preferences.updatePromptWorkspace(selectedWorkspaceId) {
+                workspaceErrorMessage = preferences.saveErrorMessage
+            } else {
+                workspaceErrorMessage = nil
+            }
+        }
+    }
+    @ObservationIgnored private let workspaceClient: (any WorkspaceManaging)?
+    @ObservationIgnored private let preferences: AgentSettingsStore?
+    @ObservationIgnored private var workspaceReloadTask: Task<Void, Never>?
+
     var onSubmit: (([PromptPanelComposerItem], [PromptAttachmentResult]) -> Void)?
     var onHide: (() -> Void)?
     var onOpenSettings: (() -> Void)?
@@ -149,12 +165,47 @@ final class PromptPanelViewModel {
         return actions.first
     }
 
-    init(actions: [ActionDefinition]) {
+    init(
+        actions: [ActionDefinition],
+        workspaceClient: (any WorkspaceManaging)? = nil,
+        preferences: AgentSettingsStore? = nil
+    ) {
+        self.workspaceClient = workspaceClient
+        self.preferences = preferences
+        self.selectedWorkspaceId = preferences?.promptWorkspaceId ?? ""
         self.actions = actions
         let textId = UUID().uuidString
         self.editableTextItemId = textId
         self.inputItems = [.text(.init(id: textId, text: ""))]
         normalizeSelectedAction()
+    }
+
+    func showSubmissionError(_ message: String) {
+        submissionDisabledMessage = message
+    }
+
+    func showWorkspaceRequired() {
+        workspaceErrorMessage = "请选择工作区"
+    }
+
+    func refreshWorkspaces() {
+        guard let workspaceClient else { return }
+        workspaceReloadTask?.cancel()
+        workspaceReloadTask = Task { @MainActor [weak self] in
+            do {
+                let workspaces = try await workspaceClient.listWorkspaces()
+                guard !Task.isCancelled, let self else { return }
+                self.workspaces = workspaces
+                if self.selectedWorkspaceId.isEmpty, let first = workspaces.first {
+                    self.selectedWorkspaceId = first.id
+                }
+                self.workspaceErrorMessage = workspaces.contains { $0.id == self.selectedWorkspaceId }
+                    ? nil : "请选择可用工作区"
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.workspaceErrorMessage = error.localizedDescription
+            }
+        }
     }
 
     func updateActions(_ actions: [ActionDefinition]) {
@@ -210,6 +261,12 @@ final class PromptPanelViewModel {
     func submit() {
         guard hasVisibleInput else { return }
         guard !isSubmissionInputDisabled else { return }
+        if workspaceClient != nil {
+            guard workspaces.contains(where: { $0.id == selectedWorkspaceId }) else {
+                workspaceErrorMessage = "请选择可用工作区"
+                return
+            }
+        }
         submissionDisabledMessage = nil
 
         onSubmit?(inputItems, validAttachments())

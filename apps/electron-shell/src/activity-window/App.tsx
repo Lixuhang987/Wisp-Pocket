@@ -6,7 +6,6 @@ import { PetReply } from "./PetReply.tsx";
 import { PetSizeControl, usePetSize } from "./PetSizeControl.tsx";
 import { PetManager } from "./PetManager.tsx";
 import { PetContextMenu, type PetMenuAction } from "./PetContextMenu.tsx";
-import { attachmentUrl } from "../../../thread-window-web/src/thread/attachmentUrl.ts";
 import { readDroppedItems } from "./readDroppedItems.ts";
 import { petWindowLayout } from "../petWindowLayout.ts";
 
@@ -43,6 +42,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   const thread = snapshot.threadId ? controller.store.getState().threadsById[snapshot.threadId] : undefined;
   const [hovered, setHovered] = useState(false);
   const draft = snapshot.draft;
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
@@ -55,7 +55,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   const [choosing, setChoosing] = useState(false);
   const [dropTarget, setDropTarget] = useState<PetDropTarget | null>(null);
   const [moving, setMoving] = useState(false);
-  const [petSize, setPetSize] = usePetSize(controller.petId);
+  const [petSize, setPetSize] = usePetSize(controller.petId, snapshot.pet?.size ?? 100, setError);
   const [sizeControlsOpen, setSizeControlsOpen] = useState(false);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const petScale = petWindowLayout.character.defaultScale * (petSize / 100);
@@ -69,7 +69,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   const ignoreClick = useRef(false);
   const visible = snapshot.bubbleVisible;
   const expanded = visible && hovered;
-  const layout = managerOpen || historyOpen ? "expanded" : expanded ? "expanded" : visible || sizeControlsOpen || contextMenuOpen ? "compact" : "pet";
+  const layout = managerOpen || historyOpen || workspaceOpen ? "expanded" : expanded ? "expanded" : visible || sizeControlsOpen || contextMenuOpen ? "compact" : "pet";
   const pending = thread?.messages.filter((item) => item.type === "user_message" && item.pending).length ?? 0;
   const waiting = !!(snapshot.latestAssistant?.awaitingReply || thread?.permissionRequests.length);
   const status = snapshot.connection !== "connected" ? "正在连接…"
@@ -137,7 +137,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       stage?.removeEventListener("scroll", reportRegions, true);
       window.removeEventListener("resize", reportRegions);
     };
-  }, [layout, historyOpen, managerOpen, petSize, sizeControlsOpen, contextMenuOpen, visible, status, displayedError, thread?.messages, thread?.permissionRequests, snapshot.files, snapshot.pet]);
+  }, [layout, historyOpen, managerOpen, workspaceOpen, petSize, sizeControlsOpen, contextMenuOpen, visible, status, displayedError, thread?.messages, thread?.permissionRequests, snapshot.files, snapshot.pet]);
 
   function attempt(action: () => void): boolean {
     try { action(); setError(null); return true; }
@@ -176,8 +176,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   }
 
   function newTopic(): void {
-    controller.newTopic();
-    controller.revealBubble();
+    void controller.newTopic().then(() => controller.revealBubble()).catch(failure => setError(failure instanceof Error ? failure.message : String(failure)));
     setHistoryOpen(false);
     setError(null);
     replyRef.current?.focus({ preventScroll: true });
@@ -218,6 +217,12 @@ export function App({ controller: suppliedController }: { controller?: PetThread
     setSizeControlsOpen(action === "size");
     setManagerOpen(action === "manager");
     setHistoryOpen(action === "history");
+    setWorkspaceOpen(action === "workspace");
+    if (action === "summon") {
+      const workspaceId = snapshot.pet?.workspaceId;
+      if (!workspaceId) { setError("请先选择工作区。"); return; }
+      void window.handAgentSettings?.summonPet(workspaceId).catch(failure=>setError(failure instanceof Error?failure.message:String(failure)));
+    }
     if (action === "hide") window.handAgentPet?.hidePet();
   }
 
@@ -235,10 +240,11 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       {contextMenuOpen && <PetContextMenu name={snapshot.pet?.name ?? "月见八千代"} petId={controller.petId} bottom={petHeight + 8}
         onSelect={selectMenuAction} onClose={() => setContextMenuOpen(false)} onEscape={() => petRef.current?.focus({ preventScroll: true })} />}
       {managerOpen && <PetManager controller={controller} threadURL={threadURL()} onClose={() => setManagerOpen(false)} />}
-      {historyOpen && <section className="pet-popover" data-pet-interactive aria-label="本宠对话">
-        <header><span>{snapshot.pet?.name}的对话</span><button onClick={() => setHistoryOpen(false)}>关闭</button></header>
+      {workspaceOpen && <PetManager controller={controller} threadURL={threadURL()} assignOnly onClose={() => setWorkspaceOpen(false)} />}
+      {historyOpen && <section className="pet-popover" data-pet-interactive aria-label="工作区对话">
+        <header><span>{controller.store.getState().workspaces.find(workspace=>workspace.id===snapshot.pet?.workspaceId)?.name ?? "当前工作区"}的对话</span><button onClick={() => setHistoryOpen(false)}>关闭</button></header>
         {snapshot.history.map(item => <div className="pet-history-row" key={item.id}>
-          <button onClick={() => { controller.selectThread(item.id); controller.revealBubble(); setHistoryOpen(false); }}>{item.preview || "新对话"}<small>{item.status} · {item.updatedAt.slice(0,16).replace("T"," ")}</small></button>
+          <button onClick={() => { void controller.selectThread(item.id).then(()=>{controller.revealBubble();setHistoryOpen(false);}).catch(failure=>setError(failure instanceof Error?failure.message:String(failure))); }}>{item.preview || "新对话"}<small>{item.status} · {item.updatedAt.slice(0,16).replace("T"," ")}</small></button>
           <button aria-label={`删除 ${item.preview || "新对话"}`} onClick={() => setDeleteTarget(item.id)}>删除</button>
         </div>)}
         {snapshot.nextCursor && <button onClick={() => controller.listMore()}>更多对话</button>}
@@ -292,7 +298,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
         onPointerCancel={() => { movement.current = null; setMoving(false); window.handAgentPet?.endMove(); }}
         onDragEnter={(event) => dragOver(event, "pet")} onDragOver={(event) => dragOver(event, "pet")}
         onDrop={(event) => void drop(event, "pet")}>
-        {snapshot.pet?.imageRef.type === "imported" && !imageFailed ? <img className="pet-custom-image" draggable={false} alt={snapshot.pet.name} src={attachmentUrl({...snapshot.pet.imageRef,type:"image",id:snapshot.pet.id}, threadURL())} onError={event => { setImageFailed(true); setError("桌宠图片不可用，请在伙伴设置中重新导入。"); }} /> : <PetSprite scale={petScale} state={moving ? "moving" : displayedError || thread?.status === "failed" ? "failed" : waiting ? "waiting" : thread?.status === "running" ? "running" : "idle"} />}
+        {snapshot.pet?.imageRef.type === "imported" && !imageFailed ? <img className="pet-custom-image" draggable={false} alt={snapshot.pet.name} src={snapshot.pet.imageRef.url} onError={event => { setImageFailed(true); setError("桌宠图片不可用，请在伙伴设置中重新导入。"); }} /> : <PetSprite scale={petScale} state={moving ? "moving" : displayedError || thread?.status === "failed" ? "failed" : waiting ? "waiting" : thread?.status === "running" ? "running" : "idle"} />}
         {dropTarget === "pet" && <span className="pet-drop-label">{snapshot.pet?.name} · 新对话</span>}
       </button>
       {sizeControlsOpen && <PetSizeControl size={petSize} bottom={petHeight + 8}

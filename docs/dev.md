@@ -45,7 +45,7 @@ env CFFIXED_USER_HOME="$qa_home" HOME="$qa_home" bash ./scripts/swiftw test
 ## 排障顺序
 
 - 无法启动：先检查完整 Xcode、`xcode-select` 和 Electron/ThreadWindow build 输出。
-- 无法提交：区分 agent-server health、hidden ThreadWindow prepared 与模型 API key；不要把连接失败归因于 provider。
+- 无法提交：区分 agent-server health、所选 Workspace 与模型 API key；ThreadWindow prepared 不影响独立任务提交；不要把连接失败归因于 provider。
 - provider 地址错误：检查 `baseUrl` 和 `api` 是否匹配服务端协议。
 - 图片失败：确认模型 API 支持多模态，并区分 Blob 落盘、STUB 展开和 provider 拒绝。
 - 窗口或热键：检查辅助功能权限，再观察 PromptPanel、ThreadWindow 和桌宠的实际所有者。桌宠位置与隔离 QA 配置见 [Electron main](../apps/electron-shell/src/main/main.md)。

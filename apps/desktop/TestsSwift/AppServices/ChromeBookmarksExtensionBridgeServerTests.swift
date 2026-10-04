@@ -13,7 +13,7 @@ final class ChromeBookmarksExtensionBridgeServerTests: XCTestCase {
                 id: "qa-bookmarks", packageId: "chrome-bookmarks", title: "QA Bookmarks", enabled: true,
                 config: ["folderIds": .stringList(["qa-folder"])], promptTemplate: "Summarize {{url}}",
                 deliveryPolicy: .default, notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             ),
         ]))
         let factory = IsolatedChromeBridgeFactory(homeURL: homeURL)

@@ -173,13 +173,13 @@ function parseApiOverride(value: string | undefined): OpenAIApiType | undefined 
 function referenceFileWriteTool(): RegisteredTool {
   return {
     name: "file.write",
-    description: "Write a UTF-8 text file inside the current Pet root.",
+    description: "Write a UTF-8 text file inside the current Workspace root.",
     inputSchema: {
       type: "object",
       properties: {
         relativePath: {
           type: "string",
-          description: "Relative path inside the Pet root.",
+          description: "Relative path inside the Workspace root.",
         },
         content: {
           type: "string",

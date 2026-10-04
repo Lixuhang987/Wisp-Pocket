@@ -2,7 +2,7 @@
 
 本目录按用户任务记录 Wisp Pocket 的界面现状，作为后续设计的 surface brief。共享产品背景见 [PRODUCT.md](../PRODUCT.md)，视觉权威为根目录 [DESIGN.md](../../DESIGN.md) 与其引用的 token 源。
 
-当前 brief 描述已实现的 Issue #8 模型；PRODUCT 统一表达 Issue #9 确认的最终产品意图，包括伙伴换工作区、工作区管理与前端分配。实现差距由 [对齐记录](../product-alignment.md) 维护；不能用本目录的旧现状否定产品意图，也不能提前把目标操作写成当前 surface 能力。
+当前 brief 描述已实现的 Issue #9 前端伙伴、Workspace 任务与 Codex 风格设置界面；时间 system 与共享消息投影同时保留。PRODUCT 表达最终意图，尚未实施的 Codex CLI 委托由 [对齐记录](../product-alignment.md)、ADR 0008 与 TODO 维护，不写成当前 surface 能力。
 
 ## 直接子节点
 
@@ -15,7 +15,7 @@
 
 ## 拆分与使用边界
 
-- 四个主要 surface 都属于同一个桌面产品；Electron 的 AI / Agent / Pets 与原生宿主设置在 Settings brief 内展开，不按工程包拆分产品。
+- 四个主要 surface 都属于同一个桌面产品；Electron 的各配置页与原生宿主设置在 Settings brief 内展开，不按工程包拆分产品。
 - 附件 chip、预览、候选弹层、删除确认与权限请求属于宿主 surface 的组件或状态；共享组件不单独建立视觉身份。
 - 系统快捷键、截图与选区采集接入 PromptPanel；系统菜单“设置…”接入 Settings。系统权限弹窗由 macOS 管理，不是产品自有页面。
 - Chrome 扩展目前只有后台 service worker，未声明 popup 或 options 页面；其连接与规则配置属于原生 Settings → 触发器。
@@ -24,7 +24,7 @@
 
 ## 状态记录方法
 
-2026-10-04 按 Issue #8 更新独立 Electron 设置、原生保留页与 Workspace 一级历史导航；关闭重开默认 AI、重复入口只聚焦和后端配置归属以当前实现为准，完整宿主实机验收仍待进行。
+2026-10-04 按 Issue #9 更新前端伙伴所有权、Workspace 管理与历史、独占分配和任意来源 Permission 承接；ThreadWindow 只面向 Workspace，PromptPanel / AgentTrigger 独立选择目标。Issue #8 的模型、工具与设置保存边界继续保留；完整宿主实机验收仍待进行。
 
 2026-10-02 已按 Issue #6/#7 更新多宠管理、历史选择、路径交付和常驻采集事实，原生及真实模型未复验；2026-10-03 按用户修订更新桌宠右键菜单、身份标题与目录隐藏、文件草稿工具行及悬停定位，逐宠对话显隐恢复继续保留。初始记录以提交 `ad9e731` 的代码及现有文档为基线；2026-09-15 合入 `codex/pet-compact-hover-20260914` 的 `f54d09f` 后更新桌宠记录，点击输入、常态收紧与悬停统一滚动属于当前实现。按 new-work 的“确认既有事实 → 识别 surface 任务 → 继承既有视觉世界 → 写 brief”记录，保留 THESIS、OWN-WORLD、STORY、FIRST VIEWPORT、FORM、FINISH 六块，明确这是现状描述，不是新设计审批。
 

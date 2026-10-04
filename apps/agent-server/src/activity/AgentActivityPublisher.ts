@@ -109,11 +109,9 @@ export class AgentActivityPublisher {
       case "thread.snapshot":
       case "thread.listed":
       case "thread.deleted":
-      case "pet.listed":
-      case "pet.created":
-      case "pet.updated":
-      case "pet.image.imported":
-      case "pet.error":
+      case "workspace.listed":
+      case "workspace.created":
+      case "workspace.error":
       case "request.resolved":
         return null;
     }

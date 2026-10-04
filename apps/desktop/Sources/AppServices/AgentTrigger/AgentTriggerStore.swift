@@ -84,17 +84,24 @@ final class AgentTriggerStore {
 
     func loadInstances() -> [AgentTriggerInstance] {
         let fileURL = Self.instancesFileURL(homeDirectoryURL: homeDirectoryURL)
-        guard let data = try? Data(contentsOf: fileURL),
-              let file = try? JSONDecoder().decode(AgentTriggerInstancesFile.self, from: data) else {
+        guard fileManager.fileExists(atPath: fileURL.path) else { return [] }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            return try JSONDecoder().decode(AgentTriggerInstancesFile.self, from: data).instances
+        } catch {
+            saveErrorMessage = "现有 AgentTrigger 配置无法读取，文件已保留：\(error.localizedDescription)"
             return []
         }
-        return file.instances
     }
 
     @discardableResult
     func saveInstances(_ instances: [AgentTriggerInstance]) -> Bool {
         let fileURL = Self.instancesFileURL(homeDirectoryURL: homeDirectoryURL)
         do {
+            if fileManager.fileExists(atPath: fileURL.path) {
+                let data = try Data(contentsOf: fileURL)
+                _ = try JSONDecoder().decode(AgentTriggerInstancesFile.self, from: data)
+            }
             try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

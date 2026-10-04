@@ -2,7 +2,6 @@ import {
   encodeThreadList,
   encodeThreadResume,
   encodeOpSubmit,
-  encodePetList,
   type RuntimeOp,
   type ThreadListEntry,
   isServerRequest,
@@ -33,10 +32,12 @@ export class ThreadSocketClient {
   private outboundQueue: string[] = [];
   private historyPages: ThreadListEntry[] = [];
   private loadingHistoryPages = false;
+  private workspaceId: string | undefined;
+  private readonly listScopes = new Map<string, string | undefined>();
 
   constructor(private readonly options: {
     url: string;
-    petId?: string;
+    workspaceId?: string;
     listWorkspaces?: boolean;
     WebSocketImpl?: WebSocketConstructor;
     now?: () => string;
@@ -44,7 +45,13 @@ export class ThreadSocketClient {
     onConnectionState: (state: ConnectionState) => void;
     onNotification: (notification: ThreadNotification) => void;
     onRequest: (request: ServerRequest) => void;
-  }) {}
+  }) { this.workspaceId = options.workspaceId; }
+
+  setWorkspaceId(workspaceId: string | undefined): void {
+    this.workspaceId = workspaceId;
+    this.historyPages = [];
+    this.loadingHistoryPages = false;
+  }
 
   connect(): void {
     this.manuallyClosed = false;
@@ -57,6 +64,7 @@ export class ThreadSocketClient {
   disconnect(): void {
     this.manuallyClosed = true;
     this.outboundQueue = [];
+    this.listScopes.clear();
     this.socket?.close();
     this.socket = null;
     this.options.onConnectionState("disconnected");
@@ -71,10 +79,12 @@ export class ThreadSocketClient {
   }
 
   listThreads(cursor?: string): void {
-    if (!cursor && !this.options.petId) { this.historyPages = []; this.loadingHistoryPages = true; }
+    if (!cursor && !this.workspaceId) { this.historyPages = []; this.loadingHistoryPages = true; }
+    const commandId = this.nextId();
+    this.listScopes.set(commandId, this.workspaceId);
     this.sendRaw(encodeThreadList({
-      petId: this.options.petId, cursor,
-      commandId: this.nextId(),
+      workspaceId: this.workspaceId, cursor,
+      commandId,
       timestamp: this.now(),
     }));
   }
@@ -108,10 +118,6 @@ export class ThreadSocketClient {
       }
       this.options.onConnectionState("connected");
       this.flushOutboundQueue(socket);
-      this.sendRaw(encodePetList({
-        commandId: this.nextId(),
-        timestamp: this.now(),
-      }));
       if (this.options.listWorkspaces) this.sendRaw(JSON.stringify({type:"workspace.list", commandId:this.nextId(),timestamp:this.now()}));
       this.listThreads();
     };
@@ -136,14 +142,19 @@ export class ThreadSocketClient {
       }
 
       if (isThreadNotification(value)) {
-        if (!this.options.petId && value.type === "thread.listed") {
+        if (value.type === "thread.listed" && value.commandId && this.listScopes.has(value.commandId)) {
+          const workspaceId = this.listScopes.get(value.commandId);
+          this.listScopes.delete(value.commandId);
+          if (workspaceId !== this.workspaceId) return;
+        }
+        if (!this.workspaceId && value.type === "thread.listed") {
           this.historyPages = [...new Map([...this.historyPages, ...value.payload.threads].map(thread => [thread.id, thread])).values()];
           this.options.onNotification({...value,payload:{...value.payload,threads:this.historyPages}});
           if (value.payload.nextCursor) this.listThreads(value.payload.nextCursor);
           else this.loadingHistoryPages = false;
           return;
         }
-        if (!this.options.petId && this.loadingHistoryPages && value.type === "thread.started") {
+        if (!this.workspaceId && this.loadingHistoryPages && value.type === "thread.started") {
           this.historyPages.push({id:value.threadId,...value.payload,createdAt:value.payload.createdAt ?? value.timestamp,updatedAt:value.timestamp,messageCount:0,status:"idle"});
         }
         if (value.type === "thread.deleted") this.historyPages = this.historyPages.filter(thread => thread.id !== value.payload.targetThreadId);

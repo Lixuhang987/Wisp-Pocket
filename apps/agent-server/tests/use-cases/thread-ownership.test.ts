@@ -19,7 +19,7 @@ describe("Thread ownership through public lifecycle", () => {
     const contexts: AgentMessage[][] = [];
     const h = threadHarness({ complete: async (messages) => { contexts.push(structuredClone(messages)); return echo.complete(messages); } });
     try {
-      const thread = await h.threads.create({ petId: h.pet.id,});
+      const thread = await h.threads.create({ workspaceId: h.workspace.id,});
       expect(await h.threads.load(thread.id)).toBe(thread);
       await thread.submit(input("first"));
       await wait(() => expect(thread.status).toBe("idle"));
@@ -38,7 +38,7 @@ describe("Thread ownership through public lifecycle", () => {
       class Socket extends EventEmitter { send() {} }
       const socket = new Socket();
       attachThreadSocketHandlers(socket as never, { commandRouter: h.router, eventPublisher: h.publisher });
-      const thread = await h.threads.create({ petId: h.pet.id,});
+      const thread = await h.threads.create({ workspaceId: h.workspace.id,});
       socket.emit("message", JSON.stringify({ type: "op.submit", threadId: thread.id, commandId: "input", timestamp: "now", payload: { op: input("background") } }));
       await entered.promise;
       socket.emit("close");
@@ -53,7 +53,7 @@ describe("Thread ownership through public lifecycle", () => {
   it("persists before input acknowledgement and before successful completion", async () => {
     const h = threadHarness(echo);
     try {
-      const thread = await h.threads.create({ petId: h.pet.id,});
+      const thread = await h.threads.create({ workspaceId: h.workspace.id,});
       const gate = Promise.withResolvers<void>();
       const persist = h.persistence.persistNotifications.bind(h.persistence);
       vi.spyOn(h.persistence, "persistNotifications").mockImplementation(async (id, events) => {
@@ -73,7 +73,7 @@ describe("Thread ownership through public lifecycle", () => {
   it("pauses on failed persistence, reports without another write and reloads consistent history", async () => {
     const h = threadHarness(echo);
     try {
-      const thread = await h.threads.create({ petId: h.pet.id,});
+      const thread = await h.threads.create({ workspaceId: h.workspace.id,});
       const persist = vi.spyOn(h.persistence, "persistRunDelta").mockRejectedValue(new Error("disk full"));
       await thread.submit(input("one"));
       await wait(() => expect(thread.status).toBe("failed"));
@@ -94,7 +94,7 @@ describe("Thread ownership through public lifecycle", () => {
     const entered = Promise.withResolvers<void>();
     const h = threadHarness({ complete: async (messages) => { entered.resolve(); await gate.promise; return echo.complete(messages); } });
     try {
-      const thread = await h.threads.create({ petId: h.pet.id,});
+      const thread = await h.threads.create({ workspaceId: h.workspace.id,});
       await thread.submit(input("stop")); await entered.promise;
       await thread.interrupt();
       expect(thread.status).toBe("interrupted");
@@ -124,7 +124,7 @@ describe("Thread ownership through public lifecycle", () => {
       }),
     });
     try {
-      const thread = await h.threads.create({ petId: h.pet.id, dynamicTools: [{
+      const thread = await h.threads.create({ workspaceId: h.workspace.id, dynamicTools: [{
         clientId: "swift-host", namespace: "automation", name: "run", description: "Run saved policy", inputSchema: { type: "object" },
       }] });
       await thread.submit(input("run then interrupt"));
@@ -148,7 +148,7 @@ describe("Thread ownership through public lifecycle", () => {
     const entered = Promise.withResolvers<void>();
     const h = threadHarness({ complete: async (messages) => { entered.resolve(); await gate.promise; return echo.complete(messages); } });
     try {
-      const thread = await h.threads.create({ petId: h.pet.id,});
+      const thread = await h.threads.create({ workspaceId: h.workspace.id,});
       await thread.submit(input("delete")); await entered.promise;
       const deleting = h.threads.delete(thread.id);
       await expect(thread.submit(input("race"))).rejects.toThrow("closed");
@@ -165,7 +165,7 @@ describe("Thread ownership through public lifecycle", () => {
     const h = threadHarness(echo);
     try {
       // 已持久但尚未加载的历史：删除失败后仍可恢复，不能把存储故障误判为删除。
-      const thread = (await h.persistence.createThread({ petId: h.pet.id })).metadata;
+      const thread = (await h.persistence.createThread({ workspaceId: h.workspace.id })).metadata;
       h.publisher.attachConnection("ui", () => {});
       const deletion = vi.spyOn(h.persistence, "deleteThread").mockRejectedValue(new Error("cannot delete"));
       await h.router.receive({ type: "thread.delete", commandId: "delete", timestamp: "now", payload: { targetThreadId: thread.id } }, "ui");
@@ -189,11 +189,11 @@ describe("Thread ownership through public lifecycle", () => {
     const path = join(directory, "threads.sqlite");
     let now = "2026-10-04T09:00:00Z";
     const h = threadHarness(echo, { now: () => now }, path);
-    const thread = await h.threads.create({ petId: h.pet.id,});
+    const thread = await h.threads.create({ workspaceId: h.workspace.id,});
     const accepted = input("saved");
     await thread.submit(accepted); await wait(() => expect(thread.status).toBe("idle"));
     const firstSaved = await h.persistence.getThread(thread.id);
-    expect(firstSaved!.messages.filter(message => message.role === "system")).toHaveLength(3);
+    expect(firstSaved!.messages.filter(message => message.role === "system")).toHaveLength(2);
     expect(firstSaved!.metadata.messageCount).toBe(2);
     await h.close();
     const complete = vi.fn(echo.complete);
@@ -231,7 +231,7 @@ it.each(["input", "context", "completion"])("honors interrupt while %s persisten
   const gate = Promise.withResolvers<void>();
   const entered = Promise.withResolvers<void>();
   try {
-    const thread = await h.threads.create({ petId: h.pet.id,});
+    const thread = await h.threads.create({ workspaceId: h.workspace.id,});
     const persist = h.persistence.persistNotifications.bind(h.persistence);
     vi.spyOn(h.persistence, "persistNotifications").mockImplementation(async (id, events) => {
       if (events.some((event) => phase === "input" ? event.type === "user.message.recorded" : event.type === "turn.completed" && event.payload.status === "completed")) {
@@ -257,7 +257,7 @@ it.each(["input", "context", "completion"])("honors interrupt while %s persisten
       await thread.submit(input("continue after interrupted save"));
       await wait(() => expect(thread.status).toBe("idle"));
       const saved = await h.persistence.getMessages(thread.id);
-      expect(saved.filter(message => message.role === "system")).toHaveLength(3);
+      expect(saved.filter(message => message.role === "system")).toHaveLength(2);
     }
   } finally { gate.resolve(); await h.close(); }
 });
@@ -270,7 +270,7 @@ it("queues inputs during execution, preserves their order and isolates other Thr
     return echo.complete(messages);
   } });
   try {
-    const a = await h.threads.create({ petId: h.pet.id,}); const b = await h.threads.create({ petId: h.pet.id,});
+    const a = await h.threads.create({ workspaceId: h.workspace.id,}); const b = await h.threads.create({ workspaceId: h.workspace.id,});
     await a.submit(input("first")); await entered.promise;
     await a.submit(input("second")); await a.submit(input("third"));
     await b.submit(input("other")); await wait(() => expect(b.status).toBe("idle"));
@@ -294,8 +294,8 @@ it("saves system context before a failing model and replaces or clears project r
   } }, { now: () => "2026-10-04T09:00:00Z" });
   try {
     await writeFile(join(directory, "AGENTS.md"), "PROJECT_RULE_ONE");
-    const pet = await h.pets.create({ name: "系统上下文", rolePrompt: "ROLE_RULE", imageRef: { type: "builtin", id: "yachiyo" }, rootPath: directory });
-    const thread = await h.threads.create({ petId: pet.id }); threadId = thread.id;
+    const { workspace } = await h.workspaces.create(directory);
+    const thread = await h.threads.create({ workspaceId: workspace.id }); threadId = thread.id;
     await thread.submit(input("first")); await wait(() => expect(thread.status).toBe("failed"));
     await writeFile(join(directory, "AGENTS.md"), "PROJECT_RULE_TWO");
     await thread.submit(input("second")); await wait(() => expect(thread.status).toBe("idle"));
@@ -307,7 +307,6 @@ it("saves system context before a failing model and replaces or clears project r
     expect(thread.snapshot().messages.every(message => message.role !== "system")).toBe(true);
     const saved = await h.persistence.getMessages(threadId);
     expect(saved.filter(message => message.role === "system" && "timeContext" in message)).toHaveLength(1);
-    expect(saved.filter(message => message.role === "system" && message.content.includes("ROLE_RULE"))).toHaveLength(1);
     expect(saved.some(message => message.role === "system" && message.content.includes("PROJECT_RULE_ONE"))).toBe(true);
     expect(saved.some(message => message.role === "system" && message.content.includes("PROJECT_RULE_TWO"))).toBe(true);
   } finally { await h.close(); await rm(directory, { recursive: true, force: true }); }

@@ -8,6 +8,10 @@
 
 - [2026-10-04-shared-message-projection.md](./2026-10-04-shared-message-projection.md)：两端共用消息投影、历史空气泡修复与验证边界。
 
+- [2026-10-04-settings-codex.md](./2026-10-04-settings-codex.md)：Codex 风格设置导航、表单与伙伴画廊的实施和验证边界。
+
+- [2026-10-04-issue-9-frontend-pet.md](./2026-10-04-issue-9-frontend-pet.md)：Pet 前端化的实施合同、并行所有权与测试预算。
+
 - [2026-10-03-issue-8-settings-workspace.md](./2026-10-03-issue-8-settings-workspace.md)：Electron 设置、Workspace/Pet 与项目历史的实施合同、检查状态和实机边界。
 
 - [2026-10-03-test-cleanup.md](./2026-10-03-test-cleanup.md)：低价值与重复测试的删除依据、保留边界和验证结果。

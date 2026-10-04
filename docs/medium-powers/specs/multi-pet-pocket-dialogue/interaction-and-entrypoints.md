@@ -1,6 +1,6 @@
 # A「口袋对话」交互与入口
 
-本文保留[多桌宠规格](./multi-pet-pocket-dialogue.md)当时的交互验收合约。历史范围：原生 Settings 管理、Pet 直接文件根等条款已由 Issue #8 覆盖，Issue #9 的工作区历史与伙伴分配目标尚未实现；本文不能用来否定新目标。先读 [当前桌宠 surface](../../../surfaces/desktop-pet.md)，点击、hover、聚焦、显隐与草稿中未被明确改变的交互继续保留；替代关系由主文档路由。
+本文保留[多桌宠规格](./multi-pet-pocket-dialogue.md)当时的交互验收合约。历史范围：原生 Settings 管理、Pet 直接文件根等条款已由 Issue #8 覆盖，Issue #9 的工作区历史与伙伴分配已实现；本文不能用来恢复旧身份与导航要求。先读 [当前桌宠 surface](../../../surfaces/desktop-pet.md)，点击、hover、聚焦、显隐与草稿中未被明确改变的交互继续保留；替代关系由主文档路由。
 
 ## 创建与管理
 

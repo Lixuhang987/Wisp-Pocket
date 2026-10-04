@@ -1,20 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-const storageKey = "handagent.pet-size";
-
-export function usePetSize(petId: string): [number, (size: number) => void] {
-  const storageKey = `handagent.pet-size.${petId}`;
-  const [size, setSize] = useState(() => {
-    try {
-      const saved = Number(localStorage.getItem(storageKey));
-      return Number.isFinite(saved) && saved >= 50 && saved <= 150 ? saved : 100;
-    } catch { return 100; }
-  });
-  return [size, (value) => {
+export function usePetSize(petId: string, size = 100, onError?: (message: string) => void): [number, (size: number) => void] {
+  return [size, value => {
     if (!Number.isFinite(value)) return;
     const next = Math.min(150, Math.max(50, value));
-    setSize(next);
-    try { localStorage.setItem(storageKey, String(next)); } catch { /* 偏好不可写时仍允许本次调整。 */ }
+    void window.handAgentSettings?.setPetSize(petId, next).catch(error => onError?.(error instanceof Error ? error.message : "大小保存失败"));
   }];
 }
 

@@ -1,6 +1,6 @@
 # tools
 
-本目录定义 AgentTool、注册与激活边界。Thread 固定保存 Pet / Workspace 归属，执行目录来自 Workspace；工具不能通过模型参数改变归属。
+本目录定义 AgentTool、注册与激活边界。Thread 固定保存 Workspace 归属，执行目录来自 Workspace；工具不能通过模型参数改变归属。
 
 ## 直接子节点
 
@@ -19,11 +19,11 @@
 | file.read | `{ path }`；绝对路径可任意读取，相对路径从后端上下文 rootPath 解析；默认开放、免 Permission，不受 builtin 设置控制 |
 | file.write | `{ relativePath, content }`；只写当前 Thread 所属 Workspace 的固定目录；继续经过 Permission 与 builtin 设置过滤 |
 
-Workspace.rootPath 与 Pet.workspaceId 创建后不可修改，Thread 不保存文件根快照。Tool 上下文由 Thread owner 根据固定 Workspace 取得，不能接受 workspaceId、petId 或 rootPath 参数重绑定。角色快照不承担文件边界；归属合约见 [Workspace](../workspace/workspace.md) 与 [Thread](../thread/thread.md)。
+Workspace.rootPath 与 Thread.workspaceId 创建后不可修改，Thread 不保存文件根快照。Tool 上下文由 Thread owner 根据固定 Workspace 取得，不能接受 workspaceId 或 rootPath 参数重绑定。归属合约见 [Workspace](../workspace/workspace.md) 与 [Thread](../thread/thread.md)。
 
 file.read 的具体文本/PDF/图片解码由 [agent-server actions](../../../../apps/agent-server/src/actions/actions.md) 实现并注入端口；每次读原文件当前内容，不用缓存替代真实读取。读取结果仍保存为 Thread 历史。
 
-写入拒绝绝对路径、`..`、越界符号链接及目标符号链接；解析最近存在的祖先，避免未创建子目录掩盖越界链接。大小限制为 10 MiB，采用临时文件原子替换。同进程所有工具实例按规范化真实目标路径共享锁，不能按 petId 分锁；进入锁和替换前检查中断。完成的磁盘写入不承诺回滚，也不提供外部进程版本合并。
+写入拒绝绝对路径、`..`、越界符号链接及目标符号链接；解析最近存在的祖先，避免未创建子目录掩盖越界链接。大小限制为 10 MiB，采用临时文件原子替换。同进程所有工具实例按规范化真实目标路径共享锁，不能按 Thread ID 分锁；进入锁和替换前检查中断。完成的磁盘写入不承诺回滚，也不提供外部进程版本合并。
 
 ## 默认目录与授权
 

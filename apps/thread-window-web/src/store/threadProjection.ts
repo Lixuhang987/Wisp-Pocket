@@ -1,5 +1,4 @@
 import type { Workspace } from "@handagent/core/workspace/Workspace.ts";
-import type { Pet } from "@handagent/core/pet/Pet.ts";
 import type {
   RunStatus,
   ServerRequest,
@@ -25,11 +24,8 @@ export type PermissionRequestState = {
 
 export type ThreadProjection = {
   threadId: string;
-  petId?: string;
   workspaceId?: string;
-  petRevision?: number;
   rootPath?: string;
-  petSnapshot?: ThreadSnapshotPayload["petSnapshot"];
   title: string | null;
   status: RunStatus;
   messages: ThreadItem[];
@@ -42,7 +38,6 @@ export type ThreadWindowProjection = {
   history: ThreadListEntry[];
   threadsById: Record<string, ThreadProjection>;
   processedNotificationIds: Record<string, true>;
-  pets: Pet[];
   workspaces: Workspace[];
 };
 
@@ -83,10 +78,7 @@ export function projectNotification(
       break;
     case "thread.snapshot": {
       const thread = state.threadsById[notification.threadId];
-      thread.petId = notification.payload.petId;
       thread.workspaceId = notification.payload.workspaceId;
-      thread.petSnapshot = notification.payload.petSnapshot;
-      thread.petRevision = notification.payload.petSnapshot.revision;
       thread.rootPath = notification.payload.rootPath;
       thread.status = notification.payload.status;
       thread.messages = notification.payload.messages.map(snapshotMessageToItem)
@@ -206,19 +198,6 @@ export function projectNotification(
     case "workspace.error":
       state.windowErrorMessage = notification.payload.message;
       break;
-    case "pet.listed":
-      state.pets = notification.payload.workspaceId
-        ? [...state.pets.filter(pet=>pet.workspaceId!==notification.payload.workspaceId),...notification.payload.pets]
-        : notification.payload.pets;
-      break;
-    case "pet.created":
-    case "pet.updated":
-      state.windowErrorMessage = null;
-      state.pets = [...state.pets.filter(pet => pet.id !== notification.payload.pet.id), notification.payload.pet];
-      break;
-    case "pet.error":
-      state.windowErrorMessage = notification.payload.message;
-      break;
     case "request.resolved": {
       const thread = state.threadsById[notification.threadId];
       if (thread) {
@@ -312,8 +291,6 @@ function upsertHistoryEntry(
     updatedAt,
     messageCount: update.messageCount ?? existing?.messageCount ?? 0,
     workspaceId: update.workspaceId ?? existing?.workspaceId ?? state.threadsById[threadId]?.workspaceId ?? "",
-    petId: update.petId ?? existing?.petId ?? state.threadsById[threadId]?.petId ?? "",
-    petRevision: update.petRevision ?? existing?.petRevision ?? 1,
     rootPath: update.rootPath ?? existing?.rootPath ?? "",
     status: update.status ?? existing?.status ?? "idle",
   };

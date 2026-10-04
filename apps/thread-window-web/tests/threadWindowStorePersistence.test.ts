@@ -25,9 +25,8 @@ describe("threadWindowStore workspace expansion persistence", () => {
     store.getState().toggleWorkspaceExpanded("qa-pet");
     store.getState().setSearchQuery("unfinished search");
     store.getState().setConnectionState("connected");
-    store.getState().setPets([{workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "qa-pet", name: "QA", rootPath: "/qa" }]);
-    store.getState().enqueueInitialPrompt({petId: "pet-default",
-      clientRequestId: "uncreated-prompt",
+    store.getState().enqueueInitialPrompt({workspaceId: "workspace-default",
+clientRequestId: "uncreated-prompt",
       userInput: { items: [{ type: "text", id: "initial-text", text: "pending initial input" }] },
     });
     store.getState().handleNotification({
@@ -66,7 +65,6 @@ describe("threadWindowStore workspace expansion persistence", () => {
       threadsById: {},
       pendingInitialPrompts: {},
       history: [],
-      pets: [],
     });
   });
 });

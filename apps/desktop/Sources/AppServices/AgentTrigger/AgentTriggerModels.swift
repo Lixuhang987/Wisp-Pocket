@@ -66,7 +66,7 @@ struct AgentTriggerInstance: Codable, Equatable, Identifiable {
     let promptTemplate: String
     let deliveryPolicy: AgentTriggerDeliveryPolicy
     let notificationPolicy: AgentTriggerNotificationPolicy
-    let targetPetId: String
+    let targetWorkspaceId: String
 }
 
 enum AgentTriggerConfigValue: Codable, Equatable {

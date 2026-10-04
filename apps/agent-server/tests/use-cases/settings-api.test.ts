@@ -42,7 +42,7 @@ it("saves backend configuration through HTTP for subsequent runtime use while pr
     expect(JSON.parse(await readFile(settingsPath,"utf8"))).toMatchObject({llm:{model:"after",summarizerModel:"summary-model",futureField:"preserve"},tools:{denylist:["file.write"]},other:{keep:true}});
     expect(JSON.parse(await readFile(nativePath,"utf8"))).toEqual({appearance:{theme:"light"}});
     expect(await (await request("/tools")).json()).toMatchObject({tools:[{name:"file.write",enabled:false}]});
-    const start = await h.threads.create({commandId:"settings-run",petId:h.pet.id});
+    const start = await h.threads.create({commandId:"settings-run",workspaceId:h.workspace.id});
     await start.submit(input("使用已保存配置"));
     await new Promise<void>((resolve,reject)=>{const deadline=Date.now()+2000;const poll=()=>{if(start.status==="idle")resolve();else if(Date.now()>deadline)reject(new Error("Turn timeout"));else setTimeout(poll,10);};poll();});
     expect(clients).toEqual(["before","after"]);

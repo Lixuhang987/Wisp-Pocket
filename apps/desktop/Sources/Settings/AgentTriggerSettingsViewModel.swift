@@ -28,10 +28,10 @@ final class AgentTriggerSettingsViewModel {
     private(set) var chromeBookmarkFolders: [ChromeBookmarkFolderOption] = []
     private(set) var saveErrorMessage: String?
     private(set) var selectedPackageId: String?
-    var targetPetId = ""
-    private(set) var pets: [PetEntry] = []
+    var targetWorkspaceId = ""
+    private(set) var workspaces: [WorkspaceEntry] = []
     var deliveryErrorMessage: String? { store.deliveryErrorMessage }
-    @ObservationIgnored private let petClient: (any PetManaging)?
+    @ObservationIgnored private let workspaceClient: (any WorkspaceManaging)?
 
     @ObservationIgnored private let store: AgentTriggerStore
     @ObservationIgnored private let runtime: (any AgentTriggerRuntimeReloading)?
@@ -41,7 +41,7 @@ final class AgentTriggerSettingsViewModel {
     init(
         store: AgentTriggerStore = AgentTriggerStore(),
         runtime: (any AgentTriggerRuntimeReloading)? = nil,
-        petClient: (any PetManaging)? = nil,
+        workspaceClient: (any WorkspaceManaging)? = nil,
         chromeBookmarksFolderTreeStore: ChromeBookmarksFolderTreeStore = ChromeBookmarksFolderTreeStore(),
         packageConnectionStatusProvider: @escaping (AgentTriggerPackageEntry) -> AgentTriggerPackageConnectionStatus? = {
             package in
@@ -55,15 +55,15 @@ final class AgentTriggerSettingsViewModel {
     ) {
         self.store = store
         self.runtime = runtime
-        self.petClient = petClient
+        self.workspaceClient = workspaceClient
         self.chromeBookmarksFolderTreeStore = chromeBookmarksFolderTreeStore
         self.packageConnectionStatusProvider = packageConnectionStatusProvider
         reload()
     }
 
-    func reloadPets() async {
-        guard let petClient else { return }
-        do { pets = try await petClient.listPets() }
+    func reloadWorkspaces() async {
+        guard let workspaceClient else { return }
+        do { workspaces = try await workspaceClient.listWorkspaces() }
         catch { saveErrorMessage = error.localizedDescription }
     }
 
@@ -158,8 +158,8 @@ final class AgentTriggerSettingsViewModel {
             saveErrorMessage = "提示词不能为空"
             return false
         }
-        let selectedPet = targetPetId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !selectedPet.isEmpty else { saveErrorMessage = "请选择目标桌宠"; return false }
+        let selectedWorkspace = targetWorkspaceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selectedWorkspace.isEmpty else { saveErrorMessage = "请选择目标工作区"; return false }
         let instance = AgentTriggerInstance(
             id: UUID().uuidString,
             packageId: packageId,
@@ -169,7 +169,7 @@ final class AgentTriggerSettingsViewModel {
             promptTemplate: resolvedPromptTemplate,
             deliveryPolicy: manifest.defaultDeliveryPolicy,
             notificationPolicy: manifest.defaultNotificationPolicy,
-            targetPetId: selectedPet
+            targetWorkspaceId: selectedWorkspace
         )
         var nextInstances = store.loadInstances()
         nextInstances.append(instance)

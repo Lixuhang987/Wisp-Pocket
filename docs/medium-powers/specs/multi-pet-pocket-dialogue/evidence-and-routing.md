@@ -2,7 +2,7 @@
 
 本文服务于[多桌宠规格](./multi-pet-pocket-dialogue.md)。只保留能限定实施、避免错误或确定验证方式的结论；不搬入产品罗列、论文统计、原型剧情或来源全文。
 
-历史范围：下文“用户已决定”“当前事实”指 Issue #7 编写与实现时的基准。Issue #8 已恢复独立 Workspace，Issue #9 已确认前端 Pet 和工作区任务接续目标、尚未实现；原先排除的独立项目与伙伴转移不能用来否定后续决定。最新目标与现状由主文档路由，下文调研取舍保留作为历史证据。
+历史范围：下文“用户已决定”“当前事实”指 Issue #7 编写与实现时的基准。Issue #8 已恢复独立 Workspace，Issue #9 已实现前端 Pet 和工作区任务接续；原先排除的独立项目与伙伴转移不能用来否定后续决定。最新目标与现状由主文档路由，下文调研取舍保留作为历史证据。
 
 ## 基准与决策优先级
 
@@ -47,7 +47,7 @@
 
 ## 当前事实与阅读路由
 
-先读 [根架构](../../../../handAgent.md) → [术语路由](../../../../CONTEXT-MAP.md)；涉及 UI 时先从 [docs](../../../docs.md) 读 PRODUCT → [surface 索引](../../../surfaces/surfaces.md) → [桌宠现有合约](../../../surfaces/desktop-pet.md)，再按任务进入下表 owning 模块及其 `<dir>.md`，最后筛选调研。当前 glossary 已定义 Pet 身份、固定根与角色快照；桌宠仍专指其轻量交互 surface。
+先读 [根架构](../../../../handAgent.md) → [术语路由](../../../../CONTEXT-MAP.md)；涉及 UI 时先从 [docs](../../../docs.md) 读 PRODUCT → [surface 索引](../../../surfaces/surfaces.md) → [桌宠现有合约](../../../surfaces/desktop-pet.md)，再按任务进入下表 owning 模块及其 `<dir>.md`，最后筛选调研。当前 glossary 将前端 Pet 与后端 Workspace / Thread 分开定义，固定根属于 Workspace；角色快照只属历史模型；桌宠仍专指其轻量交互 surface。
 
 | 实施范围 | 阅读入口与需要核对的边界 |
 | --- | --- |

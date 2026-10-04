@@ -98,7 +98,7 @@ describe("thread protocol boundaries", () => {
       commandId: "command-start",
       timestamp: "2026-06-05T00:00:00.000Z",
       payload: {
-        petId: "pet-default",
+        workspaceId: "workspace-default",
       },
     };
     const resume: ThreadCommand = {

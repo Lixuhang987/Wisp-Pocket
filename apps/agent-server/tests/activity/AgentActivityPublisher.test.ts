@@ -146,10 +146,10 @@ describe("AgentActivityPublisher", () => {
       notificationId: "n-snapshot",
       timestamp: "2026-06-08T00:00:02.000Z",
       payload: {
-        threadId: "thread-1",
+        workspaceId: "workspace-1",
+        rootPath: "/tmp",
         status: "running",
         messages: [],
-        events: [],
       },
     });
 
@@ -177,21 +177,21 @@ describe("AgentActivityPublisher", () => {
       threadId: "thread-1",
       notificationId: "n-start-preview",
       timestamp: "2026-06-08T00:00:01.000Z",
-      payload: { preview: "  准备分析项目  " },
+      payload: { preview: "  准备分析项目  ",workspaceId:"workspace-1",rootPath:"/tmp" },
     });
     publisher.observe({
       type: "thread.started",
       threadId: "thread-2",
       notificationId: "n-start-empty",
       timestamp: "2026-06-08T00:00:02.000Z",
-      payload: { preview: "   " },
+      payload: { preview: "   ",workspaceId:"workspace-1",rootPath:"/tmp" },
     });
     publisher.observe({
       type: "thread.started",
       threadId: "thread-3",
       notificationId: "n-start-missing",
       timestamp: "2026-06-08T00:00:03.000Z",
-      payload: {},
+      payload: {preview:null,workspaceId:"workspace-1",rootPath:"/tmp"},
     });
 
     expect(events.slice(1).map((event) => ({

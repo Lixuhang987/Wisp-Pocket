@@ -2,7 +2,7 @@
 
 Conversation Runtime 描述用户与 Agent 的持久交互，以及一次输入如何形成有边界的执行过程。
 
-Thread 与 Workspace 按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 已确认目标更新，尚未实现；旧模型见 [ADR 0006](../../docs/adr/0006-workspace-pet-separation.md)。Pet 与角色提示的目标术语归 [Desktop Experience](../../apps/desktop/CONTEXT.md)。
+Thread 与 Workspace 归属按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 实现；Pet 与角色提示的术语归 [Desktop Experience](../../apps/desktop/CONTEXT.md)。
 
 ## Interaction
 

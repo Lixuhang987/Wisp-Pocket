@@ -1,6 +1,6 @@
-import { BrowserWindow, app, dialog, ipcMain, screen, shell, utilityProcess } from "electron";
+import { BrowserWindow, app, dialog, ipcMain, screen, shell, utilityProcess, nativeImage, Notification } from "electron";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { PetWindowCollection } from "./windows/petWindowCollection.js";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ import { createAgentServerSupervisor } from "./serverSupervisor/agentServerSuper
 import { JsonLineBridge } from "./swiftBridge/jsonLineBridge.js";
 import { CommandSocketServer } from "./swiftBridge/commandSocketServer.js";
 import { ActivityWindowController } from "./windows/activityWindowController.js";
-import { PetPositionStore } from "./windows/petPositionStore.js";
+import { FrontendPetStore } from "./pets/frontendPetStore.js";
 import { ThreadWindowPrewarmer } from "./windows/threadWindowPrewarmer.js";
 import { configureMacOSDockApp } from "./macosDockApp.js";
 import { readAvailableSkillsFromActionsDirectory } from "./availableSkills.js";
@@ -88,6 +88,12 @@ const settingsWindow = new ThreadWindowPrewarmer({
   },
 });
 
+const petStore = new FrontendPetStore(process.env.HANDAGENT_PET_STORE_PATH ?? join(homedir(), ".spotAgent/pets.json"), image => {
+  const decoded=nativeImage.createFromDataURL(image.url);
+  const size=decoded.getSize();
+  if(decoded.isEmpty() || size.width!==image.width || size.height!==image.height)throw new Error("图片无法解码或尺寸不一致");
+});
+
 const createPetWindow = (petId: string, index: number) => new ActivityWindowController({
   petId, initialOffset: (index % 6) * 110,
   activityWindowHTMLPath,
@@ -98,10 +104,7 @@ const createPetWindow = (petId: string, index: number) => new ActivityWindowCont
   },
   threadWebSocketURL: process.env.HANDAGENT_PET_THREAD_WEBSOCKET_URL,
   initialTheme,
-  positionStore: new PetPositionStore(
-    process.env.HANDAGENT_PET_POSITION_PATH ? `${process.env.HANDAGENT_PET_POSITION_PATH}.${petId}` : join(homedir(), ".spotAgent/pet-positions", `${petId}.json`),
-    (error) => process.stderr.write(`[electron-shell] pet position: ${errorMessage(error)}\n`),
-  ),
+  positionStore: {load: () => petStore.get(petId).position ?? null, save: position => petStore.setPosition(petId,position)},
   createWindow: (options) => new BrowserWindow(options),
   screenProvider: {
     getPrimaryWorkArea: () => screen.getPrimaryDisplay().workArea,
@@ -131,20 +134,15 @@ const createPetWindow = (petId: string, index: number) => new ActivityWindowCont
   },
 });
 
-const visibilityPath = join(homedir(), ".spotAgent/pet-visibility.json");
+const defaultWorkspaceRoot = join(homedir(), ".spotAgent/workspaces/default");
+mkdirSync(defaultWorkspaceRoot,{recursive:true});
 const activityWindow = new PetWindowCollection({
   url: process.env.HANDAGENT_PET_THREAD_WEBSOCKET_URL ?? "ws://127.0.0.1:4317/api/thread",
-  createController: createPetWindow,
-  preferences: {
-    load: () => { try { const value = JSON.parse(readFileSync(visibilityPath,"utf8")); return Object.fromEntries(Object.entries(value).filter(([,v])=>typeof v==="boolean")) as Record<string,boolean>; } catch { return {}; } },
-    save: value => { mkdirSync(dirname(visibilityPath),{recursive:true});writeFileSync(`${visibilityPath}.tmp`,JSON.stringify(value));renameSync(`${visibilityPath}.tmp`,visibilityPath); },
-  },
+  createController: createPetWindow, store: petStore, defaultWorkspaceRoot,
+  onNotice: message => { if(Notification.isSupported())new Notification({title:"HandAgent",body:message}).show(); },
   onError: error => process.stderr.write(`[electron-shell] pet windows: ${errorMessage(error)}\n`),
-  onPetRemoved: petId => {
-    const positionPath = process.env.HANDAGENT_PET_POSITION_PATH ? `${process.env.HANDAGENT_PET_POSITION_PATH}.${petId}` : join(homedir(), ".spotAgent/pet-positions", `${petId}.json`);
-    rmSync(positionPath, { force: true });
-  },
 });
+petStore.subscribe(pets => { for(const window of BrowserWindow.getAllWindows())if(settingsWindow.ownsSender(window.webContents) || activityWindow.controllerForSender(window.webContents)){try {window.webContents.send("settings:pets-changed",pets);}catch(error){process.stderr.write(`[electron-shell] pet broadcast: ${errorMessage(error)}\n`);}} });
 
 let hasStartedSupervisor = false;
 let hasStoppedSupervisor = false;
@@ -211,6 +209,16 @@ ipcMain.handle("pet-window:choose-files", async event => {
 });
 
 registerSettingsManagementIpc(ipcMain, {
+  store: petStore, allocation: activityWindow,
+  importPetImage: image => {
+    if(!image || !["image/png","image/jpeg","image/webp"].includes(image.mimeType) || typeof image.bytesBase64!=="string")throw new Error("无效图片");
+    const bytes=Buffer.from(image.bytesBase64,"base64");
+    if(!bytes.length || bytes.length>20*1024*1024)throw new Error("图片必须介于 1 byte 与 20 MiB");
+    const decoded=nativeImage.createFromBuffer(bytes);
+    if(decoded.isEmpty())throw new Error("无法解码图片");
+    const {width,height}=decoded.getSize();
+    return {type:"imported",url:decoded.toDataURL(),mimeType:"image/png",width,height};
+  },
   isManagementSender: sender => settingsWindow.ownsSender(sender) || !!activityWindow.controllerForSender(sender),
   chooseDirectory: async () => {
     const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });

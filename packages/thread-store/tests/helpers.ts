@@ -39,7 +39,7 @@ export async function materializedStoreWithSession(threadId: string): Promise<{
 }> {
   const { root, dbPath } = await tempSqlitePath();
   const store = new ThreadStore({ dbPath, now: fixedNow });
-  await unwrap(store.createThread({ petId:seedPet(store), threadId, threadSource: "user" }));
+  await unwrap(store.createThread({ workspaceId:seedWorkspace(store), threadId, threadSource: "user" }));
   await unwrap(store.persistThread(threadId));
   await unwrap(store.discardThread(threadId));
   return { root, store };
@@ -53,4 +53,4 @@ export async function messageTexts(store: ThreadStore, threadId: string): Promis
     .filter((content): content is string => typeof content === "string");
 }
 
-export function seedPet(store: ThreadStore): string { return (store.listPets().find(pet=>pet.name === '测试宠') ?? store.createPet({name:'测试宠',rolePrompt:'测试助手',imageRef:{type:'builtin',id:'yachiyo'},rootPath:'/tmp'})).id; }
+export function seedWorkspace(store: ThreadStore): string { return store.createWorkspace("/tmp").workspace.id; }

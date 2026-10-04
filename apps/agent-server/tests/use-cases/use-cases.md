@@ -8,14 +8,14 @@
 - `thread-ownership.test.ts`：Thread 状态所有权、持久化、断连、删除、运行隔离及真实 Thread/Bridge 的中断与晚到结果。
 - `pet-conversation.test.ts`：真实 Thread/SQLite/Blob 与桌宠入口，覆盖首次文字、结构化原路径引用（无副本、重建保留）、普通回复、持久 pending、跨界面请求、删除及恢复。
 
-- `pet-identity.test.ts`：公开 socket 验证同根项目复用、基础 Pet、并发与创建去重、项目查询、随机 Thread 双归属、逐 Turn AGENTS.md，同时保留图片、角色隔离和重建覆盖；删除后的创建 ACK 重试跨重启保持幂等。
+- `workspace-conversation.test.ts`：公开 socket 验证同根项目复用、并发与创建去重、项目分页查询、Thread Workspace 归属、逐 Turn AGENTS.md，同时保留普通首轮提示、输入重试、Thread 隔离和重建覆盖；删除后的创建 ACK 重试跨重启保持幂等。
 - `settings-api.test.ts`：公开 HTTP 保存模型/工具/MCP、永久规则查询撤销，真实持久化与后续 Thread 模型请求，以及原生偏好交错修改。
 - `default-reading.test.ts`：首轮结构化文件引用经 socket/SQLite 后按需读到最新内容、权限策略、真实文件/历史与工具结果进入模型。
 
 ## 验证边界
 
 - system 与时间上下文沿 `thread-ownership` 的真实 Thread/SQLite 主路径验证：首轮模型前落盘、模型失败、写入期间中断后接续、规则替换/清除、重启后的整一小时及超过一小时、连续活跃轮次的注入基准，以及 snapshot/messageCount 排除内部上下文。`default-reading` 用真实 Swift 保存夹具验证 ISO/epoch 的相等端点和 Node 本地偏移输出；Swift 新写偏移格式另由 [真实 Store 用例](../../../host-automation/Tests/tests.md) 验证，静态夹具不伪造更新。
-- 重启输入去重复用 `thread-ownership` 的既有历史恢复用例；存储故障与真实删除的区分复用其协议删除失败用例。轻量观察连接的 Permission 事实接收、回执资格与正文隔离复用 `pet-conversation` 的真实 CLI 授权流，避免另建仅检查内部调用的测试。
+- 重启输入去重复用 `thread-ownership` 的既有历史恢复用例；存储故障与真实删除的区分复用其协议删除失败用例。轻量观察连接的 Permission 事实接收、结束清理、已解决请求不补发、回执资格与正文隔离复用 `pet-conversation` 的真实 CLI 授权流，避免另建仅检查内部调用的测试。
 - 桌宠首次纯文字从 controller 经过共享输入控制器到真实 Thread 与 SQLite；打开空回复框不留历史，接收后可读到持久输入，后续回复留在同一 Thread。原生点击、自动焦点和中文输入法仍由 renderer 与实机验收覆盖。
 - 真实 CLI 授权流同时覆盖纯工具 assistant 的原始历史保留、两端 live / resume 后正文集合一致，以及 SQLite 重建后的 UI 投影；不以删除工具记录来消除空气泡。
 - 只有建议的历史由真实 persistence 写入 SQLite，关闭重建后经历史翻译、socket 和桌宠 controller 恢复等待与最新项，再回复到同一 Thread；renderer 只以协议 DTO 验证呈现，不能替代这条持久恢复链路。

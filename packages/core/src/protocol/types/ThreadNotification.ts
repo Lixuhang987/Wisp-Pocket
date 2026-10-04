@@ -1,4 +1,4 @@
-import type { Pet, PetImageRef, PetErrorCode } from "../../pet/Pet.ts";
+import type { WorkspaceErrorCode } from "../../workspace/Workspace.ts";
 import type { InputItem } from "./Op.ts";
 import type {
   RunStatus,
@@ -13,9 +13,7 @@ export type ThreadStartedNotification = {
   commandId?: string;
   timestamp: string;
   payload: {
-    petId: string;
     workspaceId: string;
-    petRevision: number;
     rootPath: string;
     preview: string | null;
     createdAt?: string;
@@ -150,13 +148,7 @@ export type ThreadErrorNotification = {
   };
 };
 
-type PetNotificationBase = {notificationId:string;commandId?:string;timestamp:string};
-export type PetListedNotification = PetNotificationBase & {type:'pet.listed';payload:{pets:Pet[];workspaceId?:string}};
-export type PetCreatedNotification = PetNotificationBase & {type:'pet.created';payload:{pet:Pet}};
-export type PetUpdatedNotification = PetNotificationBase & {type:'pet.updated';payload:{pet:Pet}};
-export type PetImageImportedNotification = PetNotificationBase & {type:'pet.image.imported';payload:{imageRef:PetImageRef}};
-export type PetErrorNotification = PetNotificationBase & {type:'pet.error';payload:{code:PetErrorCode;message:string;currentRevision?:number}};
-export type PetNotification = PetListedNotification | PetCreatedNotification | PetUpdatedNotification | PetImageImportedNotification | PetErrorNotification;
+type NotificationBase = {notificationId:string;commandId?:string;timestamp:string};
 
 export type RequestResolvedNotification = {
   type: "request.resolved";
@@ -166,7 +158,7 @@ export type RequestResolvedNotification = {
   payload: { requestId: string };
 };
 
-export type WorkspaceNotification = PetNotificationBase & ({type:'workspace.listed';payload:{workspaces:import('../../workspace/Workspace.ts').Workspace[]}} | {type:'workspace.created';payload:import('../../workspace/Workspace.ts').WorkspaceCreation} | {type:'workspace.error';payload:{code:PetErrorCode;message:string}});
+export type WorkspaceNotification = NotificationBase & ({type:'workspace.listed';payload:{workspaces:import('../../workspace/Workspace.ts').Workspace[]}} | {type:'workspace.created';payload:import('../../workspace/Workspace.ts').WorkspaceCreation} | {type:'workspace.error';payload:{code:WorkspaceErrorCode;message:string}});
 
 export type ThreadNotification =
   | ThreadStartedNotification
@@ -182,5 +174,4 @@ export type ThreadNotification =
   | ThreadDeletedNotification
   | ThreadErrorNotification
   | WorkspaceNotification
-  | PetNotification
   | RequestResolvedNotification;

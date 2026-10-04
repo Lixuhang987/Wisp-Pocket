@@ -1,6 +1,6 @@
 import type { Workspace, WorkspaceCreation } from '@handagent/core/workspace/Workspace.ts';
-import { BASE_PET_PROFILE, PetError, type Pet, type PetCreateInput, type PetPatch, type PetImageRef } from "@handagent/core/pet/Pet.ts";
-import { mkdirSync, realpathSync } from "node:fs";
+import { WorkspaceError } from "@handagent/core/workspace/Workspace.ts";
+import { mkdirSync } from "node:fs";
 import { dirname, basename } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
@@ -30,7 +30,6 @@ type ThreadStoreOptions = {
 type LiveThread = {
   meta: SessionMeta;
   preview: string | null;
-  petId: string;
   createdAt: string;
   updatedAt: string;
   nextSequence: number;
@@ -53,9 +52,7 @@ type ThreadRow = {
   originator: string;
   agent_path: string | null;
   dynamic_tools_json: string | null;
-  pet_id: string;
   workspace_id: string;
-  pet_snapshot_json: string;
   closed_at: string | null;
 };
 
@@ -88,10 +85,7 @@ export class ThreadStore {
         return err("thread_exists", `Thread already exists: ${params.threadId}`);
       }
 
-      const pet = this.getPet(params.petId);
-      if (!pet) throw new PetError("not_found", `Pet not found: ${params.petId}`);
-      if (params.workspaceId && params.workspaceId !== pet.workspaceId) throw new PetError('invalid_input', 'Pet 与项目归属不一致');
-      const petSnapshot = {petId:pet.id, revision:pet.revision, name:pet.name, rolePrompt:pet.rolePrompt};
+      if (!this.getWorkspace(params.workspaceId)) throw new WorkspaceError('not_found', `Workspace not found: ${params.workspaceId}`);
       const timestamp = params.timestamp ?? this.now();
       this.liveThreads.set(params.threadId, {
         meta: {
@@ -103,12 +97,9 @@ export class ThreadStore {
           threadSource: params.threadSource ?? "user",
           ...(params.agentPath ? { agentPath: params.agentPath } : {}),
           ...(params.dynamicTools ? { dynamicTools: params.dynamicTools } : {}),
-          petId: params.petId,
-          workspaceId: pet.workspaceId,
-          petSnapshot,
+          workspaceId: params.workspaceId,
         },
         preview: params.preview ?? null,
-        petId: params.petId,
         createdAt: timestamp,
         updatedAt: timestamp,
         nextSequence: 1,
@@ -134,7 +125,6 @@ export class ThreadStore {
       this.liveThreads.set(params.threadId, {
         meta: rowToSessionMeta(row),
         preview: row.preview,
-        petId: row.pet_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         nextSequence: this.nextSequence(params.threadId),
@@ -191,7 +181,6 @@ export class ThreadStore {
         this.updateThreadRow(threadId, {
           preview: live.preview,
           updatedAt: live.updatedAt,
-          petId: live.petId,
           closedAt: null,
         });
       });
@@ -272,7 +261,6 @@ export class ThreadStore {
         this.updateThreadRow(threadId, {
           preview,
           updatedAt,
-          petId: live?.petId,
           closedAt: undefined,
         });
       }
@@ -320,7 +308,6 @@ export class ThreadStore {
         this.updateThreadRow(threadId, {
           preview: row.preview,
           updatedAt,
-          petId: row.pet_id,
           closedAt: row.closed_at,
         });
         const live = this.liveThreads.get(threadId);
@@ -351,7 +338,7 @@ export class ThreadStore {
     const prior = this.db.prepare('SELECT workspace_id FROM workspace_commands WHERE command_id=?').get(commandId) as {workspace_id:string}|undefined;
     if (!prior) return null;
     const workspace = this.getWorkspace(prior.workspace_id)!;
-    return {workspace,basePet:this.getPet(`base-${workspace.id}`)!,created:false};
+    return {workspace,created:false};
   }
 
   createWorkspace(rootPath: string, commandId?: string): WorkspaceCreation {
@@ -364,13 +351,12 @@ export class ThreadStore {
       const existingId = prior?.workspace_id ?? sameDirectory?.id;
       if (existingId) {
         const workspace = this.getWorkspace(existingId)!;
-        result = {workspace,basePet:this.getPet(`base-${workspace.id}`)!,created:false};
+        result = {workspace,created:false};
       } else {
         const workspace: Workspace = {id:crypto.randomUUID(),rootPath,name:basename(rootPath) || rootPath,createdAt:this.now()};
         this.db.prepare('INSERT INTO workspaces(id,root_path,created_at,data_json) VALUES(?,?,?,?)')
           .run(workspace.id,rootPath,workspace.createdAt,JSON.stringify(workspace));
-        const basePet = this.insertPet({...BASE_PET_PROFILE,rootPath,workspaceId:workspace.id}, `base-${workspace.id}`);
-        result = {workspace,basePet,created:true};
+        result = {workspace,created:true};
       }
       if (commandId && !prior) {
         this.db.prepare('INSERT INTO workspace_commands(command_id,workspace_id) VALUES(?,?)').run(commandId,result.workspace.id);
@@ -379,87 +365,16 @@ export class ThreadStore {
     return result;
   }
 
-  listPets(): Pet[] {
-    const rows = this.db.prepare('SELECT data_json FROM pets ORDER BY created_at,id').all() as {data_json:string}[];
-    return rows.map(row => this.projectPet(JSON.parse(row.data_json)));
-  }
-
-  getPet(id: string): Pet | null {
-    const row = this.db.prepare('SELECT data_json FROM pets WHERE id=?').get(id) as {data_json:string}|undefined;
-    return row ? this.projectPet(JSON.parse(row.data_json)) : null;
-  }
-
-  getPetByCommand(commandId: string): Pet | null {
-    const prior = this.db.prepare('SELECT pet_id FROM pet_commands WHERE command_id=?').get(commandId) as {pet_id:string}|undefined;
-    return prior ? this.getPet(prior.pet_id) : null;
-  }
-
-  private projectPet(pet: Omit<Pet,'rootPath'>): Pet {
-    return {...pet,rootPath:this.getWorkspace(pet.workspaceId)!.rootPath};
-  }
-
-  private insertPet(input: PetCreateInput & {workspaceId:string}, id = crypto.randomUUID()): Pet {
-    const now = this.now();
-    const result: Pet = {...input,rootPath:this.getWorkspace(input.workspaceId)!.rootPath,description:input.description ?? '',id,revision:1,
-      isDefault:input.isDefault === true || this.listPets().length === 0,createdAt:now,updatedAt:now};
-    if (result.isDefault) this.clearDefault();
-    this.db.prepare('INSERT INTO pets(id,workspace_id,created_at,data_json) VALUES(?,?,?,?)')
-      .run(result.id,result.workspaceId,now,JSON.stringify(this.storedPet(result)));
-    return result;
-  }
-
-  createPet(input: PetCreateInput & {workspaceId?:string}, commandId?: string): Pet {
-    const prior = commandId
-      ? this.db.prepare('SELECT pet_id FROM pet_commands WHERE command_id=?').get(commandId) as {pet_id:string}|undefined
-      : undefined;
-    if (prior) return this.getPet(prior.pet_id)!;
-    let workspaceId = input.workspaceId;
-    if (!workspaceId) {
-      mkdirSync(input.rootPath,{recursive:true});
-      workspaceId = this.createWorkspace(realpathSync(input.rootPath)).workspace.id;
-    }
-    if (!this.getWorkspace(workspaceId)) throw new PetError('not_found','项目不存在');
-    let result!: Pet;
-    this.transaction(() => {
-      result = this.insertPet({...input,workspaceId});
-      if (commandId) this.db.prepare('INSERT INTO pet_commands(command_id,pet_id) VALUES(?,?)').run(commandId,result.id);
-    });
-    return result;
-  }
-  updatePet(id: string, expectedRevision: number, patch: PetPatch): Pet {
-    let result!: Pet;
-    this.transaction(() => {
-      const prior = this.getPet(id);
-      if (!prior) throw new PetError('not_found', `Pet not found: ${id}`);
-      if (prior.revision !== expectedRevision) throw new PetError('conflict','桌宠已被其他窗口编辑',prior.revision);
-      if (prior.isDefault && patch.isDefault === false) throw new PetError('invalid_input','请将另一只桌宠设为默认');
-      if (patch.isDefault === true) this.clearDefault();
-      if (Object.keys(patch).some(key => !['name','description','rolePrompt','imageRef','isDefault'].includes(key))) throw new PetError('invalid_input','Pet 的项目归属不可更改');
-      result = {...prior,...patch,revision:prior.revision+1,updatedAt:this.now()};
-      this.db.prepare('UPDATE pets SET data_json=? WHERE id=?').run(JSON.stringify(this.storedPet(result)),id);
-    });
-    return result;
-  }
-  private storedPet(pet: Pet) { const {rootPath: _,...stored} = pet; return stored; }
-  private clearDefault(): void {
-    for (const pet of this.listPets()) if (pet.isDefault) this.db.prepare('UPDATE pets SET data_json=? WHERE id=?').run(JSON.stringify(this.storedPet({...pet,isDefault:false,revision:pet.revision+1,updatedAt:this.now()})),pet.id);
-  }
-  savePetImage(image: Extract<PetImageRef,{type:'imported'}>): void { this.db.prepare('INSERT OR REPLACE INTO pet_images(blob_id,data_json) VALUES(?,?)').run(image.blobId,JSON.stringify(image)); }
-  getPetImage(blobId:string): Extract<PetImageRef,{type:'imported'}>|null { const row=this.db.prepare('SELECT data_json FROM pet_images WHERE blob_id=?').get(blobId) as {data_json:string}|undefined; return row ? JSON.parse(row.data_json) : null; }
-
   private initialize(): void {
     const columns = this.db.prepare('PRAGMA table_info(threads)').all() as {name:string}[];
-    if (columns.length && !columns.some(column => column.name === 'workspace_id')) {
+    if (columns.length && (!columns.some(column => column.name === 'workspace_id') || columns.some(column => column.name === 'pet_id'))) {
       this.db.close();
-      throw new Error('旧开发数据库不支持 Workspace/Pet 模型。请备份 ~/.spotAgent/threads.sqlite 后使用新的数据文件重新启动；不会自动迁移或删除旧数据。');
+      throw new Error('旧开发数据库不支持当前 Workspace/Thread 模型。请备份 ~/.spotAgent/threads.sqlite 后使用新的数据文件重新启动；不会自动迁移或删除旧数据。');
     }
     this.db.exec(`
       PRAGMA foreign_keys = ON;
       CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, root_path TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, data_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS workspace_commands (command_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(id));
-      CREATE TABLE IF NOT EXISTS pets (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(id), created_at TEXT NOT NULL, data_json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS pet_commands (command_id TEXT PRIMARY KEY, pet_id TEXT NOT NULL REFERENCES pets(id));
-      CREATE TABLE IF NOT EXISTS pet_images (blob_id TEXT PRIMARY KEY, data_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS threads (
         thread_id TEXT PRIMARY KEY,
         preview TEXT,
@@ -471,9 +386,7 @@ export class ThreadStore {
         originator TEXT NOT NULL,
         agent_path TEXT,
         dynamic_tools_json TEXT,
-        pet_id TEXT NOT NULL REFERENCES pets(id),
         workspace_id TEXT NOT NULL REFERENCES workspaces(id),
-        pet_snapshot_json TEXT NOT NULL,
         closed_at TEXT
       );
       CREATE TABLE IF NOT EXISTS deleted_threads (thread_id TEXT PRIMARY KEY);
@@ -569,11 +482,9 @@ export class ThreadStore {
         originator,
         agent_path,
         dynamic_tools_json,
-        pet_id,
         workspace_id,
-        pet_snapshot_json,
         closed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     `).run(
       threadId,
       live.preview,
@@ -585,9 +496,7 @@ export class ThreadStore {
       live.meta.originator,
       live.meta.agentPath ?? null,
       live.meta.dynamicTools ? JSON.stringify(live.meta.dynamicTools) : null,
-      live.petId,
       live.meta.workspaceId,
-      JSON.stringify(live.meta.petSnapshot),
     );
   }
 
@@ -596,7 +505,6 @@ export class ThreadStore {
     input: {
       preview?: string | null;
       updatedAt: string;
-      petId?: string | null;
       closedAt?: string | null;
     },
   ): void {
@@ -604,15 +512,12 @@ export class ThreadStore {
       UPDATE threads
       SET preview = CASE WHEN ? THEN ? ELSE preview END,
           updated_at = ?,
-          pet_id = CASE WHEN ? THEN ? ELSE pet_id END,
           closed_at = CASE WHEN ? THEN ? ELSE closed_at END
       WHERE thread_id = ?
     `).run(
       Object.hasOwn(input, "preview") ? 1 : 0,
       input.preview ?? null,
       input.updatedAt,
-      Object.hasOwn(input, "petId") ? 1 : 0,
-      input.petId ?? null,
       Object.hasOwn(input, "closedAt") ? 1 : 0,
       input.closedAt ?? null,
       threadId,
@@ -652,9 +557,7 @@ export class ThreadStore {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       messageCount: this.messagesForThread(row.thread_id).filter(message => message.role !== "system").length,
-      petId: row.pet_id,
       workspaceId: row.workspace_id,
-      petSnapshot: JSON.parse(row.pet_snapshot_json),
       rootPath: this.getWorkspace(row.workspace_id)!.rootPath,
       ...(row.dynamic_tools_json
         ? { dynamicTools: JSON.parse(row.dynamic_tools_json) }
@@ -674,9 +577,7 @@ export class ThreadStore {
           createdAt: live?.createdAt ?? this.now(),
           updatedAt: live?.updatedAt ?? this.now(),
           messageCount: this.messagesForThread(threadId).filter(message => message.role !== "system").length,
-          petId: live!.petId,
           workspaceId: live!.meta.workspaceId,
-          petSnapshot: live!.meta.petSnapshot!,
           rootPath: this.getWorkspace(live!.meta.workspaceId)!.rootPath,
           ...(live?.meta.dynamicTools ? { dynamicTools: live.meta.dynamicTools } : {}),
         };
@@ -745,9 +646,7 @@ function rowToSessionMeta(row: ThreadRow): SessionMeta {
     threadSource: row.thread_source === "subagent" ? "subagent" : "user",
     ...(row.agent_path ? { agentPath: row.agent_path } : {}),
     ...(row.dynamic_tools_json ? { dynamicTools: JSON.parse(row.dynamic_tools_json) } : {}),
-    petId: row.pet_id,
     workspaceId: row.workspace_id,
-    petSnapshot: JSON.parse(row.pet_snapshot_json),
   };
 }
 

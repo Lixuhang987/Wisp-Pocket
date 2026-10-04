@@ -2,9 +2,9 @@
 
 状态：Issue #7 历史规格，相关功能曾落地，后续部分模型已被替代；实机与真实模型待验，交互按 2026-10-03 用户修订更新。已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)，实现与检查记录见 [合并计划](../../plans/2026-10-02-pets-default-reading.md)，人工验收见 [manual QA](../../../manual-qa.md)。当时确认的角色快照、固定文件根与静态图方案按下述历史范围阅读，图片导入限制为工程默认。
 
-2026-10-04 历史边界：本子树保留 Issue #7 的原决定与验收依据。Pet 直接承接 Workspace、Pet 权威 rootPath、ThreadWindow 按宠分组已被 [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8) 与 [ADR 0006](../../../adr/0006-workspace-pet-separation.md) 替代；当前固定项目根、双归属、基础 Pet 与项目历史以 owning 模块及当前 manual QA 为准。桌宠点击、hover、独立草稿与本宠查询继续保留。
+2026-10-04 历史边界：本子树保留 Issue #7 的原决定与验收依据。Pet 直接承接 Workspace、Pet 权威 rootPath、ThreadWindow 按宠分组已被 [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8) 与 [ADR 0006](../../../adr/0006-workspace-pet-separation.md) 替代；其中固定项目根与逐 Turn 项目规则保留，双归属与基础 Pet 已由 Issue #9 删除；当前模型以 owning 模块及 manual QA 为准。桌宠点击、hover 与独立草稿继续保留，历史查询已改为 Workspace。
 
-[Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9) 已确认前端 Pet、工作区历史与伙伴转移目标，尚未实现；它将替代后端 Pet、固定伙伴归属与角色快照。本文“不提供跨宠转交”等原非目标不能用于否定新目标，未被改变的点击 / hover 合约继续保留。
+[Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9) 已实现前端 Pet、工作区历史与伙伴转移；它已替代后端 Pet、固定伙伴归属与角色快照。本文“不提供跨宠转交”等原非目标不能用于否定新目标，未被改变的点击 / hover 合约继续保留。
 
 实现前决定见[决策记录](./implementation-questions.md)；共享输入与文件读取遵守 [ADR 0004](../../../adr/0004-context-history-default-tools.md)，不再保留旧分阶段规则。
 

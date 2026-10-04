@@ -43,7 +43,7 @@ pnpm exec vitest run apps/agent-server/tests/bridges
 - 不把 `.test.ts` 放进 `src/`。
 - `use-cases/` 相关测试应覆盖 `thread.snapshot` 恢复、单连接多 thread 通知路由、运行中删除或中断、`ClientResponse -> client_response Op` 回流，以及 `/api/activity` / `/api/dynamic-tools` 的主路径语义。
 - `pet-conversation` 复用真实 Thread/Runtime/SQLite/Blob 和桌宠 controller，覆盖首次文字与原路径持久接收、两处松手区域的创建/追加、建议与普通回复、执行中排队、重启恢复、晚到结果不抢占及失败后继续。
-- 跨界面删除分别覆盖桌宠在线收到广播、离线后重连读取列表；确认回到本宠仍存在的最近更新 Thread 并可继续回复，被删历史不再展示。
+- 跨界面删除分别覆盖桌宠在线收到广播、离线后重连读取列表；确认清理失效关联，显式选择工作区仍存在的 Thread 后可继续回复，被删历史不再展示。
 - 建议等待无回复计时器；Permission 用例覆盖超时、唯一回执、snapshot 恢复与两端清理。socket 关闭只解除订阅，不能清理仍执行的 Thread。
 - system、时间基准与规则版本恢复归 `use-cases/thread-ownership`；`thread/ThreadPersistence.test.ts` 补充前置 system 下首个用户标题与可见消息数边界。脚本模型证明实际请求投影，不证明真实 provider 的时间理解。
 - 默认读取沿真实文件/历史夹具、Tool 与 Runtime 验证；PromptPanel 既有图片 Item 另保留 Blob 与模型适配测试，桌宠文件引用复用真实持久化与重建用例验证路径元数据而非副本。

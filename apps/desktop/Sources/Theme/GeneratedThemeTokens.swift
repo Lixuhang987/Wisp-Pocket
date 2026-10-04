@@ -15,6 +15,14 @@ enum GeneratedThemeTokens {
         let hairline: String
         let hairlineSoft: String
         let onAccent: String
+        let settingsBorder: String
+        let settingsCanvas: String
+        let settingsControl: String
+        let settingsFocus: String
+        let settingsSecondary: String
+        let settingsSidebar: String
+        let settingsSurface: String
+        let settingsText: String
         let success: String
         let surface: String
         let surfaceElevated: String
@@ -79,6 +87,14 @@ enum GeneratedThemeTokens {
         hairline: "#e6dfd8",
         hairlineSoft: "#ebe6df",
         onAccent: "#ffffff",
+        settingsBorder: "#e5e5e5",
+        settingsCanvas: "#ffffff",
+        settingsControl: "#eeeeee",
+        settingsFocus: "#5087b4",
+        settingsSecondary: "#707070",
+        settingsSidebar: "#f6f6f6",
+        settingsSurface: "#f7f7f7",
+        settingsText: "#252525",
         success: "#5db872",
         surface: "#efe9de",
         surfaceElevated: "#ffffff",
@@ -106,6 +122,14 @@ enum GeneratedThemeTokens {
         hairline: "#3e3833",
         hairlineSoft: "#342f2a",
         onAccent: "#1a1614",
+        settingsBorder: "#353535",
+        settingsCanvas: "#181818",
+        settingsControl: "#303030",
+        settingsFocus: "#81b8e3",
+        settingsSecondary: "#a0a0a0",
+        settingsSidebar: "#222222",
+        settingsSurface: "#232323",
+        settingsText: "#e7e7e7",
         success: "#5db872",
         surface: "#211e1b",
         surfaceElevated: "#3a3530",

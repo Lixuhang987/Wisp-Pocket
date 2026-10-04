@@ -8,7 +8,7 @@ import type { ConversationMessage } from "../../conversation/types/ConversationM
 import type { PersistedThread, ThreadAuditEvent, ThreadSummary } from "./ThreadHistory.ts";
 import type { ThreadTools } from "../ThreadTools.ts";
 
-export type CreateThreadInput = { preview?: string | null; petId?: string; workspaceId?: string; commandId?: string; dynamicTools?: DynamicToolSpec[] };
+export type CreateThreadInput = { preview?: string | null; workspaceId: string; commandId?: string; dynamicTools?: DynamicToolSpec[] };
 export interface ThreadStorage {
   createThread(input: CreateThreadInput): Promise<PersistedThread>;
   getThread(id: string): Promise<PersistedThread | null>;

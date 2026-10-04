@@ -41,6 +41,7 @@ final class AgentSettingsStoreTests: XCTestCase {
         ).write(to: fileURL)
 
         let store = AgentSettingsStore(homeDirectoryURL: homeURL)
+        XCTAssertTrue(store.updatePromptWorkspace("workspace-selected"))
         store.updateAppearance { appearance in
             appearance.themePreference = .dark
         }
@@ -53,6 +54,7 @@ final class AgentSettingsStoreTests: XCTestCase {
         try Data(#"{"llm":{"model":"updated","summarizerModel":"summary"},"tools":{"denylist":["file.write"]}}"#.utf8).write(to: fileURL)
         store.updateAppearance { $0.themePreference = .light }
         let reread = try TestFiles.readJSON(fileURL)
+        XCTAssertEqual(AgentSettingsStore(homeDirectoryURL: homeURL).promptWorkspaceId, "workspace-selected")
         XCTAssertEqual((reread["llm"] as? [String: Any])?["summarizerModel"] as? String, "summary")
         XCTAssertEqual((reread["llm"] as? [String: Any])?["model"] as? String, "updated")
         XCTAssertEqual((try TestFiles.readJSON(nativeFile)["appearance"] as? [String: Any])?["themePreference"] as? String, "light")

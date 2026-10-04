@@ -118,4 +118,16 @@ contextBridge.exposeInMainWorld("handAgentSettings", {
   showPet: (petId: string) => ipcRenderer.invoke("settings:show-pet", petId),
   hidePet: (petId: string) => ipcRenderer.invoke("settings:hide-pet", petId),
   getPetVisibility: () => ipcRenderer.invoke("settings:pet-visibility"),
+  listPets: () => ipcRenderer.invoke("settings:list-pets"),
+  savePet: (input: unknown, commandId?: string) => ipcRenderer.invoke("settings:save-pet", input, commandId),
+  assignPet: (input: unknown) => ipcRenderer.invoke("settings:assign-pet", input),
+  openWorkspaceThread: (workspaceId: string, threadId: string | null) => ipcRenderer.invoke("settings:open-workspace-thread", workspaceId, threadId),
+  summonPet: (workspaceId: string) => ipcRenderer.invoke("settings:summon-pet", workspaceId),
+  importPetImage: (image: unknown) => ipcRenderer.invoke("settings:import-pet-image", image),
+  setPetSize: (petId: string, size: number) => ipcRenderer.invoke("settings:set-pet-size", petId, size),
+  onPetsChanged: (handler: (pets: unknown[]) => void) => {
+    const listener = (_event: unknown, pets: unknown[]) => handler(pets);
+    ipcRenderer.on("settings:pets-changed", listener);
+    return () => { ipcRenderer.removeListener("settings:pets-changed", listener); };
+  },
 });

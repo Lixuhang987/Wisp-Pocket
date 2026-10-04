@@ -9,6 +9,8 @@ import { ElectronShellRuntime } from "../../src/main/electronShellRuntime.js";
 import { registerPetWindowIpc } from "../../src/main/petWindowIpc.js";
 import { ActivityWindowController } from "../../src/main/windows/activityWindowController.js";
 import { PetWindowCollection } from "../../src/main/windows/petWindowCollection.js";
+import { FrontendPetStore } from "../../src/main/pets/frontendPetStore.js";
+import type { Pet } from "../../src/main/pets/petTypes.js";
 import { PetPositionStore } from "../../src/main/windows/petPositionStore.js";
 
 const nodeRequire = createRequire(import.meta.url);
@@ -101,7 +103,7 @@ describe("桌宠原生窗口用例", () => {
     expect(window.destroyed).toBe(false);
     bridge.setReceiving(false);
     expect(window.destroyed).toBe(true);
-    await harness.collection.accept({ type: "thread.started", threadId: "thread-a", payload: { petId: "pet-a" } });
+    await harness.collection.accept({ type: "thread.started", threadId: "thread-a", payload: { workspaceId: "workspace-a" } });
     await harness.collection.accept({
       type: "permission.requested", threadId: "thread-a", requestId: "permission-a",
       timestamp: new Date().toISOString(), payload: {},
@@ -111,20 +113,33 @@ describe("桌宠原生窗口用例", () => {
     expect(recalled.showInactiveCount).toBe(1);
     expect(recalled.focusedSurface).toBe("other-app");
     expect(recalled.webContents.send).toHaveBeenCalledWith("pet-window:reveal");
-    const retained = recalled;
-    await harness.collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-a" }, { id: "pet-b" }] } });
+    expect(harness.store.get("pet-a")).toMatchObject({
+      workspaceId: "workspace-a", threadId: "thread-a", visible: true,
+    });
+    await harness.collection.accept({
+      type: "permission.requested", threadId: "thread-a", requestId: "permission-a",
+      timestamp: new Date().toISOString(), payload: {},
+    });
+    expect(harness.petWindows.get("pet-a")).toBe(recalled);
+    expect(recalled.showInactiveCount).toBe(1);
+
+    await harness.collection.showPet("pet-b");
+    expect(harness.store.get("pet-b").visible).toBe(true);
     await harness.collection.hidePet("pet-b");
-    await harness.collection.accept({ type: "pet.created", payload: { pet: { id: "pet-b" } } });
     expect(harness.collection.getVisibility()["pet-b"]).toBe(false);
     expect(harness.petWindows.get("pet-b")!.destroyed).toBe(true);
+
     harness.collection.setReceiving("pet-a", true);
-    await harness.collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-b" }] } });
-    expect(retained.destroyed).toBe(false);
-    expect(harness.collection.getVisibility()).toEqual({ "pet-b": false });
+    await harness.collection.hidePet("pet-a");
+    expect(recalled.destroyed).toBe(false);
+    expect(harness.store.get("pet-a")).toMatchObject({
+      workspaceId: "workspace-a", threadId: "thread-a", visible: false,
+    });
     harness.collection.setReceiving("pet-a", false);
-    expect(retained.destroyed).toBe(true);
-    await harness.collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-b" }, { id: "pet-c" }] } });
-    expect(harness.collection.getVisibility()).toEqual({ "pet-b": false, "pet-c": true });
+    expect(recalled.destroyed).toBe(true);
+    const restored = new FrontendPetStore(harness.petStorePath);
+    expect(restored.list()).toEqual(harness.store.list());
+    expect(restored.list().every(pet => !pet.visible)).toBe(true);
 
   });
 
@@ -306,8 +321,18 @@ async function createHarness(options: { positionPath?: string; screen?: FakeScre
       return window;
     },
   });
+  const petStorePath = createPositionPath();
+  const timestamp = "2026-10-04T00:00:00.000Z";
+  const pets: Pet[] = ["pet-a", "pet-b"].map(id => ({
+    id, name: id, description: "", rolePrompt: "协助当前任务", revision: 1,
+    imageRef: { type: "builtin", id: "yachiyo" }, isDefault: id === "pet-a",
+    createdAt: timestamp, updatedAt: timestamp, workspaceId: "workspace-a",
+    threadId: null, visible: false, size: 100,
+  }));
+  writeFileSync(petStorePath, JSON.stringify({ version: 1, pets }));
+  const store = new FrontendPetStore(petStorePath);
   const collection = new PetWindowCollection({
-    url: "ws://local/api/thread", preferences: { load: () => ({}), save: vi.fn() },
+    url: "ws://local/api/thread", store, defaultWorkspaceRoot: "/tmp/workspace-a",
     createController: petId => petId === "pet-a" ? controller : new ActivityWindowController({
       activityWindowHTMLPath: "/dist/activity-window/index.html", preloadPath, petId,
       positionStore: new PetPositionStore(createPositionPath()), screenProvider: screen,
@@ -329,8 +354,10 @@ async function createHarness(options: { positionPath?: string; screen?: FakeScre
     },
     send: () => {}, now: () => "2026-09-13T00:00:00.000Z", stopSupervisor: () => {}, quit: () => {},
   });
-  if (options.collection) await collection.accept({ type: "pet.listed", payload: { pets: [{ id: "pet-a" }, ...(options.secondPet ? [{ id: "pet-b" }] : [])] } });
-  else await runtime.handleCommand({ channel: "electron_shell", type: "activity_window.show", commandId: "show-pet" });
+  if (options.collection) {
+    await collection.showPet("pet-a");
+    if (options.secondPet) await collection.showPet("pet-b");
+  } else await runtime.handleCommand({ channel: "electron_shell", type: "activity_window.show", commandId: "show-pet" });
   const mainWorld: Record<string, unknown> = {};
   (globalThis as { window?: unknown }).window = mainWorld;
   const previousArgv = process.argv;
@@ -350,7 +377,7 @@ async function createHarness(options: { positionPath?: string; screen?: FakeScre
   } finally {
     process.argv = previousArgv;
   }
-  return { controller, collection, petWindows, runtime, window, screen, positionPath, ipcMain, mainWorld, bridge: mainWorld.handAgentPet as PetBridge };
+  return { controller, collection, store, petStorePath, petWindows, runtime, window, screen, positionPath, ipcMain, mainWorld, bridge: mainWorld.handAgentPet as PetBridge };
 }
 
 function createPositionPath(): string {

@@ -44,7 +44,7 @@ describe("ThreadNotificationPublisher", () => {
       notificationId: "n-start",
       commandId: "cmd-1",
       timestamp: "2026-06-24T00:00:00.000Z",
-      payload: { preview: null },
+      payload: { preview: null, workspaceId:"workspace-1",rootPath:"/tmp" },
     } satisfies ThreadNotification);
     publisher.publish({
       type: "assistant.delta",

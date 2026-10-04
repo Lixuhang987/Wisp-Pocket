@@ -35,7 +35,7 @@ function started(threadId: string, preview: string, commandId?: string): ThreadN
     type: "thread.started", threadId,
     notificationId: `started-${++notificationSequence}`, timestamp,
     ...(commandId ? { commandId } : {}),
-    payload: {workspaceId:"workspace-default", petId:"pet-default", petRevision:1, rootPath:"/tmp/pet",  preview },
+    payload: {workspaceId:"workspace-default", rootPath:"/tmp/pet",  preview },
   };
 }
 
@@ -43,7 +43,7 @@ function receiveSnapshot(socket: FakeWebSocket, threadId: string, text: string):
   socket.receive({
     type: "thread.snapshot", threadId,
     notificationId: `snapshot-${++notificationSequence}`, timestamp,
-    payload: {workspaceId:"workspace-default", petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  status: "idle", messages: [{
+    payload: {workspaceId:"workspace-default", rootPath:"/tmp/pet", status: "idle", messages: [{
       id: `message-${threadId}`, role: "assistant", text, status: "completed",
       createdAt: timestamp, updatedAt: timestamp,
     }] },
@@ -54,7 +54,6 @@ function mountApp() {
   const view = render(<App />);
   const socket = FakeWebSocket.instances.at(-1)!;
   socket.open();
-  socket.receive({type:"pet.listed",notificationId:`pets-${++notificationSequence}`,timestamp,payload:{pets:[{id:"pet-default",workspaceId:"workspace-default",name:"Default",description:"",rolePrompt:"Help",revision:1,imageRef:{type:"builtin",id:"yachiyo"},rootPath:"/tmp/pet",isDefault:true,createdAt:timestamp,updatedAt:timestamp}]}});
   socket.receive({type:"workspace.listed",notificationId:`workspaces-${++notificationSequence}`,timestamp,payload:{workspaces:[{id:"workspace-default",name:"Project",rootPath:"/tmp/pet",createdAt:timestamp}]}});
   act(() => { if(!createThreadWindowStore.getState().expandedWorkspaceIds.has("workspace-default")) createThreadWindowStore.getState().toggleWorkspaceExpanded("workspace-default"); });
   return { ...view, socket };
@@ -70,7 +69,7 @@ function composer() { return pet().getByRole<HTMLTextAreaElement>("textbox"); }
 function openThreadA(socket: FakeWebSocket): void {
   socket.receive({
     type: "thread.listed", notificationId: `list-${++notificationSequence}`, timestamp,
-    payload: { threads: [{workspaceId:"workspace-default", petId:"pet-default", petRevision:1, rootPath:"/tmp/pet", status:"idle",
+    payload: { threads: [{workspaceId:"workspace-default", rootPath:"/tmp/pet", status:"idle",
       id: "thread-a", preview: "Thread A", messageCount: 1, createdAt: timestamp, updatedAt: timestamp,
     }] },
   });
@@ -173,8 +172,8 @@ describe("ThreadWindow selection intent", () => {
       commandId = startBlankThread(socket);
     } else {
       commandId = "failed-prompt";
-      act(() => window.handAgentReceiveInitialPrompt!({petId: "pet-default",
-        clientRequestId: commandId, userInput: { items: [{ type: "text", id: "input", text: "hello" }] },
+      act(() => window.handAgentReceiveInitialPrompt!({workspaceId: "workspace-default",
+clientRequestId: commandId, userInput: { items: [{ type: "text", id: "input", text: "hello" }] },
       }));
     }
     socket.receive({
@@ -191,8 +190,8 @@ describe("ThreadWindow selection intent", () => {
   });
 
   it("selects the fallback initial-prompt Thread and sends its original payload only once", () => {
-    const prompt: InitialPromptPayload = {petId: "pet-default",
-      clientRequestId: "fallback-prompt", userInput: { items: [
+    const prompt: InitialPromptPayload = {workspaceId: "workspace-default",
+clientRequestId: "fallback-prompt", userInput: { items: [
         { type: "text", id: "input", text: "Fallback input" },
         { type: "text_selection", id: "selection", text: "Selected context" },
       ] },
@@ -253,7 +252,7 @@ describe("ThreadWindow selection intent", () => {
 
     expect(pet().getByText("Early native reply")).toBeTruthy();
     expect(socket.commands().map((command) => command.type)).toEqual([
-      "thread.resume", "pet.list", "workspace.list", "thread.list",
+      "thread.resume", "workspace.list", "thread.list",
     ]);
     expect(window.handAgentPendingThreadOpens).toEqual([]);
   });

@@ -78,8 +78,7 @@ export class AgentRuntime {
     throwIfAborted(runOptions.signal);
     const systemMessages = await systemPromptUpdates({
       sections: [...this.systemPromptSections,
-        { name: "workspace-instructions", resolve: () => runOptions.projectInstructions ? `项目 AGENTS.md（用户本次明确要求优先于项目指令；项目指令优先于桌宠角色习惯；不能改变后端工具边界与权限）：\n${runOptions.projectInstructions}` : null },
-        { name: "pet-role", resolve: () => runOptions.rolePrompt ? `桌宠角色（表达习惯，用户明确任务与项目 AGENTS.md 可覆盖角色习惯；不能改变工具和权限规则）：\n${runOptions.rolePrompt}` : null }],
+        { name: "workspace-instructions", resolve: () => runOptions.projectInstructions ? `项目 AGENTS.md（用户本次明确要求优先于项目指令；不能改变后端工具边界与权限）：\n${runOptions.projectInstructions}` : null }],
       context: { tools: this.modelTools() }, messages: nextMessages,
     });
     const timeMessage = runOptions.startedAt ? timeContextUpdate(nextMessages, runOptions.startedAt) : undefined;

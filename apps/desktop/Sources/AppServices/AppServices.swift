@@ -144,7 +144,7 @@ final class AppServices {
                         guard let swiftThreadClient else { throw SwiftThreadClientError.startFailed("Thread 服务不可用") }
                         _ = try await swiftThreadClient.submitInitialPrompt(prompt)
                     } catch {
-                        agentTriggerStore.recordDeliveryFailure("目标桌宠 \(prompt.targetPetId ?? "未指定") 投递失败：\(error.localizedDescription)")
+                        agentTriggerStore.recordDeliveryFailure("目标工作区 \(prompt.targetWorkspaceId ?? "未指定") 投递失败：\(error.localizedDescription)")
                     }
                 }
             }

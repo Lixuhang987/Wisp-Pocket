@@ -200,21 +200,23 @@ final class SwiftThreadClientTests: XCTestCase {
         let connection = AppServerConnection(serverURL: URL(string: "ws://127.0.0.1:4317/api/thread")!, transport: transport)
         let client = SwiftThreadClient(connection: connection)
         client.connect()
-        let task = Task { try await client.submitInitialPrompt(PromptSubmission(
-            userInput: PromptUserInput(items: [.image(id: "capture", mimeType: "image/png", base64: "capture-bytes")]), summary: "截图")) }
+        let lookup = Task { try await client.listWorkspaces() }
         await Task.yield()
-        let list = transport.tasks[0].sentObjects[0]
-        XCTAssertEqual(list["type"] as? String, "pet.list")
+        let request = transport.tasks[0].sentObjects[0]
+        XCTAssertEqual(request["type"] as? String, "workspace.list")
         transport.tasks[0].succeedReceive(String(decoding: try JSONSerialization.data(withJSONObject: [
-            "type": "pet.listed", "commandId": list["commandId"]!, "payload": ["pets": [[
-                "id": "default-pet", "name": "默认", "description": "", "rolePrompt": "协助", "revision": 1,
-                "imageRef": ["type": "builtin", "id": "yachiyo"], "workspaceId": "workspace-default", "rootPath": "/tmp/default", "isDefault": true
+            "type": "workspace.listed", "commandId": request["commandId"]!, "payload": ["workspaces": [[
+                "id": "workspace-default", "name": "项目", "rootPath": "/tmp/project", "createdAt": "2026-10-04T00:00:00Z"
             ]]]
         ]), as: UTF8.self))
-        for _ in 0..<20 where transport.tasks[0].sentObjects.count < 2 { await Task.yield() }
+        let workspaces = try await lookup.value
+        XCTAssertEqual(workspaces.first?.id, "workspace-default")
+        let task = Task { try await client.submitInitialPrompt(PromptSubmission(
+            userInput: PromptUserInput(items: [.image(id: "capture", mimeType: "image/png", base64: "capture-bytes")]), summary: "截图", targetWorkspaceId: "workspace-default")) }
+        await Task.yield()
         let start = try XCTUnwrap(transport.tasks[0].sentObjects.last)
         XCTAssertEqual(start["type"] as? String, "thread.start")
-        XCTAssertEqual((start["payload"] as? [String: Any])?["petId"] as? String, "default-pet")
+        XCTAssertEqual((start["payload"] as? [String: Any])?["workspaceId"] as? String, "workspace-default")
         let tools = (start["payload"] as? [String: Any])?["dynamicTools"] as? [[String: Any]]
         XCTAssertEqual(tools?.count, 9)
         XCTAssertTrue(tools?.contains { $0["name"] as? String == "screen_capture" } == true)
@@ -259,7 +261,7 @@ final class SwiftThreadClientTests: XCTestCase {
 
         let start = transport.tasks[0].sentObjects[0]
         let startPayload = start["payload"] as? [String: Any]
-        XCTAssertEqual(startPayload?["petId"] as? String, "pet-test")
+        XCTAssertEqual(startPayload?["workspaceId"] as? String, "workspace-test")
         let dynamicTools = startPayload?["dynamicTools"] as? [[String: Any]]
         XCTAssertEqual(dynamicTools?.count, 10)
         XCTAssertTrue(dynamicTools?.contains {
@@ -287,7 +289,7 @@ private func makePromptSubmission(_ text: String) -> PromptSubmission {
     PromptSubmission(
         userInput: PromptUserInput(items: [.text(id: "text-1", text: text)]),
         summary: text,
-        targetPetId: "pet-test"
+        targetWorkspaceId: "workspace-test"
     )
 }
 

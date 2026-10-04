@@ -27,7 +27,7 @@ preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`�
 - preload 自身持续监听 `handagent:theme-changed`，只接受已校验的 `HostTheme` payload，并保存 latest theme；`handAgentSubscribeThemeChange(handler)` 订阅时会先回放 latest theme，再接收后续变化，不暴露原始 `ipcRenderer`。
 - `handAgentPet` 的窗口布局能力包括 `setLayout(mode, contentHeight?)`、`setInteractiveRegions(rectangles)` 和无参数的 `beginMove` / `move` / `endMove`。`mode` 为 `pet`、`compact` 或 `expanded`；可选高度是 renderer 测得的常态内容需求，由 main 按角色最小高度、展开上限及工作区裁剪。
 - 矩形使用当前 renderer viewport 的本地坐标；布局、角色大小、DOM 尺寸或滚动变化后重新上报。气泡、建议与请求共用上方浏览视口的裁剪规则，由 [renderer](../activity-window/activity-window.md)维护；回复框与角色单独命中。
-- 角色大小偏好仅保存在 renderer，并以实际命中矩形反映给 main；桥接不增加整体窗口或页面缩放能力。
+- 角色大小偏好通过管理桥保存在前端 Pet store，并以实际命中矩形反映给 main；桥接不增加整体窗口或页面缩放能力。
 - main 从已登记 sender 解析其宠窗，拒绝附带其他窗口目标的 move/hide 请求，并校验布局、有限且有界的内容高度、有限矩形和参数数量；拖动始终由 main 读取系统光标，不接受 renderer 提交屏幕坐标。窗口侧合约见 [windows](../main/windows/windows.md)。
 - 隔离原生 QA 可由 main 的 additional arguments 覆盖 loopback Thread endpoint；preload 限定 `ws:`、loopback host、`/api/thread`，并确保 `acceptServerRequests=1`。
 
@@ -45,4 +45,4 @@ preload 源文件使用 `.cts`，由 TypeScript 编译为 `dist/preload/*.cjs`�
 
 ## 设置和伙伴管理桥
 
-ThreadWindow/Settings 与 ActivityWindow preload 暴露 `handAgentSettings` 的 chooseDirectory、chooseImage、showPet、hidePet、getPetVisibility。main 只允许当前设置窗口或已登记 ActivityWindow sender 使用；普通 ThreadWindow 即使得到桥函数也没有管理权限。图片 picker 只返回 name/mimeType/bytesBase64，目录 picker 返回用户选择的路径，renderer 通过后端公开接口提交；没有任意文件读取或配置写入能力。`handAgentPet.hidePet()` 仍只操作 sender 自己的宠窗。
+ThreadWindow/Settings 与 ActivityWindow preload 暴露 `handAgentSettings`：目录/图片 picker、listPets/savePet/onPetsChanged、assignPet/openWorkspaceThread/summonPet、importPetImage/setPetSize 和显隐。main 只允许当前设置窗口或登记 ActivityWindow sender；普通 ThreadWindow 即使得到桥函数也无管理权限。Pet 资料和状态写入 [main store](../main/pets/pets.md)，分配前使用通用后端 Workspace/Thread 事实校验。图片 picker 返回 name/mimeType/bytesBase64，main 解码并保存前端引用，不调用后端 Pet API。`handAgentPet.hidePet()` 仅操作 sender 本窗。

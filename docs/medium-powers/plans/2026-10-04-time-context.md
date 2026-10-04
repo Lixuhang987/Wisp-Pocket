@@ -1,12 +1,12 @@
 # 时间上下文与系统提示持久化实施计划
 
-状态：2026-10-04 已实现，独立文档审核完成；真实宿主与模型回归列入 [manual QA](../../manual-qa.md)。
+状态：2026-10-04 已实现，独立文档审核完成；后续 Issue #9 已将角色改为前端首轮普通输入，其余 system 与时间合同保留；真实宿主与模型回归列入 [manual QA](../../manual-qa.md)。
 
 用户 2026-10-04 已要求直接修改后端：临时 system 提示未进入 Thread 历史属于缺陷，须与首轮时间注入、距最近注入超过一小时再注入一起修复。沿原请求补齐 Context History 本地时间和活动时间过滤；第一版不增加时钟工具、相对窗口参数或额外刷新条件。
 
 ## 用例、数据与接口
 
-- 新 Thread 首个实际 Turn：Thread 固定本轮开始时间 → Runtime 解析工具策略、项目规则、角色与时间上下文 → 通过 Thread 回调先保存 system response item → 模型读取已持久的上下文 → 生成增量保存。存储失败时不能先发送模型请求。
+- 新 Thread 首个实际 Turn：Thread 固定本轮开始时间 → Runtime 解析工具策略、项目规则与时间上下文 → 通过 Thread 回调先保存 system response item → 模型读取已持久的上下文 → 生成增量保存。存储失败时不能先发送模型请求。
 - 后续 Turn：按 system section 的结构化名称保存变更版本；模型投影只使用各 section 最新有效值，删除规则保存空版本。避免重复注入相同规则，也避免旧项目规则继续生效。时间消息按独立结构化 timestamp 恢复，只有当前开始时间减最近注入时间严格大于 3600 秒才新增。
 - system AgentMessage 增加可识别的 section 名称或时间上下文 metadata。这些仍保存为 response_item；不增加 SQLite schema。系统消息进入持久历史，用户可见投影与 messageCount 排除 system，标题按用户消息判断。
 - Runtime 保留完整内部消息；模型请求投影将最新规则前置，时间提示保持上下文顺序。Thread 回调持久化 system 后调整生成增量起点，失败/中断保留已保存提示，后续完成不重复保存。

@@ -15,16 +15,16 @@ import {
 import { applyThemeToDocument, getInitialTheme, installThemeSubscription } from "../../src/native/themeConfig.ts";
 
 describe("thread protocol helpers", () => {
-  it("encodes thread.start with pet only", () => {
+  it("encodes thread.start for a workspace", () => {
     expect(JSON.parse(encodeThreadStart({
       commandId: "cmd-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      petId: "pet-default",
+      workspaceId: "workspace-default",
     }))).toEqual({
       type: "thread.start",
       commandId: "cmd-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      payload: { petId: "pet-default" },
+      payload: { workspaceId: "workspace-default" },
     });
   });
 
@@ -193,9 +193,9 @@ describe("thread protocol helpers", () => {
     })).toBe(false);
   });
 
-  it("guards pet listed notifications", () => {
+  it("guards workspace listed notifications", () => {
     const base = {
-      type: "pet.listed",
+      type: "workspace.listed",
       notificationId: "n-pets",
       commandId: "pet-list-1",
       timestamp: "2026-06-06T00:00:09.000Z",
@@ -204,7 +204,7 @@ describe("thread protocol helpers", () => {
     expect(isThreadNotification({
       ...base,
       payload: {
-        pets: [{workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+        workspaces: [{workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
           id: "docs",
           name: "Docs",
           rootPath: "/repo/docs",
@@ -215,7 +215,7 @@ describe("thread protocol helpers", () => {
     expect(isThreadNotification({
       ...base,
       payload: {
-        pets: [{workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
+        workspaces: [{workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
           id: "docs",
           name: "Docs",
           rootPath: 123,
@@ -256,8 +256,8 @@ describe("native config boundaries", () => {
   }
 
   it("flushes initial prompts queued before React installs the receiver", () => {
-    nativeWindow().handAgentPendingInitialPrompts = [{petId: "pet-default",
-      clientRequestId: "prompt-1",
+    nativeWindow().handAgentPendingInitialPrompts = [{workspaceId: "workspace-default",
+clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },

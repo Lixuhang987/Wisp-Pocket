@@ -6,18 +6,16 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
     private let dynamicToolClient: DynamicToolProviderConnectionClient?
     private let swiftThreadClient: (any SwiftThreadSubmitting)?
     private var hasAgentServerHealth = false
-    private var hasPreparedThreadWindow = false
     private var lastPublishedAvailability = false
     private var isRunning = false
     private var agentServerErrorMessage: String?
-    private var threadWindowErrorMessage: String?
     private var pendingSettingsCommands = Set<String>()
     var onSettingsCommandFailure: ((String) -> Void)?
     private var pendingCommandKinds: [String: ThreadWindowCommandKind] = [:]
     private var pendingActivityCommandKinds: [String: ActivityWindowCommandKind] = [:]
 
     var startupErrorMessage: String? {
-        agentServerErrorMessage ?? threadWindowErrorMessage
+        agentServerErrorMessage
     }
 
     var onAvailabilityChange: ((Bool) -> Void)?
@@ -28,7 +26,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
     var onActivityWindowCommandResult: ((ActivityWindowCommandResult) -> Void)?
 
     var isAvailable: Bool {
-        hasAgentServerHealth && hasPreparedThreadWindow && startupErrorMessage == nil
+        hasAgentServerHealth && agentServerErrorMessage == nil
     }
 
     init(
@@ -79,9 +77,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         swiftThreadClient?.disconnect()
         shell.stop()
         hasAgentServerHealth = false
-        hasPreparedThreadWindow = false
         agentServerErrorMessage = nil
-        threadWindowErrorMessage = nil
         publishAvailability(force: lastPublishedAvailability)
     }
 
@@ -161,34 +157,23 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
             }
 
         case .threadWindowPrepared:
-            hasPreparedThreadWindow = true
-            threadWindowErrorMessage = nil
             publishAvailability()
 
-        case .threadWindowPrepareFailed(let message):
-            hasPreparedThreadWindow = false
-            threadWindowErrorMessage = message
-            publishAvailability(force: true)
+        case .threadWindowPrepareFailed:
+            publishAvailability()
 
         case .threadWindowClosed(_, let wasVisible):
             ThreadWindowDiagnostics.emit("electron.thread_window_closed wasVisible=\(wasVisible)")
-            hasPreparedThreadWindow = false
-            threadWindowErrorMessage = "Electron ThreadWindow 已关闭，正在重新预热…"
             if wasVisible {
                 onThreadWindowClosed?()
             }
-            publishAvailability(force: true)
+            publishAvailability()
 
         case .rendererCrashed(.activity, _):
             break
 
-        case .rendererCrashed(.thread, let reason):
-            threadWindowErrorMessage = reason
-            hasAgentServerHealth = false
-            dynamicToolClient?.disconnect()
-            swiftThreadClient?.disconnect()
-            onFatalError?(reason)
-            publishAvailability(force: true)
+        case .rendererCrashed(.thread, _):
+            publishAvailability()
 
         case .commandAck(let commandId, let ok, let error):
             handleCommandAck(commandId: commandId, ok: ok, error: error)
@@ -204,7 +189,6 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
         if message == "Electron shell exited with status 0" {
             isRunning = false
             hasAgentServerHealth = false
-            hasPreparedThreadWindow = false
             dynamicToolClient?.disconnect()
             swiftThreadClient?.disconnect()
             pendingSettingsCommands.removeAll()
@@ -217,7 +201,6 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
 
         agentServerErrorMessage = message
         hasAgentServerHealth = false
-        hasPreparedThreadWindow = false
         dynamicToolClient?.disconnect()
         swiftThreadClient?.disconnect()
         pendingSettingsCommands.removeAll()
@@ -229,9 +212,7 @@ final class ElectronBackedAppServer: AppServerManaging, ThreadWindowCommanding, 
 
     private func resetGate() {
         hasAgentServerHealth = false
-        hasPreparedThreadWindow = false
         agentServerErrorMessage = nil
-        threadWindowErrorMessage = nil
         lastPublishedAvailability = false
         isRunning = false
         pendingSettingsCommands.removeAll()

@@ -8,7 +8,6 @@ import type { ThreadWindowState } from "../store/threadWindowStore.ts";
 import type { ThreadSocketClient } from "./threadSocketClient.ts";
 
 type InputStore = Pick<ThreadWindowState,
-  | "pets"
   | "connectionState"
   | "threadsById"
   | "pendingInitialPrompts"
@@ -28,11 +27,9 @@ export class ThreadInputController {
   startInitialPrompt(prompt: InitialPromptPayload): void {
     const store = this.options.getState();
     const pending = store.pendingInitialPrompts[prompt.clientRequestId];
-    if (pending && JSON.stringify(pending.userInput) !== JSON.stringify(prompt.userInput)) throw new Error(`Initial prompt ${prompt.clientRequestId} is already pending`);
-    const petId = prompt.petId ?? store.pets.find(pet => pet.isDefault)?.id;
-    store.enqueueInitialPrompt({ ...prompt, ...(petId ? {petId} : {}) });
-    if (!petId) return;
-    this.options.client.sendRaw(encodeThreadStart({ commandId: prompt.clientRequestId, timestamp: this.now(), petId }));
+    if (pending && (pending.workspaceId !== prompt.workspaceId || JSON.stringify(pending.userInput) !== JSON.stringify(prompt.userInput))) throw new Error(`Initial prompt ${prompt.clientRequestId} is already pending`);
+    store.enqueueInitialPrompt(prompt);
+    this.options.client.sendRaw(encodeThreadStart({ commandId: prompt.clientRequestId, timestamp: this.now(), workspaceId: prompt.workspaceId }));
   }
 
   handleNotification(notification: ThreadNotification): void {
@@ -45,9 +42,7 @@ export class ThreadInputController {
 
     store.handleNotification(notification);
     this.options.onNotification?.(notification);
-    if (notification.type === "pet.listed") {
-      for (const pending of Object.values(this.options.getState().pendingInitialPrompts)) if (!pending.petId) this.startInitialPrompt(pending);
-    }
+
 
     // Preserve the callback → history load → first input handoff order.
     if (notification.type === "thread.started" && prompt) {

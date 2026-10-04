@@ -82,14 +82,14 @@ describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
         permissionPolicy: { check: async request => { permissionChecks.push(request.toolName); return "ask"; }, resolveAsk: async () => ({ decision: "allow", remember: "once" }), remember: async () => {} },
       }),
     }, join(fixture.directory, "threads.sqlite"));
-    const pet = await h.pets.create({ name: "读取宠", rolePrompt: "请依据实际材料回答", imageRef: { type: "builtin", id: "yachiyo" }, rootPath: join(fixture.directory, "pet-root") });
+    const { workspace } = await h.workspaces.create(join(fixture.directory, "workspace-root"));
     class Socket extends EventEmitter { sent: any[] = []; send(raw: string) { this.sent.push(JSON.parse(raw)); } }
     const socket = new Socket();
     attachThreadSocketHandlers(socket as never, { commandRouter: h.router, eventPublisher: h.publisher, acceptServerRequests: true });
     const send = (command: unknown) => socket.emit("message", Buffer.from(JSON.stringify(command)));
     const meta = () => ({ commandId: crypto.randomUUID(), timestamp: new Date().toISOString() });
     try {
-      send({ type: "thread.start", ...meta(), payload: { petId: pet.id, dynamicTools: [] } });
+      send({ type: "thread.start", ...meta(), payload: { workspaceId: workspace.id, dynamicTools: [] } });
       await vi.waitFor(() => expect(socket.sent.some(event => event.type === "thread.started")).toBe(true));
       const threadId = socket.sent.find(event => event.type === "thread.started").threadId;
       const op = userOp("读取这份资料");
@@ -97,7 +97,7 @@ describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
       send({ type: "op.submit", threadId, ...meta(), payload: { op: { ...op, payload: { items: [...op.payload.items, reference] } } } });
       await vi.waitFor(() => expect(h.threads.get(threadId)!.snapshot().messages.some((message: any) => message.suggestedReplies?.includes("保存"))).toBe(true));
       expect(permissionChecks).toEqual([]);
-      await expect(readFile(join(pet.rootPath, "must-not-run.txt"))).rejects.toThrow();
+      await expect(readFile(join(workspace.rootPath, "must-not-run.txt"))).rejects.toThrow();
       const saved = await h.persistence.getThread(threadId);
       const input = saved!.messages.find(message => message.role === "user")!;
       expect(input).toMatchObject({ content: expect.stringContaining(source), inputItems: [{ type: "text", text: "读取这份资料" }, reference] });
@@ -117,7 +117,7 @@ describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
       expect(JSON.stringify(await toVercelMessages(evidence))).toContain(original.contentItems[1].imageUrl.split(",")[1]);
       expect(saved!.messages.some(message => message.role === "tool" && message.name === "file.read")).toBe(true);
       send({ type: "op.submit", threadId, ...meta(), payload: { op: userOp("保存") } });
-      await vi.waitFor(async () => expect(await readFile(join(pet.rootPath, "result.txt"), "utf8")).toBe("用户要求保存的摘要"));
+      await vi.waitFor(async () => expect(await readFile(join(workspace.rootPath, "result.txt"), "utf8")).toBe("用户要求保存的摘要"));
       expect(permissionChecks).toEqual(["file.write"]);
       await vi.waitFor(() => expect(h.threads.get(threadId)!.status).toBe("idle"));
     } finally { socket.emit("close"); await h.close(); }

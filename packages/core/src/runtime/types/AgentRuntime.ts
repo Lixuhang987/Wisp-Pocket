@@ -67,7 +67,6 @@ export type AgentRuntimeRunOptions = {
   turnId?: string;
   signal?: AbortSignal;
   rootPath?: string;
-  rolePrompt?: string;
   projectInstructions?: string;
   startedAt?: string;
   persistSystemMessages?: (messages: SystemAgentMessage[]) => Promise<void>;

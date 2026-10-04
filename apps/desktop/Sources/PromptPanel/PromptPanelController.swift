@@ -93,27 +93,19 @@ final class PromptPanelController: PromptPanelControlling {
 
     func register(actions: [ActionDefinition]) {
         if viewModel == nil {
-            let vm = PromptPanelViewModel(actions: actions)
-            vm.onSubmit = { [weak self] inputItems, attachments in
-                self?.onSubmit?(inputItems, attachments)
-            }
-            vm.onHide = { [weak self] in
-                self?.hide()
-            }
-            vm.onOpenSettings = { [weak self] in
-                self?.onOpenSettings?()
-                self?.hide()
-            }
-            vm.onPreviewImage = { [weak self] attachment in
-                self?.presentQuickLook(for: attachment)
-            }
-            self.viewModel = vm
-            quickLookController.onClose = { [weak self] in
-                guard let self, let panel = self.panel, panel.isVisible else { return }
-                panel.makeKey()
-            }
-        } else {
-            viewModel?.updateActions(actions)
+            viewModel = PromptPanelViewModel(actions: actions)
+        }
+        guard let vm = viewModel else { return }
+        vm.updateActions(actions)
+        vm.onSubmit = { [weak self] inputItems, attachments in
+            self?.onSubmit?(inputItems, attachments)
+        }
+        vm.onHide = { [weak self] in self?.hide() }
+        vm.onOpenSettings = { [weak self] in self?.onOpenSettings?() }
+        vm.onPreviewImage = { [weak self] attachment in self?.presentQuickLook(for: attachment) }
+        quickLookController.onClose = { [weak self] in
+            guard let self, let panel = self.panel, panel.isVisible else { return }
+            panel.makeKey()
         }
     }
 

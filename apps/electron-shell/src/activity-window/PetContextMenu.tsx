@@ -1,10 +1,12 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 
-export type PetMenuAction = "manager" | "history" | "size" | "hide";
+export type PetMenuAction = "manager" | "history" | "workspace" | "summon" | "size" | "hide";
 
 const actions: Array<{ action: PetMenuAction; label: string }> = [
   { action: "manager", label: "伙伴" },
   { action: "history", label: "对话" },
+  { action: "workspace", label: "选择工作区" },
+  { action: "summon", label: "唤出新伙伴" },
   { action: "size", label: "调整大小" },
   { action: "hide", label: "隐藏" },
 ];
