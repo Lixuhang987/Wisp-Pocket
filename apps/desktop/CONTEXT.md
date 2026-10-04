@@ -11,7 +11,7 @@ Pet 术语按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 
 _Avoid_: Workspace、Profile（指代伙伴身份时）、基础 Pet（指代工作区自动生成的伙伴时）
 
 **当前 Thread**:
-某只 Pet 当前选择接续的 Thread，可以运行中、已结束或等待输入；改变这项选择不等于结束旧 Thread 的任务。
+某只 Pet 当前选择接续的 Thread，可以运行中、已结束或等待输入；改变这项选择不等于结束旧 Thread 的任务。同一 Thread 最多关联一只 Pet，隐藏也计入独占，可见 Pet 的当前 Thread 不可被其他 Pet 夺取。
 _Avoid_: 正在执行的 Thread（指代前端选择时）
 
 **角色提示**:
