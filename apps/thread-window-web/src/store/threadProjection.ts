@@ -12,7 +12,8 @@ import type {
   ThreadItem,
   ToolCallItem,
   UserMessageItem,
-} from "./threadItems.ts";
+} from "../messages/threadItems.ts";
+import { hasAssistantContent } from "../messages/threadItems.ts";
 
 export type PermissionRequestState = {
   id: string;
@@ -88,7 +89,8 @@ export function projectNotification(
       thread.petRevision = notification.payload.petSnapshot.revision;
       thread.rootPath = notification.payload.rootPath;
       thread.status = notification.payload.status;
-      thread.messages = notification.payload.messages.map(snapshotMessageToItem);
+      thread.messages = notification.payload.messages.map(snapshotMessageToItem)
+        .filter(item => item.type !== "assistant_message" || hasAssistantContent(item));
       clearThreadRequests(thread);
       for (const request of notification.payload.pendingRequests ?? []) projectRequest(thread, request);
       if (pendingMessage && !thread.messages.some((item) => item.type === "user_message" && item.pending)) {
@@ -139,11 +141,13 @@ export function projectNotification(
         if (notification.payload.suggestedReplies) existing.suggestedReplies = notification.payload.suggestedReplies;
         if (notification.payload.awaitingReply !== undefined) existing.awaitingReply = notification.payload.awaitingReply;
       } else {
-        thread.messages.push({
+        const item: AssistantMessageItem = {
           type: "assistant_message", id: notification.itemId, text: notification.payload.text,
           suggestedReplies: notification.payload.suggestedReplies,
           awaitingReply: notification.payload.awaitingReply,
-        });
+        };
+        // Keep leading whitespace and separately streamed reply metadata for later deltas.
+        if (item.text.length || item.suggestedReplies !== undefined || item.awaitingReply !== undefined) thread.messages.push(item);
       }
       break;
     }

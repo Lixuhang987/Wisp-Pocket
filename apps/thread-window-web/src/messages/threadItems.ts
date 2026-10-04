@@ -64,3 +64,15 @@ export function isToolCall(item: ThreadItem): item is ToolCallItem {
 export function isError(item: ThreadItem): item is ErrorItem {
   return item.type === "error";
 }
+
+export function hasAssistantText(item: AssistantMessageItem): boolean {
+  return !!item.text.trim();
+}
+
+export function hasSuggestedReplies(item: AssistantMessageItem): item is AssistantMessageItem & { suggestedReplies: string[] } {
+  return !!item.awaitingReply && !!item.suggestedReplies?.length;
+}
+
+export function hasAssistantContent(item: AssistantMessageItem): boolean {
+  return hasAssistantText(item) || hasSuggestedReplies(item);
+}

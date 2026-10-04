@@ -4,6 +4,25 @@ import { describe, expect, it, vi } from "vitest";
 import { ThreadItemBubble } from "../src/components/ThreadItemBubble.tsx";
 
 describe("ThreadItemBubble", () => {
+  it("renders assistant content, suggestions and running placeholders while keeping tool items distinct", () => {
+    const renderAssistant = (text: string, extra = {}) => renderToStaticMarkup(React.createElement(ThreadItemBubble, {
+      item: { type: "assistant_message", id: "assistant", text }, onCopy: vi.fn(), ...extra,
+    }));
+    expect(renderAssistant(" \n ")).toBe("");
+    expect(renderAssistant("", { isRunning: true })).not.toBe("");
+    const respond = vi.fn();
+    const suggestions = renderToStaticMarkup(React.createElement(ThreadItemBubble, {
+      item: { type: "assistant_message", id: "suggestions", text: "", suggestedReplies: ["进一步读取"], awaitingReply: true },
+      onCopy: vi.fn(), onRespond: respond,
+    }));
+    expect(suggestions).toContain("进一步读取");
+    const tool = renderToStaticMarkup(React.createElement(ThreadItemBubble, {
+      item: { type: "tool_call", id: "read", toolName: "context_history.sample_details", input: "{}", output: "已读取", status: "completed" }, onCopy: vi.fn(),
+    }));
+    expect(tool).toContain("context_history.sample_details");
+    expect(renderAssistant("已读取桌面上下文")).toContain("已读取桌面上下文");
+  });
+
   it("renders persisted image copies, file names and pending input from the shared history", () => {
     const html = renderToStaticMarkup(React.createElement(ThreadItemBubble, {
       item: { type: "user_message", id: "saved", text: "/tmp/保存的报告.pdf", pending: true, inputItems: [
