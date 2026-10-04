@@ -17,7 +17,7 @@
 
 - 后端继续拥有 Workspace 注册表、目录校验、持久化与逐 Turn AGENTS.md；只删除 Pet 的后端概念，创建 Workspace 不再自动生成 Pet。
 - 后端移除 Pet 注册表、Pet API / 协议、petId、Pet 版本和 Pet 关联；不得用改名后的伙伴身份或伙伴快照继续保存旧概念。
-- 本期 Pet 前端只在新建对话时添加角色 prompt，既有 Thread 不随 Pet 角色编辑或伙伴更换而重新注入。后端只接收通用提示内容，不识别其 Pet 来源；具体通用 prompt 承载方式待核对。
+- 本期 Pet 前端只在首轮普通输入中添加角色 prompt，随历史保存，既有 Thread 不随 Pet 角色编辑或伙伴更换而重新注入。后端不识别其 Pet 来源，不新增角色快照或每轮 system 注入；后续用户要求可以改变角色表现。
 - 角色提示是本期创建时固定的简化方案；后续策略单独记入 [TODO](../TODO.md)，不扩大本期实现。
 
 ## 前端状态与任务
@@ -31,8 +31,10 @@
 
 - Workspace 管理列出该工作区历史，支持打开旧 Thread 或新建对话；历史点击先查全部 Pet 的当前关联，已有则复用并显示，否则分配隐藏 Pet，重复点击幂等。
 - 历史分配无库存时只显示需要新建 Pet 的最小提示，不额外提供管理跳转或自动创建流程。
-- 用户指定 Pet 历史入口为“选择指定隐藏 Pet，再进入二级 Workspace 选择 Thread / 新建”；具体入口位置和各级选择范围仍待澄清。
-- 无 Pet 承接的任务请求 Permission 时，从隐藏库存分配 Pet、绑定目标 Workspace / Thread 并展示；已有 Pet 关联时遵守幂等独占。库存为空和自动召唤覆盖范围仍待确定。
+- 手动指定伙伴从“设置 → Pet”进入：选择隐藏 Pet，点击一级“选择工作区”，选择任意 Workspace，再选择历史 Thread 或新对话，最后绑定并展示该 Pet。若 Thread 已关联另一只 Pet，保留用户明确选择，转移给选中的 Pet 并解除旧关联；不套用自动分配的复用规则。
+- 选择旧 Thread 只恢复对话，不重放旧输入；新对话先为空态，首次发送才创建 Thread。
+- 所有 Thread 的 Permission 通知均可触发桌宠承接，与来源前端无关；没有 Pet 关联时从隐藏库存分配，已有则复用。各前端只观察后端通知，不查询另一前端是否正在呈现请求。
+- Permission 无库存时只提示任务等待授权且需要新建伙伴，不占用可见 Pet 或自动创建；请求按后端生命周期继续等待，也可由独立 ThreadWindow 回执。
 
 ## 独立前端与初始化
 
@@ -45,10 +47,10 @@
 ## 当前待决边界
 
 - 新建 Pet 的默认显隐、初始化幂等与默认标记的后续编辑边界。
-- 手动隐藏 Pet 选择的入口及 Workspace 选择范围；打开旧 Thread 是否只恢复，不自动重放输入。
-- Permission 召唤库存为空时的处理、观察范围及草稿归属。
+- 显式转移 Thread 后旧 Pet 的显隐和空态、草稿归属；可见 Pet 是否共用“选择工作区”流程。
+- Permission 无库存后补充库存的自动重试，以及目录失效时的召唤行为。
 - Pet 一级 store 的跨 renderer 所有权、持久化位置及图片资源归属。
-- PromptPanel / AgentTrigger 的 Workspace 选择、通用提示承载；ThreadWindow 仅清理旧 Pet 依赖。
+- PromptPanel / AgentTrigger 的具体 Workspace 选择；ThreadWindow 仅清理旧 Pet 依赖。
 - Workspace 目录失效处置、旧开发数据处置和手工验收范围。
 
 ## 文档与实施边界
