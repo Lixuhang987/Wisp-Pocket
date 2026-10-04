@@ -2,6 +2,8 @@
 
 规格以 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9) 为准，基准 91269ccf，隔离目录 .worktrees/issue-9-frontend-pet。已通过 scripts/test.sh 与 swiftw build 基线，CodeGraph projectPath 必须显式使用该 worktree 绝对路径。
 
+历史范围：#9 的设置内嵌工作区 / 话题选择已由 [2026-10-04 目录选择计划](./2026-10-04-pet-directory-picker.md) 覆盖；当前设置卡片直接系统选目录，同项目保留话题、换项目准备新话题。下面的测试预算与审核结论保留当时范围，桌宠紧凑管理的两级选择、前端所有权和统一分配不变量继续成立。
+
 ## 主路径与合同
 
 - 后端 Thread 创建必须传 workspaceId，删除 Pet 注册表 / 表 / DTO / API / 快照；Workspace 创建只返回 workspace 与 created。保持公开 Thread 生命周期、SQLite、普通输入历史和单次请求回执。

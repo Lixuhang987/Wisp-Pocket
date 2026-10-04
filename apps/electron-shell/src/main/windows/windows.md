@@ -52,6 +52,6 @@
 
 ## 设置与管理
 
-- 设置窗口加载 `?surface=settings`，复用独立 prewarmer，只用 focus/openHistory/updateTheme；关闭后重建默认模型服务页，不参与 ThreadWindow gate。
+- 设置窗口加载 `?surface=settings`，复用独立 prewarmer，只用 focus/openHistory/updateTheme；关闭后重建默认模型服务页，不参与 ThreadWindow gate。macOS 设置采用 `hiddenInset` 原生标题栏，保留交通灯按钮；main 同时写入 `titlebar=hiddenInset` URL 布局提示，Web 必须预留原生按钮空间和顶部空白 drag 区域，见 [Web 设置约束](../../../../thread-window-web/src/src.md)。其他平台保留默认标题栏。
 - 管理桥仅接受设置或登记宠窗 sender；提供资料保存、分配、显隐、大小、受控目录/图片 picker 和变更订阅，详见 [preload](../../preload/preload.md)。普通 ThreadWindow 无管理权限。
 - 图片限制 PNG/JPEG/WebP、20 MiB，经 main 解码后保存前端 data URL；renderer 不能指定磁盘读取路径。目录失效保留安排，后端拒绝新执行并由 renderer 展示错误。
