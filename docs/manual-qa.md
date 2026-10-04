@@ -216,6 +216,8 @@
 
 ## 文档卫生回归
 
+- **产品、spec 与 issue 历史对齐（2026-10-04）**：核对 GitHub #1–#9、全部本地 spec、关键代码与 owning 文档，新增 [对齐记录](./product-alignment.md)。PRODUCT 将 #9 提升为已确认、待实现的方向，#8 保留为当前能力；时间推荐语义继续待确认。旧多宠子文档标注适用范围，修正全局最新 Thread 与已移除 Workspace 询问的过期说明。三项提交前检查、18 份文档的 189 个本地链接 / 锚点及 `git diff --check` 通过；本轮仅修改文档，没有新增功能或实机通过结论。
+- [ ] **阅读回归**：从 PRODUCT / spec / surface 入口均能区分 #8 当前实现、#9 已确认目标与时间讨论草案；直接打开旧多宠任一子文档仍能看到历史范围。核对旧要求仅在明确覆盖范围失效，不据当前代码回退前端 Pet、工作区历史与伙伴分配目标，也不把这些目标当成已实现操作。
 - **整体产品与 surface 记录（2026-09-15）**：新增 [PRODUCT.md](./PRODUCT.md) 与 [surface 索引](./surfaces/surfaces.md)，记录四个主要界面和 Settings 九个子页；产品文档集中维护，界面现状与待实施方案分开。已核对 55 个本地链接、四份 brief 的六块结构和 `git diff --check`；同次纯文档任务的 `bash ./scripts/test.sh`、`bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 全部通过。未修改应用代码，未进行新一轮实机/视觉验收。
 - **本次文档待核验**：从 `AGENTS.md → docs/docs.md` 进入产品文档与 surface 索引，确认四个界面的任务边界易于理解；对照现行 App 核验布局记录，重点核对已合入的 Issue #5 点击输入、常态收紧与悬停统一浏览；原功能分支实机证据不等于本次合并产物已复验。产品人群细分、成功指标与导航调整仍保留待决。
 - **范围**：`AGENTS.md`、`CONTEXT-MAP.md`、三个 `CONTEXT.md`、`handAgent.md`、`README.md`、`DESIGN.md`、各级目录指南与 `docs/*.md`。
@@ -294,7 +296,7 @@
 - [ ] **提交与待处理**：空闲、运行和等待普通回复时分别提交输入；确认均立即发送、接收确认后显示 pending，后端按接收顺序处理，各自开始后只清除对应标记，A、B 互不影响。前端不提供移除已提交等待项的操作。
 - [ ] **首轮关联与占位**：经 preload initial-prompt fallback 连续创建两个 Thread，交错返回创建通知；核对各自先加载再提交首轮，snapshot 保留首轮摘要占位，正式输入记录替换本地摘要且保留其他已保存 pending，内容不串线。
 - [ ] **历史与流式展示**：显式打开历史 Thread，核对文本、图片、Append Prompt 和文本选区内容；连续回复更新同一消息，重复 assistant delta 不重复显示。后台创建抢选已由独立任务修复，按 [选择隔离回归](#threadwindow-后台创建与主动选择隔离) 验收，不改写原 Issue #3 实施范围。
-- [ ] **请求面板**：在不同 Thread 触发 Permission / Workspace 请求，回答后确认只清理对应面板；分别检查完成、中断、失败和 Thread error 后的请求清理及另一 Thread 的面板保留。
+- [ ] **请求面板**：在不同 Thread 触发 Permission 请求，回答后确认只清理对应面板；分别检查完成、中断、失败和 Thread error 后的请求清理及另一 Thread 的面板保留。旧 Workspace 询问已移除，不再作为当前回归步骤；项目选择属于输入前导航。
 - [ ] **连接与缓冲**：延迟 socket open，核对已缓冲命令和 ClientResponse 的发送顺序；意外断连后显示 disconnected 并禁用 Composer，ThreadWindow 保持无自动重连与自动订阅恢复；显式 resume 可恢复 snapshot 中的待答请求，桌宠重连按 Issue #1 条目另验。
 - [ ] **宿主窗口回执**：关闭 Settings 后从 PromptPanel 提交，确认隐藏面板时 Swift Host 回落到 accessory；ThreadWindow 打开回执和关闭均不再次改变 Swift Host 的 Dock / Cmd+Tab 可见性。本轮只校正相关测试的观察阶段。
 

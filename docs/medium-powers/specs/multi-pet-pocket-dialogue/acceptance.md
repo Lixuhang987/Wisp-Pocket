@@ -2,6 +2,8 @@
 
 本文是[多桌宠规格](./multi-pet-pocket-dialogue.md)的验收合约。实现及自动化检查见 [合并计划](../../plans/2026-10-02-pets-default-reading.md)；M01–M07 与真实模型均待验，详细状态见 [manual QA](../../../manual-qa.md)。
 
+历史范围：本表验证 Issue #7 当时的模型，不能整表重跑后用旧 petId / 固定根要求判定新设计失败。Issue #8 已替换项目模型，Issue #9 的前端伙伴分配目标尚未实现；当前人工验收看 manual QA，下一轮验收看新规格。替代关系由主文档路由。
+
 ## 主测试边界
 
 扩展现有 pet-conversation / thread-ownership 用例：实际 PetRegistry、桌宠 controller、共享输入控制器、协议分派、ThreadRegistry / Thread、Runtime、SQLite 和 Blob。用可控模型捕获真实模型消息与发起工具调用；传输和外部 Provider 可用边界替身。用真实临时目录观察文件结果；重启验证关闭并重建 owner / 数据库，不能只清 UI store 后称为恢复。
