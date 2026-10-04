@@ -12,7 +12,7 @@
 ## 运行边界
 
 - ThreadWindow 持有 `/api/thread?acceptServerRequests=1` 长连接；[桌宠](../electron-shell/electron-shell.md)复用本包客户端与投影，各界面共享后端 Thread 身份及历史。
-- 设置通过 `/api/settings/*` 管理模型 / 工具配置，通过 `/api/thread` 管理 Workspace 与历史；Pet 资料、图片和分配由 Electron 前端桥拥有。普通 ThreadWindow 不获得伙伴管理能力。两处伙伴管理复用表单与 revision 合同，桥定义见 [源码入口](./src/src.md)。
+- 设置通过 `/api/settings/*` 管理模型、MCP、永久 Permission 并查询 Codex 可用状态，通过 `/api/thread` 管理 Workspace 与历史；Pet 资料、图片和分配由 Electron 前端桥拥有。普通 ThreadWindow 不获得伙伴管理能力。两处伙伴管理复用表单与 revision 合同，桥定义见 [源码入口](./src/src.md)。
 - Swift 只提交 PromptPanel / AgentTrigger 首轮输入；Electron main 拥有窗口与前端 Pet store。两者都不 mirror React 的 Thread 消息状态。
 - [preload](../electron-shell/src/preload/preload.md) 只注入 WebSocket URL、只读 Append Prompt 候选、主题、initial-prompt fallback 与明确目标 Thread 的打开请求。React 不接触 Dynamic Tool spec。
 - 非主动断开后只进入 disconnected 状态；当前不重连、不恢复订阅、不自动拉取 snapshot。

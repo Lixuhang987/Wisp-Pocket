@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- `use-cases/`：通过真实 App、store、输入控制器与 socket 验证选择、首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期；设置用例从可见控件验证显式保存、失败保留草稿和后端隐含模型字段保存边界、Codex 未登录到 ready 的重新检查及模型草稿保留、前端伙伴创建及两级项目 / 话题选择的取消和错误保留；连接列表用例包含自动分页合并与第 51 条打开。
+- `use-cases/`：通过真实 App、store、输入控制器与 socket 验证选择、首轮、历史、Composer 立即提交、后端 pending 投影、传输 FIFO 和请求生命周期；设置用例从可见控件验证显式保存、失败保留草稿和后端隐含模型字段保存边界、Codex 未登录到 ready 的重新检查及模型草稿保留、前端伙伴创建、设置目录 picker 经创建回执后安排与同项目历史保留，以及紧凑模式两级项目 / 话题选择的取消和错误保留；连接列表用例包含自动分页合并与第 51 条打开。
 - `boundaries/`：协议 guard、preload 配置和主题边界。
 - 目录根测试：结构化输入、消息正文 / 建议 / 附件呈现与运行占位、工具独立展示、项目一级历史分组 / 运行指示及展开偏好的持久化。
 
@@ -13,7 +13,7 @@
 - 主流程优先写 use-case test，避免只断言组件内部实现。
 - Thread 选择回归用 JSDOM 挂载真实 App，仅隔离 WebSocket、布局和 preload 边界；观察正文、结构化草稿、选中行和实际提交目标。后台广播、本窗口创建与原生目标打开必须分别验证，store 单测不能证明 App 本地选择行为。
 - 协议 fixture 从 core DTO 语义出发，不复制另一套消息模型。
-- 覆盖 live/snapshot 的图片 Blob 与原路径文件引用、建议回复、输入 pending、`request.resolved` 与同一请求去重；两界面共用 store 合约，不能恢复 renderer 自有执行队列。
+- 覆盖首轮 opId 的 ACK / Turn / snapshot 摘要收敛（包括快照早于 ACK、其他同文 pending 不互相吞掉）、一行角色展示附件与正文分离，以及 live/snapshot 的图片 Blob 与原路径文件引用、建议回复、输入 pending、`request.resolved` 与同一请求去重；两界面共用 store 合约，不能恢复 renderer 自有执行队列。
 - Vitest 同时收集 `.test.ts` 与 `.test.tsx`，避免消息组件用例被遗漏。
 - 涉及真实 Electron 窗口、焦点或视口避让的行为保留到 manual QA。
 - 首轮创建验证状态/UI 回调先于 resume 与首轮提交；Composer 同时观察忙碌/等待回复时的实际发送、服务端确认后的 pending 投影与跨 Thread 隔离，不测试内部集合或文件布局。

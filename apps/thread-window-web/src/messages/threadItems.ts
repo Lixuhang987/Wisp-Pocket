@@ -14,6 +14,15 @@ export type UserMessageItem = {
   pending?: boolean;
 };
 
+// Display attachment only; the original skill Input Item remains model/persistence input.
+export type RolePromptAttachment = { type: "role_prompt"; id: string; text: string; label: string };
+
+export function rolePromptAttachment(item: InputItem): RolePromptAttachment | null {
+  return item.type === "skill" && item.actionId === "initial-role"
+    ? { type: "role_prompt", id: item.id, text: item.prompt, label: `${item.title} · ${item.prompt}` }
+    : null;
+}
+
 export type AssistantMessageItem = {
   type: "assistant_message";
   id: string;

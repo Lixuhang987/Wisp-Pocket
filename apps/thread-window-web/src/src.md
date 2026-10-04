@@ -39,14 +39,16 @@
 - 点击历史与宿主明确打开目标共用 `openHistoryThread`：先确保本地 state、设置选中项，再发送 resume 等待 snapshot。两者不创建 Thread 或重发首轮输入。
 - 宿主通过 [Electron preload](../../electron-shell/src/preload/preload.md) 的 `handAgentReceiveThreadOpen(threadId)` 交付目标；React 安装 receiver 时按序消费并清空早到请求，卸载只移除本次 receiver。该缓冲只跨 preload 与 React 初始化，不保存消息或执行队列。
 - 组件通过 props、store action 或根 callback 发起行为，不直接操作 WebSocket。
-- 图片使用互斥的 base64/blobId Input Item；文件引用 `file_reference` 只保存原路径，live、pending 与 snapshot 均显示文件名卡片，不加载原文件或渲染路径正文。Blob 读取服务见 [agent-server server](../../agent-server/src/server/server.md)。
+- 首轮角色提示由共享消息模块识别并呈现为一行角色附件，不拼入正文；模型与持久记录仍保留原 skill。图片使用互斥的 base64/blobId Input Item；文件引用 `file_reference` 只保存原路径，live、pending 与 snapshot 均显示文件名卡片，不加载原文件或渲染路径正文。Blob 读取服务见 [agent-server server](../../agent-server/src/server/server.md)。
 - 建议回复与自由输入共用 UserInput；用户回复或新 Turn 会清除旧 assistant 等待展示，不引入专用建议回执。
 
 ## 设置与伙伴编辑
+
+- macOS 设置的 `titlebar=hiddenInset` URL 提示与 [Electron 设置窗口](../../electron-shell/src/main/windows/windows.md)的原生样式成对变更；顶部空白只用于拖动，交通灯留白在宽窄布局中保留，搜索、导航和表单不进入 drag 区。其他框架 / 浏览器预览不默认增加该区域。
 
 - 设置使用独立中性色 token，按个人 / 集成 / 项目分组，直接导航到模型、伙伴、工具、MCP、权限和工作区；搜索只过滤入口，不卸载当前表单。模型、MCP 和伙伴草稿留在各组件内，切页与输入变化不触发保存。失败保留字段与错误；重复打开的窗口由 Electron 聚焦，不重建 renderer。
 - Codex 执行页只查询 `/api/settings/tools` 的状态、说明与版本，重新检查不写配置或启动任务；没有 builtin 写入开关。MCP 页保留配置管理并说明尚未接入 Codex、主 Agent 不直接调用。后端合约见 [settings](../../agent-server/src/settings/settings.md)。
 - 设置 HTTP 地址从既有 Thread URL 的 origin 派生，前端只提交可编辑模型字段，后端合并保留未展示字段；API Key 使用密码输入。MCP 保存只表达配置已保存，连接在服务下次启动时读取。
 - 伙伴资料类型与桥在 `native/petTypes.ts` / `native/settingsBridge.ts` 拥有，与后端 Thread DTO 隔离。设置和桌宠通过同一前端桥保存资料与受管图片、订阅伙伴变化；默认标记只用于初始化，不提供编辑入口。新伙伴加入隐藏库存，无需目录。
-- 伙伴两级选择先选工作区、再选历史或新话题；确定后才调用 assignPet，取消不变，失败保留选择。内部首发接续可传 expected 原关联及 activate:false，由 main 对异步检查和可见性作统一仲裁。可见伙伴占用由 main 原子拒绝；表单不自行解除其他关联。Workspaces 的通用打开与随机召唤也由同一 main 分配入口处理，准备新话题不创建后端 Thread。
+- 设置伙伴卡片的“选择工作区 / 显示”通过 `chooseWorkspace` 回调直接打开原生目录 picker，沿 workspace.create 回执创建 / 复用实际目录，再 assignPet 并显示；取消不变，同 Workspace 保留 Thread，换项目准备新话题。项目身份采用后端回执，不以目录字符串比较替代规范化；安排失败不改变伙伴，但已成功注册的工作区不回滚，重试复用。桌宠紧凑伙伴管理仍先选工作区、再选历史或新话题；确定后才调用 assignPet，取消不变，失败保留选择。内部首发接续可传 expected 原关联及 activate:false，由 main 对异步检查和可见性作统一仲裁。可见伙伴占用由 main 原子拒绝；表单不自行解除其他关联。Workspaces 的通用打开与随机召唤也由同一 main 分配入口处理，准备新话题不创建后端 Thread。
 - 设置伙伴页使用可选 gallery 布局，卡片选择只改变预览，不安排或显示伙伴；桌宠内管理保持紧凑列表。内置形象静态预览复用 [Electron 图集](../../electron-shell/src/activity-window/assets/assets.md)的 idle 首帧，图集布局变化时需同步预览。

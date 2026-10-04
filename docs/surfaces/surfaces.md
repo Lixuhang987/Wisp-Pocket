@@ -19,7 +19,7 @@
 - 附件 chip、预览、候选弹层、删除确认与权限请求属于宿主 surface 的组件或状态；共享组件不单独建立视觉身份。
 - 系统快捷键、截图与选区采集接入 PromptPanel；系统菜单“设置…”接入 Settings。系统权限弹窗由 macOS 管理，不是产品自有页面。
 - Chrome 扩展目前只有后台 service worker，未声明 popup 或 options 页面；其连接与规则配置属于原生 Settings → 触发器。
-- Context History 通过默认历史读取工具与设置状态接入，Automation 通过工具和独立开关接入；未建立独立时间线、录制编辑器或流程管理页面。后端服务和存储包不构成 surface。
+- Context History 通过默认历史读取工具与设置状态接入，Automation 保留宿主实现、声明通道和独立开关；主 Agent 不直接公开 Automation 工具，尚未迁入 Codex。未建立独立时间线、录制编辑器或流程管理页面。后端服务和存储包不构成 surface。
 - README 与开发文档是阅读资料，未作为本轮桌面界面拆分对象；未发现需要记录为已实现 surface 的独立营销站或 onboarding 向导。
 
 ## 状态记录方法

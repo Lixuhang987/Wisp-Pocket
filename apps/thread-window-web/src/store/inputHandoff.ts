@@ -40,8 +40,15 @@ export function applyInputNotification(
         : null;
       if (notification.commandId) delete state.pendingInitialPrompts[notification.commandId];
       break;
+    case "user.message.recorded":
+      if (notification.payload.messageId === thread.pendingInitialPrompt?.clientRequestId) thread.pendingInitialPrompt = null;
+      break;
+    case "thread.snapshot":
+      if (notification.payload.messages.some(message => message.role === "user" && message.id === thread.pendingInitialPrompt?.clientRequestId)) thread.pendingInitialPrompt = null;
+      break;
+    case "turn.started":
     case "turn.completed":
-      thread.pendingInitialPrompt = null;
+      if (notification.turnId === thread.pendingInitialPrompt?.clientRequestId) thread.pendingInitialPrompt = null;
       break;
   }
 }

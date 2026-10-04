@@ -28,6 +28,8 @@ describe("ThreadItemBubble", () => {
       item: { type: "user_message", id: "saved", text: "/tmp/保存的报告.pdf", pending: true, inputItems: [
         { type: "image", id: "image", mimeType: "image/png", blobId: "blob-saved-image" },
         { type: "file_reference", id: "file", name: "保存的报告.pdf", path: "/tmp/保存的报告.pdf" },
+        { type: "text", id: "text", text: "讲解一下这个项目" },
+        { type: "skill", id: "role", actionId: "initial-role", title: "角色提示", prompt: "根据用户的实际任务提供清晰、可靠的帮助。" },
       ] }, onCopy: vi.fn(),
     }));
     expect(html).toContain('src="http://127.0.0.1:4317/api/blobs/blob-saved-image"');
@@ -35,6 +37,9 @@ describe("ThreadItemBubble", () => {
     expect(html).toContain("待处理");
     expect(html).not.toContain("/tmp/保存的报告.pdf");
     expect(html).not.toContain("base64,undefined");
+    expect(html).toContain('data-attachment-type="role_prompt"');
+    expect(html).toContain('title="根据用户的实际任务提供清晰、可靠的帮助。"');
+    expect(html).toMatch(/<p[^>]*>讲解一下这个项目<\/p>/);
   });
 
   it("renders user messages as image strip, chip row, and text block based on input items", () => {

@@ -64,7 +64,7 @@ function textPdf(text: string): Buffer {
 }
 
 async function harness(client: LLMClientLike, options: {
-  directory?: string; pageError?: string; gate?: Promise<void>;
+  directory?: string; pageError?: string; gate?: Promise<void>; rolePrompt?: string;
   dynamicBridge?: WebSocketDynamicToolBridge; permissionPrompt?: boolean; extraTools?: AgentTool[]; codexCLI?:CodexCLI;
 } = {}) {
   const directory = options.directory ?? await mkdtemp(join(tmpdir(), "pet-conversation-"));
@@ -76,6 +76,7 @@ async function harness(client: LLMClientLike, options: {
   const workspaces = new WorkspaceRegistry(store);
   const {workspace} = await workspaces.create(join(directory,"files"));
   const petConfig: Pet = frontendPets.get(directory) ?? {id:"test-pet",name:"测试伙伴",description:"",rolePrompt:"",revision:1,imageRef:{type:"builtin",id:"yachiyo"},isDefault:true,createdAt:"now",updatedAt:"now",workspaceId:workspace.id,threadId:null,visible:true,size:100};
+  if (options.rolePrompt !== undefined) petConfig.rolePrompt = options.rolePrompt;
   frontendPets.set(directory,petConfig);
   const petListeners = new Set<(pets:Pet[])=>void>();
   const notifyPets = () => { for(const listener of petListeners)listener(structuredClone([petConfig])); };
@@ -168,20 +169,49 @@ async function settled(h: Awaited<ReturnType<typeof harness>>) {
 
 describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => {
   it("空白回复框首次文字创建 Thread 并持久保存，后续文字继续同一对话", async () => {
-    const h = await harness(decisionClient());
+    const contexts: AgentMessage[][] = [];
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const client = decisionClient(contexts);
+    const h = await harness({ complete: async (...args) => { await gate; return client.complete(...args); } }, { rolePrompt: "根据用户的实际任务提供清晰、可靠的帮助。" });
     h.pet.revealBubble();
     expect(h.pet.getSnapshot()).toMatchObject({ threadId: null, bubbleVisible: true });
     expect(h.pet.store.getState().history).toHaveLength(0);
     await h.pet.respond("帮我安排阅读");
-    await settled(h);
     const id = current(h).id;
+    await until(() => expect(current(h).status).toBe("running"));
     const saved = await h.persistence.getThread(id);
-    expect(saved!.messages.find((message) => message.role === "user")?.content).toBe("帮我安排阅读");
+    const users = saved!.messages.filter(message => message.role === "user");
+    expect(users).toHaveLength(1);
+    expect(users[0].content).toContain("帮我安排阅读");
+    expect(users[0].inputItems).toContainEqual(expect.objectContaining({ type: "skill", actionId: "initial-role", prompt: h.petConfig.rolePrompt }));
+    const resumed = new h.LocalSocket("ws://local/api/thread");
+    const snapshot = new Promise<void>(resolve => { resumed.onmessage = event => {
+      const notification = JSON.parse(event.data);
+      if (notification.type !== "thread.snapshot") return;
+      expect(notification.payload.messages.filter((message: { role: string }) => message.role === "user")).toHaveLength(1);
+      h.pet.store.getState().handleNotification(notification);
+      resolve();
+    }; });
+    await until(() => expect(resumed.readyState).toBe(1));
+    resumed.send(JSON.stringify({ type: "thread.resume", commandId: "running-resume", threadId: id, timestamp: new Date().toISOString() }));
+    await snapshot;
+    release();
+    expect(h.pet.store.getState().threadsById[id].messages.filter(message => message.type === "user_message")).toHaveLength(1);
+    await settled(h);
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0].findLast(message => message.role === "user")?.content).toContain(h.petConfig.rolePrompt);
     expect(h.pet.getSnapshot().latestAssistant?.text).toContain("帮我安排阅读");
     h.pet.respond("再补充十分钟");
     await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("再补充十分钟"));
     expect(current(h).id).toBe(id);
     expect(h.pet.store.getState().history).toHaveLength(1);
+    await h.pet.respond("再补充十分钟");
+    await until(() => expect(h.pet.store.getState().threadsById[id].messages.filter(message => message.type === "user_message")).toHaveLength(3));
+    await h.close();
+    const restored = await harness(decisionClient(), { directory: h.directory });
+    await until(() => expect(restored.pet.store.getState().threadsById[id]?.messages.filter(message => message.type === "user_message")).toHaveLength(3));
+    expect((await restored.persistence.getThread(id))!.messages.filter(message => message.role === "user")).toHaveLength(3);
   });
 
   it.each(["online", "reconnect"])("完整窗口删除当前 Thread 后，桌宠 %s 清理失效关联并能接续仍存在的历史", async (connection) => {

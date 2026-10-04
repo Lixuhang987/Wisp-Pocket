@@ -133,3 +133,11 @@
   .pet-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { .settings-app button { transition: none; } }
+
+/* Native traffic lights overlay the page; only the empty top band drags. */
+.settings-app[data-inset-titlebar] { position: relative; }
+.settings-titlebar { position: absolute; inset: 0 0 auto; height: 40px; z-index: 1; -webkit-app-region: drag; }
+.settings-app[data-inset-titlebar] .settings-nav { padding-top: var(--ha-spacing-xxl); }
+@media (min-width: 561px) {
+  .settings-app[data-inset-titlebar] .settings-page { padding-top: var(--ha-spacing-xxl); }
+}

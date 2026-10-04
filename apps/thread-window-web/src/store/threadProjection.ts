@@ -85,14 +85,14 @@ export function projectNotification(
         .filter(item => item.type !== "assistant_message" || hasAssistantContent(item));
       clearThreadRequests(thread);
       for (const request of notification.payload.pendingRequests ?? []) projectRequest(thread, request);
-      if (pendingMessage && !thread.messages.some((item) => item.type === "user_message" && item.pending)) {
+      if (pendingMessage) {
         thread.messages.unshift(pendingMessage);
       }
       break;
     }
     case "user.message.recorded": {
       const thread = state.threadsById[notification.threadId];
-      thread.messages = thread.messages.filter((item) => !(item.type === "user_message" && item.pending && item.id.startsWith("pending-")));
+      thread.messages = thread.messages.filter((item) => item.id !== `pending-${notification.payload.messageId}`);
       for (const item of thread.messages) {
         if (item.type === "assistant_message") item.awaitingReply = false;
       }

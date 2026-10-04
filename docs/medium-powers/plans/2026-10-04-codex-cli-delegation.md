@@ -41,7 +41,7 @@
 - [x] 运行 TypeScript/Web、Swift test/build 三项提交前检查；真实 CLI 烟测与界面验收分开记录。
 - [x] 以 worktree 起点 `417dd275ad5253b2a5a9e5c8994a0d41d8d6c975` 审查本次变更，分别执行 Standards 与 Spec 独立审查并修复问题。
 - [x] 分发无继承上下文的独立文档审核子 agent，确认结论与 manual QA 更新。
-- [ ] 提交当前分支并记录 commit。
+- [x] 提交首版实现 `5037df16`。
 
 ## 验证与完成状态
 
@@ -54,3 +54,7 @@
 ## 独立文档审核结论
 
 无继承上下文子 agent 已读取 Issue #10 完整正文（无评论）、本计划、修改目录指南及父链到 handAgent.md，核对生产目录、CLI/结果 schema、Permission、SQLite 会话归属、设置和测试。当前 owning 文档与代码一致；README、产品对齐、ADR、目录索引、开发/mock 说明及历史激活/写入条款已同步，PRODUCT 不写实施进度。TODO 只保留扩展迁移和统一终止两个后续项；manual QA 已新增首版功能待验清单与真实 CLI 烟测范围，未宣称完整宿主/真实主模型通过。55 份本次修改 Markdown 的 348 个本地链接均存在，git diff --check 通过；仅修改文档，提交由主 agent 执行。
+
+## 与 main 界面改动集成
+
+将 main `bca389e0` 合入首版分支 `5037df16`，保留角色附件 / 首轮去重、回复红点、设置目录 picker 与隐藏标题栏。合并后的 `scripts/test.sh`、`swiftw test`、`swiftw build` 均 success，新增测试 0；独立无继承上下文文档审核复核四项界面计划、Issue #10 与最终差异，修正仍将固定根写入、工具配置或 Automation 执行入口描述为当前事实的文档。未发现代码阻断，完整宿主 / 真实模型的联合验收与本轮日志见 [manual QA](../../manual-qa.md#codex-委托与-main-界面联合回归2026-10-04)。原分支烟测与受控 UI 证据不扩大为本次集成产物实机通过。

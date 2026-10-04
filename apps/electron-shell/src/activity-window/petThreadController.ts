@@ -14,10 +14,10 @@ export type PetDraftFile = { id: string; path: string };
 export type PetSnapshot = {
   threadId: string | null; pet?: Pet; bubbleVisible: boolean; draft: string; files: PetDraftFile[]; error?: string;
   latestAssistant?: AssistantMessageItem; connection: "disconnected" | "connecting" | "connected";
-  history: ThreadListEntry[]; nextCursor?: string | null; receiving: boolean;
+  history: ThreadListEntry[]; nextCursor?: string | null; receiving: boolean; replyUnread: boolean;
 };
 type Submission = { id: string; workspaceId: string; selectedAtStart: string | null; threadId?: string; items: InputItem[]; key: string; navigation: number; draftKey?: string; draftText?: string; files?: PetDraftFile[]; resolve?: () => void; reject?: (error: Error) => void };
-type Preferences = { navigation?: number; selectedThreadId?: string | null; drafts: Record<string, string>; files?: Record<string, PetDraftFile[]>; visibility?: "visible" | "hidden"; submissions?: Array<Omit<Submission,"resolve"|"reject">> };
+type Preferences = { navigation?: number; selectedThreadId?: string | null; drafts: Record<string, string>; files?: Record<string, PetDraftFile[]>; visibility?: "visible" | "hidden"; unreadReplies?: Record<string, boolean>; submissions?: Array<Omit<Submission,"resolve"|"reject">> };
 
 /** One independent UI projection bound permanently to one Pet. */
 export class PetThreadController {
@@ -28,12 +28,13 @@ export class PetThreadController {
   private readonly listeners = new Set<() => void>();
   private preferences: Preferences = { drafts: {} };
   private visibility: "startup" | "visible" | "hidden" = "startup";
-  private snapshot: PetSnapshot = { threadId: null, bubbleVisible: false, draft: "", files: [], connection: "disconnected", history: [], receiving: false };
+  private snapshot: PetSnapshot = { threadId: null, bubbleVisible: false, draft: "", files: [], connection: "disconnected", history: [], receiving: false, replyUnread: false };
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private closed = true;
   private error?: string;
   private nextCursor?: string | null;
   private readonly submissions = new Map<string, Submission>();
+  private readonly replyTurns = new Map<string, { turnId: string; items: Set<string> }>();
   private pet?: Pet;
   private disposePets?: () => void;
   private petVersion = 0;
@@ -88,7 +89,13 @@ export class PetThreadController {
   getSnapshot = (): PetSnapshot => this.snapshot;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   hideBubble(): void { this.visibility = "hidden"; this.preferences.visibility = "hidden"; this.save(); this.changed(); }
-  revealBubble(): void { this.visibility = "visible"; this.preferences.visibility = "visible"; this.save(); this.changed(); }
+  revealBubble(): void { this.visibility = "visible"; this.preferences.visibility = "visible"; this.markReplyRead(); this.save(); this.changed(); }
+  markReplyRead(): void {
+    const threadId = this.preferences.selectedThreadId;
+    if (!threadId || !this.preferences.unreadReplies?.[threadId]) return;
+    delete this.preferences.unreadReplies[threadId];
+    this.save(); this.changed();
+  }
   setDraft(text: string, threadId = this.preferences.selectedThreadId): void { this.preferences.drafts[threadId ?? "new"] = text; this.save(); this.changed(); }
   addFiles(paths: string[], threadId = this.preferences.selectedThreadId): void {
     if (threadId && !this.ownsThread(threadId)) throw new Error("目标对话已删除，文件没有改投其他对话。");
@@ -133,6 +140,7 @@ export class PetThreadController {
     const items: InputItem[] = text.trim() ? [{type:"text",id:crypto.randomUUID(),text:text.trim()}] : [];
     items.push(...files.map(file => ({ ...pathInput(file.path), id: file.id })));
     if (!items.length) return;
+    this.markReplyRead();
     return this.submit(items, this.preferences.selectedThreadId ?? undefined, crypto.randomUUID(),
       { draftKey: key, draftText: originalDraft.trim() === text.trim() ? originalDraft : undefined, files });
   }
@@ -156,6 +164,28 @@ export class PetThreadController {
     this.save(); this.changed(); return accepted;
   }
   private receive(notification: ThreadNotification): void {
+    if (notification.type === "turn.started" && notification.threadId === this.preferences.selectedThreadId) {
+      this.replyTurns.set(notification.threadId, { turnId: notification.turnId, items: new Set() });
+      this.markReplyRead();
+    } else if (notification.type === "assistant.delta" && notification.threadId === this.preferences.selectedThreadId) {
+      let turn = this.replyTurns.get(notification.threadId);
+      if (turn?.turnId !== notification.turnId) {
+        turn = { turnId: notification.turnId, items: new Set() };
+        this.replyTurns.set(notification.threadId, turn);
+      }
+      turn.items.add(notification.itemId);
+    } else if (notification.type === "turn.completed") {
+      const turn = this.replyTurns.get(notification.threadId);
+      if (turn?.turnId === notification.turnId) {
+        if (notification.threadId === this.preferences.selectedThreadId && notification.payload.status === "completed"
+          && this.store.getState().threadsById[notification.threadId]?.messages.some(item =>
+            item.type === "assistant_message" && turn.items.has(item.id) && hasAssistantContent(item))) {
+          (this.preferences.unreadReplies ??= {})[notification.threadId] = true;
+          this.save();
+        }
+        this.replyTurns.delete(notification.threadId);
+      }
+    }
     if (notification.type === "thread.started") {
       const submission = notification.commandId ? this.submissions.get(notification.commandId) : undefined;
       if (submission) {
@@ -216,7 +246,7 @@ export class PetThreadController {
     if (next) this.petsLoaded = true;
     this.changed();
   }
-  private clearDraft(key: string): void { delete this.preferences.drafts[key]; if (this.preferences.files) delete this.preferences.files[key]; }
+  private clearDraft(key: string): void { delete this.preferences.drafts[key]; if (this.preferences.files) delete this.preferences.files[key]; if (this.preferences.unreadReplies) delete this.preferences.unreadReplies[key]; this.replyTurns.delete(key); }
   private finish(submission: Submission, error?: Error): void {
     if (error) submission.reject?.(error);
     else {
@@ -237,7 +267,7 @@ export class PetThreadController {
     const state=this.store.getState(), threadId=this.preferences.selectedThreadId ?? null, thread=threadId ? state.threadsById[threadId] : undefined;
     this.snapshot={threadId,pet:this.pet,bubbleVisible:this.visibility==="visible",draft:this.preferences.drafts[threadId??"new"]??"",files:this.preferences.files?.[threadId??"new"]??[],error:this.error,
       latestAssistant:thread?.messages.findLast((item):item is AssistantMessageItem=>item.type==="assistant_message"&&hasAssistantContent(item)),connection:state.connectionState,
-      history:this.history(),nextCursor:this.nextCursor,receiving:[...this.submissions.values()].some(s=>!!s.resolve)};
+      history:this.history(),nextCursor:this.nextCursor,receiving:[...this.submissions.values()].some(s=>!!s.resolve),replyUnread:!!threadId && !!this.preferences.unreadReplies?.[threadId] && thread?.status !== "running"};
     for(const listener of this.listeners) listener();
   }
 }

@@ -6,8 +6,9 @@ import type {
   ThreadItem,
   ToolCallItem,
   UserMessageItem,
+  RolePromptAttachment,
 } from '../messages/threadItems.ts';
-import { hasAssistantText, hasSuggestedReplies } from '../messages/threadItems.ts';
+import { hasAssistantText, hasSuggestedReplies, rolePromptAttachment } from '../messages/threadItems.ts';
 import type { InputItem } from '../protocol/threadProtocol.ts';
 import { cn } from '../utils/cn.ts';
 import { TypingIndicator } from './TypingIndicator.tsx';
@@ -185,6 +186,13 @@ function UserMessageBubble({ item, onCopy }: { item: UserMessageItem; onCopy: (t
         >
           {sections ? (
             <div className="space-y-xs">
+              {sections.roles.map(role => (
+                <div key={role.id} data-attachment-type={role.type} title={role.text}
+                  className="flex min-w-0 items-center gap-xs rounded-lg border border-app-hairline bg-app-surface-muted px-sm py-xs text-sm text-app-text-secondary">
+                  <FileText size={14} strokeWidth={1.5} className="shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{role.label}</span>
+                </div>
+              ))}
               {sections.chips.length > 0 ? (
                 <div data-testid="user-message-chips" className="flex flex-wrap gap-xs">
                   {sections.chips.map((chip) => (
@@ -328,6 +336,7 @@ function ErrorBubble({ item }: { item: ErrorItem }) {
 // ---------------------------------------------------------------------------
 
 function splitUserMessageSections(items: InputItem[]): {
+  roles: RolePromptAttachment[];
   images: Array<{ id: string; previewUrl: string }>;
   files: Array<{ id: string; name: string }>;
   chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }>;
@@ -341,6 +350,7 @@ function splitUserMessageSections(items: InputItem[]): {
   const files: Array<{ id: string; name: string }> = [];
   const chips: Array<{ id: string; type: "skill" | "text_selection"; label: string }> = [];
   const textParts: string[] = [];
+  const roles: RolePromptAttachment[] = [];
 
   for (const item of items) {
     if (item.type === "image") {
@@ -349,7 +359,9 @@ function splitUserMessageSections(items: InputItem[]): {
     } else if (item.type === "file_reference") {
       files.push({ id: item.id, name: item.name });
     } else if (item.type === "skill") {
-      chips.push({ id: item.id, type: "skill", label: item.title });
+      const role = rolePromptAttachment(item);
+      if (role) roles.push(role);
+      else chips.push({ id: item.id, type: "skill", label: item.title });
     } else if (item.type === "text_selection") {
       chips.push({ id: item.id, type: "text_selection", label: item.text.slice(0, 24) });
     } else if (item.type === "text" && item.text.trim().length > 0) {
@@ -358,6 +370,7 @@ function splitUserMessageSections(items: InputItem[]): {
   }
 
   return {
+    roles,
     images,
     files,
     chips,
