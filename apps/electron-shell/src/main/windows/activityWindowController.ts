@@ -10,7 +10,7 @@ export type BrowserWindowLike = {
     on(event: "render-process-gone", listener: (event: unknown, details: { reason: string }) => void): unknown;
     on(event: "will-navigate", listener: (event: { preventDefault(): void }, url: string) => void): unknown;
     setWindowOpenHandler(handler: (details: { url: string }) => { action: "deny" }): void;
-    send(channel: string, theme?: HostTheme): void;
+    send(channel: string, value?: unknown): void;
   };
   on(event: "closed", listener: () => void): unknown;
   loadFile(filePath: string): Promise<unknown> | unknown;
@@ -41,7 +41,7 @@ type Options = {
   createWindow: (options: BrowserWindowConstructorOptions) => BrowserWindowLike;
   openExternal?: (url: string) => Promise<void>;
   screenProvider: ScreenProvider;
-  positionStore: PetPositionStore;
+  positionStore: Pick<PetPositionStore, "load" | "save">;
   onRendererCrashed?: (reason: string) => void;
 };
 

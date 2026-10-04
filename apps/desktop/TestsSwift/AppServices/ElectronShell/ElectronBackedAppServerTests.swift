@@ -148,8 +148,8 @@ final class ElectronBackedAppServerTests: XCTestCase {
         shell.emit(.threadWindowClosed(timestamp: "2026-06-08T00:00:02.000Z", wasVisible: true))
 
         XCTAssertEqual(closeCount, 1)
-        XCTAssertFalse(appServer.isAvailable)
-        XCTAssertEqual(appServer.startupErrorMessage, "Electron ThreadWindow 已关闭，正在重新预热…")
+        XCTAssertTrue(appServer.isAvailable)
+        XCTAssertNil(appServer.startupErrorMessage)
     }
 
     func testThreadWindowClosedDoesNotSendShutdown() {
@@ -181,7 +181,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
         XCTAssertEqual(closeCount, 0)
     }
 
-    func testAvailableOnlyAfterServerHealthAndThreadPrepared() {
+    func testAvailableAfterServerHealthBeforeThreadPrepared() {
         let shell = RecordingElectronShellProcess()
         let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
@@ -191,8 +191,8 @@ final class ElectronBackedAppServerTests: XCTestCase {
         shell.emit(.electronReady(timestamp: "2026-06-08T00:00:00.000Z"))
         shell.emit(.agentServerHealth(available: true, message: nil))
 
-        XCTAssertFalse(appServer.isAvailable)
-        XCTAssertEqual(availability, [])
+        XCTAssertTrue(appServer.isAvailable)
+        XCTAssertEqual(availability, [true])
 
         shell.emit(.threadWindowPrepared(timestamp: "2026-06-08T00:00:01.000Z"))
 
@@ -227,7 +227,7 @@ final class ElectronBackedAppServerTests: XCTestCase {
         XCTAssertEqual(appServer.startupErrorMessage, "port unavailable")
     }
 
-    func testThreadWindowPrepareFailedMarksUnavailableWithMessage() {
+    func testThreadWindowPrepareFailureKeepsBackendSubmissionAvailable() {
         let shell = RecordingElectronShellProcess()
         let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
@@ -238,12 +238,12 @@ final class ElectronBackedAppServerTests: XCTestCase {
         shell.emit(.threadWindowPrepared(timestamp: "2026-06-08T00:00:01.000Z"))
         shell.emit(.threadWindowPrepareFailed(message: "load failed"))
 
-        XCTAssertFalse(appServer.isAvailable)
-        XCTAssertEqual(appServer.startupErrorMessage, "load failed")
-        XCTAssertEqual(availability, [true, false])
+        XCTAssertTrue(appServer.isAvailable)
+        XCTAssertNil(appServer.startupErrorMessage)
+        XCTAssertEqual(availability, [true])
     }
 
-    func testThreadWindowClosedReportsSpecificPrewarmError() {
+    func testThreadWindowClosedKeepsBackendSubmissionAvailable() {
         let shell = RecordingElectronShellProcess()
         let appServer = ElectronBackedAppServer(shell: shell)
         var availability: [Bool] = []
@@ -254,9 +254,9 @@ final class ElectronBackedAppServerTests: XCTestCase {
         shell.emit(.threadWindowPrepared(timestamp: "2026-06-08T00:00:01.000Z"))
         shell.emit(.threadWindowClosed(timestamp: "2026-06-08T00:00:02.000Z", wasVisible: false))
 
-        XCTAssertFalse(appServer.isAvailable)
-        XCTAssertEqual(appServer.startupErrorMessage, "Electron ThreadWindow 已关闭，正在重新预热…")
-        XCTAssertEqual(availability, [true, false])
+        XCTAssertTrue(appServer.isAvailable)
+        XCTAssertNil(appServer.startupErrorMessage)
+        XCTAssertEqual(availability, [true])
     }
 
     func testAgentServerHealthAvailableStartsDynamicToolProviderClient() async {
@@ -399,10 +399,10 @@ final class ElectronBackedAppServerTests: XCTestCase {
         shell.emit(.agentServerHealth(available: true, message: nil))
         shell.emit(.rendererCrashed(window: .thread, reason: "renderer gone"))
 
-        XCTAssertFalse(appServer.isAvailable)
-        XCTAssertEqual(appServer.startupErrorMessage, "renderer gone")
-        XCTAssertEqual(fatalMessages, ["renderer gone"])
-        XCTAssertEqual(availability, [true, false])
+        XCTAssertTrue(appServer.isAvailable)
+        XCTAssertNil(appServer.startupErrorMessage)
+        XCTAssertTrue(fatalMessages.isEmpty)
+        XCTAssertEqual(availability, [true])
     }
 
     func testActivityRendererCrashDoesNotMarkServerUnavailable() {

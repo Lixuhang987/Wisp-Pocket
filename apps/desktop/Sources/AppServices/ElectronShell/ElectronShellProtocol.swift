@@ -3,7 +3,7 @@ import Foundation
 struct ElectronInitialPromptPayload: Encodable, Equatable {
     let clientRequestId: String
     let userInput: PromptUserInput
-    var petId: String? = nil
+    var workspaceId: String? = nil
 
     init(
         clientRequestId: String,
@@ -16,18 +16,18 @@ struct ElectronInitialPromptPayload: Encodable, Equatable {
     init(prompt: PromptSubmission, clientRequestId: String = UUID().uuidString) {
         self.clientRequestId = clientRequestId
         self.userInput = prompt.userInput
-        self.petId = prompt.targetPetId
+        self.workspaceId = prompt.targetWorkspaceId
     }
 
     private enum CodingKeys: String, CodingKey {
-        case clientRequestId, userInput, petId
+        case clientRequestId, userInput, workspaceId
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(clientRequestId, forKey: .clientRequestId)
         try container.encode(userInput, forKey: .userInput)
-        try container.encodeIfPresent(petId, forKey: .petId)
+        try container.encodeIfPresent(workspaceId, forKey: .workspaceId)
     }
 }
 

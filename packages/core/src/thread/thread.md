@@ -22,8 +22,8 @@
 
 ## 拖入与请求
 
-- 每段 Thread 固定一致的 petId / workspaceId 与创建时角色快照；执行根从 Workspace 取得，不存文件根快照。恢复后旧角色仍用于模型请求，配置修改只影响新 Thread。
-- 实际 Turn 开始只读取根 AGENTS.md 一次，同轮模型调用保持内容固定，下一轮重新读取；排队期间不提前固定规则。文件缺失视为空，项目目录不可用或其他读取失败使 Turn 明确失败。用户明确要求优先于项目规则，项目规则优先于角色习惯；文本不能改变后端工具与 Permission。
+- 每段 Thread 固定归属 Workspace，执行根从 Workspace 取得，不存文件根快照。前端角色提示通过首轮普通 skill Input Item 保存；恢复只接续历史，不重新注入提示。
+- 实际 Turn 开始只读取根 AGENTS.md 一次，同轮模型调用保持内容固定，下一轮重新读取；排队期间不提前固定规则。文件缺失视为空，项目目录不可用或其他读取失败使 Turn 明确失败。用户明确要求优先于项目规则；文本不能改变后端工具与 Permission。
 - 输入仅持久接收，不自动读取资料。模型通过默认工具取得文件和历史，所有入口共享同一执行规则。
 - [runtime](../runtime/runtime.md) 的 `user.ask` 结束 Turn 并留下等待普通消息的 assistant 内容，因此后续回复可直接继续，不占用请求 broker。
 - Permission 仍由 `ThreadRequests` 持有。一次有效 ClientResponse 消耗一个请求，随后发布 `request.resolved`；两种界面同时回复也只产生一次决定。

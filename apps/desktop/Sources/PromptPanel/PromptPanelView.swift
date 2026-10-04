@@ -10,13 +10,15 @@ struct PromptPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            workspacePicker
+                .padding(.bottom, 8)
             firstRow
                 .padding(.bottom, viewModel.chipItems.isEmpty ? 16 : 8)
             if !viewModel.chipItems.isEmpty {
                 chipRow
                     .padding(.bottom, 16)
             }
-            if let message = viewModel.submissionDisabledMessage {
+            if let message = viewModel.submissionDisabledMessage ?? viewModel.workspaceErrorMessage {
                 submissionDisabledBanner(message)
                     .padding(.bottom, 16)
             }
@@ -28,6 +30,21 @@ struct PromptPanelView: View {
         .promptPanelContainer()
         .onAppear { isQueryFocused = true }
         .onChange(of: viewModel.focusSeed) { isQueryFocused = true }
+    }
+
+    private var workspacePicker: some View {
+        Picker("工作区", selection: $viewModel.selectedWorkspaceId) {
+            Text("请选择工作区").tag("")
+            if !viewModel.selectedWorkspaceId.isEmpty,
+               !viewModel.workspaces.contains(where: { $0.id == viewModel.selectedWorkspaceId }) {
+                Text("工作区不可用").tag(viewModel.selectedWorkspaceId)
+            }
+            ForEach(viewModel.workspaces) { workspace in
+                Text(workspace.name).tag(workspace.id)
+            }
+        }
+        .pickerStyle(.menu)
+        .accessibilityLabel("任务工作区")
     }
 
     private var chipRow: some View {

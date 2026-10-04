@@ -92,7 +92,7 @@ final class ChromeBookmarksAgentTriggerProviderTests: XCTestCase {
             promptTemplate: "Summarize {{url}}",
             deliveryPolicy: .default,
             notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
         )
     }
 

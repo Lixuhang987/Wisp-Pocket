@@ -7,7 +7,7 @@
 - `MCPServerRegistry.ts`：按 serverId 复用 client 与适配后的工具。
 - `DefaultReadTools.ts`：组合 file.read 与四个 context_history 普通工具，独立于 Swift Provider 和 builtin 设置。
 - `LocalFileReader.ts`：调用时读取原路径的文本、PDF、PNG/JPEG/WebP；不创建用户文件副本。
-- `ReadImage.ts`：完整解码、实际 MIME、尺寸与 PNG 完整性校验；Pet 图片导入复用相同边界。
+- `ReadImage.ts`：完整解码、实际 MIME、尺寸与 PNG 完整性校验。
 - `ContextHistoryReader.ts`：读取 Swift 已发布的本地活动、AX、PNG 证据。
 
 ## 默认读取与模型内容
@@ -30,4 +30,4 @@
 
 ## 激活与连接
 
-MCP server id 来自上游配置；失败记录 skip 而不阻断 builtin。动态工具按持久 metadata 适配，实时执行通过 bridge 找在线 Provider；不借此通道承载 Pet 管理。默认读取、MCP 与动态工具统一由 [core ThreadTools](../../../../packages/core/src/thread/thread.md) 组合。
+MCP server id 来自上游配置；失败记录 skip 而不阻断 builtin。动态工具按持久 metadata 适配，实时执行通过 bridge 找在线 Provider；不借此通道承载前端管理。默认读取、MCP 与动态工具统一由 [core ThreadTools](../../../../packages/core/src/thread/thread.md) 组合。

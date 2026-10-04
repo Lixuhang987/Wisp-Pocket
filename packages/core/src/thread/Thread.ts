@@ -14,9 +14,7 @@ import { settleWithin } from "./utils/settleWithin.ts";
 export class Thread {
   readonly requests: ThreadRequests;
   readonly createdAt: string;
-  readonly petId: string;
   readonly workspaceId: string;
-  readonly petSnapshot: import("../pet/Pet.ts").PetSnapshot;
   readonly rootPath: string;
   private history: AgentMessage[];
   private readonly tools: ThreadTools;
@@ -32,9 +30,7 @@ export class Thread {
     this.history = structuredClone(data.messages);
     this.inputs = structuredClone(data.pendingInputs ?? []);
     this.createdAt = data.metadata.createdAt;
-    this.petId = data.metadata.petId;
     this.workspaceId = data.metadata.workspaceId;
-    this.petSnapshot = structuredClone(data.metadata.petSnapshot);
     this.rootPath = data.metadata.rootPath;
     this.state = status;
     this.tools = services.createTools(data.metadata.dynamicTools ?? []);
@@ -48,7 +44,7 @@ export class Thread {
   snapshot() {
     const pending = new Set(this.inputs.map((input) => input.opId));
     return {
-      petId: this.petId, workspaceId: this.workspaceId, petRevision: this.petSnapshot.revision, petSnapshot: structuredClone(this.petSnapshot), rootPath: this.rootPath,
+      workspaceId: this.workspaceId, rootPath: this.rootPath,
       messages: this.services.projection.conversation(structuredClone(this.history)).map((message) => {
         if (message.role === "user" && pending.has(message.id)) return { ...message, pending: true };
         if (message.role === "assistant" && this.active) return { ...message, awaitingReply: false };
@@ -200,7 +196,7 @@ export class Thread {
           const audit = this.services.projection.audit(event, time);
           if (audit) events.push(audit);
         }, { threadId: this.id, turnId: active.id, signal: active.controller.signal,
-          rootPath: this.rootPath, projectInstructions, rolePrompt: this.petSnapshot.rolePrompt });
+          rootPath: this.rootPath, projectInstructions });
         if (!this.valid(active)) return;
         // The runtime owns a detached summary working copy; only committed deltas enter history.
         const committed = structuredClone(result.messages).map((message, index) => index >= base && message.role === "assistant" && message.id

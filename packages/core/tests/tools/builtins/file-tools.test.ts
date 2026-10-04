@@ -8,7 +8,7 @@ const directories: string[] = [];
 afterEach(async () => { for (const dir of directories.splice(0)) await rm(dir, { recursive: true, force: true }); });
 async function root() { const dir = await mkdtemp(join(tmpdir(), "pet-files-")); directories.push(dir); return dir; }
 
-describe("Pet固定根的实际文件写入", () => {
+describe("Workspace固定根的实际文件写入", () => {
   it("两个Thread共用根时顺序覆盖同一文件，其他目录保持独立", async () => {
     const rootPath = await root();
     const tool = FileWriteTool.create({});

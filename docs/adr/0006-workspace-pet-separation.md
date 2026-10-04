@@ -1,6 +1,6 @@
 # Workspace 与 Pet 分离，Thread 保留两种归属
 
-状态：已实现（2026-10-04），完整实机待验。规格见 [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)，检查状态见 [实施记录](../medium-powers/plans/2026-10-03-issue-8-settings-workspace.md)，人工步骤见 [manual QA](../manual-qa.md)。本决策替代多桌宠历史规格中“Pet 直接替换 Workspace”的选择；配置归属沿 [ADR 0005](./0005-settings-data-ownership.md)。
+状态：部分被 [ADR 0007](./0007-frontend-pet-workspace-threads.md) 替代（2026-10-04）。以下是 [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8) 的历史决策，不描述当前 Pet 模型；实际目录唯一性、固定 Workspace 根及逐 Turn AGENTS.md 继续保留，Pet 后端所有权、Thread 双归属、角色快照和项目自动生成基础 Pet 已删除。历史检查见 [实施记录](../medium-powers/plans/2026-10-03-issue-8-settings-workspace.md)。
 
 用户需要多个伙伴共享项目目录及项目指令，同时保持伙伴角色、Thread 和界面偏好独立。将项目上下文作为独立 Workspace，由多个 Pet 引用；Pet 的所属 Workspace 与 Workspace 的 rootPath 创建后均不可更换。同一实际目录只对应一个 Workspace，选择已有目录时复用该身份。规范术语见 [Conversation Runtime](../../packages/core/CONTEXT.md)。
 

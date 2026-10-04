@@ -81,7 +81,7 @@ describe("Thread input and socket flows", () => {
     createThreadWindowStore.setState(createThreadWindowStore.getInitialState(), true);
   });
 
-  it("connects, lists pets and threads, and dispatches inbound notifications without recovery requests", () => {
+  it("connects, lists workspaces and threads, and dispatches inbound notifications without recovery requests", () => {
     const events: string[] = [];
     const { client } = createInputClient({
       url: "ws://127.0.0.1:4317/api/thread",
@@ -89,7 +89,6 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("workspace-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("page-2")
@@ -113,14 +112,13 @@ describe("Thread input and socket flows", () => {
 
     expect(events).toEqual(["state:connecting", "state:connected", "thread.listed"]);
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "pet.list", commandId: "pet-list-1" },
       { type: "workspace.list", commandId: "workspace-list-1" },
       { type: "thread.list", commandId: "list-1" },
     ]);
     expect(socket.sent.map((raw) => JSON.parse(raw)).some((command) => command.type === "thread.resume")).toBe(false);
 
     const entry = (id: string) => ({
-      id, workspaceId:"workspace-default", petId: "pet-a", petRevision: 1, rootPath: "/tmp", status: "idle" as const,
+      id, workspaceId:"workspace-default", rootPath: "/tmp", status: "idle" as const,
       preview: id, messageCount: 1, createdAt: timestamp, updatedAt: timestamp,
     });
     socket.receive({ type: "thread.listed", notificationId: "page-1", timestamp, payload: {
@@ -129,7 +127,7 @@ describe("Thread input and socket flows", () => {
     expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({ type: "thread.list", payload: { cursor: "page-2" } });
     socket.receive({ type: "thread.listed", notificationId: "page-2", timestamp, payload: { threads: [entry("old-51")] } });
     expect(createThreadWindowStore.getState().history).toHaveLength(51);
-    expect(createThreadWindowStore.getState().history.find(thread => thread.preview === "old-51")?.petId).toBe("pet-a");
+    expect(createThreadWindowStore.getState().history.find(thread => thread.preview === "old-51")?.workspaceId).toBe("workspace-default");
     client.resumeThread("old-51");
     expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({ type: "thread.resume", threadId: "old-51" });
     client.disconnect();
@@ -141,7 +139,6 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -153,8 +150,8 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({petId: "pet-default",
-      clientRequestId: "prompt-1",
+    inputs.startInitialPrompt({workspaceId: "workspace-default",
+clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
@@ -166,14 +163,13 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
+        payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet",  preview: "hello" },
       }),
     });
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: "workspace-default" } },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       { type: "op.submit", threadId: "thread-1", commandId: "input-1", payload: { op: { type: "user_input", opId: "prompt-1", payload: { items: [{ type: "text", id: "text-1", text: "hello" }] } } } },
     ]);
@@ -183,8 +179,8 @@ describe("Thread input and socket flows", () => {
 
   it("keeps interleaved initial prompts associated through creation, snapshot, and recorded input", () => {
     const store = createThreadWindowStore;
-    const promptA: InitialPromptPayload = {petId: "pet-default",
-      clientRequestId: "prompt-a",
+    const promptA: InitialPromptPayload = {workspaceId: "workspace-default",
+clientRequestId: "prompt-a",
       userInput: {
         items: [
           { type: "text", id: "text-a", text: "focus on regressions" },
@@ -195,8 +191,8 @@ describe("Thread input and socket flows", () => {
         ],
       },
     };
-    const promptB: InitialPromptPayload = {petId: "pet-default",
-      clientRequestId: "prompt-b",
+    const promptB: InitialPromptPayload = {workspaceId: "workspace-default",
+clientRequestId: "prompt-b",
       userInput: { items: [{ type: "text", id: "text-b", text: "another question" }] },
     };
     const observedPrompts: Array<{ threadId: string; prompt: InitialPromptPayload | null }> = [];
@@ -221,14 +217,14 @@ describe("Thread input and socket flows", () => {
       notificationId: "started-b",
       commandId: "prompt-b",
       timestamp,
-      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "another question" },
+      payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet",  preview: "another question" },
     });
     socket.receive({
       type: "thread.snapshot",
       threadId: "thread-b",
       notificationId: "snapshot-b",
       timestamp,
-      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
+      payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet", messages: [], status: "running" },
     });
     socket.receive({
       type: "thread.started",
@@ -236,21 +232,21 @@ describe("Thread input and socket flows", () => {
       notificationId: "started-a",
       commandId: "prompt-a",
       timestamp,
-      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "focus on regressions" },
+      payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet",  preview: "focus on regressions" },
     });
     socket.receive({
       type: "thread.snapshot",
       threadId: "thread-a",
       notificationId: "snapshot-a",
       timestamp,
-      payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet", petSnapshot:{petId:"pet-default",revision:1,name:"Default",rolePrompt:"Help"},  messages: [], status: "running" },
+      payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet", messages: [], status: "running" },
     });
 
     expect(observedPrompts).toEqual([
       { threadId: "thread-b", prompt: promptB },
       { threadId: "thread-a", prompt: promptA },
     ]);
-    expect(socket.sent.map((raw) => JSON.parse(raw)).slice(2)).toMatchObject([
+    expect(socket.sent.map((raw) => JSON.parse(raw)).slice(1)).toMatchObject([
       { type: "thread.start", commandId: "prompt-a" },
       { type: "thread.start", commandId: "prompt-b" },
       { type: "thread.resume", threadId: "thread-b" },
@@ -312,7 +308,6 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1"),
       onConnectionState: () => {},
       onNotification: () => {},
@@ -322,8 +317,8 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({petId: "pet-default",
-      clientRequestId: "prompt-1",
+    inputs.startInitialPrompt({workspaceId: "workspace-default",
+clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
@@ -334,7 +329,7 @@ describe("Thread input and socket flows", () => {
       type: "thread.start",
       commandId: "prompt-1",
       timestamp: "2026-06-06T00:00:00.000Z",
-      payload: { petId: "pet-default" },
+      payload: { workspaceId: "workspace-default" },
     });
   });
 
@@ -396,7 +391,6 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1"),
       onConnectionState: () => {},
       onNotification: () => {},
@@ -413,7 +407,6 @@ describe("Thread input and socket flows", () => {
 
     expect(FakeWebSocket.instances).toHaveLength(1);
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
     ]);
   });
@@ -424,7 +417,6 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -436,8 +428,8 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
 
-    expect(() => inputs.startInitialPrompt({petId: "pet-default",
-      clientRequestId: "prompt-1",
+    expect(() => inputs.startInitialPrompt({workspaceId: "workspace-default",
+clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello before open" }],
       },
@@ -452,13 +444,12 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello before open" },
+        payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet",  preview: "hello before open" },
       }),
     });
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
-      { type: "pet.list", commandId: "pet-list-1" },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: "workspace-default" } },
       { type: "thread.list", commandId: "list-1" },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       { type: "op.submit", threadId: "thread-1", commandId: "input-1", payload: { op: { type: "user_input", opId: "prompt-1", payload: { items: [{ type: "text", id: "text-1", text: "hello before open" }] } } } },
@@ -577,8 +568,7 @@ describe("Thread input and socket flows", () => {
           },
         },
       },
-      { type: "pet.list", commandId: "command-3", timestamp },
-      { type: "thread.list", commandId: "command-4", timestamp },
+      { type: "thread.list", commandId: "command-3", timestamp },
     ]);
   });
 
@@ -693,7 +683,6 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -705,8 +694,8 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({petId: "pet-default",
-      clientRequestId: "prompt-1",
+    inputs.startInitialPrompt({workspaceId: "workspace-default",
+clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "hello" }],
       },
@@ -719,7 +708,7 @@ describe("Thread input and socket flows", () => {
         notificationId: "n-other-started",
         commandId: "prompt-other",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "other" },
+        payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet",  preview: "other" },
       }),
     });
     socket.onmessage?.({
@@ -747,15 +736,14 @@ describe("Thread input and socket flows", () => {
         notificationId: "n-late-started",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "hello" },
+        payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet",  preview: "hello" },
       }),
     });
 
     const sent = socket.sent.map((raw) => JSON.parse(raw));
     expect(sent).toMatchObject([
-      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: "workspace-default" } },
     ]);
     expect(sent.some((command) => command.type === "input.submit")).toBe(false);
     expect(sent.some((command) => command.type === "thread.resume" && command.threadId === "thread-1")).toBe(false);
@@ -767,7 +755,6 @@ describe("Thread input and socket flows", () => {
       WebSocketImpl: FakeWebSocket as never,
       now: () => "2026-06-06T00:00:00.000Z",
       id: vi.fn()
-        .mockReturnValueOnce("pet-list-1")
         .mockReturnValueOnce("list-1")
         .mockReturnValueOnce("resume-1")
         .mockReturnValueOnce("input-1"),
@@ -779,15 +766,15 @@ describe("Thread input and socket flows", () => {
     client.connect();
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    inputs.startInitialPrompt({petId: "pet-default",
-      clientRequestId: "prompt-1",
+    inputs.startInitialPrompt({workspaceId: "workspace-default",
+clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-1", text: "first" }],
       },
     });
 
-    expect(() => inputs.startInitialPrompt({petId: "pet-default",
-      clientRequestId: "prompt-1",
+    expect(() => inputs.startInitialPrompt({workspaceId: "workspace-default",
+clientRequestId: "prompt-1",
       userInput: {
         items: [{ type: "text", id: "text-2", text: "second" }],
       },
@@ -800,14 +787,13 @@ describe("Thread input and socket flows", () => {
         notificationId: "n1",
         commandId: "prompt-1",
         timestamp: "2026-06-06T00:00:00.000Z",
-        payload: {workspaceId:"workspace-default",petId:"pet-default",petRevision:1, rootPath:"/tmp/pet",  preview: "first" },
+        payload: {workspaceId:"workspace-default",rootPath:"/tmp/pet",  preview: "first" },
       }),
     });
 
     expect(socket.sent.map((raw) => JSON.parse(raw))).toMatchObject([
-      { type: "pet.list", commandId: "pet-list-1" },
       { type: "thread.list", commandId: "list-1" },
-      { type: "thread.start", commandId: "prompt-1", payload: { petId: "pet-default" } },
+      { type: "thread.start", commandId: "prompt-1", payload: { workspaceId: "workspace-default" } },
       { type: "thread.resume", threadId: "thread-1", commandId: "resume-1" },
       {
         type: "op.submit",

@@ -8,17 +8,10 @@ const timestamp = "2026-06-09T00:00:00.000Z";
 
 const mockState: Pick<
   ThreadWindowState,
-  "history" | "workspaces" | "pets" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded" | "threadsById"
+  "history" | "workspaces" | "expandedWorkspaceIds" | "searchQuery" | "setSearchQuery" | "toggleWorkspaceExpanded" | "threadsById"
 > = {
   history: [],
   workspaces: [{id:"workspace-1",name:"Project",rootPath:"/tmp/project",createdAt:timestamp}],
-  pets: [
-    {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
-      id: "pet-1",
-      name: "Project pet",
-      rootPath: "/tmp/project",
-    },
-  ],
   expandedWorkspaceIds: new Set(["workspace-1"]),
   searchQuery: "",
   setSearchQuery: vi.fn(),
@@ -36,13 +29,6 @@ describe("HistorySidebar", () => {
   beforeEach(() => {
     mockState.history = [];
     mockState.workspaces = [{id:"workspace-1",name:"Project",rootPath:"/tmp/project",createdAt:timestamp}];
-    mockState.pets = [
-      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",
-        id: "pet-1",
-        name: "Project pet",
-        rootPath: "/tmp/project",
-      },
-    ];
     mockState.expandedWorkspaceIds = new Set(["workspace-1"]);
     mockState.searchQuery = "";
     mockState.setSearchQuery = vi.fn();
@@ -50,25 +36,18 @@ describe("HistorySidebar", () => {
     mockState.threadsById = {};
   });
 
-  it("renders all projects alphabetically and groups different pets under one project", () => {
-    mockState.pets = [
-      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "default", name: "default", rootPath: "/default" },
-      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "tmp", name: "tmp", rootPath: "/tmp" },
-      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "qa-pet", name: "qa-pet", rootPath: "/qa" },
-      {workspaceId:"workspace-1",description:"", rolePrompt:"Help", revision:1, imageRef:{type:"builtin",id:"yachiyo"}, isDefault:false, createdAt:"2026", updatedAt:"2026",  id: "handagent-test", name: "handagent-test", rootPath: "/handagent" },
-    ];
-    mockState.workspaces = mockState.pets.map(p => ({id:p.id,name:p.name,rootPath:p.rootPath,createdAt:timestamp}));
+  it("renders all projects alphabetically and groups separate threads under one project", () => {
+    mockState.workspaces = ["default", "tmp", "qa-pet", "handagent-test"].map(id => ({ id, name: id, rootPath: `/${id}`, createdAt: timestamp }));
     mockState.expandedWorkspaceIds = new Set(["tmp", "qa-pet", "handagent-test"]);
     mockState.history = [
-      {workspaceId:"workspace-1",petRevision:1, rootPath:"/tmp/pet", status:"idle",
+      {workspaceId:"workspace-1",rootPath:"/tmp/pet", status:"idle",
         id: "thread-default",
         preview: "default conversation",
-        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,
       },
-      {workspaceId:"tmp",petId:"another-pet",petRevision:1,rootPath:"/tmp",status:"idle",id:"thread-second",preview:"another partner conversation",createdAt:timestamp,updatedAt:timestamp,messageCount:1},
+      {workspaceId:"tmp",rootPath:"/tmp",status:"idle",id:"thread-second",preview:"another partner conversation",createdAt:timestamp,updatedAt:timestamp,messageCount:1},
     ];
     mockState.history[0].workspaceId="tmp";
 
@@ -116,18 +95,16 @@ describe("HistorySidebar", () => {
       },
     };
     mockState.history = [
-      {workspaceId:"workspace-1",petRevision:1, rootPath:"/tmp/pet", status:"idle",
+      {workspaceId:"workspace-1",rootPath:"/tmp/pet", status:"idle",
         id: "thread-pet",
         preview: "pet conversation",
-        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,
       },
-      {workspaceId:"workspace-1",petRevision:1, rootPath:"/tmp/pet", status:"idle",
+      {workspaceId:"workspace-1",rootPath:"/tmp/pet", status:"idle",
         id: "thread-default",
         preview: "default conversation",
-        petId: "pet-1",
         createdAt: timestamp,
         updatedAt: timestamp,
         messageCount: 1,

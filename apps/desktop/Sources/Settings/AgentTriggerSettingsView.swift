@@ -18,7 +18,7 @@ struct AgentTriggerSettingsView: View {
             }
         }
         .overlayScrollbar()
-        .task { await viewModel.reloadPets() }
+        .task { await viewModel.reloadWorkspaces() }
     }
 }
 
@@ -204,11 +204,11 @@ private struct PackageDetailView: View {
             SettingsSectionHeader("新增自动化")
             SettingsSection {
                 if hasFormFields {
-                    SettingsRow("目标桌宠") {
-                        Picker("目标桌宠", selection: $viewModel.targetPetId) {
-                            Text("请选择桌宠").tag("")
-                            ForEach(viewModel.pets) { pet in
-                                Text("\(pet.name) · \(pet.id.prefix(8))").tag(pet.id)
+                    SettingsRow("目标工作区") {
+                        Picker("目标工作区", selection: $viewModel.targetWorkspaceId) {
+                            Text("请选择工作区").tag("")
+                            ForEach(viewModel.workspaces) { workspace in
+                                Text("\(workspace.name) · \(workspace.id.prefix(8))").tag(workspace.id)
                             }
                         }
                     }

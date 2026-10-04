@@ -64,7 +64,7 @@ export class ThreadNotificationPublisher {
     if (hasThreadId(event)) {
       for (const state of this.connections.values()) {
         if (state.observeRequests) {
-          if (event.type === "thread.started" || isServerRequest(event)) {
+          if (event.type === "thread.started" || event.type === "request.resolved" || isServerRequest(event)) {
             try { state.send(event); } catch { /* Isolate disconnected request observers. */ }
           }
           continue;

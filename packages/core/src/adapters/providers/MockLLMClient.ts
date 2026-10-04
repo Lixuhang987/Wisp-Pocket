@@ -91,7 +91,7 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "file-read",
     trigger: "[mock:file-read]",
-    description: "调用 file.read，按当前 Pet 固定根解析相对路径。",
+    description: "调用 file.read，按当前 Workspace 固定根解析相对路径。",
     toolCall: {
       id: "mock-file-read-1",
       name: "file.read",
@@ -104,7 +104,7 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "path-escape",
     trigger: "[mock:path-escape]",
-    description: "返回越狱路径 file.write，用于验证 Pet 文件根边界拒绝。",
+    description: "返回越狱路径 file.write，用于验证 Workspace 文件根边界拒绝。",
     toolCall: {
       id: "mock-path-escape-1",
       name: "file.write",
@@ -118,7 +118,7 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "symlink-escape",
     trigger: "[mock:symlink-escape]",
-    description: "返回指向 symlink 内路径的 file.write，用于验证 Pet realpath 文件根边界拒绝。",
+    description: "返回指向 symlink 内路径的 file.write，用于验证 Workspace realpath 文件根边界拒绝。",
     toolCall: {
       id: "mock-symlink-escape-1",
       name: "file.write",

@@ -7,9 +7,9 @@
 | 文件 | 职责 |
 |------|------|
 | `threadWindowPrewarmer.ts` | ThreadWindow 单实例以及独立设置实例的 hidden loading、首轮输入与目标 Thread 交付、show/focus、close 状态、host theme 下发与只读 `availableSkills` 注入 |
-| `petWindowCollection.ts` | N 个绑定 petId 的窗口集合、可见偏好、接收期间延后回收及轻量请求召回 |
+| `petWindowCollection.ts` | N 个绑定 petId 的窗口集合、前端 store 驱动窗口、Workspace/Thread 分配校验与 Permission 召回 |
 | `activityWindowController.ts` | 单宠 ActivityWindow 的非激活展示、布局、拖动、透明命中、host theme 下发和 renderer crash 回调 |
-| `petPositionStore.ts` | 角色右下角屏幕坐标的原子保存与恢复；文件路径由 main 注入 |
+| `petPositionStore.ts` | 角色右下角屏幕坐标类型与独立几何测试适配；生产写入 Pet store |
 
 ## ThreadWindow 前提
 
@@ -28,7 +28,7 @@
 - 窗口透明、无边框、置顶；`showInactive()` 负责启动展示。保留 `focusable: true`、`acceptFirstMouse: true`，角色主动点击唤出时由 renderer 聚焦回复框；hover 和后台更新不请求窗口聚焦。
 - 初次在主屏工作区右下方按集合顺序错位定位，并预留角色右侧的对话列。`PetPosition` 保存角色右下角的屏幕 DIP 坐标及显示器 ID、相对 workArea 锚点；恢复/布局变化先沿显示器关联还原，原屏消失后回可达主屏；窗口右边界还包含对话列，不能当作角色锚点。
 - 角色本地锚点与对话列尺寸来自 [src 共享布局](../../src.md)。`compact` 使用 renderer 上报的内容高度，在角色所需最小高度与展开上限之间收紧或增高；`expanded` 使用统一浏览高度。两种模式都只利用锚点上方可用空间，切换和内容变化保留角色及 composer 的底部锚点（输入行与下方工具行随资料高度统一测量），溢出由 renderer 的上方浏览区裁剪。恢复位置、屏幕变动和拖动仍将完整窗口限制在目标工作区内。
-- 位置存储只保存角色锚点及显示器关联；大小偏好、消息、当前 Thread 和回复草稿归 renderer。角色缩放不改变窗口布局槽位，main 只消费实际命中矩形。已有桌宠窗口被重复显示或 ThreadWindow 关闭时，继续使用同一 renderer。
+- 伙伴位置、大小和当前 Thread 归 [前端 store](../pets/pets.md)；消息投影和回复草稿归 renderer。角色缩放不改变窗口布局槽位，main 只消费实际命中矩形。已有桌宠窗口被重复显示或 ThreadWindow 关闭时，继续使用同一 renderer。
 - renderer 按[桌宠布局](../../activity-window/activity-window.md)统一浏览视口裁剪上方气泡、建议和请求，经 [preload](../../preload/preload.md) 上报角色和各交互表面的本地矩形；main 再按窗口边界裁剪，用系统光标轮询决定 `setIgnoreMouseEvents(..., { forward: true })`。透明间隙保持穿透，外部应用拖入时也能恢复命中，不能只依赖 renderer 的 mousemove。
 - `beginMove`、`move`、`endMove` 只使用 main 读取的系统光标。拖动期间保留鼠标事件，让 renderer 的 pointer capture 跨窗口边界继续工作；结束后保存位置并恢复局部命中。
 - 鼠标和焦点直接进入桌宠 renderer，保留输入、滚动和原生 drop；窗口控制器不把这些事件转换为 ThreadWindow 聚焦请求。
@@ -44,13 +44,14 @@
 
 ## 多宠窗口集合
 
-- 可见集合持久于 `~/.spotAgent/pet-visibility.json`，每个角色窗口绑定稳定 petId，位置文件逐宠隔离；Pet 配置仍从后端获取。新宠默认显示，Swift `pet.show/hide` 与桌宠入口操作同一集合。
-- main 使用 `/api/thread?observeRequests=1` 分页读取轻量身份与有效 Permission 事实，仅保存 threadId→petId 路由。不 resume 全部历史，不持有消息、不回答请求；完整投影只在各 renderer 明确打开 Thread 时恢复。
-- 隐藏角色先取消显示；若 renderer 仍在等待接收 ACK，则延后 close。接收结果不因隐藏丢失，后端执行也不随窗口关闭停止。
-- 有效 Permission 恢复角色窗口并发送无焦点的展示意图，renderer 保持原选择；普通后台消息不能解除主动隐藏。
+- [Pet store](../pets/pets.md) 是显隐与关联权威；重启只恢复可见集合，已有全部隐藏不会重播种。Swift `pet.show/hide` 与桌宠入口操作同一集合。
+- main 使用 `/api/thread?observeRequests=1` 分页查询 Workspace/Thread 摘要与有效 Permission 事实，绑定前核对后端 Thread→Workspace。不会 resume 历史、保存消息或回答请求；各 renderer 恢复完整投影。
+- 手动指定 Pet 可以转移隐藏 Pet 的 Thread；另一可见 Pet 占用时拒绝且双方不变。Workspace 历史和 Permission 自动复用已有 owner，否则使用隐藏库存；同步 store 提交使并发操作保持唯一关联。
+- 隐藏先取消显示；若 renderer 等待接收 ACK，则延后 close。隐藏、换工作区、清空当前 Thread、窗口关闭均不停止后端任务。
+- Permission 观察请求结束、超时和 Thread 删除；有效请求唤出绑定正确项目与 Thread 的角色，再发送无焦点展示意图。库存不足显示最小系统通知，不抢其他可见角色，也不自动重试分配。
 
-## 设置与完整身份对账
+## 设置与管理
 
-- 设置窗口加载 `?surface=settings`，复用 `ThreadWindowPrewarmer` 的独立实例，只用 focus/openHistory/updateTheme，不向 renderer 注入 Thread 或清空表单。关闭后实例清空，下一次重新加载默认 AI；窗口没有 ThreadWindow gate 回调，也不停止 supervisor。
-- 管理桥能选目录/PNG、JPEG、WebP图片，返回 picker 原始目录或不超过20MiB的图片bytes；不接受 renderer 指定任意磁盘路径，不直写业务文件。sender 合约见 [preload](../../preload/preload.md)。
-- 观察连接的完整 Pet 快照替换身份集合，删除失效 Thread 路由与 visible/位置偏好，保留有效项。失效窗口立即隐藏，接收在途时等 ACK 后回收；局部 scope 只增加身份，不能清理其他项目。新身份默认显示，幂等 created 重投保留已隐藏的有效身份；异步加载完成后须重新核验身份与显示偏好，目录不可访问不等于身份失效。
+- 设置窗口加载 `?surface=settings`，复用独立 prewarmer，只用 focus/openHistory/updateTheme；关闭后重建默认 AI，不参与 ThreadWindow gate。
+- 管理桥仅接受设置或登记宠窗 sender；提供资料保存、分配、显隐、大小、受控目录/图片 picker 和变更订阅，详见 [preload](../../preload/preload.md)。普通 ThreadWindow 无管理权限。
+- 图片限制 PNG/JPEG/WebP、20 MiB，经 main 解码后保存前端 data URL；renderer 不能指定磁盘读取路径。目录失效保留安排，后端拒绝新执行并由 renderer 展示错误。

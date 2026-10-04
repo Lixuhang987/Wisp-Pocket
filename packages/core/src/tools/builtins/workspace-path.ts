@@ -2,14 +2,14 @@ import { lstat, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isNotFoundError } from "../../utils/nodeErrors.ts";
 
-export function requirePetRoot(rootPath?: string): string {
-  if (!rootPath || !isAbsolute(rootPath)) throw new Error("Thread Pet rootPath is required");
+export function requireWorkspaceRoot(rootPath?: string): string {
+  if (!rootPath || !isAbsolute(rootPath)) throw new Error("Thread Workspace rootPath is required");
   return rootPath;
 }
 
 function ensureInside(root: string, target: string): void {
   const path = relative(root, target);
-  if (isAbsolute(path) || path.split(sep).includes("..")) throw new Error(`Path escapes Pet root: ${target}`);
+  if (isAbsolute(path) || path.split(sep).includes("..")) throw new Error(`Path escapes Workspace root: ${target}`);
 }
 
 // Resolve the nearest existing ancestor, including symlinks before missing directories.
@@ -23,10 +23,10 @@ async function resolveAncestor(path: string): Promise<string> {
   }
 }
 
-export async function resolvePetWritePath(rootPath: string, relativePath: string): Promise<string> {
+export async function resolveWorkspaceWritePath(rootPath: string, relativePath: string): Promise<string> {
   if (isAbsolute(relativePath)) throw new Error("relativePath must not be absolute");
-  if (!relativePath.trim() || relativePath.split(/[\\/]/).includes("..")) throw new Error("Path escapes Pet root or is empty");
-  const root = await realpath(requirePetRoot(rootPath));
+  if (!relativePath.trim() || relativePath.split(/[\\/]/).includes("..")) throw new Error("Path escapes Workspace root or is empty");
+  const root = await realpath(requireWorkspaceRoot(rootPath));
   const target = resolve(root, relativePath);
   ensureInside(root, target);
   if (target === root) throw new Error("Write target must be a file");

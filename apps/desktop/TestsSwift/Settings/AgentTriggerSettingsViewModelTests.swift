@@ -24,7 +24,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         store.ensureBuiltinPackagesInstalled()
         let viewModel = AgentTriggerSettingsViewModel(store: store)
 
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
 
         XCTAssertEqual(viewModel.selectedPackageId, "chrome-bookmarks")
@@ -39,7 +39,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         store.ensureBuiltinPackagesInstalled()
         let runtime = RecordingAgentTriggerRuntime()
         let viewModel = AgentTriggerSettingsViewModel(store: store, runtime: runtime)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
 
         let didCreate = viewModel.createInstanceForCurrentPackage(
@@ -54,7 +54,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.instances.first?.promptTemplate, "Summarize the bookmarked page: {{title}} {{url}}")
         XCTAssertEqual(runtime.reloadCount, 1)
         XCTAssertEqual(store.loadInstances().count, 1)
-        XCTAssertEqual(store.loadInstances().first?.targetPetId, "pet-test")
+        XCTAssertEqual(store.loadInstances().first?.targetWorkspaceId, "workspace-test")
     }
 
     @MainActor
@@ -84,7 +84,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         let store = AgentTriggerStore(homeDirectoryURL: homeURL)
         store.ensureBuiltinPackagesInstalled()
         let viewModel = AgentTriggerSettingsViewModel(store: store)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
 
         let didCreate = viewModel.createInstanceForCurrentPackage(
@@ -125,7 +125,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
             store: store,
             chromeBookmarksFolderTreeStore: ChromeBookmarksFolderTreeStore(homeDirectoryURL: homeURL)
         )
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
 
         let didCreate = viewModel.createChromeBookmarkInstance(
@@ -147,7 +147,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         let store = AgentTriggerStore(homeDirectoryURL: homeURL)
         store.ensureBuiltinPackagesInstalled()
         let viewModel = AgentTriggerSettingsViewModel(store: store)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
 
         let didCreate = viewModel.createChromeBookmarkInstance(
@@ -169,7 +169,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         store.ensureBuiltinPackagesInstalled()
         let runtime = RecordingAgentTriggerRuntime()
         let viewModel = AgentTriggerSettingsViewModel(store: store, runtime: runtime)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
 
         let didCreate = viewModel.createInstanceForCurrentPackage(
@@ -192,7 +192,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         store.ensureBuiltinPackagesInstalled()
         let runtime = RecordingAgentTriggerRuntime()
         let viewModel = AgentTriggerSettingsViewModel(store: store, runtime: runtime)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "system-clock")
 
         XCTAssertTrue(viewModel.createInstanceForCurrentPackage(
@@ -222,7 +222,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         store.ensureBuiltinPackagesInstalled()
         let runtime = RecordingAgentTriggerRuntime()
         let viewModel = AgentTriggerSettingsViewModel(store: store, runtime: runtime)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "system-clock")
         XCTAssertTrue(viewModel.createInstanceForCurrentPackage(
             title: "Daily",
@@ -245,7 +245,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         store.ensureBuiltinPackagesInstalled()
         let runtime = RecordingAgentTriggerRuntime()
         let viewModel = AgentTriggerSettingsViewModel(store: store, runtime: runtime)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
 
         let didCreate = viewModel.createInstanceForCurrentPackage(
@@ -286,7 +286,7 @@ final class AgentTriggerSettingsViewModelTests: XCTestCase {
         let store = AgentTriggerStore(homeDirectoryURL: homeURL)
         store.ensureBuiltinPackagesInstalled()
         let viewModel = AgentTriggerSettingsViewModel(store: store)
-        viewModel.targetPetId = "pet-test"
+        viewModel.targetWorkspaceId = "workspace-test"
         viewModel.selectPackage(id: "chrome-bookmarks")
         XCTAssertEqual(viewModel.selectedPackageId, "chrome-bookmarks")
 

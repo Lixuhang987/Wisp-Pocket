@@ -10,8 +10,7 @@
 - [runtime/runtime.md](/Users/mu9/proj/handAgent/packages/core/src/runtime/runtime.md)：Turn、消息与 LLM/Tool 循环。
 - [llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md)：provider-neutral LLM 接口与适配。
 - [tools/tools.md](/Users/mu9/proj/handAgent/packages/core/src/tools/tools.md)：Tool、registry、builtin 与 Dynamic Tool adapter。
-- [workspace/workspace.md](./workspace/workspace.md)：稳定项目身份、实际目录唯一性与基础 Pet 创建端口。
-- [pet/pet.md](./pet/pet.md)：Pet 身份、角色配置与固定 Workspace 引用。
+- [workspace/workspace.md](./workspace/workspace.md)：稳定项目身份、实际目录唯一性与创建端口。
 - [permission/permission.md](/Users/mu9/proj/handAgent/packages/core/src/permission/permission.md)：Permission policy 与记忆。
 - [conversation/conversation.md](/Users/mu9/proj/handAgent/packages/core/src/conversation/conversation.md)：UI conversation projection。
 - [blob/blob.md](/Users/mu9/proj/handAgent/packages/core/src/blob/blob.md)：大内容存储端口。

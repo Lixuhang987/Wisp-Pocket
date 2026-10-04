@@ -17,7 +17,7 @@
 | 消息、状态、历史摘要、错误 | `handleNotification` 交给投影模块；snapshot 替换历史显示，delta 追加到同一 item | 删除 Thread 时移除缓存；不持久化为运行事实 |
 | 已保存输入的 pending | `user.message.recorded` 与 snapshot 投影后端待处理状态 | 对应 `turn.started` 按输入身份清除；其他输入的 pending 保留 |
 | Permission 面板 | `handleRequest` 与 snapshot 投影到所属 Thread，按 requestId 避免重复 | `request.resolved`、终态和错误清理；显式 resolve action 只移除本地面板，后端判断回执有效性 |
-| Workspace / Pet 列表 | Workspace 完整列表替换；Pet 完整列表替换，含 workspaceId 的局部列表只替换对应项目 | 页面内缓存 |
+| Workspace 列表 | 后端完整列表替换，新建回执按身份合并 | 页面内缓存 |
 | 连接状态 | socket 事件经 `setConnectionState` 写入 | 展示传输状态，重连策略归各界面控制器 |
 | 搜索与分组展开 | 偏好模块的公共 action | 只有项目展开集合写入 localStorage；完整项目列表清理失效展开身份；搜索随页面重建清空 |
 
@@ -34,7 +34,7 @@
 
 本地摘要不代表持久接收，真实输入以服务端通知为准。关联尚未清空时再次 snapshot 仍可能按原规则合成摘要；这不是输入重发或恢复保证。
 
-ThreadWindow 草稿仍在 `ThreadPetPane` 内按 Thread 保存，切换保留、提交清空、页面重建丢失。桌宠的当前 Thread、隐藏状态与回复草稿由桌宠控制器按 petId/Thread 持久保存，窗口选择不迁入此 store。
+ThreadWindow 草稿仍在 `ThreadPetPane` 内按 Thread 保存，切换保留、提交清空、页面重建丢失。桌宠当前 Workspace / Thread、伙伴显隐、位置 / 大小与资料分配由 Electron main store 唯一拥有，不进入 Thread 事实投影。renderer 只按 petId / Thread 持久保存对话显隐、回复草稿、在途提交与导航代次，不另存 selectedThreadId。
 
 ## 协议边界
 

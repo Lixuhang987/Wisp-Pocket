@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from "vitest";
+import { installPetBridge, petFixture } from "./petBridgeFixture.ts";
 import { PetThreadController } from "../../src/activity-window/petThreadController.ts";
 
 class Socket {
@@ -24,12 +25,13 @@ const note = (type: string, payload: object, extra: object = {}) => ({
   type, payload, ...extra, notificationId: String(++sequence), timestamp,
 });
 const entry = (id: string, petId = "pet-a") => ({
-  id, petId, workspaceId: "workspace-shared", petRevision: 1, rootPath: "/tmp", status: "idle",
+  id, workspaceId: "workspace-shared", rootPath: "/tmp", status: "idle",
   createdAt: timestamp, updatedAt: timestamp, preview: id, messageCount: 0,
 });
-afterEach(() => { controller?.disconnect(); otherControllers.splice(0).forEach(item => item.disconnect()); localStorage.clear(); });
+afterEach(() => { controller?.disconnect(); otherControllers.splice(0).forEach(item => item.disconnect()); localStorage.clear(); delete window.handAgentSettings; });
 
-it("本宠超过一页时，离线删除的旧选择通过 resume not_found 回到本宠历史", () => {
+it("工作区历史分页与已选任务恢复由前端关联决定", () => {
+  const fixture=installPetBridge([petFixture("pet-a","workspace-shared","selected")]);
   controller = new PetThreadController({ url: "ws://local/api/thread", WebSocketImpl: Socket, petId: "pet-a" });
   controller.connect();
   let socket = Socket.latest;
@@ -48,18 +50,22 @@ it("本宠超过一页时，离线删除的旧选择通过 resume not_found 回�
   socket = Socket.latest;
   socket.open();
   socket.receive(note("thread.listed", {
-    threads: [entry("other-pet", "pet-b"), ...Array.from({ length: 50 }, (_, i) => entry(`remaining-${i}`))],
+    threads: [...Array.from({ length: 50 }, (_, i) => entry(`remaining-${i}`))],
     nextCursor: "next",
   }));
   expect(socket.sent.at(-1)).toMatchObject({ type: "thread.resume", threadId: "selected" });
   expect(controller.getSnapshot()).toMatchObject({ threadId: "selected", draft: "当前输入不能丢" });
   socket.receive(note("thread.error", { code: "not_found", message: "Thread not found" }, { threadId: "selected" }));
-  expect(controller.getSnapshot()).toMatchObject({ threadId: "remaining-0", draft: "" });
+  expect(controller.getSnapshot()).toMatchObject({ threadId: null, draft: "" });
+  fixture.publish([petFixture("pet-a","workspace-shared",null)]);
+  void fixture.bridge.assignPet({petId:"pet-a",workspaceId:"workspace-shared",threadId:"remaining-0"});
+  expect(controller.getSnapshot()).toMatchObject({threadId:"remaining-0"});
   expect(socket.sent.at(-1)).toMatchObject({ type: "thread.resume", threadId: "remaining-0" });
   expect(JSON.parse(localStorage.getItem("handagent.pet-ui.v1.pet-a")!).drafts.selected).toBeUndefined();
 });
 
 it("五宠的两段历史与新话题草稿在 renderer 重建后分别恢复", () => {
+  const fixture=installPetBridge(Array.from({length:5},(_,i)=>petFixture(`pet-${i}`,"workspace-shared",`a-${i}`)));
   function openPet(petId: string, threads: string[]) {
     const pet = new PetThreadController({ url: "ws://local/api/thread", WebSocketImpl: Socket, petId });
     otherControllers.push(pet);
@@ -81,20 +87,8 @@ it("五宠的两段历史与新话题草稿在 renderer 重建后分别恢复", 
     if (i % 2 === 0) pet.revealBubble(); else pet.hideBubble();
     pet.disconnect();
   }
-  localStorage.setItem("handagent.pet-ui.v1.removed-pet", JSON.stringify({drafts:{new:"过期草稿"}}));
-  localStorage.setItem("handagent.pet-size.removed-pet", "125");
-  localStorage.setItem("handagent.pet-size.pet-0", "115");
-  localStorage.setItem("unrelated-setting", "保留");
-  const pets = Array.from({length:5}, (_,i) => ({id:`pet-${i}`,workspaceId:"workspace-shared",name:`伙伴${i}`,description:"",rolePrompt:"角色",revision:1,rootPath:"/tmp",imageRef:{type:"builtin",id:"yachiyo"},isDefault:i===0,createdAt:timestamp,updatedAt:timestamp}));
   for (let i = 0; i < 5; i++) {
     const pet = openPet(`pet-${i}`, [`a-${i}`, `b-${i}`]);
-    Socket.latest.receive(note("pet.listed", {pets:[pets[i]],workspaceId:"workspace-shared"}));
-    expect(localStorage.getItem("handagent.pet-ui.v1.pet-4")).not.toBeNull();
-    Socket.latest.receive(note("pet.listed", {pets}));
-    expect(localStorage.getItem("handagent.pet-ui.v1.removed-pet")).toBeNull();
-    expect(localStorage.getItem("handagent.pet-size.removed-pet")).toBeNull();
-    expect(localStorage.getItem("handagent.pet-size.pet-0")).toBe("115");
-    expect(localStorage.getItem("unrelated-setting")).toBe("保留");
     expect(pet.getSnapshot()).toMatchObject({ threadId: null, draft: `New${i}`, bubbleVisible: i % 2 === 0 });
     expect(pet.getSnapshot().files.map(file => file.path)).toEqual([`/tmp/New${i}.pdf`]);
     pet.selectThread(`a-${i}`);

@@ -27,6 +27,7 @@ final class AppCoordinator {
     @ObservationIgnored private let activationPolicy = AppActivationPolicyCoordinator()
     @ObservationIgnored private var registeredActionShortcutNames: Set<KeyboardShortcuts.Name> = []
     @ObservationIgnored private var showThreadWindowMonitor: Any?
+    @ObservationIgnored private let promptPanelViewModel: PromptPanelViewModel
     @ObservationIgnored private let promptPanelController: any PromptPanelControlling
     @ObservationIgnored private lazy var captureCoordinator = PromptCaptureCoordinator(
         controller: promptPanelController,
@@ -41,6 +42,11 @@ final class AppCoordinator {
         promptPanelController: (any PromptPanelControlling)? = nil
     ) {
         self.services = services
+        self.promptPanelViewModel = PromptPanelViewModel(
+            actions: [],
+            workspaceClient: services.swiftThreadClient as? any WorkspaceManaging,
+            preferences: services.settingsStore
+        )
         self.agentServerHealth = AgentServerHealth(
             appServer: services.appServer,
             fatalAlertPresenter: services.fatalAlertPresenter,
@@ -83,11 +89,13 @@ final class AppCoordinator {
         switch action {
         case .showPromptPanel:
             refreshActionDefinitions()
+            promptPanelViewModel.refreshWorkspaces()
             promptPanelController.show()
         case .hidePromptPanel:
             promptPanelController.hide()
         case .togglePromptPanel:
             refreshActionDefinitions()
+            promptPanelViewModel.refreshWorkspaces()
             promptPanelController.toggle()
         case .submitPrompt(let inputItems, let attachments):
             handleSubmitPrompt(inputItems, attachments: attachments)
@@ -116,7 +124,7 @@ final class AppCoordinator {
         AgentTriggerSettingsViewModel(
             store: services.agentTriggerStore,
             runtime: services.agentTriggerRuntime,
-            petClient: services.swiftThreadClient as? any PetManaging
+            workspaceClient: services.swiftThreadClient as? any WorkspaceManaging
         )
     }
 
@@ -125,6 +133,7 @@ final class AppCoordinator {
     }
 
     private func setupPromptPanel() {
+        promptPanelController.configure(viewModel: promptPanelViewModel)
         promptPanelController.updateTheme(services.appearanceThemeService.appTheme)
         refreshActionDefinitions()
         promptPanelController.onSubmit = { [weak self] inputItems, attachments in
@@ -162,6 +171,7 @@ final class AppCoordinator {
             guard let self else { return }
             self.promptPanelController.setSubmissionEnabled(available, message: message)
             if available {
+                self.promptPanelViewModel.refreshWorkspaces()
                 try? self.services.threadWindowCommandClient.sendThemeChanged(
                     self.services.appearanceThemeService.currentTheme
                 )
@@ -208,10 +218,17 @@ final class AppCoordinator {
             return
         }
 
-        guard let prompt = PromptSubmission.compose(
+        guard var prompt = PromptSubmission.compose(
             inputItems: inputItems,
             attachments: attachments
         ) else { return }
+        guard !promptPanelViewModel.selectedWorkspaceId.isEmpty else {
+            promptPanelViewModel.showWorkspaceRequired()
+            promptPanelViewModel.refreshWorkspaces()
+            promptPanelController.show()
+            return
+        }
+        prompt.targetWorkspaceId = promptPanelViewModel.selectedWorkspaceId
         promptPanelController.hide(restoringFocus: false)
 
         if let swiftThreadClient = services.swiftThreadClient {
@@ -296,7 +313,7 @@ final class AppCoordinator {
     }
 
     private func handleThreadWindowOpenFailure(_ message: String) {
-        promptPanelController.setSubmissionEnabled(false, message: message)
+        promptPanelViewModel.showSubmissionError(message)
         promptPanelController.show()
     }
 

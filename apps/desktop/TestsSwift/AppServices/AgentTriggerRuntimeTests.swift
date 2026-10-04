@@ -19,7 +19,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 promptTemplate: "Summarize bookmark",
                 deliveryPolicy: .default,
                 notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             ),
             AgentTriggerInstance(
                 id: "daily-study",
@@ -33,7 +33,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 promptTemplate: "Run scheduled task",
                 deliveryPolicy: .default,
                 notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             ),
         ]))
 
@@ -69,7 +69,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 promptTemplate: "Summarize bookmark",
                 deliveryPolicy: .default,
                 notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             )
         ]))
 
@@ -124,7 +124,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 promptTemplate: "Read {{title}} at {{url}} from {{folderId}}",
                 deliveryPolicy: .default,
                 notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             )
         ]))
 
@@ -157,7 +157,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
 
         wait(for: [submitted], timeout: 1.0)
         XCTAssertEqual(prompts.count, 1)
-        XCTAssertEqual(prompts.first?.targetPetId, "pet-test")
+        XCTAssertEqual(prompts.first?.targetWorkspaceId, "workspace-test")
         guard case .text(_, let text) = prompts.first?.userInput.items.first else {
             return XCTFail("Expected text input item")
         }
@@ -181,7 +181,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
                 promptTemplate: "Summarize {{url}}",
                 deliveryPolicy: .default,
                 notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             )
         ]))
 
@@ -219,7 +219,7 @@ final class AgentTriggerRuntimeTests: XCTestCase {
 
         wait(for: [submitted], timeout: 1.0)
         XCTAssertEqual(prompts.count, 1)
-        XCTAssertEqual(prompts.first?.targetPetId, "pet-test")
+        XCTAssertEqual(prompts.first?.targetWorkspaceId, "workspace-test")
         guard case .text(_, let text) = prompts.first?.userInput.items.first else {
             return XCTFail("Expected text input item")
         }

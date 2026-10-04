@@ -11,7 +11,7 @@ describe("ThreadPersistence", () => {
       () => "2026-05-17T00:00:00.000Z",
     );
 
-    const Thread = await persistence.createThread({ petId:(persistence as any).store.listPets().find((pet: {name:string}) => pet.name === "测试宠")!.id, preview: "测试 thread" });
+    const Thread = await persistence.createThread({ workspaceId:(persistence as any).store.listWorkspaces()[0].id, preview: "测试 thread" });
     expect(Thread.metadata.preview).toBe("测试 thread");
 
     await persistence.renameThread(Thread.metadata.id, "新预览");
@@ -30,7 +30,7 @@ describe("ThreadPersistence", () => {
         updatedAt: "2026-05-17T00:00:00.000Z",
         messageCount: 1,
         status: "idle",
-        petId: expect.any(String), petSnapshot:expect.objectContaining({rolePrompt:"测试助手"}),workspaceId:Thread.metadata.workspaceId,rootPath:Thread.metadata.rootPath,
+        workspaceId:Thread.metadata.workspaceId,rootPath:Thread.metadata.rootPath,
       },
     ]);
 
@@ -313,13 +313,13 @@ describe("ThreadPersistence", () => {
 
 function testStore(now: () => string): ThreadStore {
   const store = new ThreadStore({ dbPath: ":memory:", now });
-  store.createPet({name:"测试宠",rolePrompt:"测试助手",imageRef:{type:"builtin",id:"yachiyo"},rootPath:"/tmp"});
+  store.createWorkspace("/tmp");
   return store;
 }
 
 async function createFixture(persistence: ThreadPersistence, id: string) {
   const store = (persistence as unknown as { store: ThreadStore }).store;
-  await store.createThread({ threadId: id,petId:store.listPets().find(pet=>pet.name === "测试宠")!.id });
+  await store.createThread({ threadId: id,workspaceId:store.listWorkspaces()[0].id });
   await store.persistThread(id);
   await persistence.ensureThread(id);
 }

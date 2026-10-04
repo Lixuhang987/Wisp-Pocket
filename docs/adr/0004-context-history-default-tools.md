@@ -8,9 +8,9 @@
 
 仅桌宠将 PDF、图片等文件输入改为提交原文件路径，由 LLM 按需调用默认开放的 `file.read` 取得实际内容，后端删除原 `inspect` 自动预读。新读取实现直接替换旧 Workspace 文本工具，首版允许任意路径，无需 Workspace 或 Permission 确认。用户原文件不复制；每次读取取得路径当前内容，修改后读最新内容，移动、删除或无法访问时报错。已读取结果仍按 Thread 历史机制保存，不得由输入路径直接宣称已读取内容。
 
-[多桌宠规格](../medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)采用本读取 / 输入规则。当前目录归属已沿 [ADR 0006](./0006-workspace-pet-separation.md) 拆分：Workspace 的固定 rootPath 是相对路径基准和内置写入边界，不限制 file.read 的任意路径读取；Pet 固定引用项目，Thread 保存双归属和角色快照，不存文件根快照。桌宠本期不接收截图或剪贴板图片，不增加原文件变更监控或失效恢复。原生行为及真实模型理解仍须实机验证。
+[多桌宠规格](../medium-powers/specs/multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)采用本读取 / 输入规则。当前目录归属按 [ADR 0007](./0007-frontend-pet-workspace-threads.md) 实现：Workspace 的固定 rootPath 是相对路径基准和内置写入边界，不限制 file.read 的任意路径读取；Thread 只归属 Workspace，不保存 Pet 身份、角色或文件根快照；Pet 可在前端重新安排。桌宠本期不接收截图或剪贴板图片，不增加原文件变更监控或失效恢复。原生行为及真实模型理解仍须实机验证。
 
-2026-10-03 用户修订覆盖原先桌宠路径使用 text 的决定：`InputItem.pdf` 替换为 `file_reference`，桌宠用结构化原路径引用，两端历史按文件名卡片呈现；持久化不存副本，模型输入仍是路径文字。此身份贯穿 pending、live 与恢复，避免把展示文案当协议。其他输入前端的资料交付方式保持；合并实现的 Issue #7 同步必要 Pet 协议、Settings 管理和 AgentTrigger 目标归属。PromptPanel 的截图仍按当前图片 bytes/Blob 链路进入模型，保留其现有输入协议和临时文件生命周期。共享后端统一工具规则不意味着统一所有前端的资料交付方式。宿主设置呈现真实采集状态，Pet 管理范围由 Issue #7 规定。
+2026-10-03 用户修订覆盖原先桌宠路径使用 text 的决定：`InputItem.pdf` 替换为 `file_reference`，桌宠用结构化原路径引用，两端历史按文件名卡片呈现；持久化不存副本，模型输入仍是路径文字。此身份贯穿 pending、live 与恢复，避免把展示文案当协议。其他输入前端的资料交付方式保持；合并实现的 Issue #7 同步必要 Pet 协议、Settings 管理和 AgentTrigger 目标归属。PromptPanel 的截图仍按当前图片 bytes/Blob 链路进入模型，保留其现有输入协议和临时文件生命周期。共享后端统一工具规则不意味着统一所有前端的资料交付方式。宿主设置呈现真实采集状态，Pet 前端管理与 Workspace 接续范围由 Issue #9 规定。
 
 移除 Context History 的采集开关，采集随 Swift Host 应用生命周期常驻运行。保留期限和自动删除后续单独设计，不在本次实现。常驻描述应用运行期间的采集生命周期，不改变 macOS 系统权限要求。采集失败或缺少权限时保留已有历史查询能力，在设置中明确展示失败与缺失权限。
 

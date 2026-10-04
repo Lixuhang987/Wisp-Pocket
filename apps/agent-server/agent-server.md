@@ -17,11 +17,11 @@
 | `/api/dynamic-tools` | Swift Host / Provider | Dynamic Tool 注册与调用 |
 | `/api/settings/*` | Electron 设置 | 模型、builtin Tool、MCP 与永久 Permission 的 HTTP 管理 |
 
-三条 socket 与 HTTP 设置接口语义隔离；不要用 Dynamic Tool 通道承载 UI 请求，也不要在 Activity 中复制 Thread 内容。Workspace/Pet 管理继续走 `/api/thread`。
+三条 socket 与 HTTP 设置接口语义隔离；不要用 Dynamic Tool 通道承载 UI 请求，也不要在 Activity 中复制 Thread 内容。Workspace 管理继续走 `/api/thread`。
 
 ## 组合边界
 
-- `startDefaultServer` 创建设置接口、LLM、Workspace/Pet 注册表、Permission、Blob、MCP、Tool registry、ThreadStore、ThreadRegistry 和三条 socket 通道。
+- `startDefaultServer` 创建设置接口、LLM、Workspace 注册表、Permission、Blob、MCP、Tool registry、ThreadStore、ThreadRegistry 和三条 socket 通道。
 - ThreadRegistry / Thread 是运行中及空闲 Thread 的唯一 owner；公开输入经 `op.submit`，UI 回执经连接资格检查后交给所属 Thread 的待答请求。
 - 本包注入协议翻译与持久化适配，由 core Thread 决定何时翻译、保存和发布运行结果；UI 不直接看到 runtime event。
 - Dynamic Tool spec 可随 Thread 持久化，实际调用按 `clientId` 转发给在线 Provider。
@@ -30,7 +30,7 @@
 ## 本地数据
 
 - `~/.spotAgent/settings.json`：模型与 Tool 设置。
-- `~/.spotAgent/threads.sqlite`：Workspace/Pet 配置、受管图片引用与 Thread rollout。
+- `~/.spotAgent/threads.sqlite`：Workspace 配置与 Thread rollout。
 - `~/.spotAgent/mcp.json`：全局 MCP 配置。
 - Workspace 固定文件根、Permission、Blob 与日志路径由对应 src 子模块文档说明。Swift 外观使用独立 `native-preferences.json`，不写后端配置镜像。
 

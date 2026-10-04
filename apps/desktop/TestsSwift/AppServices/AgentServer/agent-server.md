@@ -2,7 +2,7 @@
 
 ## 直接文件
 
-- `AppServerConnectionTests.swift`：连接、Provider hello/调用，以及 Swift 首轮 petId / 工具 metadata、默认宠查询与图片输入。
+- `AppServerConnectionTests.swift`：连接、Provider hello/调用，以及 Swift 首轮 workspaceId / 工具 metadata、通用工作区查询与图片输入。
 - `AgentServerHealthTests.swift`：可用性与错误回调。
 - `AgentServerRuntimeModeTests.swift`：生产/测试运行模式选择。
 

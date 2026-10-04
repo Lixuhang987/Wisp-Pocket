@@ -1,11 +1,11 @@
 # activity-window
 
-本目录是[桌宠](../../../desktop/CONTEXT.md)的 React renderer。每窗永久绑定一个 `petId`，独立创建 Thread store、输入控制器与 socket；业务配置和正式历史仍由共享后端拥有。
+本目录是[桌宠](../../../desktop/CONTEXT.md)的 React renderer。每窗永久绑定一个 `petId`，独立创建 Thread store、输入控制器与 socket；Pet 资料、关联与几何由 Electron main 的前端 store 拥有，正式历史仍由共享后端拥有。
 
 ## 直接子节点
 
 - `App.tsx`：角色点击、hover、两处 drop、当前回复、历史弹层与原生窗口桥接。
-- `PetManager.tsx`：接入 [共享伙伴表单](../../../thread-window-web/src/src.md)，与 Electron 设置使用同一名称、描述、角色、图片、默认项、显示隐藏与 revision 规则。
+- `PetManager.tsx`：接入 [共享伙伴表单](../../../thread-window-web/src/src.md)，与 Electron 设置使用同一资料、受管图片、显示隐藏、工作区分配与 revision 规则。
 - `PetConversation.tsx`：紧凑最新正文/建议、hover 全部当前 Thread 消息与 Permission。
 - `PetMarkdown.tsx`：助手 Markdown 正文与资源/链接展示边界。
 - `PetReply.tsx`：固定输入、文件 chip、底部图标行、发送/停止与 IME Enter 边界。
@@ -18,22 +18,21 @@
 
 ## 身份、导航和接收
 
-- 配置从 `pet.listed/created/updated` 投影；不把业务配置写入 localStorage。Pet 固定归属 Workspace，目录由项目派生，Thread 保留角色快照；实际目录消费后端身份字段，不能从前端路径猜归属。
-- 完整 `pet.listed` 清理失效 Pet 的本地草稿和大小偏好，保留有效项；带 workspaceId 的局部列表不能清理全局身份。窗口与路由的对账由 main 管理，目录访问失败不等于身份删除。
-- 启动恢复本宠上次选择，首次无偏好时选本宠最近更新的历史且仅显示角色；后续只有明确选择、新话题或本界面主动创建确认能改变选择。后台 Thread 不抢草稿/焦点。选择可能在后续分页中，第一页缺失不能视为删除；resume 明确返回 not_found 后才清理其草稿并回到本宠历史或空态。
-- 文字与待发送文件路径按 `(petId, threadId 或 new)` 保存，大小、选择与点击显隐也按 petId 隔离。保存失败显示原因并保留内存输入；这些偏好不是后端消息或执行队列。
+- Pet 配置和当前 workspaceId / threadId 从 [前端伙伴桥](../../../thread-window-web/src/src.md) 查询与订阅；renderer 不再接收后端 Pet 协议，也不持久化当前 Thread 选择。null 表示准备新话题，不能自动选择项目最近历史。
+- 历史按当前 Workspace 查询；切项目更新 socket 查询作用域而不关闭连接，旧 Thread 的在途输入与执行继续。明确选历史、新话题与首发创建确认均经过 main 的唯一分配入口；失败显示错误并保留原关联。首发使用 expected 原关联与 activate:false，main 在异步检查后拒绝较新导航 / 显隐操作已替换的分配，避免旧确认覆盖用户选择。后台新建不自动切换当前 Thread。
+- 文字与待发送文件路径按 `(petId, threadId 或 new)` 保存，点击对话显隐也按 petId 隔离；伙伴大小与实际显示由 main 保存。保存失败显示原因并保留内存输入；这些偏好不是后端消息或执行队列。
 - 打开空回复框不创建历史，第一次发送才创建 Thread。`thread.started` 仅确认创建；`user.message.recorded` 或 snapshot 中相同 opId 的真实记录才确认接收。创建/接收失败保留输入，确认不清除后来编辑的草稿。
-- 未确认提交的 commandId/opId、路径与已创建 Thread 关系随界面偏好保存；重试相同输入沿用身份，不新建重复 Thread。后端仍负责执行去重、持久化和排队。
+- 未确认提交的 commandId/opId、路径、已创建 Thread 关系与导航代次随界面偏好保存；初始化不推进代次，用户导航在分配前保存新代次，确保重建不会使已撤销的旧确认重新匹配；重试相同输入沿用身份，不新建重复 Thread。后端仍负责执行去重、持久化和排队。
 - 角色 drop 新建本宠 Thread，对话区 drop 追加松手时的 Thread；App 在异步处理前捕获目标和提交身份，切历史/收起不能改投。没有当前 Thread 的追加明确失败。
 - 原文件只通过 `file_reference` Input Item 交付绝对路径及文件名，preload 使用 Electron `webUtils.getPathForFile` 取得真实路径。无路径图片明确失败；模型读取由默认 `file.read` 决定，不自动预读、上传或复制用户资料。用户附件消息按结构化项显示图标和文件名，不显示完整路径或翻译后的模型文字；pending、live 与恢复一致。协议与转换见 [core](../../../../packages/core/src/protocol/protocol.md) 和 [agent-server](../../../agent-server/src/protocol/protocol.md)。
-- 角色图片导入是另一条管理流程：PNG/JPEG/WebP bytes 发送 `pet.image.import`，后端验证后保存受管副本；renderer 经 Blob 只读 URL 展示。
-- Permission 回答使用 ClientResponse，建议和回复使用普通 UserInput；后端仲裁首个有效回执。隐藏宠收到有效 Permission 可以显示，但不切换当前 Thread、不聚焦。
+- 角色图片导入是另一条管理流程：PNG/JPEG/WebP bytes 交付前端导入桥，main 保存受管副本；renderer 使用返回的只读 URL 展示，不调用后端 Pet API。
+- Permission 回答使用 ClientResponse，建议和回复使用普通 UserInput；后端仲裁首个有效回执。当前已关联 Thread 的有效 Permission 可揭示对话而不聚焦；跨入口或其他 Thread 的伙伴承接由 main 统一分配，renderer 不按整个项目历史自行召回。
 
 ## Surface 和原生边界
 
 - 点击角色显示并聚焦输入，再点隐藏；仅 hover 对话区展开全部当前 Thread 历史，移出立即收起，输入节点/焦点/草稿保持。历史与伙伴弹层只管理选择/配置，不锁定消息浏览。回复框聚焦不绘制轮廓，仍保留光标与输入焦点；按钮键盘焦点提示和 drop 高亮独立保留。
 - 选择文件只添加到选择开始时的草稿，不创建 Thread 或提交；文件名 chip 可移除。发送将文字和结构化文件引用一次提交，持久 ACK 按提交文件 id 清理，期间新增资料和新编辑文字保留；失败可重试，建议文字不消耗待发送资料。新建对话图标只导航 new 并聚焦。
-- 角色周围不设常驻管理入口；伙伴、对话、隐藏与大小调节仅在角色右键菜单中提供，菜单支持方向键、Escape、外部点击及失焦关闭。菜单显隐不改变逐宠对话显隐恢复与角色点击语义。当前对话不显示身份标题气泡、创建时名字/版本或原角色提示；角色快照继续由后端保存。不展示根目录或路径 title，固定目录在伙伴管理 / Settings 中查看。
+- 角色周围不设常驻管理入口；伙伴、工作区对话、选择工作区、当前工作区唤出新伙伴、隐藏与大小调节在角色右键菜单中提供，菜单支持方向键、Escape、外部点击及失焦关闭。菜单显隐不改变逐宠对话显隐恢复与角色点击语义。当前对话不显示身份标题气泡、名字/版本或角色提示标题。角色提示只在新话题首发作为普通 skill Input Item 注入，并随稳定 submission 保存以支持重建重试；旧话题不重新注入。不展示根目录或路径 title，项目目录在 Workspaces 中查看。
 - 显示对话后常态呈现最新非空 assistant 正文与当前建议；消息保持底部对齐、统一滚动；整个 composer 留在其外，底部工具行固定，文件 chip 限高滚动；紧凑高度测量包括所有 composer 内容。工具过程保持在完整 ThreadWindow。
 - 助手正文按 Markdown / GFM 呈现，常态限制为约三行正文的高度预算（块间距也占用预算），hover 查看全文；用户正文优先从结构化 text / text_selection / skill 提取并按原文显示，其中用户主动输入的路径仍是文字；`file_reference` 仅显示文件卡片，不拼入模型路径摘要。没有结构化项时保留原 text 回显；状态、错误、建议和 Permission 不参与 Markdown 解析。代码长行及表格单元格折行，不增加内嵌纵向滚动；任务复选框只读，流式未闭合语法按当前增量解析。原始 HTML 只显示文字，Markdown 图片只显示替代文字（无替代文字时显示“图片”），不自动加载资源；此限制不改变用户主动交付的图片附件展示。仅绝对 HTTP/HTTPS 链接可点击，由 [窗口控制器](../main/windows/windows.md) 再校验并交给系统浏览器，不能导航桌宠页面。
 - 逐窗命中使用实际 DOM 矩形，上方历史按浏览视口裁剪；角色、回复框和弹层各自上报。布局槽位和锚点来自 [共享布局](../src.md)，透明空白穿透仍由 main 决定。

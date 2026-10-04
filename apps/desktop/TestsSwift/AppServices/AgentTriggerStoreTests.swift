@@ -85,7 +85,7 @@ final class AgentTriggerStoreTests: XCTestCase {
             promptTemplate: "Keep me.",
             deliveryPolicy: .default,
             notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
         )
         let removed = AgentTriggerInstance(
             id: "to-remove",
@@ -96,7 +96,7 @@ final class AgentTriggerStoreTests: XCTestCase {
             promptTemplate: "Drop me.",
             deliveryPolicy: .default,
             notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
         )
         XCTAssertTrue(store.saveInstances([kept, removed]))
 
@@ -122,7 +122,7 @@ final class AgentTriggerStoreTests: XCTestCase {
                 promptTemplate: "Summarize this bookmark.",
                 deliveryPolicy: .default,
                 notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             ),
             AgentTriggerInstance(
                 id: "daily-study",
@@ -136,7 +136,7 @@ final class AgentTriggerStoreTests: XCTestCase {
                 promptTemplate: "Start the daily study routine.",
                 deliveryPolicy: .default,
                 notificationPolicy: .default,
-                targetPetId: "pet-test"
+                targetWorkspaceId: "workspace-test"
             ),
         ]
 

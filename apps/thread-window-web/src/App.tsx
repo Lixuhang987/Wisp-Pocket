@@ -34,9 +34,7 @@ export function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [deleteTargetThreadId, setDeleteTargetThreadId] = useState<string | null>(null);
   const [newThreadWorkspaceId, setNewThreadWorkspaceId] = useState<string | null>(null);
-  const [newThreadPetId, setNewThreadPetId] = useState("");
   const workspaces = createThreadWindowStore(state=>state.workspaces);
-  const pets = createThreadWindowStore(state=>state.pets);
   const [showNewThread, setShowNewThread] = useState(false);
   const sidebarLayout = useSidebarLayout();
 
@@ -112,7 +110,6 @@ export function App() {
 
   const handleNewThread = (workspaceId?: string) => {
     setNewThreadWorkspaceId(workspaceId ?? workspaces[0]?.id ?? null);
-    setNewThreadPetId("");
     setShowNewThread(true);
   };
 
@@ -124,7 +121,7 @@ export function App() {
 
     pendingSelectionCommandsRef.current.add(commandId);
     try {
-      client.sendRaw(encodeThreadStart({ commandId, timestamp, workspaceId: newThreadWorkspaceId, ...(newThreadPetId ? {petId:newThreadPetId} : {}) }));
+      client.sendRaw(encodeThreadStart({ commandId, timestamp, workspaceId: newThreadWorkspaceId }));
       setShowNewThread(false);
     } catch (error) {
       pendingSelectionCommandsRef.current.delete(commandId);
@@ -180,14 +177,11 @@ export function App() {
             <AlertDialog.Overlay className="fixed inset-0 z-20 bg-app-canvas/55 backdrop-blur-sm" />
             <AlertDialog.Content className="fixed left-1/2 top-1/2 z-20 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border border-app-hairline bg-app-surface-elevated p-lg text-app-text-primary focus:outline-none">
               <AlertDialog.Title className="text-base font-medium">新建对话</AlertDialog.Title>
-              <AlertDialog.Description className="my-sm text-sm text-app-text-secondary">选择项目，可指定伙伴或随机分配。</AlertDialog.Description>
-              <label className="block text-sm">项目<select aria-label="项目" className="my-xs w-full rounded-md border border-app-hairline bg-app-canvas p-xs" value={newThreadWorkspaceId??""} onChange={e=>{setNewThreadWorkspaceId(e.target.value);setNewThreadPetId("");}}>
+              <AlertDialog.Description className="my-sm text-sm text-app-text-secondary">选择项目，在独立对话中继续工作。</AlertDialog.Description>
+              <label className="block text-sm">项目<select aria-label="项目" className="my-xs w-full rounded-md border border-app-hairline bg-app-canvas p-xs" value={newThreadWorkspaceId??""} onChange={e=>setNewThreadWorkspaceId(e.target.value)}>
                 {workspaces.map(workspace=><option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
               </select></label>
-              <label className="block text-sm">伙伴<select aria-label="伙伴" className="my-xs w-full rounded-md border border-app-hairline bg-app-canvas p-xs" value={newThreadPetId} onChange={e=>setNewThreadPetId(e.target.value)}>
-                <option value="">随机分配</option>{pets.filter(pet=>pet.workspaceId===newThreadWorkspaceId).map(pet=><option key={pet.id} value={pet.id}>{pet.name}</option>)}
-              </select></label>
-              {workspaces.length===0 && <p className="text-sm text-app-text-secondary">请先在设置中添加伙伴和项目。</p>}
+              {workspaces.length===0 && <p className="text-sm text-app-text-secondary">请先在设置中添加项目。</p>}
               <div className="mt-md flex justify-end gap-xs"><AlertDialog.Cancel className="rounded-md border border-app-hairline px-sm py-xs">取消</AlertDialog.Cancel><button disabled={!newThreadWorkspaceId} onClick={createNewThread} className="rounded-md bg-app-accent px-sm py-xs text-app-on-accent disabled:opacity-50">创建对话</button></div>
             </AlertDialog.Content>
           </AlertDialog.Portal>

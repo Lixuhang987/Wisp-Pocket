@@ -57,19 +57,28 @@ final class AppCoordinatorTests: XCTestCase {
     func testSubmitPromptUsesSwiftThreadClientBeforeOpeningThreadWindow() async throws {
         let threadClient = RecordingSwiftThreadClient(threadId: "thread-123")
         let windowClient = RecordingThreadWindowCommandClient()
+        let panel = RecordingPromptPanelController()
         let coordinator = AppCoordinator(
             services: electronServices(
                 commandClient: windowClient,
                 swiftThreadClient: threadClient
-            )
+            ),
+            promptPanelController: panel
         )
 
         coordinator.send(.submitPrompt(promptItems("hello"), attachments: []))
         try await Task.sleep(for: .milliseconds(10))
 
         XCTAssertEqual(threadClient.submittedPrompts.map(\.textContent), ["hello"])
+        XCTAssertEqual(threadClient.submittedPrompts.first?.targetWorkspaceId, "workspace-test")
         XCTAssertTrue(windowClient.openedPrompts.isEmpty)
         XCTAssertEqual(windowClient.focusedThreadIDs, ["thread-123"])
+        windowClient.complete(commandId: "focus-1", kind: .focus, ok: false, error: "window unavailable")
+        XCTAssertFalse(panel.viewModel?.isSubmissionInputDisabled ?? true)
+        panel.viewModel?.draft = "next task"
+        panel.viewModel?.submit()
+        try await Task.sleep(for: .milliseconds(10))
+        XCTAssertEqual(threadClient.submittedPrompts.map(\.textContent), ["hello", "next task"])
         _ = coordinator
     }
 
@@ -471,6 +480,7 @@ private func electronServices(
     terminateApplication: @escaping @MainActor () -> Void = {}
 ) -> AppServices {
     let settingsStore = AgentSettingsStore(homeDirectoryURL: TestFiles.makeTemporaryHomeDirectory())
+    settingsStore.updatePromptWorkspace("workspace-test")
     return AppServices(
         appServer: appServer,
         threadWindowCommandClient: commandClient,
@@ -495,18 +505,22 @@ private final class RecordingPromptPanelController: PromptPanelControlling {
     var onDidShow: (() -> Void)?
     var onDidHide: (() -> Void)?
     var isVisible = false
+    private(set) var viewModel: PromptPanelViewModel?
     private(set) var hideCalls: [Bool] = []
 
     init(recordEvent: @escaping (String) -> Void = { _ in }) {
         self.recordEvent = recordEvent
     }
 
-    func configure(viewModel: PromptPanelViewModel) {}
+    func configure(viewModel: PromptPanelViewModel) {
+        self.viewModel = viewModel
+        viewModel.onSubmit = { [weak self] items, attachments in self?.onSubmit?(items, attachments) }
+    }
     func updateTheme(_ theme: AppTheme) {}
     func register(actions: [ActionDefinition]) {}
     func appendAttachment(_ attachment: PromptAttachmentResult) {}
     func selectActionAndShow(_ action: ActionDefinition) {}
-    func setSubmissionEnabled(_ enabled: Bool, message: String?) {}
+    func setSubmissionEnabled(_ enabled: Bool, message: String?) { viewModel?.setSubmissionEnabled(enabled, message: message) }
 
     func show() {
         isVisible = true

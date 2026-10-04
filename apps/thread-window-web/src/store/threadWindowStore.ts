@@ -27,7 +27,6 @@ export type ThreadWindowState = Omit<ThreadWindowProjection, "threadsById"> & In
   enqueueInitialPrompt(prompt: InitialPromptPayload): void;
   ensureThreadState(threadId: string): void;
   resolvePermissionRequest(requestId: string): void;
-  setPets(pets: ThreadWindowProjection["pets"]): void;
   handleNotification(notification: ThreadNotification): void;
   handleRequest(request: ServerRequest): void;
 };
@@ -48,16 +47,11 @@ return create<ThreadWindowState>()(persist((set) => ({
   threadsById: {},
   pendingInitialPrompts: {},
   processedNotificationIds: {},
-  pets: [],
   workspaces: [],
   ...createWindowPreferences(set),
 
   setConnectionState(state) {
     set({ connectionState: state });
-  },
-
-  setPets(pets) {
-    set({ pets });
   },
 
   enqueueInitialPrompt(prompt) {
@@ -83,7 +77,7 @@ return create<ThreadWindowState>()(persist((set) => ({
       if (notification.type === "thread.started") {
         thread = draft.threadsById[notification.threadId] ??= emptyThreadState(notification.threadId, notification.payload.preview);
         thread.workspaceId = notification.payload.workspaceId;
-        thread.petId = notification.payload.petId; thread.petRevision = notification.payload.petRevision; thread.rootPath = notification.payload.rootPath;
+        thread.rootPath = notification.payload.rootPath;
       } else if (notification.type === "request.resolved") {
         thread = draft.threadsById[notification.threadId];
       } else if ("threadId" in notification && notification.threadId) {

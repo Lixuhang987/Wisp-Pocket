@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- `SettingsApp.tsx`：独立设置 renderer，显式模型 / MCP / Pet 保存与即时工具 / 权限操作。
+- `SettingsApp.tsx`：独立设置 renderer，模型 / MCP 显式保存、前端伙伴管理与工作区历史入口。
 - `App.tsx`：连接 socket、store 与当前展示 Thread 的根编排。
 - `components/`：项目历史侧栏、消息、Composer、请求面板与两处界面共享的伙伴编辑表单。
 - `native/`：读取 preload 配置和主题，接收 fallback initial prompt 与明确目标 Thread 的打开请求。
@@ -17,7 +17,7 @@
 
 ## 状态所有权
 
-- store factory 为每个界面创建独立 UI 投影，持有 `threadsById`、历史、请求、Workspace / Pet 列表、连接状态和窗口错误；后端 Thread 是权威真源。
+- store factory 为每个界面创建独立 UI 投影，持有 `threadsById`、历史、请求、Workspace 列表、连接状态和窗口错误；后端 Thread 是权威真源。
 - 当前右侧展示的 `activeThreadId` 与待确认选择记录由 `App` 拥有，不进入 store；选择记录按创建 commandId 关联，既有首轮 payload 仍只登记在 store。
 - socket client 只负责收发、传输缓冲和协议回调；输入控制器统一首轮关联及 ThreadWindow Composer 提交，状态修改经 store 公共 action。
 - Permission request 按 Thread 保存；snapshot 恢复请求，`request.resolved`、Turn 终态或 Thread error 清理失效展示。两端回执只由服务端仲裁一次。
@@ -43,6 +43,7 @@
 
 ## 设置与伙伴编辑
 
-- AI、Agent、Pets 使用同一暖色 token；模型、MCP 和伙伴草稿留在各组件内，切页与输入变化不触发保存。失败保留字段与错误；重复打开的窗口由 Electron 聚焦，不重建 renderer。
+- AI、Agent、Pets、Workspaces 使用同一暖色 token；模型、MCP 和伙伴草稿留在各组件内，切页与输入变化不触发保存。失败保留字段与错误；重复打开的窗口由 Electron 聚焦，不重建 renderer。
 - 设置 HTTP 地址从既有 Thread URL 的 origin 派生，前端只提交可编辑模型字段，后端合并保留未展示字段；API Key 使用密码输入。MCP 保存只表达配置已保存，连接在服务下次启动时读取。
-- `components/PetManager.tsx` 由设置与桌宠消费，二者通过同一个后端 command / revision 合同编辑描述、角色、图片、默认项；项目位置编辑时只读。受控图片 / 目录 picker 和逐宠显示隐藏由 preload 提供，业务文件写入留给后端。
+- 伙伴资料类型与桥在 `native/petTypes.ts` / `native/settingsBridge.ts` 拥有，与后端 Thread DTO 隔离。设置和桌宠通过同一前端桥保存资料与受管图片、订阅伙伴变化；默认标记只用于初始化，不提供编辑入口。新伙伴加入隐藏库存，无需目录。
+- 伙伴两级选择先选工作区、再选历史或新话题；确定后才调用 assignPet，取消不变，失败保留选择。内部首发接续可传 expected 原关联及 activate:false，由 main 对异步检查和可见性作统一仲裁。可见伙伴占用由 main 原子拒绝；表单不自行解除其他关联。Workspaces 的通用打开与随机召唤也由同一 main 分配入口处理，准备新话题不创建后端 Thread。

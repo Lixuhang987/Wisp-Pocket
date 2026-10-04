@@ -43,7 +43,7 @@ enum PromptInputItem: Encodable, Equatable {
 struct PromptSubmission {
     let userInput: PromptUserInput
     let summary: String
-    var targetPetId: String? = nil
+    var targetWorkspaceId: String? = nil
 
     var socketAttachments: [UserMessageAttachmentPayload] {
         userInput.items.compactMap { item in

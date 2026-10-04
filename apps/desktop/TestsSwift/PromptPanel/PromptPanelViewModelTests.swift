@@ -21,8 +21,16 @@ final class PromptPanelViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testSubmitCallsOnSubmitWithTextItemArray() {
-        let vm = PromptPanelViewModel(actions: makeTestActions())
+    func testSubmitCallsOnSubmitWithTextItemArray() async {
+        let home = TestFiles.makeTemporaryHomeDirectory()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let preferences = AgentSettingsStore(homeDirectoryURL: home)
+        let client = PromptWorkspaceClient()
+        let vm = PromptPanelViewModel(actions: makeTestActions(), workspaceClient: client, preferences: preferences)
+        vm.refreshWorkspaces()
+        for _ in 0..<50 where vm.workspaces.isEmpty { await Task.yield() }
+        XCTAssertEqual(vm.selectedWorkspaceId, "workspace-first")
+        vm.selectedWorkspaceId = "workspace-second"
         var submitted: [PromptPanelComposerItem] = []
         vm.onSubmit = { items, _ in submitted = items }
 
@@ -31,6 +39,13 @@ final class PromptPanelViewModelTests: XCTestCase {
 
         XCTAssertEqual(texts(in: submitted), ["  hello world  "])
         XCTAssertEqual(vm.draft, "")
+        let restored = PromptPanelViewModel(actions: [], workspaceClient: client,
+            preferences: AgentSettingsStore(homeDirectoryURL: home))
+        restored.refreshWorkspaces()
+        for _ in 0..<50 where restored.workspaces.isEmpty { await Task.yield() }
+        XCTAssertEqual(restored.selectedWorkspaceId, "workspace-second")
+        restored.resetForNewThread()
+        XCTAssertEqual(restored.selectedWorkspaceId, "workspace-second")
     }
 
     @MainActor
@@ -278,5 +293,15 @@ final class PromptPanelViewModelTests: XCTestCase {
             if case .skill(let item) = $0 { return item }
             return nil
         }
+    }
+}
+
+@MainActor
+private final class PromptWorkspaceClient: WorkspaceManaging {
+    func workspaceCommand(_ type: String, payload: [String: Any]?) async throws -> [String: Any] {
+        ["workspaces": [
+            ["id": "workspace-first", "rootPath": "/tmp/first", "name": "First", "createdAt": "2026-10-04T00:00:00Z"],
+            ["id": "workspace-second", "rootPath": "/tmp/second", "name": "Second", "createdAt": "2026-10-04T00:00:00Z"]
+        ]]
     }
 }

@@ -1,13 +1,13 @@
 # Pet 归前端，Thread 仅归属 Workspace
 
-状态：规格已发布（2026-10-04），尚未实现；实施规格见 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，标记 ready-for-agent。目标拟替代 [ADR 0006](./0006-workspace-pet-separation.md) 的 Pet 后端所有权、固定项目归属及 Thread 双归属；ADR 0006 仍描述当前实现。
+状态：已实现（2026-10-04），完整实机待验；规格见 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，检查状态见 [实施记录](../medium-powers/plans/2026-10-04-issue-9-frontend-pet.md)，人工步骤见 [manual QA](../manual-qa.md)。本决策替代 [ADR 0006](./0006-workspace-pet-separation.md) 的 Pet 后端所有权、固定项目归属与 Thread 双归属。
 
 用户希望桌宠是可以被召到不同工作区的前端伙伴，而不是后端任务身份。后端删除 Pet 概念，Thread 仅关联 Workspace；Pet 列表由前端一级 store 管理，包含角色资料、图片、默认标记、时间与版本、Workspace、当前 Thread，以及可见性、位置和大小等界面状态。代价是角色提示的执行语义、多个窗口的共享状态，以及非桌宠入口的任务上下文必须重新确定，不能沿用后端 Pet 注册表隐式解决。
 
 ## 用户已明确的目标
 
 - 启动恢复所有可见 Pet；桌面可见 Pet 均已有固定的当前 Workspace，可有正在接续的 Thread，也可处于新对话空态。
-- Pet 管理页支持新建、修改；“修改工作区”是一级操作。Pet 的当前 Thread 为空表示下一次输入新建对话，“新建对话”清空该关联。
+- Pet 管理页支持新建、修改；“选择工作区”是一级操作。Pet 的当前 Thread 为空表示下一次输入新建对话，“新建对话”清空该关联。
 - Pet 右键提供“唤出新伙伴”：取一个隐藏 Pet，将其 Workspace 改成当前 Pet 的 Workspace，再显示；无库存时提示需要新建。
 - Pet 对话历史按 Workspace 查询，不再仅按 Pet 查询；不同 Thread 的模型历史是否共享不由此推导。
 - Workspace 管理页支持选择文件夹创建 Workspace，并以一级入口随机召来一只隐藏 Pet。
@@ -53,22 +53,22 @@
 - 首版准备十几只内置 Pet 作为库存，其余初始隐藏；用户新建 Pet 默认隐藏且可以未绑定 Workspace。内置库存不意味着自动显示全部伙伴。
 - 第一版不提供 Pet / Workspace 删除；不据此撤销已有 Thread 删除能力。
 
-目标术语由 [Desktop Experience](../../apps/desktop/CONTEXT.md) 的 Pet / 角色提示和 [Conversation Runtime](../../packages/core/CONTEXT.md) 的 Thread / Workspace 分别拥有；词表记录已确定目标，不代表旧实现已迁移。
+规范术语由 [Desktop Experience](../../apps/desktop/CONTEXT.md) 的 Pet / 角色提示和 [Conversation Runtime](../../packages/core/CONTEXT.md) 的 Thread / Workspace 分别拥有。
 
-## 工程方案（已纳入规格，尚未实施）
+## 工程所有权
 
-- Pet 一级 store 由 Electron UI Shell 的 main 统一持有和持久化，设置与宠窗通过 IPC 操作 / 订阅；Electron main 属于前端宿主，不属于 agent-server。Pet 图片导入与受管文件也归前端，不保留后端 Pet 图片表或导入 API。
+- Pet 一级 store 由 Electron UI Shell 的 main 统一持有和持久化，设置与宠窗通过 IPC 操作 / 订阅；Electron main 属于前端宿主，不属于 agent-server。Pet 图片导入与受管 data URL 也归前端，不保留后端 Pet 图片表或导入 API。
 - Pet 列表保留用户要求的身份、名称、描述、rolePrompt、revision、imageRef、isDefault、时间、Workspace / Thread 和显隐 / 位置 / 大小；Workspace / Thread 关联可为空。Thread 消息、运行和请求仍是后端事实，Pet store 不另存权威历史。
 - 所有关联、显隐及转移在同一 store 操作中校验并提交；启动恢复持久状态，初始化幂等，不因重启补出重复伙伴。首轮只通过现有通用 Input Item 承载角色提示，不新增 Pet 字段。
 - PromptPanel 使用独立的 Workspace 选择并记住上次选择；AgentTrigger 配置 Workspace；均不读取 Pet store。ThreadWindow 只清理旧 Pet UI / DTO 依赖，不加入桌面管理流程或选择联动。
-- 不设计旧开发 schema 兼容层；开发和验收使用隔离数据，不把本次重构当作授权清空用户实际目录。旧文件保留，实施时按已有开发 schema 管理方式处理。
+- 不设计旧开发 schema 兼容层；开发和验收使用隔离数据，不把本次重构当作授权清空用户实际目录。旧开发数据库明确拒绝打开并说明隔离数据方式，不自动迁移或清除旧文件。
 
 ## 首版排除与验收
 
 - 草稿转移语义和 Permission 无库存后新增库存的自动重试暂不设计，分别留到 [TODO](../TODO.md)；首版有最小库存不足提示。
 - 验证重点：后端无 Pet 类型 / 表 / 协议 / 身份关联，启动可见集合恢复，自动分配幂等，隐藏关联转移与可见占用拒绝，目录失效、后台任务继续、普通角色输入，以及跨前端 Permission 的单次有效回执。
-- 本轮只完成设计文档，未实现功能，暂无可新增的已实现 manual QA；实施完成后必须更新人工验收与模块现状文档，并按仓库要求独立审核。
+- 自动化用例与窗口替身只证明分配、恢复和协议编排，完整宿主的 picker、焦点、透明命中、多屏与真实模型仍待人工验收。
 
 ## 文档与实施边界
 
-当前产品与 surface 文档继续描述已实现行为；目标术语、决策及 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9) 均描述待实现行为，实施后再替换现状说明。用户已确认以 Electron 前端公开分配 / 恢复 / 承接操作作为主要测试边界，后端公开协议验证执行和请求仲裁；详细用户故事与验收以 GitHub 规格为准，本 ADR 不代表已经通过验收。
+产品、surface 和 owning 模块文档描述当前行为；用户故事和验收要求以 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9) 为准。主要测试边界为 Electron 前端公开分配 / 恢复 / 承接操作，后端公开协议验证执行与请求仲裁；本 ADR 的实现状态不表示已通过实机验收。

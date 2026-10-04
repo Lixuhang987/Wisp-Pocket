@@ -2,7 +2,7 @@
 
 Desktop Experience 描述用户在 macOS 上发起、查看和配置 Agent 工作的产品界面与主动输入边界。
 
-Pet 术语按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 已确认目标更新，尚未实现；旧模型见 [ADR 0006](../../docs/adr/0006-workspace-pet-separation.md)。
+Pet 术语按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 实现；伙伴由 Electron 前端拥有，后端只保存 Workspace 与 Thread。
 
 ## 伙伴
 
@@ -15,7 +15,7 @@ _Avoid_: Workspace、Profile（指代伙伴身份时）、基础 Pet（指代工
 _Avoid_: 正在执行的 Thread（指代前端选择时）
 
 **角色提示**:
-Pet 在新建对话时添加的提示内容；它不建立 Thread 对 Pet 的归属，也不因伙伴之后更换或修改而重新注入既有对话。
+Pet 在新建对话首轮添加的普通用户输入提示，随历史保存；它没有单独 system 优先级，不建立 Thread 对 Pet 的归属，也不因伙伴之后更换或修改而重新注入既有对话。
 _Avoid_: Pet Snapshot（指代后端伙伴身份快照时）
 
 ## Surfaces

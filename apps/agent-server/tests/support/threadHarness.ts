@@ -1,4 +1,4 @@
-import { PetRegistry } from "@handagent/core/pet/PetRegistry.ts";
+import { WorkspaceRegistry } from "@handagent/core/workspace/WorkspaceRegistry.ts";
 import { ThreadRegistry } from "@handagent/core/thread/ThreadRegistry.ts";
 import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
 import { AgentRuntime } from "@handagent/core/runtime/AgentRuntime.ts";
@@ -16,8 +16,8 @@ import type { ServerRequest } from "@handagent/core/protocol/types/ServerRequest
 
 export function threadHarness(client: LLMClientLike, options: Partial<ThreadServices> = {}, dbPath = ":memory:") {
   const store = new ThreadStore({ dbPath });
-  const pet = store.listPets().find(pet => pet.name === "测试宠") ?? store.createPet({name:"测试宠",rolePrompt:"测试助手",imageRef:{type:"builtin",id:"yachiyo"},rootPath:"/tmp"});
-  const pets = new PetRegistry(store);
+  const workspace = store.createWorkspace("/tmp").workspace;
+  const workspaces = new WorkspaceRegistry(store);
   const persistence = new ThreadPersistence(store, undefined, new MemoryBlobStore());
   const events: (ThreadNotification | ServerRequest)[] = [];
   const publisher = new ThreadNotificationPublisher((event) => events.push(event));
@@ -31,8 +31,8 @@ export function threadHarness(client: LLMClientLike, options: Partial<ThreadServ
     stopTimeoutMs: 20,
     ...options,
   });
-  const router = new ThreadCommandRouter(threads, publisher, pets);
-  return { pet, pets, store, persistence, threads, router, publisher, events,
+  const router = new ThreadCommandRouter(threads, publisher, workspaces);
+  return { workspace, workspaces, store, persistence, threads, router, publisher, events,
     async close() { await threads.close(); store.close(); } };
 }
 export function input(text: string) {

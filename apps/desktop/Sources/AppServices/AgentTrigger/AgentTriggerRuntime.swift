@@ -74,7 +74,7 @@ final class AgentTriggerRuntime: AgentTriggerRuntimeReloading, AgentTriggerSubmi
                 .text(id: UUID().uuidString, text: renderedPrompt)
             ]),
             summary: instance.title.isEmpty ? event.summary : instance.title,
-            targetPetId: instance.targetPetId
+            targetWorkspaceId: instance.targetWorkspaceId
         )
     }
 

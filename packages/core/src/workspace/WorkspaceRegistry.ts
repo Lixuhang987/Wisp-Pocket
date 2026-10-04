@@ -1,6 +1,6 @@
 import { mkdir, realpath, stat } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
-import { PetError } from '../pet/Pet.ts';
+import { WorkspaceError } from './Workspace.ts';
 import type { WorkspaceCreation, WorkspaceStorage } from './Workspace.ts';
 
 export class WorkspaceRegistry {
@@ -20,13 +20,13 @@ export class WorkspaceRegistry {
     finally { if (this.creating.get(commandId) === task) this.creating.delete(commandId); }
   }
   private async createNew(rootPath: string, commandId?: string) {
-    if (!isAbsolute(rootPath)) throw new PetError('invalid_input', '项目目录必须是绝对路径');
+    if (!isAbsolute(rootPath)) throw new WorkspaceError('invalid_input', '项目目录必须是绝对路径');
     let canonical: string;
     try {
       await mkdir(rootPath, { recursive: true });
       canonical = await realpath(rootPath);
       if (!(await stat(canonical)).isDirectory()) throw new Error('不是目录');
-    } catch { throw new PetError('invalid_input', '无法使用项目目录'); }
+    } catch { throw new WorkspaceError('invalid_input', '无法使用项目目录'); }
     return this.storage.createWorkspace(canonical, commandId);
   }
 }
