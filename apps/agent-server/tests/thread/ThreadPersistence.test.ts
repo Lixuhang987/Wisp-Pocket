@@ -46,12 +46,15 @@ describe("ThreadPersistence", () => {
     );
 
     await createFixture(persistence, "Thread-attach");
+    const system: AgentMessage = { role: "system", promptSection: "tool-use-policy", content: "工具规则" };
+    await persistence.persistRunDelta("Thread-attach", 0, [system], []);
     await persistence.persistUserMessage("Thread-attach", "解释这段代码", [
       { kind: "text_selection", id: "a", text: "let x = 1" },
     ]);
     await persistence.autoTitle("Thread-attach", "解释这段代码");
 
     expect(await persistence.getMessages("Thread-attach")).toEqual([
+      system,
       {
         role: "user",
         content: "解释这段代码\n\n[选区]\nlet x = 1",
@@ -59,6 +62,7 @@ describe("ThreadPersistence", () => {
     ]);
     const Thread = await persistence.getThread("Thread-attach");
     expect(Thread?.metadata.preview).toBe("解释这段代码");
+    expect(Thread?.metadata.messageCount).toBe(1);
   });
 
   it("leaves an existing preview unchanged on later messages", async () => {

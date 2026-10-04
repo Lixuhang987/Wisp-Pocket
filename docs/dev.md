@@ -68,7 +68,7 @@ env CFFIXED_USER_HOME="$qa_home" HOME="$qa_home" bash ./scripts/swiftw test
 
 ## 代码边界
 
-- 用户主动输入才可进入初始上下文；宿主状态通过 Tool 按需读取。
+- 初始任务资料由用户主动提交；system 规则与时间基准按 [Runtime 合约](../packages/core/src/runtime/runtime.md) 持久化注入。屏幕、剪贴板、文件与应用状态通过 Tool 按需读取。
 - core 不依赖产品 UI 或 macOS；平台能力通过 Dynamic Tool Provider 接入。
 - Tool 名称使用稳定点号形式，输入、输出、Permission 和错误语义必须明确。
 - 视觉常量只修改 `design/tokens.json`，再运行 `pnpm generate:theme-tokens`；桌宠结构与角色图集边界见 [DESIGN.md](../DESIGN.md)。

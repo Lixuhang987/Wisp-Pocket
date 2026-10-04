@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- [2026-10-04-time-context-draft.md](./2026-10-04-time-context-draft.md)：时间上下文、本地证据时间与历史时间过滤讨论草案；推荐语义待用户确认，尚未实现。
+- [2026-10-04-time-context-draft.md](./2026-10-04-time-context-draft.md)：系统提示与时间注入持久化、小时刷新、本地证据时间及范围过滤的简版规格；已实现、三项检查与独立文档审核完成，实机待验。
 - [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)：Electron 设置、后端配置接口与 Workspace/Pet 拆分已实现，完整实机待验；固定项目根、逐 Turn AGENTS.md、基础 Pet 与项目一级历史采用当前 owning 模块合约，MCP 运行刷新另列 TODO。
 - [multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md](./multi-pet-pocket-dialogue/multi-pet-pocket-dialogue.md)：Issue #7 的多桌宠 A「口袋对话」历史规格，轻量交互仍保留；Pet 直接替代 Workspace 与按宠分组的设计已由 Issue #8 替代，当前项目模型不以本子树为准。
 - `2026-06-24-agenttrigger-thread-path-migration-spec.md`

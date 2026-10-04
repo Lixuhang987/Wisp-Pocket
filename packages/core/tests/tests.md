@@ -13,4 +13,6 @@
 - `config/`、`selection/`：设置与选区归一化。
 - `mcp/`：MCP 配置与传输。
 
+Runtime 的既有用例验证 system section 保留在结果且重复请求不重复追加；持久恢复、小时阈值、项目规则替换/清除与中断写入由 [server 组合主路径](../../../apps/agent-server/tests/use-cases/use-cases.md) 验证，不在本目录重复建立 Thread/SQLite 状态。
+
 跨目录回归通过 `bash ./scripts/test.sh`；模型真实端点的运行要求见 [API 集成测试](../../../docs/llm-api-integration.md)。

@@ -41,6 +41,8 @@ export type ToolAgentMessage = {
 export type SystemAgentMessage = {
   role: "system";
   content: string;
+  promptSection?: string;
+  timeContext?: { timestamp: string; timezone: string };
 };
 
 export type AgentMessage =

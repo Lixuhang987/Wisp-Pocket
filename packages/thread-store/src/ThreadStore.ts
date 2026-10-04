@@ -651,7 +651,7 @@ export class ThreadStore {
       preview: row.preview,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      messageCount: this.messagesForThread(row.thread_id).length,
+      messageCount: this.messagesForThread(row.thread_id).filter(message => message.role !== "system").length,
       petId: row.pet_id,
       workspaceId: row.workspace_id,
       petSnapshot: JSON.parse(row.pet_snapshot_json),
@@ -673,7 +673,7 @@ export class ThreadStore {
           preview: live?.preview ?? null,
           createdAt: live?.createdAt ?? this.now(),
           updatedAt: live?.updatedAt ?? this.now(),
-          messageCount: this.messagesForThread(threadId).length,
+          messageCount: this.messagesForThread(threadId).filter(message => message.role !== "system").length,
           petId: live!.petId,
           workspaceId: live!.meta.workspaceId,
           petSnapshot: live!.meta.petSnapshot!,
@@ -687,7 +687,7 @@ export class ThreadStore {
     const pendingInputs = messages.flatMap((message) => message.role === "user" && message.id && message.inputItems && !started.has(message.id)
       ? [{ opId: message.id, payload: { items: message.inputItems,  } }]
       : []);
-    metadata.messageCount = messages.length;
+    metadata.messageCount = messages.filter(message => message.role !== "system").length;
     return {
       version: 1,
       metadata,

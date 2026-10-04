@@ -66,8 +66,8 @@ describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
       round++;
       const call = (name: string, args: Record<string, unknown>) => ({ id: `${round}-${name}`, name, arguments: args });
       if (round === 1) { await writeFile(source, "原路径最新内容"); return { message: { role: "assistant" as const, content: "" }, toolCalls: [
-        call("file.read", { path: source }), call("context_history.activity_index", {}),
-        call("context_history.sample_details", { ids: ["swift-sample"] }), call("context_history.thumbnails", {}),
+        call("file.read", { path: source }), call("context_history.activity_index", { start: "2023-11-15T06:13:20+08:00", end: 1700000000 }),
+        call("context_history.sample_details", { ids: ["swift-sample"] }), call("context_history.thumbnails", { start: 1700000000, end: "2023-11-15T06:13:20+08:00" }),
         call("context_history.screenshot_original", { id: "swift-screenshot" }),
       ] }; }
       if (round === 2) return { message: { role: "assistant" as const, content: "" }, toolCalls: [call("use_tools", {})] };
@@ -106,6 +106,10 @@ describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
       expect(JSON.stringify(requests[0])).not.toContain("原路径最新内容");
       expect(JSON.stringify(requests[1])).toContain("原路径最新内容");
       const evidence = requests[1].filter(message => message.role === "tool");
+      const index = JSON.parse(evidence.find(message => message.name === "context_history.activity_index")!.content);
+      expect(index.samples.map((sample: any) => sample.id)).toEqual(["swift-sample"]);
+      expect(index.samples[0].timestamp).toMatch(/[+-]\d{2}:\d{2}$/);
+      expect(Date.parse(index.samples[0].timestamp)).toBe(1700000000000);
       const details = JSON.parse(evidence.find(message => message.name === "context_history.sample_details")!.content);
       expect(details.samples[0]).toMatchObject({ id: "swift-sample", axSummary: { root: { role: "AXWindow" } } });
       const original = JSON.parse(evidence.find(message => message.name === "context_history.screenshot_original")!.content);

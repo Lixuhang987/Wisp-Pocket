@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { threadHarness, input } from "../support/threadHarness.ts";
@@ -100,7 +100,9 @@ describe("Thread ownership through public lifecycle", () => {
       expect(thread.status).toBe("interrupted");
       gate.resolve();
       await new Promise((resolve) => setTimeout(resolve, 10));
-      expect((await h.persistence.getMessages(thread.id))).toHaveLength(1);
+      const saved = await h.persistence.getMessages(thread.id);
+      expect(saved.filter(message => message.role !== "system")).toHaveLength(1);
+      expect(saved.some(message => message.role === "system" && "timeContext" in message)).toBe(true);
     } finally { gate.resolve(); await h.close(); }
   });
 
@@ -185,26 +187,45 @@ describe("Thread ownership through public lifecycle", () => {
   it("recovers saved history after backend restart without resuming an old turn", async () => {
     const directory = await mkdtemp(join(tmpdir(), "thread-restart-"));
     const path = join(directory, "threads.sqlite");
-    const h = threadHarness(echo, {}, path);
+    let now = "2026-10-04T09:00:00Z";
+    const h = threadHarness(echo, { now: () => now }, path);
     const thread = await h.threads.create({ petId: h.pet.id,});
     const accepted = input("saved");
     await thread.submit(accepted); await wait(() => expect(thread.status).toBe("idle"));
+    const firstSaved = await h.persistence.getThread(thread.id);
+    expect(firstSaved!.messages.filter(message => message.role === "system")).toHaveLength(3);
+    expect(firstSaved!.metadata.messageCount).toBe(2);
     await h.close();
     const complete = vi.fn(echo.complete);
-    const restored = threadHarness({ complete }, {}, path);
+    const restored = threadHarness({ complete }, { now: () => now }, path);
     try {
       const [a, b] = await Promise.all([restored.threads.load(thread.id), restored.threads.load(thread.id)]);
       expect(a).toBe(b); expect(a.snapshot().messages).toHaveLength(2); expect(complete).not.toHaveBeenCalled();
       await Promise.all([a.submit(accepted), b.submit(accepted)]);
       expect(complete).not.toHaveBeenCalled();
       expect((await restored.persistence.getMessages(thread.id)).filter(message => message.role === "user")).toHaveLength(1);
+      now = "2026-10-04T10:00:00Z";
       await a.submit(input("next")); await wait(() => expect(a.status).toBe("idle"));
       expect(a.snapshot().messages).toHaveLength(4);
+      const timeMessages = async () => (await restored.persistence.getMessages(thread.id)).filter(message => message.role === "system" && "timeContext" in message);
+      expect(await timeMessages()).toHaveLength(1);
+      now = "2026-10-04T10:00:01Z";
+      await a.submit(input("after an hour")); await wait(() => expect(a.status).toBe("idle"));
+      expect(await timeMessages()).toHaveLength(2);
+      expect((await timeMessages()).at(-1)).toMatchObject({ timeContext: { timestamp: new Date(now).toISOString() }, content: expect.stringContaining("3601") });
+      now = "2026-10-04T10:50:00Z";
+      await a.submit(input("still active")); await wait(() => expect(a.status).toBe("idle"));
+      expect(await timeMessages()).toHaveLength(2);
+      now = "2026-10-04T11:00:02Z";
+      await a.submit(input("another elapsed hour")); await wait(() => expect(a.status).toBe("idle"));
+      expect(await timeMessages()).toHaveLength(3);
+      expect(a.snapshot().messages).toHaveLength(10);
+      expect((await restored.persistence.getThread(thread.id))!.metadata.messageCount).toBe(10);
     } finally { await restored.close(); await rm(directory, { recursive: true, force: true }); }
   });
 });
 
-it.each(["input", "completion"])("honors interrupt while %s persistence is delayed", async (phase) => {
+it.each(["input", "context", "completion"])("honors interrupt while %s persistence is delayed", async (phase) => {
   const complete = vi.fn(echo.complete);
   const h = threadHarness({ complete });
   const gate = Promise.withResolvers<void>();
@@ -218,13 +239,26 @@ it.each(["input", "completion"])("honors interrupt while %s persistence is delay
       }
       await persist(id, events);
     });
+    if (phase === "context") {
+      const save = h.persistence.persistRunDelta.bind(h.persistence);
+      vi.spyOn(h.persistence, "persistRunDelta").mockImplementation(async (id, base, messages, ...rest) => {
+        if (messages.some(message => message.role === "system")) { entered.resolve(); await gate.promise; }
+        await save(id, base, messages, ...rest);
+      });
+    }
     const submitting = thread.submit(input("interrupt during save"));
     await entered.promise;
     const stopping = thread.interrupt();
     gate.resolve(); await submitting; await stopping;
     expect(thread.status).toBe("interrupted");
-    if (phase === "input") expect(complete).not.toHaveBeenCalled();
     expect(h.events.some((event) => event.type === "turn.completed" && event.payload.status === "completed")).toBe(false);
+    if (phase !== "completion") expect(complete).not.toHaveBeenCalled();
+    if (phase === "context") {
+      await thread.submit(input("continue after interrupted save"));
+      await wait(() => expect(thread.status).toBe("idle"));
+      const saved = await h.persistence.getMessages(thread.id);
+      expect(saved.filter(message => message.role === "system")).toHaveLength(3);
+    }
   } finally { gate.resolve(); await h.close(); }
 });
 
@@ -244,4 +278,37 @@ it("queues inputs during execution, preserves their order and isolates other Thr
     expect(a.snapshot().messages.map((message) => message.text)).toEqual(["first", "second", "third", "reply:first", "reply:second", "reply:third"]);
     expect(b.snapshot().messages.map((message) => message.text)).toEqual(["other", "reply:other"]);
   } finally { gate.resolve(); await h.close(); }
+});
+
+it("saves system context before a failing model and replaces or clears project rules on later turns", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "thread-system-context-"));
+  const requests: AgentMessage[][] = [];
+  let threadId = "";
+  const h = threadHarness({ complete: async messages => {
+    requests.push(structuredClone(messages));
+    const saved = await h.persistence.getMessages(threadId);
+    expect(saved.some(message => message.role === "system" && "timeContext" in message)).toBe(true);
+    expect(saved.some(message => message.role === "system" && "promptSection" in message)).toBe(true);
+    if (requests.length === 1) throw new Error("model unavailable");
+    return echo.complete(messages);
+  } }, { now: () => "2026-10-04T09:00:00Z" });
+  try {
+    await writeFile(join(directory, "AGENTS.md"), "PROJECT_RULE_ONE");
+    const pet = await h.pets.create({ name: "系统上下文", rolePrompt: "ROLE_RULE", imageRef: { type: "builtin", id: "yachiyo" }, rootPath: directory });
+    const thread = await h.threads.create({ petId: pet.id }); threadId = thread.id;
+    await thread.submit(input("first")); await wait(() => expect(thread.status).toBe("failed"));
+    await writeFile(join(directory, "AGENTS.md"), "PROJECT_RULE_TWO");
+    await thread.submit(input("second")); await wait(() => expect(thread.status).toBe("idle"));
+    expect(JSON.stringify(requests[1])).toContain("PROJECT_RULE_TWO");
+    expect(JSON.stringify(requests[1])).not.toContain("PROJECT_RULE_ONE");
+    await unlink(join(directory, "AGENTS.md"));
+    await thread.submit(input("third")); await wait(() => expect(thread.status).toBe("idle"));
+    expect(JSON.stringify(requests[2])).not.toContain("PROJECT_RULE_TWO");
+    expect(thread.snapshot().messages.every(message => message.role !== "system")).toBe(true);
+    const saved = await h.persistence.getMessages(threadId);
+    expect(saved.filter(message => message.role === "system" && "timeContext" in message)).toHaveLength(1);
+    expect(saved.filter(message => message.role === "system" && message.content.includes("ROLE_RULE"))).toHaveLength(1);
+    expect(saved.some(message => message.role === "system" && message.content.includes("PROJECT_RULE_ONE"))).toBe(true);
+    expect(saved.some(message => message.role === "system" && message.content.includes("PROJECT_RULE_TWO"))).toBe(true);
+  } finally { await h.close(); await rm(directory, { recursive: true, force: true }); }
 });

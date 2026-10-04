@@ -1,4 +1,4 @@
-import type { AgentMessage } from "./types/AgentMessage.ts";
+import type { AgentMessage, SystemAgentMessage } from "./types/AgentMessage.ts";
 import type { RegisteredTool } from "../tools/ToolRegistry.ts";
 import { META_TOOL_NAME } from "../tools/MetaToolUseTool.ts";
 
@@ -26,17 +26,31 @@ export async function resolveSystemPromptSections(
   return resolved.filter(isNonEmptyPromptSection);
 }
 
-export async function buildSystemPromptMessages(input: {
+export async function systemPromptUpdates(input: {
   sections: SystemPromptSection[];
   context: SystemPromptContext;
   messages: AgentMessage[];
-}): Promise<AgentMessage[]> {
-  const promptSections = await resolveSystemPromptSections(input.sections, input.context);
-  if (promptSections.length === 0) return input.messages;
+}): Promise<SystemAgentMessage[]> {
+  const current = await Promise.all(input.sections.map(async (section): Promise<SystemAgentMessage> => {
+    const content = await section.resolve(input.context);
+    return { role: "system", promptSection: section.name, content: isNonEmptyPromptSection(content) ? content! : "" };
+  }));
+  return current.filter((message) => {
+    const previous = input.messages.findLast((item) => item.role === "system" && item.promptSection === message.promptSection);
+    return previous ? previous.content !== message.content : !!message.content;
+  });
+}
 
+/** Keep every rule version in history; only the current version applies to the model. */
+export function modelMessagesWithSystemPrompts(messages: AgentMessage[]): AgentMessage[] {
+  const sections = new Map<string, SystemAgentMessage>();
+  for (const message of messages) {
+    if (message.role === "system" && message.promptSection) sections.set(message.promptSection, message);
+  }
   return [
-    ...promptSections.map((content): AgentMessage => ({ role: "system", content })),
-    ...input.messages,
+    ...[...sections.values()].filter(message => message.content).map(({ content }): AgentMessage => ({ role: "system", content })),
+    ...messages.filter(message => message.role !== "system" || !message.promptSection)
+      .map((message): AgentMessage => message.role === "system" ? { role: "system", content: message.content } : message),
   ];
 }
 

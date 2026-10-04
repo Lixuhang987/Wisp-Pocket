@@ -37,7 +37,7 @@ final class ContextHistoryTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: ["role": "AXWindow", "title": "Existing evidence"])
             .write(to: axDirectory.appendingPathComponent("legacy-ax.json"))
 
-        let store = ContextHistoryStore(directoryURL: directory)
+        let store = ContextHistoryStore(directoryURL: directory, timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0)))
         let router = ContextHistoryToolRouter(store: store)
         let index = try toolJSON(router.handle(tool: "activity_index", arguments: ["limit": 1]))
         let sample = try XCTUnwrap((index["samples"] as? [[String: Any]])?.first)
@@ -143,6 +143,39 @@ final class ContextHistoryTests: XCTestCase {
         XCTAssertFalse(index.success)
         XCTAssertTrue(try XCTUnwrap(index.contentItems.first?["text"] as? String).contains("blocked-history"))
         XCTAssertNil(module.lastSampleAt)
+    }
+
+    func testLocalTimeStorageAndRangeQueriesSurviveStoreRecreation() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 8 * 3_600))
+        let store = ContextHistoryStore(directoryURL: directory, timeZone: timeZone)
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        for (id, offset) in [("before", 0.0), ("inside", 30.0), ("after", 60.0)] {
+            _ = try store.recordActivity(id: id, timestamp: start.addingTimeInterval(offset),
+                                         app: ["bundleId": "test.local"], window: [:], axSummary: ["role": "AXWindow"])
+        }
+        _ = try store.recordScreenshot(id: "local-shot", timestamp: start.addingTimeInterval(30),
+                                       originalBase64: makeHistoryPNG(width: 4, height: 2).base64EncodedString(),
+                                       thumbnailBase64: makeHistoryPNG(width: 2, height: 1).base64EncodedString(),
+                                       width: 4, height: 2, sampleId: "inside")
+        for file in ["activities.json", "screenshots.json"] {
+            let data = try Data(contentsOf: directory.appendingPathComponent(file))
+            let records = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+            XCTAssertTrue(records.allSatisfy { ($0["timestamp"] as? String)?.hasSuffix("+08:00") == true })
+        }
+        let restored = ContextHistoryStore(directoryURL: directory, timeZone: timeZone)
+        XCTAssertEqual(try restored.loadActivities().map(\.timestamp), [start, start.addingTimeInterval(30), start.addingTimeInterval(60)])
+        let router = ContextHistoryToolRouter(store: restored)
+        let result = try toolJSON(router.handle(tool: "activity_index", arguments: [
+            "limit": 1, "start": "2023-11-15T06:13:50+08:00", "end": 1_700_000_030,
+        ]))
+        let samples = try XCTUnwrap(result["samples"] as? [[String: Any]])
+        XCTAssertEqual(samples.map { $0["id"] as? String }, ["inside"])
+        XCTAssertEqual(samples.first?["timestamp"] as? String, "2023-11-15T06:13:50+08:00")
+        XCTAssertFalse(router.handle(tool: "activity_index", arguments: ["start": 1_700_000_060, "end": 1_700_000_000]).success)
+        let image = try toolJSON(router.handle(tool: "screenshot_original", arguments: ["id": "local-shot"]))
+        XCTAssertEqual((image["screenshot"] as? [String: Any])?["timestamp"] as? String, "2023-11-15T06:13:50+08:00")
     }
 
     private func temporaryDirectory() -> URL {

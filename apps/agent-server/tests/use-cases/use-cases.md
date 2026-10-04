@@ -14,6 +14,7 @@
 
 ## 验证边界
 
+- system 与时间上下文沿 `thread-ownership` 的真实 Thread/SQLite 主路径验证：首轮模型前落盘、模型失败、写入期间中断后接续、规则替换/清除、重启后的整一小时及超过一小时、连续活跃轮次的注入基准，以及 snapshot/messageCount 排除内部上下文。`default-reading` 用真实 Swift 保存夹具验证 ISO/epoch 的相等端点和 Node 本地偏移输出；Swift 新写偏移格式另由 [真实 Store 用例](../../../host-automation/Tests/tests.md) 验证，静态夹具不伪造更新。
 - 重启输入去重复用 `thread-ownership` 的既有历史恢复用例；存储故障与真实删除的区分复用其协议删除失败用例。轻量观察连接的 Permission 事实接收、回执资格与正文隔离复用 `pet-conversation` 的真实 CLI 授权流，避免另建仅检查内部调用的测试。
 - 桌宠首次纯文字从 controller 经过共享输入控制器到真实 Thread 与 SQLite；打开空回复框不留历史，接收后可读到持久输入，后续回复留在同一 Thread。原生点击、自动焦点和中文输入法仍由 renderer 与实机验收覆盖。
 - Dynamic Tool 用例使用真实 `WebSocketDynamicToolBridge` 与 `DynamicToolAdapter`，以 socket 传输替身输入 hello/request/response。相同连接的声明刷新须保留在途调用并更新新 Thread 的默认集合，旧 Thread metadata 保持不变；显式空集合仍为空，旧连接不能刷新新身份的集合。默认长操作等待实际结果，真正关闭连接后才 offline。显式超时另由 bridge 边界测试覆盖。

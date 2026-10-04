@@ -25,6 +25,7 @@
 ## 保存与读取
 
 - ThreadPersistence 实现 ThreadStorage 端口，缓存顺序写入句柄，不拥有历史、输入队列或 Turn；SQLite 机制归 [thread-store](../../../../packages/thread-store/thread-store.md)。
+- system 与用户/模型消息共用 response_item，完整保存 section 及时间 metadata；何时写入由 [core Thread](../../../../packages/core/src/thread/thread.md) 决定。内部历史恢复包含 system，用户可见投影排除 system；首轮标题只按用户输入判断，不因前置 system 失效。
 - 每条输入在执行前落盘，持久接收后才确认。桌宠 `file_reference` 仅保存原路径元数据；图片 Item 先写 Blob，response item 与 live 通知返回同一结构化项。模型路径文字不作为 UI 附件正文。
 - 所有入口共享默认工具和 Permission 规则，不预读或区分输入阶段。模型调用 file.read / 历史工具才产生真实读取，能力与失败语义见 [actions](../actions/actions.md)。
 - Blob 的只读 HTTP 入口见 [server](../server/server.md)；Input Item 转换见 [protocol](../protocol/protocol.md)。

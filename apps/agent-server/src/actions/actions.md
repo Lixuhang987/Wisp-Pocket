@@ -20,11 +20,11 @@
 
 ## Swift / Node 历史存储合约
 
-写入方是 [Context History](../../../host-automation/Sources/sources.md)，Node 只读 `~/.spotAgent/context-history`。`activities.json` / `screenshots.json` 是各自原子替换的数组索引；AX 为 `ax/<id>.json`；截图索引记录 originalPath / thumbnailPath，文件为完整 PNG 的 base64 文本。时间采用 ISO8601，Activity app/window 的值为字符串，AX 保留原始类型；目标 pid、window id/title 归一化核对。
+写入方是 [Context History](../../../host-automation/Sources/sources.md)，Node 只读 `~/.spotAgent/context-history`。`activities.json` / `screenshots.json` 是各自原子替换的数组索引；AX 为 `ax/<id>.json`；截图索引记录 originalPath / thumbnailPath，文件为完整 PNG 的 base64 文本。Swift 新写时间为宿主本地带偏移 ISO8601、秒粒度；Node 对活动、详情与图片元数据统一转为后端本地带偏移时间，旧 Z 记录也按绝对时刻读取，无需重写索引。两端不维护采集时区历史；Activity app/window 的值为字符串，AX 保留原始类型；目标 pid、window id/title 归一化核对。
 
 单文件原子替换不是跨文件事务：Swift 先保存 AX 再发布活动，先保存图片再发布截图索引，最后更新活动 thumbnailId。新截图已发布而活动尚未关联属于正常过渡；不能因此报损坏或伪造一致快照。已发布索引引用的缺失/损坏证据、错误尺寸或目标关联必须失败。
 
-索引文件不存在表示空历史，损坏或访问错误不是空历史。活动按时间倒序，详情保持请求 ID 顺序；limit 默认20、范围1–200，时间范围含端点。activity_index 不推断实时 collection 状态；采集失败与恢复由 Swift 设置状态源展示。
+索引文件不存在表示空历史，损坏或访问错误不是空历史。activity_index 与 thumbnails 均接受可选 start/end（带偏移 ISO8601 或 epoch 秒），包含端点，反向范围明确失败；按绝对时刻先过滤、再倒序、最后 limit。详情与原图按 ID 读取，详情保持请求 ID 顺序；limit 默认20、范围1–200。不自动把“最近十分钟”转为范围，不增加分页或截断元数据。activity_index 不推断实时 collection 状态；采集失败与恢复由 Swift 设置状态源展示。
 
 跨语言共享验证使用 [真实 Swift 保存夹具](../../tests/fixtures/context-history/context-history.md)，不能用两端各自手写的格式宣称兼容。
 

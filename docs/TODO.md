@@ -7,18 +7,6 @@
 
 最后核对日期：2026-10-04。
 
-## 时间上下文与历史时间过滤（访谈中）
-
-讨论草案由 [specs 入口](./medium-powers/specs/specs.md) 路由。用户已提出本地证据时间、新 Thread 时间注入、超过一小时的后续提示和工具时间过滤；时间表达、精确窗口与查询基准的推荐语义待一次性确认。
-
-- [x] 读取根架构、领域路由、产品及 owning 文档，核对真实记录、模型请求和 Codex 的日期/时区更新机制。
-- [x] 按 grill-with-docs 委派只读工程事实调查，形成明确标记未实现的讨论草案。
-- [ ] 用户确认共同理解，收敛草案中本地时间表示、相对窗口解析及消息/执行时间基准。
-- [ ] 从主 checkout 运行 `scripts/create-worktree.sh`，确认独立 CodeGraph 索引；后续 MCP 显式传绝对 projectPath。
-- [ ] 在 worktree 执行 `scripts/test.sh` 与 `scripts/swiftw build` 基线，再沿 owning 文档链实施。
-- [ ] 验证时间注入、持久恢复、消息投影和 Swift/Node 过滤；同步 owning 文档并完成三项提交前检查。
-- [ ] 分发不继承上下文的独立文档审核子 agent；确认结论，更新 `manual-qa.md` 并迁出完成 TODO 后提交。
-
 ## Pet 前端所有权破坏性重构（规格已发布，待实现）
 
 实施规格见 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，架构决策见 [ADR 0007](./adr/0007-frontend-pet-workspace-threads.md)；尚未实现，不计入已实现 manual QA。

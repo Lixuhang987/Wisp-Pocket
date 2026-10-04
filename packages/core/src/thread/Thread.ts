@@ -189,7 +189,7 @@ export class Thread {
         const ordered = this.history.filter((message) => message.role !== "user" || !message.id || !pending.has(message.id));
         if (inputMessage) ordered.push(inputMessage);
         const messages = this.services.projection.runtimeMessages(structuredClone(ordered));
-        const base = messages.length;
+        let base = messages.length;
         const events: ThreadAuditEvent[] = [];
         const notifications: ThreadNotification[] = [];
         const result = await this.runtime.runWithMessages(messages, (event) => {
@@ -200,7 +200,16 @@ export class Thread {
           const audit = this.services.projection.audit(event, time);
           if (audit) events.push(audit);
         }, { threadId: this.id, turnId: active.id, signal: active.controller.signal,
-          rootPath: this.rootPath, projectInstructions, rolePrompt: this.petSnapshot.rolePrompt });
+          rootPath: this.rootPath, projectInstructions, rolePrompt: this.petSnapshot.rolePrompt,
+          startedAt: this.now(), persistSystemMessages: async (systemMessages) => {
+            await this.serial(async () => {
+              if (!this.valid(active)) return;
+              await this.write(() => this.services.storage.persistRunDelta(this.id, 0, systemMessages, []));
+              // A committed context remains part of history even if the Turn was interrupted during its write.
+              if (!this.closed) this.history.push(...structuredClone(systemMessages));
+            });
+            base += systemMessages.length;
+          } });
         if (!this.valid(active)) return;
         // The runtime owns a detached summary working copy; only committed deltas enter history.
         const committed = structuredClone(result.messages).map((message, index) => index >= base && message.role === "assistant" && message.id

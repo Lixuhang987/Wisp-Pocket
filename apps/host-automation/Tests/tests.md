@@ -4,7 +4,7 @@
 
 ## 直接文件
 
-- `ContextHistoryTests.swift`：既有业务数据格式、图像验证、重复启动/重叠 tick 和磁盘失败。
+- `ContextHistoryTests.swift`：既有业务数据格式、图像验证、重复启动/重叠 tick 和磁盘失败；真实临时 Store 加注入时区验证本地偏移落盘、重建读取、ISO/epoch 范围端点、过滤先于 limit 与反向范围失败。
 - `AutomationRuntimeTests.swift`：条件分支、步骤/断言、录制转 Policy、执行历史、修复数据应用与非法输入。
 
 ## 验证入口

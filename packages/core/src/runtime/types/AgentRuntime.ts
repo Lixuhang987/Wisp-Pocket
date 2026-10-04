@@ -1,4 +1,4 @@
-import type { AgentMessage } from "./AgentMessage.ts";
+import type { AgentMessage, SystemAgentMessage } from "./AgentMessage.ts";
 
 export type AgentRunResult = {
   messages: AgentMessage[];
@@ -69,6 +69,8 @@ export type AgentRuntimeRunOptions = {
   rootPath?: string;
   rolePrompt?: string;
   projectInstructions?: string;
+  startedAt?: string;
+  persistSystemMessages?: (messages: SystemAgentMessage[]) => Promise<void>;
 };
 
 export type AgentRuntimeEventSink = (event: AgentRuntimeEvent) => void;

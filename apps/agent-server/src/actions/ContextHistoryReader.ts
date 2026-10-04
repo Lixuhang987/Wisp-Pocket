@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { decodeImage } from "./ReadImage.ts";
+import { formatLocalTimestamp } from "@handagent/core/runtime/TimeContext.ts";
 
 const id = z.string().refine((value) => value.trim().length > 0 && value !== "." && value !== ".." && !/[\\/]/.test(value));
 const timestamp = z.string().refine((value) => Number.isFinite(Date.parse(value)));
@@ -16,9 +17,12 @@ export type HistoryDate = number | string;
 export class ContextHistoryReader {
   constructor(private readonly root: string) {}
 
-  async activityIndex(limit: number) {
+  async activityIndex(limit: number, start?: HistoryDate, end?: HistoryDate) {
+    const lower = parseDate(start); const upper = parseDate(end);
+    if (lower !== undefined && upper !== undefined && lower > upper) throw new Error("invalid_arguments: start must not follow end");
     const samples = await this.activities();
-    return { samples: newest(samples).slice(0, limit).map(({ axSummaryId: _ax, ...sample }) => ({ ...sample, thumbnailId: sample.thumbnailId ?? null })) };
+    const selected = samples.filter(sample => (lower === undefined || Date.parse(sample.timestamp) >= lower) && (upper === undefined || Date.parse(sample.timestamp) <= upper));
+    return { samples: newest(selected).slice(0, limit).map(({ axSummaryId: _ax, ...sample }) => ({ ...sample, timestamp: formatLocalTimestamp(sample.timestamp), thumbnailId: sample.thumbnailId ?? null })) };
   }
 
   async sampleDetails(ids: string[]) {
@@ -30,7 +34,7 @@ export class ContextHistoryReader {
       const ax = await jsonFile(join(this.root, "ax", `${sample.axSummaryId}.json`));
       validateAX(ax, sample);
       const { axSummaryId: _ax, ...summary } = sample;
-      return { ...summary, thumbnailId: sample.thumbnailId ?? null, axSummary: ax };
+      return { ...summary, timestamp: formatLocalTimestamp(sample.timestamp), thumbnailId: sample.thumbnailId ?? null, axSummary: ax };
     })) };
   }
 
@@ -63,7 +67,7 @@ export class ContextHistoryReader {
       if (original ? image.width !== record.width || image.height !== record.height : image.width > record.width || image.height > record.height) throw new Error(`invalid_image: screenshot ${record.id} dimensions disagree with evidence`);
       return { record, image, encoded };
     }));
-    const metadata = images.map(({ record, image }, index) => ({ id: record.id, timestamp: record.timestamp, sampleId: record.sampleId ?? null, mimeType: image.mimeType, dimensions: { width: image.width, height: image.height }, imageContentIndex: index + 1 }));
+    const metadata = images.map(({ record, image }, index) => ({ id: record.id, timestamp: formatLocalTimestamp(record.timestamp), sampleId: record.sampleId ?? null, mimeType: image.mimeType, dimensions: { width: image.width, height: image.height }, imageContentIndex: index + 1 }));
     return { success: true, contentItems: [
       { type: "inputText", text: JSON.stringify(original ? { screenshot: metadata[0] } : { thumbnails: metadata }) },
       ...images.map(({ encoded }) => ({ type: "inputImage", imageUrl: `data:image/png;base64,${encoded}` })),

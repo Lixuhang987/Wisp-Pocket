@@ -141,7 +141,7 @@ class FakeTurnSummarizer implements TurnSummarizerLike {
 }
 
 describe("AgentRuntime", () => {
-  it("adds default system prompt sections to LLM requests without persisting them", async () => {
+  it("persists default system prompt sections and reuses them across model requests", async () => {
     const seenMessages: AgentMessage[][] = [];
     const runtime = new AgentRuntime(
       {
@@ -172,9 +172,13 @@ describe("AgentRuntime", () => {
       },
     ]);
     expect(result.messages).toEqual([
+      { role: "system", promptSection: "tool-use-policy", content: expect.stringContaining("structured tool calls") },
       { role: "user", content: "执行一个流程，使用两个tool调用" },
       { role: "assistant", id: "assistant-1", content: "ok" },
     ]);
+    const next = await runtime.runWithMessages([...result.messages, { role: "user", content: "继续" }]);
+    expect(next.messages.filter(message => message.role === "system")).toHaveLength(1);
+    expect(seenMessages[1].filter(message => message.role === "system")).toHaveLength(1);
   });
 
   it("passes the configured blob store into the LLM client", async () => {
@@ -725,7 +729,7 @@ describe("AgentRuntime", () => {
         }),
       },
     ]);
-    expect(result.messages[2]).toEqual({
+    expect(result.messages.find(message => message.role === "assistant" && message.id === "assistant-1")).toEqual({
       role: "assistant",
       id: "assistant-1",
       content: "先调用工具",

@@ -29,10 +29,10 @@ public struct ContextHistoryImageEvidence: Sendable {
     public let width: Int
     public let height: Int
 
-    fileprivate func metadata(contentIndex: Int) -> [String: Any] {
+    fileprivate func metadata(contentIndex: Int, timeZone: TimeZone) -> [String: Any] {
         [
             "id": record.id,
-            "timestamp": contextHistoryTimestamp(record.timestamp),
+            "timestamp": contextHistoryTimestamp(record.timestamp, timeZone: timeZone),
             "sampleId": record.sampleId.map { $0 as Any } ?? NSNull(),
             "mimeType": "image/png",
             "dimensions": ["width": width, "height": height],
@@ -47,13 +47,18 @@ public final class ContextHistoryStore {
     private let fileManager: FileManager
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    fileprivate let timeZone: TimeZone
 
-    public init(directoryURL: URL, fileManager: FileManager = .default) {
+    public init(directoryURL: URL, fileManager: FileManager = .default, timeZone: TimeZone = .current) {
         self.directoryURL = directoryURL
         self.fileManager = fileManager
+        self.timeZone = timeZone
         encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(contextHistoryTimestamp(date, timeZone: timeZone))
+        }
         decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
     }
@@ -139,11 +144,20 @@ public final class ContextHistoryStore {
         return screenshot
     }
 
-    public func activityIndex(limit: Int) throws -> [[String: Any]] {
+    public func activityIndex(limit: Int, start: Date? = nil, end: Date? = nil) throws -> [[String: Any]] {
         try validateLimit(limit)
-        return try loadActivities().sorted { $0.timestamp > $1.timestamp }.prefix(limit).map { sample in
+        if let start, let end, start > end {
+            throw ContextHistoryFailure("invalid_arguments", "start must be earlier than or equal to end")
+        }
+        return try loadActivities()
+            .filter { sample in
+                if let start, sample.timestamp < start { return false }
+                if let end, sample.timestamp > end { return false }
+                return true
+            }
+            .sorted { $0.timestamp > $1.timestamp }.prefix(limit).map { sample in
             [
-                "id": sample.id, "timestamp": contextHistoryTimestamp(sample.timestamp),
+                "id": sample.id, "timestamp": contextHistoryTimestamp(sample.timestamp, timeZone: timeZone),
                 "app": sample.app, "window": sample.window,
                 "thumbnailId": sample.thumbnailId.map { $0 as Any } ?? NSNull(),
             ]
@@ -159,7 +173,7 @@ public final class ContextHistoryStore {
             }
             let axSummary = try loadAXSummary(for: sample)
             return [
-                "id": sample.id, "timestamp": contextHistoryTimestamp(sample.timestamp),
+                "id": sample.id, "timestamp": contextHistoryTimestamp(sample.timestamp, timeZone: timeZone),
                 "app": sample.app, "window": sample.window, "axSummary": axSummary,
                 "thumbnailId": sample.thumbnailId.map { $0 as Any } ?? NSNull(),
             ]
@@ -452,8 +466,8 @@ public final class ContextHistoryToolRouter {
             }
             switch tool {
             case "activity_index":
-                try validateKeys(object, allowed: ["limit"])
-                var result: [String: Any] = ["samples": try store.activityIndex(limit: limit(object))]
+                try validateKeys(object, allowed: ["limit", "start", "end"])
+                var result: [String: Any] = ["samples": try store.activityIndex(limit: limit(object), start: date(object, "start"), end: date(object, "end"))]
                 if let collectionStatus { result["collection"] = collectionStatus }
                 return .json(result)
             case "sample_details":
@@ -481,7 +495,7 @@ public final class ContextHistoryToolRouter {
     }
 
     private func imageResult(_ images: [ContextHistoryImageEvidence], key: String, single: Bool) -> DynamicToolResult {
-        let metadata = images.enumerated().map { index, image in image.metadata(contentIndex: index + 1) }
+        let metadata = images.enumerated().map { index, image in image.metadata(contentIndex: index + 1, timeZone: store.timeZone) }
         let json = DynamicToolResult.json([key: single ? metadata[0] as Any : metadata as Any])
         guard json.success else { return json }
         return DynamicToolResult(contentItems: json.contentItems + images.map { image in
@@ -655,6 +669,8 @@ private func contextHistoryStrings(_ value: Any?) -> [String: String] {
     }
 }
 
-func contextHistoryTimestamp(_ date: Date) -> String {
-    ISO8601DateFormatter().string(from: date)
+func contextHistoryTimestamp(_ date: Date, timeZone: TimeZone) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.timeZone = timeZone
+    return formatter.string(from: date)
 }

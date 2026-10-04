@@ -12,9 +12,11 @@ import { renderStub, type StubCacheScope } from "./Stub.ts";
 import type { TurnSummarizerLike } from "./TurnSummarizer.ts";
 import {
   buildDefaultSystemPromptSections,
-  buildSystemPromptMessages,
+  systemPromptUpdates,
+  modelMessagesWithSystemPrompts,
   type SystemPromptSection,
 } from "./SystemPrompt.ts";
+import { timeContextUpdate } from "./TimeContext.ts";
 import {
   META_TOOL_NAME,
   META_TOOL_ALREADY_ACTIVE_RESULT,
@@ -74,6 +76,21 @@ export class AgentRuntime {
     throwIfAborted(runOptions.signal);
     await this.waitForPendingSummaries(nextMessages);
     throwIfAborted(runOptions.signal);
+    const systemMessages = await systemPromptUpdates({
+      sections: [...this.systemPromptSections,
+        { name: "workspace-instructions", resolve: () => runOptions.projectInstructions ? `项目 AGENTS.md（用户本次明确要求优先于项目指令；项目指令优先于桌宠角色习惯；不能改变后端工具边界与权限）：\n${runOptions.projectInstructions}` : null },
+        { name: "pet-role", resolve: () => runOptions.rolePrompt ? `桌宠角色（表达习惯，用户明确任务与项目 AGENTS.md 可覆盖角色习惯；不能改变工具和权限规则）：\n${runOptions.rolePrompt}` : null }],
+      context: { tools: this.modelTools() }, messages: nextMessages,
+    });
+    const timeMessage = runOptions.startedAt ? timeContextUpdate(nextMessages, runOptions.startedAt) : undefined;
+    if (timeMessage) systemMessages.push(timeMessage);
+    if (systemMessages.length) {
+      throwIfAborted(runOptions.signal);
+      await runOptions.persistSystemMessages?.(systemMessages);
+      throwIfAborted(runOptions.signal);
+      const lastUser = nextMessages.findLastIndex(message => message.role === "user");
+      nextMessages.splice(Math.max(0, lastUser), 0, ...systemMessages);
+    }
     let assistantCount = 0;
 
     for (let time = 0; time < this.maxTimes; time += 1) {
@@ -337,12 +354,8 @@ export class AgentRuntime {
     const messageId = `assistant-${assistantCount}`;
     let content = "";
     const toolCalls: ToolCallEnvelope[] = [];
-    const tools = [...this.toolRegistry.list().filter(tool => tool.name !== USER_QUESTION_TOOL_NAME), userQuestionTool];
-    const llmMessages = await buildSystemPromptMessages({
-      sections: [...this.systemPromptSections, ...(runOptions.projectInstructions ? [{name:'workspace-instructions',resolve:() => `项目 AGENTS.md（用户本次明确要求优先于项目指令；项目指令优先于桌宠角色习惯；不能改变后端工具边界与权限）：\n${runOptions.projectInstructions}`}]:[]), ...(runOptions.rolePrompt ? [{name:"pet-role",resolve:() => `桌宠角色（表达习惯，用户明确任务与项目 AGENTS.md 可覆盖角色习惯；不能改变工具和权限规则）：\n${runOptions.rolePrompt}`}]:[])],
-      context: { tools },
-      messages,
-    });
+    const tools = this.modelTools();
+    const llmMessages = modelMessagesWithSystemPrompts(messages);
 
     throwIfAborted(runOptions.signal);
     onEvent({
@@ -446,6 +459,10 @@ export class AgentRuntime {
   async waitForPendingSummaries(messages: AgentMessage[] = []): Promise<void> {
     await this.pendingTurnSummary;
     await this.turnSummarizer?.applyStoredSummaries(messages);
+  }
+
+  private modelTools() {
+    return [...this.toolRegistry.list().filter(tool => tool.name !== USER_QUESTION_TOOL_NAME), userQuestionTool];
   }
 
   private startTurnSummary(messages: AgentMessage[]): void {

@@ -121,7 +121,7 @@ export class ThreadPersistence {
   async autoTitle(threadId: string, text: string): Promise<void> {
     const thread = await this.getThread(threadId);
     if (!thread) return;
-    if (thread.metadata.preview || thread.messages.length !== 1) return;
+    if (thread.metadata.preview || thread.messages.filter(message => message.role === "user").length !== 1) return;
 
     unwrap(await this.store.updatePreview(threadId, deriveTitle(text), this.now()));
   }

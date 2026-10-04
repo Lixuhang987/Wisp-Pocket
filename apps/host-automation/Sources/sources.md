@@ -26,6 +26,6 @@ Context History 和 Automation 的可变业务状态由 `MainActor` 隔离。两
 
 ## Swift 写入与 Node 读取合约
 
-历史目录使用 activities.json / screenshots.json 数组索引，日期为 ISO8601；Activity 的 app/window 值保存为字符串，AX JSON 保留原始数值。AX 先原子落盘，再发布 Activity；PNG 的 base64 文本写入 screenshots/original 与 thumbnails，随后原子发布截图索引，最后更新 Activity.thumbnailId。单文件原子替换不构成跨文件事务：截图已发布但 Activity 反向关联尚未更新是正常过渡，已发布证据缺失 / 损坏则必须失败。Node 读取不触发实时采样，不能从历史时间推断采集状态。
+历史目录使用 activities.json / screenshots.json 数组索引，新写日期为宿主本地带偏移 ISO8601、秒粒度；旧 Z 时间仍按绝对时刻读取，不迁移或清理历史。Store 的时区默认取创建时的宿主本地时区，不维护采集时区历史；Activity 的 app/window 值保存为字符串，AX JSON 保留原始数值。AX 先原子落盘，再发布 Activity；PNG 的 base64 文本写入 screenshots/original 与 thumbnails，随后原子发布截图索引，最后更新 Activity.thumbnailId。单文件原子替换不构成跨文件事务：截图已发布但 Activity 反向关联尚未更新是正常过渡，已发布证据缺失 / 损坏则必须失败。Node 读取不触发实时采样，不能从历史时间推断采集状态。
 
-Node 适配与证据校验见 [后端源码](../../agent-server/src/src.md)。跨语言 fixture 已用真实 Store 导出并作为静态证据保留；来源与消费边界见 [共享夹具](../../agent-server/tests/fixtures/context-history/context-history.md)，常规测试不重新导出。
+activity_index 与 thumbnails 使用相同 start/end 合约：带偏移 ISO8601 或 epoch 秒，包含端点，反向范围失败；按绝对时刻先过滤，再倒序和 limit。详情与原图按 ID 读取。Swift 工具结果采用 Store 时区，Node 查询时统一转为后端本地带偏移时间，不依赖索引重写；双方合约与证据校验见 [后端历史读取](../../agent-server/src/actions/actions.md)。跨语言 fixture 已用真实 Store 导出并作为静态证据保留；来源与消费边界见 [共享夹具](../../agent-server/tests/fixtures/context-history/context-history.md)，常规测试不重新导出。

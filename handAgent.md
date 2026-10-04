@@ -37,7 +37,7 @@ flowchart TD
 - **单后端，多个独立前端**是产品设计边界：领域业务事实、Thread 执行、请求仲裁与持久化由同一个后端拥有；桌宠、PromptPanel、ThreadWindow 等前端各自通过后端协议接入。前端之间不依赖对方转发业务输入，也不依赖对方的 store、当前选择、草稿、窗口显示与连接来完成自身任务。
 - 前端各自拥有界面、导航、草稿和订阅生命周期。打开、关闭、切换或重建一个前端不等于切换其他前端的选择或结束后端 Thread；观察同一 Thread 时同步的是后端事实，回执仍由后端仲裁。
 - 共享协议有变更时，各消费者需同步 DTO、编码 / 守卫及必要调用参数，但这不自动扩大为其他前端的交互重设计，也不要求多个前端一起启用。用户确认的功能范围与提交前检查分别决定改动和验证边界。
-- 初始上下文只来自用户主动提交的 Input Item。未主动交付的屏幕、剪贴板、文件和 App 状态由 Tool 按需读取。
+- 初始任务资料只来自用户主动提交的 Input Item；后端按合约加入 system 规则与时间基准。未主动交付的屏幕、剪贴板、文件和 App 状态由 Tool 按需读取。
 - `/api/thread` 承载 `ThreadCommand`、`ThreadNotification`、`ServerRequest` 与 `ClientResponse`。ThreadWindow 和桌宠分别连接并共享后端 Thread；Swift 只创建 PromptPanel / AgentTrigger Thread 并提交首轮 `UserInput`。
 - `/api/activity` 只发送 Agent Activity，不承载 Thread 消息或历史。
 - `/api/dynamic-tools` 只连接 Dynamic Tool Provider。Swift Host 暴露原生能力与已启用的 Automation，并向两个业务模块提供共享 macOS 实现；Context History 的已保存记录由 agent-server 普通工具直接读取。
@@ -55,7 +55,7 @@ flowchart TD
 - Context History 的采集与 Automation 的录制、执行由 Swift Host 应用生命周期管理。关闭窗口继续运行，Automation 禁用时或应用完全退出时清理对应任务；长期业务数据由各模块持久化。正常退出等待 Automation 取消结果落盘后再答复 AppKit。
 - 两种 React 界面各持 store 和输入控制器，分别管理后端事实投影、首轮关联和界面偏好；权威历史共用同一个 Thread。桌宠的可见集合、逐宠位置 / 大小、当前 Thread、对话隐藏和逐 Thread 回复草稿是界面状态；Swift 与 Electron main 不 mirror 消息或历史。
 - core Workspace / Pet 注册表通过同一 SQLite 拥有配置；实际目录唯一且固定，新项目与基础 Pet 同事务创建，用户 Pet 独立保存。Pet 固定引用 Workspace，Thread 固定保存一致的 petId / workspaceId 与角色快照，执行根由 Workspace 派生；同项目共享文件但不合并历史。
-- Thread 实际 Turn 开始读取项目根 AGENTS.md 一次，同轮固定、下一轮重读；缺失为空，其他读取错误明确失败。ThreadWindow 展示全部项目一级历史分组，按项目新建且可选本项目 Pet，省略时后端随机分配；桌宠仍仅查询自己的 Thread。
+- Thread 实际 Turn 开始读取项目根 AGENTS.md 一次，同轮固定、下一轮重读；缺失为空，其他读取错误明确失败。system 规则版本与时间基准共用持久历史，模型只应用最新有效规则，用户可见投影排除内部 system；注入与恢复合约见 [Runtime](./packages/core/src/runtime/runtime.md)。ThreadWindow 展示全部项目一级历史分组，按项目新建且可选本项目 Pet，省略时后端随机分配；桌宠仍仅查询自己的 Thread。
 - core ThreadRegistry / Thread 持有运行中的 Thread、历史、Turn、请求和工具状态；agent-server 仅持有订阅、连接和请求路由。Electron main 的请求观察连接仅消费召回所需身份 / Permission 通知，不持消息或历史。
 - Thread 历史主文件是 `~/.spotAgent/threads.sqlite`；其他本地配置和数据路径由 owning 模块文档说明。
 
