@@ -7,6 +7,18 @@
 
 最后核对日期：2026-10-04。
 
+## Pet 前端所有权破坏性重构（设计访谈中）
+
+目标与未决边界见 [ADR 0007](./adr/0007-frontend-pet-workspace-threads.md)；尚未实现，不计入已实现 manual QA。
+
+- [x] 读取根架构、领域路由、产品与相关 surface / ADR，核对当前模型并启动只读事实调查。
+- [ ] 通过分轮访谈确定所有权、角色执行语义、工作区切换、库存、其他输入入口与失效规则；即时更新产品、术语和 ADR，确认共同理解。
+- [ ] 确认实施规格；涉及工程 skill 的 spec 按仓库规则发布到 GitHub Issues。
+- [ ] 从主 checkout 使用 `scripts/create-worktree.sh` 初始化 `.worktrees/<task-name>/`，确认 CodeGraph 独立索引；后续 MCP 调用显式传入输出的绝对 projectPath。
+- [ ] 在 worktree 跑 `scripts/test.sh` 与桌面启动链相关的 `scripts/swiftw build` 基线，再沿 owning 目录文档链读取代码、实施删除与替换。
+- [ ] 完成必要验证及三项提交前检查，同步当前产品、架构和目录文档。
+- [ ] 分发不继承上下文的独立文档审核子 agent；确认 spec、代码、文档一致，更新 `manual-qa.md` 并迁出已完成 TODO 后提交。
+
 ## MCP 配置运行刷新（设置迁移之后）
 
 - [ ] 后端配置接口修改 MCP 后，由后端自行刷新连接与工具状态；前端不编排刷新。设置迁移本轮仅交付配置读写接口，保存成功不等于运行连接已更新。
