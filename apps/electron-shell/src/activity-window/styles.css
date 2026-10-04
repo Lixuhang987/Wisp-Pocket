@@ -26,6 +26,11 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
   user-select: none; -webkit-user-select: none;
 }
 .pet-character.is-moving { cursor: grabbing; }
+.pet-reply-dot {
+  position: absolute; top: var(--ha-spacing-xxs); right: var(--ha-spacing-xxs);
+  width: var(--ha-spacing-xs); height: var(--ha-spacing-xs); border-radius: 50%;
+  background: var(--ha-color-error); pointer-events: none;
+}
 .pet-sprite { position: absolute; right: 0; bottom: 0; display: block; transform-origin: bottom right; background-repeat: no-repeat; pointer-events: none; }
 .pet-character.is-drop-target { background: var(--ha-color-accent-subtle); outline: 2px solid var(--pet-accent); outline-offset: -2px; }
 .pet-conversation {
@@ -41,7 +46,6 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 .pet-message[data-author="user"], .pet-reply { background: var(--pet-user); border-radius: var(--ha-radius-lg) var(--ha-radius-lg) var(--ha-radius-xs) var(--ha-radius-lg); }
 .pet-message[data-author="user"] { margin-left: auto; }
 .pet-message p, .pet-request p { margin: 0; white-space: pre-wrap; }
-.pet-status { display: block; color: var(--pet-muted); font-size: var(--ha-typography-caption-size); }
 .pet-conversation.is-drop-target .pet-reply { outline: 2px solid var(--pet-accent); outline-offset: -2px; }
 .pet-latest { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pet-conversation:not(.is-expanded) .pet-latest { max-height: 4.95em; overflow: hidden; }
