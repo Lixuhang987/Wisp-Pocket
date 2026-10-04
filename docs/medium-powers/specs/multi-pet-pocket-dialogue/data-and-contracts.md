@@ -1,5 +1,7 @@
 # 数据与协议合约
 
+Issue #10 后续边界：主 Agent 的 use_tools、内置 file.write 与扩展执行入口已删除，全部文件修改委托 Codex；Workspace 工作目录不是沙箱。下文内置写入、文件锁与激活相关条款只作历史追溯，当前验收以 [manual QA](../../../manual-qa.md) 为准。
+
 本文保留[多桌宠规格](./multi-pet-pocket-dialogue.md)当时的数据验收合约。历史范围：Pet 替代 Workspace、权威 rootPath 与按宠分组已由 Issue #8 替代；Issue #9 已实现前端 Pet 并删除后端角色快照。本文不是当前数据模型或下一轮规格，替代关系从主文档进入；原条款保留用于追溯，不能据此回退后续决定。
 
 ## Pet 替换 Workspace

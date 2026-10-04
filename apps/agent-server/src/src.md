@@ -8,10 +8,10 @@
 - [thread/thread.md](/Users/mu9/proj/handAgent/apps/agent-server/src/thread/thread.md)：Thread 命令接入、Workspace 管理、持久化适配和通知分发。
 - [agent/agent.md](/Users/mu9/proj/handAgent/apps/agent-server/src/agent/agent.md)：历史 Agent 目录说明；生产 Thread owner 位于 core `thread/`。
 - [protocol/protocol.md](/Users/mu9/proj/handAgent/apps/agent-server/src/protocol/protocol.md)：runtime、UI 与持久化表达之间的翻译。
-- [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md)：Thread-scoped Tool registry 与 MCP 激活。
+- [actions/actions.md](/Users/mu9/proj/handAgent/apps/agent-server/src/actions/actions.md)：默认读取与 Codex CLI 外部适配；保留 MCP client 实现。
 - [bridges/bridges.md](/Users/mu9/proj/handAgent/apps/agent-server/src/bridges/bridges.md)：Dynamic Tool Provider bridge。
 - [activity/activity.md](/Users/mu9/proj/handAgent/apps/agent-server/src/activity/activity.md)：Agent Activity 投影。
-- [settings/settings.md](/Users/mu9/proj/handAgent/apps/agent-server/src/settings/settings.md)：后端配置 HTTP 管理与设置驱动的 LLM / Tool 热加载。
+- [settings/settings.md](/Users/mu9/proj/handAgent/apps/agent-server/src/settings/settings.md)：后端配置 HTTP 管理、Codex 可用状态与 LLM 热加载。
 
 ## 依赖方向
 

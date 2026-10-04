@@ -6,15 +6,16 @@
 
 1. 安装依赖：`pnpm install`。
 2. 运行 Wisp Pocket Swift Host：`bash ./scripts/swiftw run HandAgentDesktop`（Swift 内部 executable target 名称暂保留）。
-3. 从 menu bar 的“设置”打开 Electron 窗口，在 AI 显式保存模型 provider、model、API Key 和可选 Base URL；原生宿主设置仍从 PromptPanel 进入。
+3. 从 menu bar 的“设置”打开 Electron 窗口，在模型服务显式保存 provider、model、API Key 和可选 Base URL；原生宿主设置仍从 PromptPanel 进入。
+4. 复杂任务与写文件需要预先安装并登录 Codex CLI；在“Codex 执行”重新检查。Wisp 不安装或登录 Codex，也不将主 Agent 配置复制进去。
 
 `swiftw run` 会按需安装依赖、生成主题 token，并构建 ThreadWindow 与 Electron UI Shell。成功路径保持安静，失败时回放对应子命令输出。
 
 ## 模型设置
 
-- 后端模型/Tool 文件是 `~/.spotAgent/settings.json`，Electron 设置通过 `/api/settings/*` 修改。Swift 外观独立写 `~/.spotAgent/native-preferences.json`，不镜像后端配置；MCP 配置写 `mcp.json`，保存后重启 App 加载，尚无运行刷新。
+- 后端模型文件是 `~/.spotAgent/settings.json`，Electron 设置通过 `/api/settings/*` 修改。Swift 外观独立写 `~/.spotAgent/native-preferences.json`，不镜像后端配置；MCP 配置写 `mcp.json`，保存后不会刷新运行连接；现有 MCP/macOS/Automation 尚未接入 Codex，主 Agent 不直接调用。
 - provider 支持 `openai-compatible` 与 `anthropic`；OpenAI-compatible API 支持 `responses`、`chat`、`completion`。
-- agent-server 按文件戳热加载模型与 Tool 设置；正常修改无需重启。
+- agent-server 按文件戳热加载主 Agent 模型设置；正常修改无需重启。
 - 图片输入要求支持多模态的 API；`completion` 路径不支持图片。
 - `web_search` 需要 agent-server 环境中的 `TAVILY_API_KEY`；`fetch_page` 会请求目标公共 URL。
 - 桌宠拖入的 PDF 只交付原路径引用，由模型按需调用 file.read 读取当时内容，不保存原文件副本；扫描版、加密或损坏文档会说明读取障碍，不承诺 OCR。
@@ -49,7 +50,8 @@ env CFFIXED_USER_HOME="$qa_home" HOME="$qa_home" bash ./scripts/swiftw test
 - provider 地址错误：检查 `baseUrl` 和 `api` 是否匹配服务端协议。
 - 图片失败：确认模型 API 支持多模态，并区分 Blob 落盘、STUB 展开和 provider 拒绝。
 - 窗口或热键：检查辅助功能权限，再观察 PromptPanel、ThreadWindow 和桌宠的实际所有者。桌宠位置与隔离 QA 配置见 [Electron main](../apps/electron-shell/src/main/main.md)。
-- 平台 Tool：先跑对应 core/Swift 测试，真实屏幕录制、AX 和焦点行为进入 manual QA。
+- Codex 无法委托：在设置重新检查，区分未安装、未登录和启动不可用；终端核对 `codex --version` / `codex login status`。桌面进程 PATH 可与终端不同，后端也搜索常见 Homebrew 与用户安装目录。ready 不证明实际任务或内部权限通过。
+- 平台 Tool：现有 Provider/实现仍可专项验证，但生产主 Agent 不直接公开；不要用旧 mock 宿主/MCP 触发词证明当前产品入口可用。真实屏幕录制、AX 和焦点行为进入 manual QA。
 
 ## 内置功能实机数据
 
@@ -68,7 +70,7 @@ env CFFIXED_USER_HOME="$qa_home" HOME="$qa_home" bash ./scripts/swiftw test
 
 ## 代码边界
 
-- 初始任务资料由用户主动提交；system 规则与时间基准按 [Runtime 合约](../packages/core/src/runtime/runtime.md) 持久化注入。屏幕、剪贴板、文件与应用状态通过 Tool 按需读取。
+- 初始任务资料由用户主动提交；system 规则与时间基准按 [Runtime 合约](../packages/core/src/runtime/runtime.md) 持久化注入。文件/保存历史通过默认 Tool 按需读取；实时屏幕、剪贴板与应用工具的实现保留，尚未迁入 Codex。
 - core 不依赖产品 UI 或 macOS；平台能力通过 Dynamic Tool Provider 接入。
 - Tool 名称使用稳定点号形式，输入、输出、Permission 和错误语义必须明确。
 - 视觉常量只修改 `design/tokens.json`，再运行 `pnpm generate:theme-tokens`；桌宠结构与角色图集边界见 [DESIGN.md](../DESIGN.md)。

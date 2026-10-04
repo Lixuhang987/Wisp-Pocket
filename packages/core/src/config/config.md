@@ -1,54 +1,24 @@
 # config
 
-`~/.spotAgent/settings.json` 解析。当前拆成 `ModelSettings` + `ToolSettings` 两个独立 loader，共享同一个文件。
+本目录解析 `~/.spotAgent/settings.json` 中主 Agent 的模型配置。Codex 使用用户自己的 CLI 配置与登录，不映射主 Agent 模型、凭据或权限。
 
-## 文件
+## 直接子节点
 
-| 文件 | 职责 |
-|------|------|
-| `ModelSettings.ts` | `loadModelSettings()`：同步 `readFileSync` 读 `settings.json`，用 `zod` 归一化 `llm.{provider, model, summarizerModel, apiKey, baseUrl, api}`；JSON 解析失败抛错（带文件路径），其它字段缺失走默认；调用方负责是否加缓存 |
-| `ToolSettings.ts` | `loadToolSettings()` + `filterToolNames()`：解析 `tools.allowlist / tools.denylist`；`denylist` 优先；JSON 解析失败静默 fallback 到默认 |
+- `ModelSettings.ts`：模型设置 schema、默认值与文件路径。
 
-## 配置文件结构
+## 配置与生效边界
 
-```
-~/.spotAgent/settings.json
-```
+`llm` 保存 provider、model、summarizerModel、apiKey、baseUrl 与 api；字段真相以类型定义为准。顶层 JSON 解析失败明确报错，缺失或未识别字段按 schema 默认值归一化。已删除 ToolSettings 与 builtin allowlist / denylist 的执行过滤，不提供旧开发配置迁移。
 
-```json
-{
-  "llm": {
-    "provider": "openai-compatible",
-    "model": "gpt-5-mini",
-    "summarizerModel": "claude-haiku-4-5-20251001",
-    "apiKey": "sk-...",
-    "baseUrl": "https://api.openai.com/v1",
-    "api": "responses"
-  },
-  "tools": {
-    "allowlist": ["file.write"],
-    "denylist": ["file.write"]
-  }
-}
-```
+[agent-server 设置接口](../../../../apps/agent-server/src/settings/settings.md) 校验并合并模型 patch，保留未展示字段。[SettingsBackedLLMClient](../../../../apps/agent-server/src/settings/SettingsBackedLLMClient.ts) 按实例缓存 mtimeMs + size，配置改变后下次模型请求生效；只有有效 Provider 配置变化才重建 client。chat / summarizer 共用服务端凭据与端点，purpose 只改变模型。
 
-## 当前实现特点
+Swift 原生主题使用独立偏好文件，不写后端镜像；Codex 可用状态是只读探测，不保存为模型或 Tool 开关。
 
-- **LLM 模型配置热加载 + mtime cache**：`SettingsBackedLLMClient.stream` / `complete` 每次先读取 `settings.json` 的 `mtimeMs + size` stamp；stamp 未变时复用上次解析出的有效配置与 `LLMClientFactory` 创建的 client，不调用 `loadModelSettings()`；stamp 变化后同步重读，若 `provider / model / apiKey / baseUrl / api`（摘要路径为 `summarizerModel`）等有效 client 配置变化才重建 client。配合 agent-server 设置接口写盘，模型设置在下一次 LLM 请求可见。
-- **tool settings 热加载 + mtime cache**：`SettingsBackedToolRegistry.refresh()` 每次新一轮 user message 进入 runtime 前读取 `settings.json` stamp；stamp 未变时跳过，stamp 变化后重读 `tools.allowlist / tools.denylist` 并原地刷新同一个 `ToolRegistry` 实例，后续 LLM 请求立即看到最新 builtin tool 列表。
-- **`ModelSettings` vs `ToolSettings` 错误处理不一致**：前者 JSON 解析失败抛错（让用户看到明确反馈），后者静默回默认（避免阻塞启动）。当前是有意为之但未在文档中明示，本文件起统一约定。
-- **默认 api 不一致**：`defaultModelSettings.api = "responses"`，`VercelClient` 构造默认 `api = "chat"`。生产路径全程透传 settings 故无冲突，但留下了一个潜在 footgun。
-- **provider 默认兼容旧配置**：`provider` 缺失或非法时回退到 `openai-compatible`，旧版 `settings.json` 无需迁移即可继续走 OpenAI 兼容路径；当前可选值为 `openai-compatible` 与 `anthropic`。
+## 修改约束
 
-## 编辑此目录的约束
+- 不在模块作用域缓存设置；缓存归调用方实例，保持改完下次请求生效。
+- 新配置组有独立 schema 与 loader，不混入 ModelSettings。
+- 文件路径函数保留 homeDir 注入，避免测试触碰用户配置。
+- 配置字段变化须同步 Provider client 配置比较；默认设置 api 为 responses，直接构造 VercelClient 的默认 api 为 chat，生产路径必须显式透传。
 
-- 不要把 settings 缓存到模块作用域。读盘优化必须是调用方实例级缓存，并引入 mtime / TTL 失效策略，同时保持模型设置"改完下次请求生效"的语义。
-- 新增配置组（例如 `permissions.cacheTtl`）请独立 `XxxSettings.ts` + `loadXxxSettings()`，不要塞回 `ModelSettings`。
-- 字段类型要通过 schema 做防御式校验和 trim 归一化，未识别值要走默认而非抛错（除了顶层 JSON 解析失败）。
-- 文件路径函数 `xxxSettingsFilePath(homeDir = homedir())` 必须保留 `homeDir` 参数，便于测试注入临时目录。
-
-## 相关文档
-
-- 调用方：[apps/agent-server/agent-server.md](/Users/mu9/proj/handAgent/apps/agent-server/agent-server.md)（`SettingsBackedLLMClient` + `SettingsBackedToolRegistry`）
-- 配置读写：[agent-server 设置接口](../../../../apps/agent-server/src/settings/settings.md)；Swift 原生主题使用独立偏好文件，不写后端配置。
-- LLM 适配：[llm/llm.md](/Users/mu9/proj/handAgent/packages/core/src/llm/llm.md)
+Provider 适配见 [adapters](../adapters/adapters.md)，模型端口见 [llm](../llm/llm.md)。

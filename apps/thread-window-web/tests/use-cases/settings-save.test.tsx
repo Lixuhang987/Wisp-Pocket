@@ -9,12 +9,13 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('saves AI explicitly, retains a failed draft and preserves the hidden summarizer setting', async () => {
   const writes: unknown[] = [];
   let fail = true;
+  let codexReady = false;
   vi.stubGlobal('fetch', vi.fn(async (_url: unknown, options?: RequestInit) => {
     if (options?.method === 'PUT') {
       writes.push(JSON.parse(String(options.body)));
       return new Response(JSON.stringify(fail ? {error:'配置保存失败'} : {...JSON.parse(String(options.body)),summarizerModel:'keep-summary'}), {status:fail?500:200});
     }
-    if (String(_url).endsWith('/tools')) return new Response(JSON.stringify({tools:[]}));
+    if (String(_url).endsWith('/tools')) return new Response(JSON.stringify({codex:{state:codexReady?'ready':'not_logged_in',message:codexReady?'Codex CLI 已安装并登录':'请运行 codex login',version:'codex-cli fixture'}}));
     if (String(_url).endsWith('/mcp')) return new Response(JSON.stringify({version:1,servers:[]}));
     if (String(_url).endsWith('/permissions')) return new Response(JSON.stringify({rules:[]}));
     return new Response(JSON.stringify({provider:'openai-compatible',model:'old-model',api:'responses',baseUrl:'https://example.test/v1',apiKey:'secret',summarizerModel:'keep-summary'}));
@@ -32,6 +33,13 @@ it('saves AI explicitly, retains a failed draft and preserves the hidden summari
   fireEvent.click(screen.getByRole('button', {name:'模型服务'}));
   expect(screen.getByLabelText<HTMLInputElement>('模型').value).toBe('new-model');
   expect(writes).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button', {name:'Codex 执行'}));
+  await screen.findByText('请运行 codex login');
+  codexReady = true;
+  fireEvent.click(screen.getByRole('button', {name:'重新检查'}));
+  await screen.findByText('Codex CLI 已安装并登录');
+  fireEvent.click(screen.getByRole('button', {name:'模型服务'}));
+  expect(screen.getByLabelText<HTMLInputElement>('模型').value).toBe('new-model');
   fireEvent.click(screen.getByRole('button', {name:'保存模型'}));
   await screen.findByRole('alert');
   expect(screen.getByLabelText<HTMLInputElement>('模型').value).toBe('new-model');

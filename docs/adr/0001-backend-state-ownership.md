@@ -1,6 +1,6 @@
 # 后端按状态归属与生命周期划分边界
 
-各项原则已在 [实施规格 #2](https://github.com/Lixuhang987/Wisp-Pocket/issues/2) 中落地。当前所有权见 [后端状态归属](../backend-state-ownership.md)；本文保留决策理由与明确排除的能力，Issue #3 沿用这些边界；后续 Issue #1 在相同所有权下增加持久 pending 输入与 snapshot 待答请求恢复，因此本文对原实施范围的排除不表示当前缺少这些能力。Issue #7 已将下文历史记录中的 Workspace 替换为 Pet，并移除 Workspace 选择请求；当前字段与流程以 owning 模块为准。
+各项原则已在 [实施规格 #2](https://github.com/Lixuhang987/Wisp-Pocket/issues/2) 中落地。当前所有权见 [后端状态归属](../backend-state-ownership.md)；本文保留决策理由与明确排除的能力，Issue #3 沿用这些边界；后续 Issue #1 在相同所有权下增加持久 pending 输入与 snapshot 待答请求恢复，因此本文对原实施范围的排除不表示当前缺少这些能力。Issue #7 已将下文历史记录中的 Workspace 替换为 Pet，并移除 Workspace 选择请求；随后 #9 恢复独立 Workspace 并移除后端 Pet；#10 移除工具激活与 builtin Tool 配置，改为每轮目录解析与 Codex 委托。下文相应表述只保留原重构的历史范围，当前字段与流程以 owning 模块为准。
 
 重构覆盖整个后端，包括 Thread 执行、协议接入、持久化、Tool / Provider、交互请求和服务生命周期。默认保持现有用户行为；发现矛盾时单独决策，不借结构调整改变产品规则。
 

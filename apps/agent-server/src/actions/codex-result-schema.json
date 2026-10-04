@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "success": { "type": "boolean", "description": "本次任务及验收要求是否实际完成。操作受限、需要审批或尚未完成时为 false；成功结束对话不等于任务完成。" },
+    "reply": { "type": "string", "description": "最终用户正文：完成的工作、验收结果、相关产物路径或具体障碍。" },
+    "error": { "type": ["string", "null"], "description": "未完成、受限或执行失败的具体原因；成功时为 null。" }
+  },
+  "required": ["success", "reply", "error"]
+}

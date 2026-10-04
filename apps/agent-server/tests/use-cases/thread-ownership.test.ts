@@ -106,41 +106,27 @@ describe("Thread ownership through public lifecycle", () => {
     } finally { gate.resolve(); await h.close(); }
   });
 
-  it("interrupts a Thread while its Dynamic Tool is pending and ignores the provider's late result", async () => {
-    const bridge = new WebSocketDynamicToolBridge();
-    const entered = Promise.withResolvers<DynamicToolCallRequestPayload>();
-    const token = bridge.attach("swift-host", (message) => entered.resolve(message.payload));
+  it("interrupts a Thread while its external Tool is pending and ignores the late result", async () => {
+    const entered = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<string>();
     let completion = 0;
-    const client = { complete: async () => ({
-      message: { role: "assistant" as const, content: "" },
-      toolCalls: [{ id: `call-${++completion}`, name: completion === 1 ? "use_tools" : "automation.run", arguments: completion === 1 ? {} : { policyId: "waiting-policy" } }],
-    }) };
+    const client = { complete: async () => ({message:{role:"assistant" as const,content:""},toolCalls:[{id:`call-${++completion}`,name:"test.pending",arguments:{}}]}) };
     const h = threadHarness(client, {
-      createTools: (dynamicTools) => new ThreadTools({
-        builtinRegistry: new ToolRegistry(), globalMcpServerIds: [], listMcpTools: async () => [], dynamicToolBridge: bridge,
-      }, dynamicTools),
-      createRuntime: (_id, tools) => new AgentRuntime(client, tools.registry, {
-        onMetaToolActivate: () => tools.activate(), isThreadActivated: () => tools.isActivated(),
-      }),
+      createTools: () => new ThreadTools({resolveTools:()=>[{
+        name:"test.pending",description:"等待外部任务",inputSchema:{type:"object"},requiresPermission:false,
+        call:async()=>{entered.resolve();return gate.promise;},
+      }]}),
     });
     try {
-      const thread = await h.threads.create({ workspaceId: h.workspace.id, dynamicTools: [{
-        clientId: "swift-host", namespace: "automation", name: "run", description: "Run saved policy", inputSchema: { type: "object" },
-      }] });
-      await thread.submit(input("run then interrupt"));
-      const request = await entered.promise;
-      await thread.interrupt();
-      expect(thread.status).toBe("interrupted");
+      const thread = await h.threads.create({workspaceId:h.workspace.id});
+      await thread.submit(input("run then interrupt"));await entered.promise;
+      await thread.interrupt();expect(thread.status).toBe("interrupted");
       const saved = await h.persistence.getMessages(thread.id);
-      bridge.handleResponse({
-        callId: request.callId, success: true,
-        contentItems: [{ type: "inputText", text: "late provider completion" }],
-      }, token);
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      gate.resolve("late external completion");
+      await new Promise(resolve=>setTimeout(resolve,10));
       expect(await h.persistence.getMessages(thread.id)).toEqual(saved);
-      expect(thread.status).toBe("interrupted");
-      expect(completion).toBe(2);
-    } finally { bridge.close(); await h.close(); }
+      expect(thread.status).toBe("interrupted");expect(completion).toBe(1);
+    } finally {gate.resolve("finished");await h.close();}
   });
 
   it("deletes an executing Thread, rejects new input and never recreates history from late results", async () => {

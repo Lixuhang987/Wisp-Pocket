@@ -8,6 +8,7 @@ import type { AddressInfo } from "node:net";
 import { FilePermissionPolicy } from "@handagent/core/adapters/filesystem/FilePermissionPolicy.ts";
 import { loadModelSettings } from "@handagent/core/config/ModelSettings.ts";
 import { AgentRuntime } from "@handagent/core/runtime/AgentRuntime.ts";
+import { codexFixture } from "../support/codexFixture.ts";
 import { SettingsAPI } from "../../src/settings/SettingsAPI.ts";
 import { SettingsBackedLLMClient } from "../../src/settings/SettingsBackedLLMClient.ts";
 import { startServer } from "../../src/server/server.ts";
@@ -23,7 +24,7 @@ it("saves backend configuration through HTTP for subsequent runtime use while pr
   await writeFile(settingsPath, JSON.stringify({llm:{model:"before",summarizerModel:"summary-model",futureField:"preserve"},tools:{denylist:[]},other:{keep:true}}));
   await writeFile(nativePath, JSON.stringify({appearance:{theme:"dark"}}));
   const permissionPolicy = new FilePermissionPolicy({filePath:join(root,"permissions.json")});
-  await permissionPolicy.remember({toolName:"file.write",arguments:{},toolCallId:"call"}, {decision:"allow",remember:"always"});
+  await permissionPolicy.remember({toolName:"codex.execute",arguments:{},toolCallId:"call"}, {decision:"allow",remember:"always"});
   const clients: string[] = [];
   const client = new SettingsBackedLLMClient({}, {
     loadModelSettings: () => loadModelSettings(home),
@@ -31,17 +32,21 @@ it("saves backend configuration through HTTP for subsequent runtime use while pr
     createClient: settings => { clients.push(settings.model); return {complete:async () => ({message:{role:"assistant",content:settings.model}})}; },
   });
   const h = threadHarness(client, {createRuntime:(_id,tools) => new AgentRuntime(client,tools.registry)});
-  const server = await startServer({commandRouter:h.router,eventPublisher:h.publisher,settingsAPI:new SettingsAPI({settingsPath,mcpPath,permissionPolicy}),port:0});
+  const server = await startServer({commandRouter:h.router,eventPublisher:h.publisher,settingsAPI:new SettingsAPI({settingsPath,mcpPath,permissionPolicy,codexCLI:await codexFixture(home)}),port:0});
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/settings`;
   const request = (path:string,method="GET",body?:unknown) => fetch(base+path,{method,headers:{"Content-Type":"application/json"},...(body === undefined ? {} : {body:JSON.stringify(body)})});
   try {
     expect(await (await request("/model")).json()).toMatchObject({model:"before",summarizerModel:"summary-model",futureField:"preserve"});
     await client.complete([],[]);
-    const results = await Promise.all([request("/model","PUT",{provider:"anthropic",model:"after",api:"chat",apiKey:"secret-value",baseUrl:"https://example.com"}),request("/tools","PUT",{name:"file.write",enabled:false}),writeFile(nativePath,JSON.stringify({appearance:{theme:"light"}}))]);
+    const results = await Promise.all([request("/model","PUT",{provider:"anthropic",model:"after",api:"chat",apiKey:"secret-value",baseUrl:"https://example.com"}),request("/tools"),writeFile(nativePath,JSON.stringify({appearance:{theme:"light"}}))]);
     expect(results.slice(0,2).every(response => response instanceof Response && response.ok)).toBe(true);
-    expect(JSON.parse(await readFile(settingsPath,"utf8"))).toMatchObject({llm:{model:"after",summarizerModel:"summary-model",futureField:"preserve"},tools:{denylist:["file.write"]},other:{keep:true}});
+    expect(JSON.parse(await readFile(settingsPath,"utf8"))).toMatchObject({llm:{model:"after",summarizerModel:"summary-model",futureField:"preserve"},tools:{denylist:[]},other:{keep:true}});
     expect(JSON.parse(await readFile(nativePath,"utf8"))).toEqual({appearance:{theme:"light"}});
-    expect(await (await request("/tools")).json()).toMatchObject({tools:[{name:"file.write",enabled:false}]});
+    expect(await (await request("/tools")).json()).toMatchObject({codex:{state:"ready",version:"codex-cli fixture",message:expect.any(String)}});
+    await writeFile(join(home,"fixture-state"),"not_logged_in");
+    expect(await (await request("/tools")).json()).toMatchObject({codex:{state:"not_logged_in",message:expect.stringContaining("codex login")}});
+    await writeFile(join(home,"fixture-state"),"unavailable");
+    expect(await (await request("/tools")).json()).toMatchObject({codex:{state:"unavailable"}});
     const start = await h.threads.create({commandId:"settings-run",workspaceId:h.workspace.id});
     await start.submit(input("使用已保存配置"));
     await new Promise<void>((resolve,reject)=>{const deadline=Date.now()+2000;const poll=()=>{if(start.status==="idle")resolve();else if(Date.now()>deadline)reject(new Error("Turn timeout"));else setTimeout(poll,10);};poll();});
@@ -52,9 +57,9 @@ it("saves backend configuration through HTTP for subsequent runtime use while pr
     expect(await (await request("/mcp")).json()).toEqual(mcp);
     expect(JSON.parse(await readFile(mcpPath,"utf8"))).toEqual(mcp);
     const rules = await (await request("/permissions")).json();
-    expect(rules.rules[0]).toMatchObject({toolName:"file.write",decision:"allow",createdAt:expect.any(String)});
-    expect(await (await request("/permissions/file.write","DELETE")).json()).toEqual({rules:[]});
-    expect(await permissionPolicy.check({toolName:"file.write",arguments:{},toolCallId:"call"})).toBe("ask");
+    expect(rules.rules[0]).toMatchObject({toolName:"codex.execute",decision:"allow",createdAt:expect.any(String)});
+    expect(await (await request("/permissions/codex.execute","DELETE")).json()).toEqual({rules:[]});
+    expect(await permissionPolicy.check({toolName:"codex.execute",arguments:{},toolCallId:"call"})).toBe("ask");
     const invalid = await request("/model","PUT",{model:"",apiKey:"secret-value"});
     expect(invalid.status).toBe(400);
     expect(await invalid.text()).not.toContain("secret-value");

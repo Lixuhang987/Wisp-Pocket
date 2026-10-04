@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AgentMessage } from '@handagent/core/runtime/types/AgentMessage.ts';
 import { attachThreadSocketHandlers } from '../../src/server/server.ts';
+import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
 import { threadHarness, input } from '../support/threadHarness.ts';
 
 const roots: string[] = [];
@@ -24,11 +25,11 @@ it('reuses real-directory Workspaces and preserves ordinary role inputs and isol
     const latestUser = messages.filter(message => message.role === 'user').at(-1);
     if (latestUser?.content === '同轮规则固定' && !messages.some(message => message.role === 'tool')) {
       await writeFile(join(dir, 'shared', 'AGENTS.md'), '模型调用中改写的第三版');
-      return {message:{role:'assistant' as const,content:''},toolCalls:[{id:'activate-once',name:'use_tools',arguments:{}}]};
+      return {message:{role:'assistant' as const,content:''},toolCalls:[{id:'read-once',name:'test.read',arguments:{}}]};
     }
     return { message: { role: 'assistant' as const, content: '完成' } };
   } };
-  let h = threadHarness(model, {}, dbPath);
+  let h = threadHarness(model, {createTools:()=>new ThreadTools({resolveTools:()=>[{name:"test.read",description:"读取",inputSchema:{type:"object"},requiresPermission:false,call:async()=>"当前内容"}]})}, dbPath);
   const sockets: Socket[] = [];
   const connect = () => {
     const socket = new Socket();
@@ -111,7 +112,7 @@ it('preserves a deleted creation identity across owner restarts while allowing g
     requests.push(structuredClone(messages));
     return { message: {role:'assistant' as const,content:'完成'} };
   } };
-  let h = threadHarness(model, {}, dbPath);
+  let h = threadHarness(model, {createTools:()=>new ThreadTools({resolveTools:()=>[{name:"test.read",description:"读取",inputSchema:{type:"object"},requiresPermission:false,call:async()=>"当前内容"}]})}, dbPath);
   const frames:any[]=[];
   const attach = () => h.publisher.attachConnection('pet-window',frame=>frames.push(frame));
   attach();
@@ -127,7 +128,7 @@ it('preserves a deleted creation identity across owner restarts while allowing g
     expect(frames.at(-1)).toMatchObject({type:'thread.error',commandId:command.commandId,payload:{code:'not_found'}});
     expect(await h.persistence.listThreads()).toEqual([]);
     await h.close();
-    h = threadHarness(model, {}, dbPath); attach();
+    h = threadHarness(model, {createTools:()=>new ThreadTools({resolveTools:()=>[{name:"test.read",description:"读取",inputSchema:{type:"object"},requiresPermission:false,call:async()=>"当前内容"}]})}, dbPath); attach();
     await h.router.receive(command,'pet-window');
     expect(frames.at(-1)).toMatchObject({type:'thread.error',commandId:command.commandId,payload:{code:'not_found'}});
     await h.router.receive({type:'op.submit',commandId:'retry-first-input',timestamp:'now',threadId:deletedId,payload:{op:input('旧接收动作不可复活')}},'pet-window');

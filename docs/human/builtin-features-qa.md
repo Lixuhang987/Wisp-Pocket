@@ -6,13 +6,13 @@
 
 - 使用本次 worktree 的最终构建，记录分支、commit/diff、macOS、bundle 路径、签名、进程、端口及屏幕录制/辅助功能/事件监听权限。基线与打包命令见 [开发说明](../dev.md)。
 - 通过 `HANDAGENT_HOST_DATA_HOME` 隔离内置配置和业务数据；其他设置与 Thread 数据不会一起重定向。使用可撤销的测试窗口、文本和流程，保留原环境状态以便恢复。
-- 实时宿主 / Automation 工具走实际 Swift Dynamic Tool Provider，历史查询走 agent-server 普通工具读取 Swift 已存记录；测试辅助客户端记录实际入口、调用标识与响应。图片还需确认模型消费或 UI 能读取真实内容，不能只看磁盘有文件。
+- Issue #10 后，主 Agent 不直接公开实时宿主 / Automation 工具，它们也未迁入 Codex；AU/HOST 的能力专项验收使用显式测试客户端，不能作为主 Agent 或 Codex 已接管的证据。实时宿主 / Automation 工具走实际 Swift Dynamic Tool Provider，历史查询走 agent-server 普通工具读取 Swift 已存记录；测试辅助客户端记录实际入口、调用标识与响应。图片还需确认模型消费或 UI 能读取真实内容，不能只看磁盘有文件。
 - 每个编号记录日期、环境、输入动作、工具结果、可见 UI、文件/进程证据及结论。通过项由 project-live-qa 归档脚本从 manual-qa 移出；未执行或证据不足的项保留待验证。
 
 ## CH1：常驻采集与独立 Automation 配置
 
 1. 在全新的内置数据 home 启动应用，打开 Settings → 工具，确认 Context History 无开关且开始采集或展示真实权限失败，Automation 默认关闭。
-2. 启用 Automation，确认仅保存其启用选择。新建 Thread 首轮直接可见四个 context_history 工具，激活其他工具后仍保留；automation 工具沿既有激活路径。
+2. 启用 Automation，确认仅保存其启用选择。新建 Thread 首轮直接可见四个 context_history 工具，目录每轮仍保留；Automation 仅沿显式 Provider 测试客户端验证，不再通过主 Agent 激活。
 3. 退出再启动同一数据 home，确认采集自动恢复、Automation 选择保留；断开 Swift Provider 后已有历史仍可查询。声明刷新不应误断在途调用。
 
 ## CH2：变化、周期与定期截图

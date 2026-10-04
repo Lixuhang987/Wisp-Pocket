@@ -2,8 +2,7 @@ import { readFile, mkdir, writeFile, rename, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { defaultModelSettings } from "@handagent/core/config/ModelSettings.ts";
-import { filterToolNames } from "@handagent/core/config/ToolSettings.ts";
-import { buildBuiltinToolCandidates } from "@handagent/core/tools/registerBuiltins.ts";
+import type { CodexCLI } from "../actions/CodexCLI.ts";
 import { parseMCPConfig } from "@handagent/core/mcp/MCPConfig.ts";
 import type { FilePermissionPolicy } from "@handagent/core/adapters/filesystem/FilePermissionPolicy.ts";
 import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
@@ -16,7 +15,6 @@ const modelPatch = z.object({
   apiKey:z.string().optional(),
   summarizerModel:z.string().trim().min(1).optional(),
 }).strict();
-const toolPatch = z.object({name:z.string().min(1),enabled:z.boolean()}).strict();
 
 type Request = {
   method?:string; url?:string;
@@ -30,7 +28,7 @@ class InvalidSettings extends Error {}
 /** Serializes read-modify-write operations on backend configuration, independently of native preferences. */
 export class SettingsAPI {
   private writing:Promise<void> = Promise.resolve();
-  constructor(private readonly options:{settingsPath:string;mcpPath:string;permissionPolicy:FilePermissionPolicy}) {}
+  constructor(private readonly options:{settingsPath:string;mcpPath:string;permissionPolicy:FilePermissionPolicy;codexCLI:CodexCLI}) {}
 
   async handle(request:Request,response:Response):Promise<boolean> {
     const pathname = new URL(request.url??"/","http://127.0.0.1").pathname;
@@ -54,18 +52,7 @@ export class SettingsAPI {
         });
       } else if (path === "/tools" && request.method === "GET") {
         await this.writing;
-        result = this.tools(await this.readObject(this.options.settingsPath));
-      } else if (path === "/tools" && request.method === "PUT") {
-        const parsed = toolPatch.safeParse(await readJSON(request));
-        if (!parsed.success || !buildBuiltinToolCandidates().candidates.some(tool => tool.name === parsed.data.name)) throw new InvalidSettings("工具配置无效。");
-        result = await this.updateSettings(settings => {
-          const tools = objectOrEmpty(settings.tools);
-          const denied = new Set(stringList(tools.denylist));
-          if (parsed.data.enabled) denied.delete(parsed.data.name); else denied.add(parsed.data.name);
-          const allowed = stringList(tools.allowlist);
-          settings.tools = {...tools,denylist:[...denied],...(allowed.length && parsed.data.enabled ? {allowlist:[...new Set([...allowed,parsed.data.name])]} : {})};
-          return this.tools(settings);
-        });
+        result = {codex:await this.options.codexCLI.readiness()};
       } else if (path === "/mcp" && request.method === "GET") {
         await this.writing;
         const config = await this.readObject(this.options.mcpPath,{version:1,servers:[]});
@@ -99,13 +86,6 @@ export class SettingsAPI {
     return true;
   }
 
-  private tools(settings:Record<string,unknown>) {
-    const tools = objectOrEmpty(settings.tools);
-    const candidates = buildBuiltinToolCandidates().candidates;
-    const allowed = stringList(tools.allowlist);
-    const enabled = new Set(filterToolNames(candidates.map(tool=>tool.name),{allowlist:allowed.length?allowed:null,denylist:stringList(tools.denylist)}).enabled);
-    return {tools:candidates.map(tool=>({name:tool.name,title:tool.name,enabled:enabled.has(tool.name)}))};
-  }
   private updateSettings<T>(update:(settings:Record<string,unknown>)=>T):Promise<T> {
     return this.enqueue(async () => {
       const settings = await this.readObject(this.options.settingsPath);
@@ -139,7 +119,6 @@ export class SettingsAPI {
 }
 function isObject(value:unknown):value is Record<string,unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function objectOrEmpty(value:unknown):Record<string,unknown> { return isObject(value)?value:{}; }
-function stringList(value:unknown):string[] { return Array.isArray(value)?value.filter((entry):entry is string=>typeof entry === "string"):[]; }
 function readJSON(request:Request):Promise<unknown> {
   return new Promise((resolve,reject) => {
     const chunks:Buffer[] = []; let size = 0;

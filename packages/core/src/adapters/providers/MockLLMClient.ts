@@ -75,18 +75,17 @@ export const mockLLMScenarios: MockLLMScenario[] = [
     finalText: "Mock host_macos.screen_capture window completed.",
   }),
   toolScenario({
-    id: "file-write",
-    trigger: "[mock:file-write]",
-    description: "调用 file.write，参数形态参考真实 API 集成测试。",
+    id: "codex-write",
+    trigger: "[mock:codex-write]",
+    description: "委托实际 Codex CLI 写入 hello.txt；仍需用户安装、登录和 Wisp Permission。",
     toolCall: {
-      id: "mock-file-write-1",
-      name: "file.write",
+      id: "mock-codex-write-1",
+      name: "codex.execute",
       arguments: {
-        relativePath: "hello.txt",
-        content: "hello from MockLLMClient",
+        prompt: "在当前工作目录创建 hello.txt，内容为 hello from MockLLMClient。验证文件后汇报。",
       },
     },
-    finalText: "Mock file.write completed for hello.txt.",
+    finalText: "Mock codex.execute returned for hello.txt.",
   }),
   toolScenario({
     id: "file-read",
@@ -100,34 +99,6 @@ export const mockLLMScenarios: MockLLMScenario[] = [
       },
     },
     finalText: "Mock file.read completed for hello.txt.",
-  }),
-  toolScenario({
-    id: "path-escape",
-    trigger: "[mock:path-escape]",
-    description: "返回越狱路径 file.write，用于验证 Workspace 文件根边界拒绝。",
-    toolCall: {
-      id: "mock-path-escape-1",
-      name: "file.write",
-      arguments: {
-        relativePath: "../../etc/passwd",
-        content: "should be rejected",
-      },
-    },
-    finalText: "Mock path escape scenario finished.",
-  }),
-  toolScenario({
-    id: "symlink-escape",
-    trigger: "[mock:symlink-escape]",
-    description: "返回指向 symlink 内路径的 file.write，用于验证 Workspace realpath 文件根边界拒绝。",
-    toolCall: {
-      id: "mock-symlink-escape-1",
-      name: "file.write",
-      arguments: {
-        relativePath: "outside-link/escape.txt",
-        content: "should be rejected through symlink",
-      },
-    },
-    finalText: "Mock symlink escape scenario finished.",
   }),
   toolScenario({
     id: "user-ask",
@@ -146,13 +117,12 @@ export const mockLLMScenarios: MockLLMScenario[] = [
   toolScenario({
     id: "permission-write",
     trigger: "[mock:permission-write]",
-    description: "返回 file.write，用于触发权限审批 UI。",
+    description: "委托 Codex CLI，用于触发权限审批 UI。",
     toolCall: {
       id: "mock-permission-write-1",
-      name: "file.write",
+      name: "codex.execute",
       arguments: {
-        relativePath: "permission-check.txt",
-        content: "permission scenario content",
+        prompt: "在当前工作目录创建 permission-check.txt，内容为 permission scenario content。验证文件后汇报。",
       },
     },
     finalText: "Mock permission write completed.",

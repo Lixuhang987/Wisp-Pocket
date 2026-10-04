@@ -1,5 +1,7 @@
 # Websearch Tool Implementation Plan
 
+历史边界：Issue #10 已移除 use_tools、内置写入注册/设置与激活状态；下文激活流程只保留原实施背景。Web 首轮公开与免 Permission 的合约仍保留，当前目录见 [工具 owning 文档](../../../packages/core/src/tools/tools.md)。
+
 ## Default websearch tools use case
 
 ### Goal

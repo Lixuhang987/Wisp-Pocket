@@ -12,5 +12,5 @@
 ## 使用方式
 
 - Append Prompt 示例复制到 `~/.spotAgent/actions/append-prompts/action.json`。
-- MCP 示例复制到 `~/.spotAgent/mcp.json`，保存后重启桌面 App。
+- MCP 示例复制到 `~/.spotAgent/mcp.json` 或在设置保存；当前只保留 Wisp 配置，主 Agent 不直接调用，也不会自动复制到 Codex。
 - Settings 页面也提供"添加示例"按钮，会写入同等结构的本地配置。

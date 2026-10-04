@@ -16,9 +16,9 @@ import type { Op } from "@handagent/core/protocol/types/Op.ts";
 import type { MCPClient } from "@handagent/core/mcp/MCPClient.ts";
 import type { MCPServerConfig, StdioMCPServerConfig, StreamableHttpMCPServerConfig } from "@handagent/core/mcp/MCPConfig.ts";
 import { parseMCPConfig } from "@handagent/core/mcp/MCPConfig.ts";
-import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 import type { BlobStore } from "@handagent/core/blob/types/BlobStore.ts";
-import { META_TOOL_NAME } from "@handagent/core/tools/MetaToolUseTool.ts";
+import { CodexCLI } from "../actions/CodexCLI.ts";
+import { createCodexExecuteTool } from "../actions/CodexExecuteTool.ts";
 import { isNotFoundError } from "@handagent/core/utils/nodeErrors.ts";
 import { ThreadPersistence } from "../thread/ThreadPersistence.ts";
 import { createDefaultReadTools } from "../actions/DefaultReadTools.ts";
@@ -473,7 +473,6 @@ export async function startDefaultServer(port = 4317) {
     { WorkspaceRegistry },
     { FilePermissionPolicy },
     { SettingsBackedLLMClient },
-    { SettingsBackedToolRegistry },
     { MCPServerRegistry },
     { StdioMCPClient },
     { StreamableHttpMCPClient },
@@ -487,7 +486,6 @@ export async function startDefaultServer(port = 4317) {
     import("@handagent/core/workspace/WorkspaceRegistry.ts"),
     import("@handagent/core/adapters/filesystem/FilePermissionPolicy.ts"),
     import("../settings/SettingsBackedLLMClient.ts"),
-    import("../settings/SettingsBackedToolRegistry.ts"),
     import("../actions/MCPServerRegistry.ts"),
     import("@handagent/core/adapters/mcp/StdioMCPClient.ts"),
     import("@handagent/core/adapters/mcp/StreamableHttpMCPClient.ts"),
@@ -510,8 +508,7 @@ export async function startDefaultServer(port = 4317) {
 
   const dynamicToolBridge = new WebSocketDynamicToolBridge();
   let threads: ThreadRegistry;
-  const toolRegistry = new SettingsBackedToolRegistry();
-  await toolRegistry.refresh();
+  const codexCLI = new CodexCLI({searchPath:process.env.PATH ?? "",homePath:homedir()});
   const llmMode = resolveLLMMode();
 
   const mcpRegistry = new MCPServerRegistry({
@@ -526,7 +523,6 @@ export async function startDefaultServer(port = 4317) {
       });
     },
   });
-  const globalMcpServerIds = [...mcpServers.keys()];
   const permissionPolicy = new FilePermissionPolicy({
     filePath: paths.permissionsPath,
     askResolver: (request) => threads.get(request.threadId ?? "")?.requests.askPermission(request) ?? Promise.resolve({ decision: "deny" }),
@@ -556,25 +552,21 @@ export async function startDefaultServer(port = 4317) {
       summarizeInput: projection.summarizeUserInput,
     },
     publish: (event) => eventPublisher.publish(event),
-    createTools: (dynamicTools) => new ThreadTools({
-      builtinRegistry: toolRegistry.registry,
-      refreshBuiltins: () => toolRegistry.refresh(),
-      globalMcpServerIds,
-      listMcpTools: (id) => mcpRegistry.listTools(id),
-      dynamicToolBridge,
-      exposeBuiltinToolsBeforeActivation: llmMode === "mock",
-      defaultTools: [...createDefaultWebTools(), ...createDefaultReadTools({contextHistoryRoot:join(paths.spotDir,"context-history")})],
-    }, dynamicTools, { log: (message) => console.warn(message) }),
+    createTools: (threadId) => new ThreadTools({
+      resolveTools: async () => [
+        ...createDefaultWebTools(),
+        ...createDefaultReadTools({contextHistoryRoot:join(paths.spotDir,"context-history")}),
+        await createCodexExecuteTool({cli:codexCLI,store,threadId}),
+      ],
+    }),
     createRuntime: (id, tools) => new AgentRuntime(llmClient, tools.registry, {
       permissionPolicy, blobStore, turnSummarizer: summarizer,
-      onMetaToolActivate: () => tools.activate(),
-      isThreadActivated: () => tools.isActivated(),
     }),
   });
   const commandRouter = new ThreadCommandRouter(threads, eventPublisher, workspaceRegistry, undefined, () => dynamicToolBridge.availableTools());
   const server = await startServer({ commandRouter, eventPublisher, activityPublisher, dynamicToolBridge,
     staticFilesDir: resolveThreadWindowWebDistDir(), blobStore,
-    settingsAPI: new SettingsAPI({settingsPath:join(paths.spotDir,"settings.json"),mcpPath:paths.mcpConfigPath,permissionPolicy}),port });
+    settingsAPI: new SettingsAPI({settingsPath:join(paths.spotDir,"settings.json"),mcpPath:paths.mcpConfigPath,permissionPolicy,codexCLI}),port });
   let shutdown: Promise<void> | undefined;
   const close = () => shutdown ??= (async () => {
     const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
@@ -651,9 +643,7 @@ function resolveThreadWindowWebDistDir(
   return join(currentDirectory, "apps/thread-window-web/dist");
 }
 
-function historyShowsToolsActivated(messages: readonly AgentMessage[]): boolean {
-  return messages.some((m) => m.role === "tool" && m.name === META_TOOL_NAME);
-}
+
 
 const THREAD_WINDOW_HTTP_PREFIX = "/thread-window";
 

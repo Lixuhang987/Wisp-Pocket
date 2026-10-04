@@ -12,4 +12,4 @@ Codex 会话仅可接续当前 Wisp Thread 委托产生并保存的明确 sessio
 
 用户最后确认：本期暂不处理 Codex 执行的专用取消，后续为 Tool 设计统一终止机制并列入 TODO。首版沿用现有 Turn 中断与晚到结果隔离；Turn 已中断不证明 Codex 子进程已停止，既有文件修改继续保留。会话关联的持久保存仍是已确认要求，终止机制后续单独收敛。
 
-用户调用 to-spec 后，已将收敛方案发布为 [Issue #10](https://github.com/Lixuhang987/Wisp-Pocket/issues/10)，标记 ready-for-agent，尚未实施。Codex 不自动获得 Wisp 的 MCP、macOS 或 Automation 能力。产品边界见 [PRODUCT](../PRODUCT.md)，后续实施流程见 [TODO](../TODO.md)。
+用户调用 to-spec 后，已将收敛方案发布为 [Issue #10](https://github.com/Lixuhang987/Wisp-Pocket/issues/10)，首版已实现，自动化、真实 CLI 烟测与完整宿主验收分别见 [实施记录](../medium-powers/plans/2026-10-04-codex-cli-delegation.md) 和 [manual QA](../manual-qa.md)。Codex 不自动获得 Wisp 的 MCP、macOS 或 Automation 能力。产品边界见 [PRODUCT](../PRODUCT.md)，后续实施流程见 [TODO](../TODO.md)。

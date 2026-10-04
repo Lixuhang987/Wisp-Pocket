@@ -2,7 +2,9 @@ import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { codexFixture } from "../support/codexFixture.ts";
+import { createCodexExecuteTool } from "../../src/actions/CodexExecuteTool.ts";
+import type { CodexCLI } from "../../src/actions/CodexCLI.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FilesystemBlobStore } from "@handagent/core/adapters/filesystem/FilesystemBlobStore.ts";
 import { AgentRuntime } from "@handagent/core/runtime/AgentRuntime.ts";
@@ -63,7 +65,7 @@ function textPdf(text: string): Buffer {
 
 async function harness(client: LLMClientLike, options: {
   directory?: string; pageError?: string; gate?: Promise<void>;
-  dynamicBridge?: WebSocketDynamicToolBridge; permissionPrompt?: boolean; extraTools?: AgentTool[];
+  dynamicBridge?: WebSocketDynamicToolBridge; permissionPrompt?: boolean; extraTools?: AgentTool[]; codexCLI?:CodexCLI;
 } = {}) {
   const directory = options.directory ?? await mkdtemp(join(tmpdir(), "pet-conversation-"));
   if (!options.directory) cleanups.push(() => rm(directory, { recursive: true, force: true }));
@@ -103,10 +105,9 @@ async function harness(client: LLMClientLike, options: {
     projection: { runtimeMessages: projection.agentMessagesToRuntimeMessages, conversation: projection.agentMessagesToConversation,
       notification: projection.toThreadNotification, audit: projection.toAuditEvent, summarizeInput: projection.summarizeUserInput },
     publish: (event) => publisher.publish(event),
-    createTools: (dynamicTools) => new ThreadTools({ builtinRegistry: tools, globalMcpServerIds: [], listMcpTools: async () => [], exposeBuiltinToolsBeforeActivation: true, dynamicToolBridge: options.dynamicBridge }, dynamicTools),
+    createTools: threadId => new ThreadTools({ resolveTools: async () => [...tools.all(), ...(options.codexCLI ? [await createCodexExecuteTool({cli:options.codexCLI,store,threadId})] : [])] }),
     createRuntime: (id, threadTools) => new AgentRuntime(client, threadTools.registry, {
       blobStore: blobs, maxTimes: 8,
-      onMetaToolActivate: () => threadTools.activate(), isThreadActivated: () => threadTools.isActivated(),
       ...(options.permissionPrompt ? { permissionPolicy: {
         check: async () => "ask" as const,
         resolveAsk: (request) => threads.get(id)!.requests.askPermission(request),
@@ -205,35 +206,19 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toContain("继续第一份资料"));
   });
 
-  it("用户决定后沿在线 Provider 执行真实 CLI；两界面竞争回答权限只执行一次", async () => {
-    const bridge = new WebSocketDynamicToolBridge();
-    cleanups.push(async () => bridge.close());
-    const provider = new EventEmitter() as EventEmitter & { send: (data: string) => void };
-    let calls = 0;
-    let executedPath = "";
-    provider.send = (data) => {
-      const message = JSON.parse(data);
-      if (message.type !== "tool_call_request") return;
-      calls += 1;
-      execFileSync(process.execPath, ["-e", "require('node:fs').writeFileSync(process.argv[1], 'CLI completed after user decision')", executedPath]);
-      provider.emit("message", Buffer.from(JSON.stringify({ channel: "dynamic_tools", type: "tool_call_response",
-        payload: { callId: message.payload.callId, success: true, contentItems: [{ type: "inputText", text: "CLI completed" }] } })));
-    };
-    attachDynamicToolSocketHandlers(provider as never, { bridge });
-    provider.emit("message", Buffer.from(JSON.stringify({ channel: "dynamic_tools", type: "provider_hello", clientId: "qa-host", tools: [] })));
-    provider.emit("message", Buffer.from(JSON.stringify({ channel: "dynamic_tools", type: "provider_hello", clientId: "qa-host", tools: [
-      { clientId: "qa-host", namespace: "host", name: "cli", description: "执行用户已决定的整理", inputSchema: { type: "object", properties: {} } },
-    ] })));
+  it("用户决定后委托 Codex CLI；两界面竞争回答权限只执行一次", async () => {
+    const directory=await mkdtemp(join(tmpdir(),"pet-codex-"));
+    cleanups.push(()=>rm(directory,{recursive:true,force:true}));
+    const cli=await codexFixture(directory);
     const h = await harness({ complete: async (messages, tools) => {
       if (messages.findLast(message=>message.role==="user")?.content === "交付内容") return ask();
-      if (messages.at(-1)?.role === "tool" && (messages.at(-1) as { name: string }).name === "host.cli") return answer("CLI 已按你的决定完成。");
-      return { message: { role: "assistant", content: "" }, toolCalls: [{ id: crypto.randomUUID(), name: tools.some((tool) => tool.name === "host.cli") ? "host.cli" : "use_tools", arguments: {} }] };
-    } }, { dynamicBridge: bridge, permissionPrompt: true });
-    executedPath = h.executedPath;
+      if (messages.at(-1)?.role === "tool" && (messages.at(-1) as { name: string }).name === "codex.execute") return answer("CLI 已按你的决定完成。");
+      return { message: { role: "assistant", content: "" }, toolCalls: [{ id: crypto.randomUUID(), name: "codex.execute", arguments: {prompt:"CLI completed after user decision"} }] };
+    } }, { directory,codexCLI:cli, permissionPrompt: true });
+    const executedPath = join(h.workspace.rootPath,"result.txt");
     h.pet.drop([textItem("交付内容")], "pet"); await settled(h);
     const id = current(h).id;
-    expect((await h.persistence.getThread(id))!.metadata.dynamicTools?.[0].name).toBe("cli");
-    expect(calls).toBe(0);
+    await expect(readFile(executedPath)).rejects.toThrow();
     const fullView = makeThreadWindowStore();
     let fullSnapshots = 0;
     const fullSocket = new ThreadSocketClient({ url: "ws://local/api/thread", WebSocketImpl: h.LocalSocket,
@@ -258,11 +243,11 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
     await until(() => expect(observed.filter(frame => frame.type === "permission.requested")).toHaveLength(2));
     observer.emit("message", encodePermissionAnswer({ requestId, decision: "allow", scope: "once", timestamp: new Date().toISOString() }));
     expect(h.threads.get(id)!.requests.snapshot()).toHaveLength(1);
-    expect(calls).toBe(0);
+    await expect(readFile(executedPath)).rejects.toThrow();
     fullSocket.sendRaw(encodePermissionAnswer({ requestId, decision: "allow", scope: "once", timestamp: new Date().toISOString() }));
     h.pet.answerPermission(requestId, "deny");
     await until(() => expect(h.pet.getSnapshot().latestAssistant?.text).toBe("CLI 已按你的决定完成。"));
-    expect(calls).toBe(1);
+    expect((await readFile(join(h.workspace.rootPath,"invocations.jsonl"),"utf8")).trim().split("\n")).toHaveLength(1);
     expect(await readFile(executedPath, "utf8")).toBe("CLI completed after user decision");
     expect(fullView.getState().threadsById[id].permissionRequests).toEqual([]);
     expect(h.pet.store.getState().threadsById[id].permissionRequests).toEqual([]);
@@ -283,7 +268,7 @@ describe("桌宠入口 → 真实 Thread → 持久化 → 桌宠消息", () => 
       for (const view of [fullView, h.pet.store]) {
         const messages = view.getState().threadsById[id].messages;
         expect(messages.flatMap(message => message.type === "assistant_message" ? [message.text] : [])).toEqual(liveAssistantTexts);
-        expect(messages.some(message => message.type === "tool_call" && message.toolName === "host.cli")).toBe(true);
+        expect(messages.some(message => message.type === "tool_call" && message.toolName === "codex.execute")).toBe(true);
       }
     }, { timeout: 1000, interval: 10 });
     fullSocket.disconnect();

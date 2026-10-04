@@ -2,7 +2,7 @@
 
 本目录按用户任务记录 Wisp Pocket 的界面现状，作为后续设计的 surface brief。共享产品背景见 [PRODUCT.md](../PRODUCT.md)，视觉权威为根目录 [DESIGN.md](../../DESIGN.md) 与其引用的 token 源。
 
-当前 brief 描述已实现的 Issue #9 前端伙伴、Workspace 任务与 Codex 风格设置界面；时间 system 与共享消息投影同时保留。PRODUCT 表达最终意图，尚未实施的 Codex CLI 委托由 [对齐记录](../product-alignment.md)、ADR 0008 与 TODO 维护，不写成当前 surface 能力。
+当前 brief 描述已实现的 Issue #9 前端伙伴、Workspace 任务与 Codex 风格设置界面；时间 system 与共享消息投影同时保留。PRODUCT 表达最终意图，Codex CLI 委托已实现，当前工具与设置边界由 [对齐记录](../product-alignment.md)、ADR 0008 和对应 brief 维护，完整宿主与真实模型仍待验。
 
 ## 直接子节点
 

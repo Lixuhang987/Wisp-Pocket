@@ -4,6 +4,7 @@
 
 ## 直接子节点
 
+- [2026-10-04-codex-cli-delegation.md](./2026-10-04-codex-cli-delegation.md)：Issue #10 的委托执行、会话关联、设置状态与验证合同。
 - [2026-10-04-time-context.md](./2026-10-04-time-context.md)：系统提示和时间上下文持久化、小时刷新、本地证据时间与范围过滤的已完成实施记录及实机边界。
 
 - [2026-10-04-shared-message-projection.md](./2026-10-04-shared-message-projection.md)：两端共用消息投影、历史空气泡修复与验证边界。

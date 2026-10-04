@@ -4,7 +4,6 @@ import type { AgentMessage } from "../runtime/types/AgentMessage.ts";
 import type { Op } from "../protocol/types/Op.ts";
 import type { ThreadNotification } from "../protocol/types/ThreadNotification.ts";
 import type { RunStatus } from "../protocol/types/ThreadProtocolShared.ts";
-import { META_TOOL_NAME } from "../tools/MetaToolUseTool.ts";
 import { ThreadRequests } from "./ThreadRequests.ts";
 import type { ThreadTools } from "./ThreadTools.ts";
 import type { ActiveTurn, QueuedInput, ThreadRuntime, ThreadServices } from "./types/ThreadServices.ts";
@@ -33,7 +32,7 @@ export class Thread {
     this.workspaceId = data.metadata.workspaceId;
     this.rootPath = data.metadata.rootPath;
     this.state = status;
-    this.tools = services.createTools(data.metadata.dynamicTools ?? []);
+    this.tools = services.createTools(id);
     this.runtime = services.createRuntime(id, this.tools);
     this.requests = new ThreadRequests(id, (request) => services.publish(request), () => !!this.active && !this.active.controller.signal.aborted && !this.closed,
       60_000, (requestId) => services.publish({ type: "request.resolved", threadId: id, notificationId: crypto.randomUUID(), timestamp: this.now(), payload: { requestId } }));
@@ -177,7 +176,6 @@ export class Thread {
       });
       if (this.valid(active)) {
         const projectInstructions = await this.readProjectInstructions();
-        if (!this.tools.isActivated() && this.history.some((message) => message.role === "tool" && message.name === META_TOOL_NAME)) await this.tools.activate();
         await this.tools.refresh();
         if (!this.valid(active)) return;
         const pending = new Set([...this.inputs.map((input) => input.opId), active.id]);

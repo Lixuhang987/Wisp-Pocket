@@ -10,7 +10,7 @@
 
 - 首次 `provider_hello` 按 `clientId` 绑定 token，并保存该 Provider 声明且 `clientId` 匹配的 Tool spec。相同身份替换连接时，旧 token 下的 pending call 立即失败。
 - 同一 socket、相同 `clientId` 的再次 hello 刷新在线声明，保留 token 和 pending call。刷新须校验当前 token；旧连接不能覆盖新连接的工具集合。
-- 新 Thread 未显式指定工具集时，组合根从 `availableTools()` 读取当前在线声明；显式空集合仍表示空集合。spec 随 Thread 保存，后续 hello 不重写已有 Thread metadata，执行仍按 `clientId` 转发。
+- 新 Thread 未显式指定工具集时，组合根从 `availableTools()` 读取当前在线声明；显式空集合仍表示空集合。spec 随 Thread 保存，后续 hello 不重写已有 Thread metadata；此 metadata 通道保留，但生产主 Agent 不再将声明适配成可见工具。显式 adapter 调用仍按 `clientId` 转发，未提供 Codex 能力出口。
 - pending key 由 Provider token 与 provider-facing callId 组成。不同 Provider 的同名 callId 不互相唤醒；旧 socket 的晚到回执被 token 隔离。
 
 ## 失败与取消

@@ -6,4 +6,4 @@
 
 ## 子节点
 
-- `mcp.json`：包含 `filesystem` 与 Wisp Pocket 原生兼容的 `computer_use` 两个 stdio server 示例。
+- `mcp.json`：包含 `filesystem` 与 `computer_use` 两个真实 stdio MCP server 示例；不存在原生兼容 client。Wisp 配置保留，尚未接入 Codex，主 Agent 不直接公开这些工具。

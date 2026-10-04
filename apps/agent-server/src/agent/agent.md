@@ -8,7 +8,7 @@ Thread owner 已下沉到 core；`agent/` 不再拥有生产代码或运行状�
 
 ## 现状
 
-本目录当前无生产文件。Thread 生命周期、输入队列、Turn、交互请求、工具激活和关闭均由 `packages/core/src/thread/` 持有；agent-server 只负责组合依赖、协议翻译和连接适配。
+本目录当前无生产文件。Thread 生命周期、输入队列、Turn、交互请求、工具组合和关闭均由 `packages/core/src/thread/` 持有；agent-server 只负责组合依赖、协议翻译和连接适配。
 
 相关入口：
 

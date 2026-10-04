@@ -1,7 +1,9 @@
 import { EventEmitter } from "node:events";
 import { threadHarness, input as userOp } from "../support/threadHarness.ts";
+import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
 import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
-import { FileWriteTool } from "@handagent/core/tools/builtins/FileWriteTool.ts";
+import { createCodexExecuteTool } from "../../src/actions/CodexExecuteTool.ts";
+import { codexFixture } from "../support/codexFixture.ts";
 import { attachThreadSocketHandlers } from "../../src/server/server.ts";
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,7 +13,6 @@ import sharp from "sharp";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDefaultReadTools } from "../../src/actions/DefaultReadTools.ts";
 import { AgentRuntime } from "@handagent/core/runtime/AgentRuntime.ts";
-import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
 import { toVercelMessages } from "@handagent/core/adapters/providers/VercelAdapters.ts";
 import type { AgentMessage } from "@handagent/core/runtime/types/AgentMessage.ts";
 
@@ -55,9 +56,10 @@ async function swiftFixture() {
 }
 
 describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
-  it("首轮默认读取与路径历史持久化、激活后保留目录、按需追问及既有写入授权", async () => {
+  it("首轮默认读取与路径历史持久化、按需追问及Codex 委托授权", async () => {
     const fixture = await swiftFixture();
     const source = join(fixture.directory, "outside-root.txt"); await writeFile(source, "提交时的旧内容");
+    const cli = await codexFixture(fixture.directory);
     const readNames = ["user.ask", ...fixture.tools.map(tool => tool.name)];
     let round = 0; const requests: AgentMessage[][] = []; const permissionChecks: string[] = [];
     const model = { complete: async (messages: AgentMessage[], tools: any[]) => {
@@ -70,15 +72,13 @@ describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
         call("context_history.sample_details", { ids: ["swift-sample"] }), call("context_history.thumbnails", { start: 1700000000, end: "2023-11-15T06:13:20+08:00" }),
         call("context_history.screenshot_original", { id: "swift-screenshot" }),
       ] }; }
-      if (round === 2) return { message: { role: "assistant" as const, content: "" }, toolCalls: [call("use_tools", {})] };
-      if (round === 3) return { message: { role: "assistant" as const, content: "" }, toolCalls: [call("user.ask", { message: "保存摘要吗？", suggestedReplies: ["保存"] }), call("file.write", { relativePath: "must-not-run.txt", content: "未开始的同批调用" })] };
-      if (round === 4) return { message: { role: "assistant" as const, content: "" }, toolCalls: [call("file.write", { relativePath: "result.txt", content: "用户要求保存的摘要" })] };
+      if (round === 2) return { message: { role: "assistant" as const, content: "" }, toolCalls: [call("user.ask", { message: "保存摘要吗？", suggestedReplies: ["保存"] }), call("codex.execute", { prompt: "未开始的同批调用" })] };
+      if (round === 3) return { message: { role: "assistant" as const, content: "" }, toolCalls: [call("codex.execute", { prompt: "用户要求保存的摘要" })] };
       return { message: { role: "assistant" as const, content: "已保存" } };
     } };
     const h = threadHarness(model, {
-      createTools: dynamicTools => new ThreadTools({ builtinRegistry: new ToolRegistry([FileWriteTool.create({})]), defaultTools: fixture.tools, globalMcpServerIds: [], listMcpTools: async () => [] }, dynamicTools),
+      createTools: id => new ThreadTools({ resolveTools: async () => [...fixture.tools, await createCodexExecuteTool({cli,store:h.store,threadId:id})] }),
       createRuntime: (_id, tools) => new AgentRuntime(model, tools.registry, {
-        onMetaToolActivate: () => tools.activate(), isThreadActivated: () => tools.isActivated(),
         permissionPolicy: { check: async request => { permissionChecks.push(request.toolName); return "ask"; }, resolveAsk: async () => ({ decision: "allow", remember: "once" }), remember: async () => {} },
       }),
     }, join(fixture.directory, "threads.sqlite"));
@@ -118,7 +118,7 @@ describe("真实Thread协议、Runtime、SQLite的统一默认读取", () => {
       expect(saved!.messages.some(message => message.role === "tool" && message.name === "file.read")).toBe(true);
       send({ type: "op.submit", threadId, ...meta(), payload: { op: userOp("保存") } });
       await vi.waitFor(async () => expect(await readFile(join(workspace.rootPath, "result.txt"), "utf8")).toBe("用户要求保存的摘要"));
-      expect(permissionChecks).toEqual(["file.write"]);
+      expect(permissionChecks).toEqual(["codex.execute"]);
       await vi.waitFor(() => expect(h.threads.get(threadId)!.status).toBe("idle"));
     } finally { socket.emit("close"); await h.close(); }
   });

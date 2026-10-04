@@ -2,7 +2,6 @@ import { WorkspaceRegistry } from "@handagent/core/workspace/WorkspaceRegistry.t
 import { ThreadRegistry } from "@handagent/core/thread/ThreadRegistry.ts";
 import { ThreadTools } from "@handagent/core/thread/ThreadTools.ts";
 import { AgentRuntime } from "@handagent/core/runtime/AgentRuntime.ts";
-import { ToolRegistry } from "@handagent/core/tools/ToolRegistry.ts";
 import { ThreadStore } from "@handagent/thread-store/index.ts";
 import { ThreadPersistence } from "../../src/thread/ThreadPersistence.ts";
 import { ThreadCommandRouter } from "../../src/thread/ThreadCommandRouter.ts";
@@ -26,7 +25,7 @@ export function threadHarness(client: LLMClientLike, options: Partial<ThreadServ
     projection: { runtimeMessages: projection.agentMessagesToRuntimeMessages, conversation: projection.agentMessagesToConversation,
       notification: projection.toThreadNotification, audit: projection.toAuditEvent, summarizeInput: projection.summarizeUserInput },
     publish: (event) => publisher.publish(event),
-    createTools: (dynamicTools) => new ThreadTools({ builtinRegistry: new ToolRegistry(), globalMcpServerIds: [], listMcpTools: async () => [] }, dynamicTools),
+    createTools: () => new ThreadTools({ resolveTools: () => [] }),
     createRuntime: (_id, tools) => new AgentRuntime(client, tools.registry),
     stopTimeoutMs: 20,
     ...options,

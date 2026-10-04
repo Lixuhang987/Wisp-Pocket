@@ -4,7 +4,7 @@
 
 ## 直接子节点
 
-- [Issue #10](https://github.com/Lixuhang987/Wisp-Pocket/issues/10)：移除 use_tools，主 Agent 收敛为读取与 Codex CLI 委托；已发布、尚未实现，现有扩展能力迁移与统一工具终止机制本期暂不做。
+- [Issue #10](https://github.com/Lixuhang987/Wisp-Pocket/issues/10)：移除 use_tools，主 Agent 收敛为读取与 Codex CLI 委托；首版已实现，完整宿主与真实模型待验；现有扩展能力迁移与统一工具终止机制本期暂不做。
 - [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)：Pet 前端化已实现、完整实机待验；后端移除 Pet、Thread 仅归 Workspace，前端统一分配伙伴，当前边界见 ADR 0007 与 owning 模块。
 - [2026-10-04-time-context-draft.md](./2026-10-04-time-context-draft.md)：系统提示与时间注入持久化、小时刷新、本地证据时间及范围过滤的简版规格；已实现、三项检查与独立文档审核完成，实机待验。
 - [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8)：Electron 设置、后端配置接口与 Workspace/Pet 拆分已实现，完整实机待验；固定项目根、逐 Turn AGENTS.md 与项目一级历史保留；后端 Pet、双归属与基础 Pet 已由 #9 替代，MCP 运行刷新另列 TODO。
@@ -16,4 +16,4 @@
 - [2026-06-25-react-dynamic-tools-removal-spec.md](./2026-06-25-react-dynamic-tools-removal-spec.md)：React 不传工具集合的历史迁移；“React Thread 无动态能力”已失效。
 - [2026-06-25-self-evolving-automation-spec.md](./2026-06-25-self-evolving-automation-spec.md)：历史独立 Plugin 与自进化方案，已被 Issue #4 替代，完整自主修复不作为当前交付。
 
-Context History 与 Automation 的初始内置化规格为 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)；默认读取与常驻采集由 [ADR 0004](../../adr/0004-context-history-default-tools.md) 更新。其他迁移规格中的 Plugin 保留要求、React Thread 没有 Dynamic Tool 的旧结论也已失效；当前默认能力由服务端采用在线 Provider 声明，读取前先核对各文件的历史状态。
+Context History 与 Automation 的初始内置化规格为 [Issue #4](https://github.com/Lixuhang987/Wisp-Pocket/issues/4)；默认读取与常驻采集由 [ADR 0004](../../adr/0004-context-history-default-tools.md) 更新。其他迁移规格中的 Plugin 保留要求、React Thread 没有 Dynamic Tool 的旧结论也已失效；Provider 声明通道保留，但 Issue #10 后不再将这些扩展工具直接暴露给主 Agent；读取前先核对各文件的历史状态。

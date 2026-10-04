@@ -1,6 +1,6 @@
 # src
 
-本目录拥有同一 SQLite 中的 Workspace 配置、Thread rollout 与派生视图。调用方通过公开 API 读写，不直接操作表。
+本目录拥有同一 SQLite 中的 Workspace 配置、Thread rollout、Codex 会话关联与派生视图。调用方通过公开 API 读写，不直接操作表。
 
 ## 直接子节点
 
@@ -23,4 +23,5 @@
 - Thread 元数据只保存固定 workspaceId，rootPath 从 Workspace 派生；普通角色提示随 UserInput 保存，不存在结构化伙伴身份或角色快照。
 - 旧开发 schema 明确拒绝打开，不做自动迁移或数据清除；新数据库使用 Workspace 引用和 Thread 单归属 schema。
 
+- Codex 会话关联与 rollout 分开保存：收到有效会话身份就登记，不等整轮工具历史落盘。一个 Thread 可有多个会话，sessionId 全库唯一归属；登记按 Thread 写入队列串行，Thread 已删除则失败，删除时外键级联清理。会话摘要只供 Agent 选择，不替代 Codex 执行上下文；调用边界见 [actions](../../../apps/agent-server/src/actions/actions.md)。
 - 删除 Thread 时在同一 SQLite 事务内保存 threadId 墓碑并删除历史，墓碑不随级联删除清除。创建身份由稳定 commandId 派生，同身份重试在进程重建后仍返回 not_found；新的 commandId 可正常创建。

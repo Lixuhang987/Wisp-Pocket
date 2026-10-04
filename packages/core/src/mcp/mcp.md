@@ -1,6 +1,6 @@
 # mcp
 
-标准 MCP client 与 tool adapter。第一版支持 `stdio` 和 `Streamable HTTP`，按 MCP `2025-11-25` 稳定规范实现完整客户端能力：`tools`、`prompts`、`resources` 三类 server-side primitive 全部覆盖。`~/.spotAgent/mcp.json` 中配置的 server 作为全局 MCP tools 注入 thread tool registry。
+标准 MCP client 与 tool adapter。第一版支持 `stdio` 和 `Streamable HTTP`，按 MCP `2025-11-25` 稳定规范实现完整客户端能力：`tools`、`prompts`、`resources` 三类 server-side primitive 全部覆盖。MCP client/adapter 与 `~/.spotAgent/mcp.json` 配置保留；Issue #10 后生产主 Agent 不再注入这些工具，也未接入 Codex。当前组合边界见 [actions](../../../../apps/agent-server/src/actions/actions.md)。
 
 | 文件 | 职责 |
 |------|------|
@@ -20,7 +20,7 @@
 - `listTools()` / `callTool(name, args)`：tool 列表与调用，结果为 `MCPCallToolResult { content, isError? }`。
 - `listPrompts()` / `getPrompt(name, args?)`：prompt 模板列表与展开，返回 `messages: { role, content }[]`。
 - `listResources()` / `readResource(uri)`：资源列表与读取，内容为 `text` 或 base64 `blob`。
-- `serverInfo()`：本地缓存的 capabilities，`refreshForThread` 等上层逻辑可按 capability 决定是否调用对应 endpoint。
+- `serverInfo()`：本地缓存的 capabilities，调用方可按 capability 决定是否调用对应 endpoint。
 
 ## 配置形状
 
@@ -52,7 +52,7 @@
 
 ## 约束
 
-- `mcp.json` 中配置的所有 server 默认作为**全局** MCP server，会被注入每个 thread 的 tool registry。
+- `mcp.json` 是 Wisp 全局配置，保存与 client 能力实现不等于生产目录已公开，更不等于 Codex 已读取该配置；宿主能力迁移另列 TODO。
 - MCP exposed tool name 统一为 `mcp.<serverId>.<toolName>`，避免与 builtin tool 冲突。
 - `computer_use` / `computer-use` 不再有 Wisp Pocket 原生兼容 client；如需使用，必须在 `~/.spotAgent/mcp.json` 中配置真实 MCP transport。macOS host 能力走 Swift dynamic tools，不走 MCP 兼容层。
 - stdio server 可配置 `cwd`；也可配置 `requestTimeoutMs`，默认 60s，避免外部 server 卡死时拖挂当前 thread run。

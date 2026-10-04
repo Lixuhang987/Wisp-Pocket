@@ -7,23 +7,9 @@
 
 最后核对日期：2026-10-04。
 
-## 移除 use_tools，委托 Codex CLI（规格已发布，待实现）
+## Codex 执行后续能力
 
-实施规格见 [Issue #10](https://github.com/Lixuhang987/Wisp-Pocket/issues/10)，产品目标见 [PRODUCT](./PRODUCT.md)，决定见 [ADR 0008](./adr/0008-codex-execution-delegation.md)。主 Agent 只保留问答、读取与 Codex 委托；沿用用户 CLI 配置和权限，由主 Agent 选择新建或 resume 当前 Thread 已关联会话，外层走 Wisp Permission，等待完成后回传。现有扩展能力迁移与统一工具终止机制本期暂不做。尚未实施，不计入已实现功能 QA。
-
-- [x] 读取根架构、领域路由、产品与工程文档规则，按 grill-with-docs 启动访谈。
-- [x] 确认复杂任务由主 Agent 判断、所有写文件委托，以及用户预装并登录 Codex CLI 的产品前提。
-- [x] 确认主 Agent 只保留问答、读取和 Codex 委托，扩展执行能力全部迁到 Codex；记录与仅移除懒激活门槛的区别。
-- [x] 完成只读工具链与 Codex CLI 事实调查，核对删除 `use_tools` 的影响。
-- [x] 确认扩展能力迁移暂不实施、沿用用户 Codex 模型与配置，以及由主 Agent 判断新建或 resume。
-- [x] 确认外层 Wisp Permission、内部 Codex 权限，当前 Thread 会话的持久关联，以及主 Agent 整理必要上下文。
-- [x] 确认作为普通工具等待完成，复用现有运行状态与最终结果，失败回传且由主 Agent 判断重试。
-- [x] 逐轮确认委托边界、运行环境、权限、上下文、结果和后续接续策略；确认本期暂不新增 Codex 专用取消，形成产品记录与架构决策。
-- [x] 用户调用 to-spec，将收敛方案发布为 [Issue #10](https://github.com/Lixuhang987/Wisp-Pocket/issues/10)，应用 ready-for-agent 并核对正文与标签。
-- [ ] 从主 checkout 运行 `scripts/create-worktree.sh`，确认独立 CodeGraph 索引；后续 MCP 显式传绝对 projectPath。
-- [ ] 在 worktree 执行 `scripts/test.sh` 基线；若影响桌面或启动链，再执行 `scripts/swiftw build`；沿 owning 文档链实施。
-- [ ] 完成必要验证、三项提交前检查，并同步相关文档。
-- [ ] 完成 spec 实现后分发不继承上下文的独立文档审核子 agent，确认结论；更新 `manual-qa.md` 并迁出完成 TODO 后提交。
+首版委托已实现，验收与检查见 [manual QA](./manual-qa.md) 和 [实施记录](./medium-powers/plans/2026-10-04-codex-cli-delegation.md)。
 
 ### 现有扩展能力迁到 Codex（本期之外）
 

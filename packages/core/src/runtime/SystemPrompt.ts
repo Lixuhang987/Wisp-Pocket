@@ -1,6 +1,5 @@
 import type { AgentMessage, SystemAgentMessage } from "./types/AgentMessage.ts";
 import type { RegisteredTool } from "../tools/ToolRegistry.ts";
-import { META_TOOL_NAME } from "../tools/MetaToolUseTool.ts";
 
 export type SystemPromptContext = {
   tools: RegisteredTool[];
@@ -60,20 +59,18 @@ export function buildDefaultSystemPromptSections(): SystemPromptSection[] {
 
 export function buildToolUsePolicySection(): SystemPromptSection {
   return systemPromptSection("tool-use-policy", ({ tools }) => {
-    if (!hasRealTools(tools)) return null;
+    if (!tools.length) return null;
     return TOOL_USE_POLICY_PROMPT;
   });
 }
 
-function hasRealTools(tools: RegisteredTool[]): boolean {
-  return tools.some((t) => t.name !== META_TOOL_NAME);
-}
-
 export const TOOL_USE_POLICY_PROMPT =
-  "Tool-use policy: available tools are provided separately by the runtime. " +
-  "When the user asks you to use tools, call tools, read external state, inspect the app, or execute a multi-step workflow that requires tools, emit structured tool calls instead of only describing planned tool calls in assistant text. " +
-  "When multiple tools are needed, emit all required tool calls in the same assistant response when possible. " +
-  "After tool results are returned, summarize the results for the user.";
+  "主 Agent 负责问答、按需读取资料和委托。简单问题直接回答；需要自主规划、多步执行或反复验证的复杂任务，以及所有创建或修改文件任务，必须调用 codex.execute。" +
+  "委托 prompt 应交付本次任务、必要背景、约束、验收要求和文件路径；不要假定 Codex 已收到 Wisp 对话历史。" +
+  "自行选择省略 sessionId 新建，或使用工具描述/结果中属于当前 Thread 的明确 sessionId 接续，并提供新增要求。" +
+  "信息不足时使用 user.ask。需要外部事实时发出结构化读取调用，勿只描述计划。工具返回后据实际结果验证、解释、追问或决定重试。" +
+  "Codex 使用用户自己的配置和权限，工作目录不是沙箱；Wisp 不能接管其内部审批，也尚未将宿主 MCP/macOS/Automation 迁给 Codex。" +
+  "Wisp Turn 中断不保证 Codex 已停止，已有修改保留；不要将中断或关闭界面报告为进程终止。";
 
 function isNonEmptyPromptSection(value: string | null): value is string {
   return typeof value === "string" && value.trim().length > 0;

@@ -15,7 +15,7 @@ import './styles/settings.css';
 const settingsPages = [
   { id: 'AI', label: '模型服务', group: '个人', icon: Bot, keywords: 'AI provider api 模型 接口 密钥' },
   { id: 'Pets', label: '桌面伙伴', group: '个人', icon: PawPrint, keywords: 'Pets 桌宠 虚拟宠物 角色' },
-  { id: 'Tools', label: '内置工具', group: '集成', icon: Wrench, keywords: 'Agent Tools 工具' },
+  { id: 'Tools', label: 'Codex 执行', group: '集成', icon: Wrench, keywords: 'Codex CLI Agent Tools 工具' },
   { id: 'MCP', label: 'MCP 服务器', group: '集成', icon: Blocks, keywords: 'Agent 插件 扩展' },
   { id: 'Permissions', label: '权限', group: '集成', icon: ShieldCheck, keywords: 'Agent Permissions 授权' },
   { id: 'Workspaces', label: '工作区', group: '项目', icon: Folder, keywords: 'Workspaces 项目 目录 历史' },

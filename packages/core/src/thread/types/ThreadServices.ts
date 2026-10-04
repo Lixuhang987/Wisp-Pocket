@@ -38,7 +38,7 @@ export type ThreadServices = {
   projection: ThreadProjection;
   publish: (message: ThreadNotification | ServerRequest) => void;
   createRuntime: (id: string, tools: ThreadTools) => ThreadRuntime;
-  createTools: (dynamicTools: DynamicToolSpec[]) => ThreadTools;
+  createTools: (threadId: string) => ThreadTools;
   now?: () => string;
   stopTimeoutMs?: number;
 };

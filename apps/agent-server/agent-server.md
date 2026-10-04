@@ -15,7 +15,7 @@
 | `/api/thread` | ThreadWindow、桌宠、Swift 窄口径 client | ThreadCommand、ThreadNotification、ServerRequest、ClientResponse |
 | `/api/activity` | 轻量状态订阅者 | Agent Activity |
 | `/api/dynamic-tools` | Swift Host / Provider | Dynamic Tool 注册与调用 |
-| `/api/settings/*` | Electron 设置 | 模型、builtin Tool、MCP 与永久 Permission 的 HTTP 管理 |
+| `/api/settings/*` | Electron 设置 | 模型、Codex 可用状态、MCP 与永久 Permission 的 HTTP 管理 |
 
 三条 socket 与 HTTP 设置接口语义隔离；不要用 Dynamic Tool 通道承载 UI 请求，也不要在 Activity 中复制 Thread 内容。Workspace 管理继续走 `/api/thread`。
 
@@ -29,8 +29,8 @@
 
 ## 本地数据
 
-- `~/.spotAgent/settings.json`：模型与 Tool 设置。
-- `~/.spotAgent/threads.sqlite`：Workspace 配置与 Thread rollout。
+- `~/.spotAgent/settings.json`：主 Agent 模型设置；Codex 使用自身配置。
+- `~/.spotAgent/threads.sqlite`：Workspace 配置、Thread rollout 与独立 Codex 会话关联。
 - `~/.spotAgent/mcp.json`：全局 MCP 配置。
 - Workspace 固定文件根、Permission、Blob 与日志路径由对应 src 子模块文档说明。Swift 外观使用独立 `native-preferences.json`，不写后端配置镜像。
 

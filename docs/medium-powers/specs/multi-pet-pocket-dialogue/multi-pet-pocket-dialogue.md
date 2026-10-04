@@ -1,5 +1,7 @@
 # 多桌宠 A「口袋对话」实现规格
 
+Issue #10 后续边界：主 Agent 的 use_tools、内置 file.write 与扩展执行入口已删除，全部文件修改委托 Codex；Workspace 工作目录不是沙箱。下文内置写入、文件锁与激活相关条款只作历史追溯，当前验收以 [manual QA](../../../manual-qa.md) 为准。
+
 状态：Issue #7 历史规格，相关功能曾落地，后续部分模型已被替代；实机与真实模型待验，交互按 2026-10-03 用户修订更新。已发布为 [Issue #7](https://github.com/Lixuhang987/Wisp-Pocket/issues/7)，实现与检查记录见 [合并计划](../../plans/2026-10-02-pets-default-reading.md)，人工验收见 [manual QA](../../../manual-qa.md)。当时确认的角色快照、固定文件根与静态图方案按下述历史范围阅读，图片导入限制为工程默认。
 
 2026-10-04 历史边界：本子树保留 Issue #7 的原决定与验收依据。Pet 直接承接 Workspace、Pet 权威 rootPath、ThreadWindow 按宠分组已被 [Issue #8](https://github.com/Lixuhang987/Wisp-Pocket/issues/8) 与 [ADR 0006](../../../adr/0006-workspace-pet-separation.md) 替代；其中固定项目根与逐 Turn 项目规则保留，双归属与基础 Pet 已由 Issue #9 删除；当前模型以 owning 模块及 manual QA 为准。桌宠点击、hover 与独立草稿继续保留，历史查询已改为 Workspace。

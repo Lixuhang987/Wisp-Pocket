@@ -23,5 +23,5 @@
 
 - runtime 可依赖 LLM、Tool、Permission 和 Blob 端口；这些基础模块不反向依赖 runtime 编排。
 - protocol 只定义 DTO，不引用 UI、socket、数据库或 provider 实现。
-- Tool 通过后端调用上下文取得所属 Workspace 文件根，写入边界与 Permission 分别校验；模型不能传身份参数重绑定。
+- Tool 通过后端调用上下文取得所属 Workspace 文件根，目录归属与 Permission 分别校验，Workspace 根不代表 Codex 沙箱；模型不能传身份参数重绑定。
 - 具体组合、持久化和网络生命周期属于 apps/agent-server。

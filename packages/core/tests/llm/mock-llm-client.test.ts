@@ -4,16 +4,15 @@ import { AgentRuntime } from "../../src/runtime/AgentRuntime";
 import type { AgentTool } from "../../src/tools/types/AgentTool";
 import { ToolRegistry } from "../../src/tools/ToolRegistry";
 
-class FakeFileWriteTool implements AgentTool {
-  name = "file.write";
+class FakeCodexTool implements AgentTool {
+  name = "codex.execute";
   description = "write file";
   inputSchema = {
     type: "object",
     properties: {
-      relativePath: { type: "string" },
-      content: { type: "string" },
+      prompt: { type: "string" },
     },
-    required: ["relativePath", "content"],
+    required: ["prompt"],
     additionalProperties: false,
   } as const;
 
@@ -33,11 +32,9 @@ describe("MockLLMClient", () => {
     expect(triggers).toEqual(expect.arrayContaining([
       "[mock:assistant-ok]",
       "[mock:clipboard-read]",
-      "[mock:file-write]",
+      "[mock:codex-write]",
       "[mock:file-read]",
       "[mock:history-index]",
-      "[mock:path-escape]",
-      "[mock:symlink-escape]",
       "[mock:user-ask]",
       "[mock:permission-write]",
       "[mock:mcp-echo]",
@@ -107,7 +104,7 @@ describe("MockLLMClient", () => {
 
     const events = [];
     for await (const event of client.stream(
-      [{ role: "user", content: "run [mock:file-write]" }],
+      [{ role: "user", content: "run [mock:codex-write]" }],
       [],
     )) {
       events.push(event);
@@ -117,11 +114,10 @@ describe("MockLLMClient", () => {
       {
         type: "tool_call",
         toolCall: {
-          id: "mock-file-write-1",
-          name: "file.write",
+          id: "mock-codex-write-1",
+          name: "codex.execute",
           arguments: {
-            relativePath: "hello.txt",
-            content: "hello from MockLLMClient",
+            prompt: "在当前工作目录创建 hello.txt，内容为 hello from MockLLMClient。验证文件后汇报。",
           },
         },
       },
@@ -130,11 +126,10 @@ describe("MockLLMClient", () => {
         message: { role: "assistant", content: "" },
         toolCalls: [
           {
-            id: "mock-file-write-1",
-            name: "file.write",
+            id: "mock-codex-write-1",
+            name: "codex.execute",
             arguments: {
-                relativePath: "hello.txt",
-              content: "hello from MockLLMClient",
+                prompt: "在当前工作目录创建 hello.txt，内容为 hello from MockLLMClient。验证文件后汇报。",
             },
           },
         ],
@@ -142,10 +137,10 @@ describe("MockLLMClient", () => {
     ]);
   });
 
-  it("returns a real-shape file.write tool call and then a final answer", async () => {
+  it("returns a real-shape codex.execute tool call and then a final answer", async () => {
     const client = new MockLLMClient();
     const first = await client.complete(
-      [{ role: "user", content: "run [mock:file-write]" }],
+      [{ role: "user", content: "run [mock:codex-write]" }],
       [],
     );
 
@@ -153,11 +148,10 @@ describe("MockLLMClient", () => {
       message: { role: "assistant", content: "" },
       toolCalls: [
         {
-          id: "mock-file-write-1",
-          name: "file.write",
+          id: "mock-codex-write-1",
+          name: "codex.execute",
           arguments: {
-            relativePath: "hello.txt",
-            content: "hello from MockLLMClient",
+            prompt: "在当前工作目录创建 hello.txt，内容为 hello from MockLLMClient。验证文件后汇报。",
           },
         },
       ],
@@ -166,12 +160,12 @@ describe("MockLLMClient", () => {
     await expect(
       client.complete(
         [
-          { role: "user", content: "run [mock:file-write]" },
+          { role: "user", content: "run [mock:codex-write]" },
           { ...first.message, toolCalls: first.toolCalls },
           {
             role: "tool",
-            toolCallId: "mock-file-write-1",
-            name: "file.write",
+            toolCallId: "mock-codex-write-1",
+            name: "codex.execute",
             content: JSON.stringify({ ok: true }),
           },
         ],
@@ -180,7 +174,7 @@ describe("MockLLMClient", () => {
     ).resolves.toEqual({
       message: {
         role: "assistant",
-        content: "Mock file.write completed for hello.txt.",
+        content: "Mock codex.execute returned for hello.txt.",
       },
       toolCalls: [],
     });
@@ -339,24 +333,23 @@ describe("MockLLMClient", () => {
   });
 
   it("drives AgentRuntime through tool call, tool result, and final assistant answer", async () => {
-    const tool = new FakeFileWriteTool();
+    const tool = new FakeCodexTool();
     const runtime = new AgentRuntime(
       new MockLLMClient(),
       new ToolRegistry([tool]),
     );
 
-    const result = await runtime.run("please [mock:file-write]");
+    const result = await runtime.run("please [mock:codex-write]");
 
     expect(tool.calls).toEqual([
       {
-        relativePath: "hello.txt",
-        content: "hello from MockLLMClient",
+        prompt: "在当前工作目录创建 hello.txt，内容为 hello from MockLLMClient。验证文件后汇报。",
       },
     ]);
     expect(result.messages.at(-1)).toEqual({
       role: "assistant",
       id: expect.any(String),
-      content: "Mock file.write completed for hello.txt.",
+      content: "Mock codex.execute returned for hello.txt.",
     });
     expect(result).not.toHaveProperty("bubbles");
   });

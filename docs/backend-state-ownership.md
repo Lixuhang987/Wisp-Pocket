@@ -8,14 +8,14 @@ agent-server 组合根
 │  └─ 已加载 Thread
 │     ├─ 内存历史 / 输入队列
 │     ├─ 当前 Turn / 取消信号
-│     ├─ ThreadTools 激活状态
+│     ├─ ThreadTools 每轮工具目录
 │     └─ 待答 Permission / Workspace 请求
 ├─ ThreadPersistence
 │  └─ CurrentThread 顺序写入句柄缓存
 ├─ 共享服务
-│  ├─ LLM / Tool 设置、MCP clients
+│  ├─ LLM 设置、Codex CLI adapter、MCP clients
 │  ├─ Workspace、永久 Permission、BlobStore
-│  └─ thread-store SQLite 数据库
+│  └─ thread-store SQLite 数据库 / Codex 会话归属
 └─ 连接适配
    ├─ ThreadNotificationPublisher 订阅与发送通道
    ├─ Dynamic Tool Provider bridge

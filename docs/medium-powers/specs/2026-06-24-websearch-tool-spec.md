@@ -1,5 +1,7 @@
 # Websearch Tool Spec
 
+历史边界：Issue #10 已移除 use_tools、内置写入注册/设置与激活状态；下文激活流程只保留原实施背景。Web 首轮公开与免 Permission 的合约仍保留，当前目录见 [工具 owning 文档](../../../packages/core/src/tools/tools.md)。
+
 状态：默认 `web_search` / `fetch_page` 已实现，下文 Background 是改造前问题。当前能力见 [产品背景](../../PRODUCT.md)，真实 provider 与 SSE 回归仍按 [manual QA](../../manual-qa.md) 验收；自动检查不能代替真实外部服务通过。
 
 ## Background

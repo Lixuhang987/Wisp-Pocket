@@ -38,7 +38,7 @@ flowchart TD
   "version": 2,
   "rules": [
     {
-      "toolName": "file.write",
+      "toolName": "codex.execute",
       "decision": "allow",
       "createdAt": "2026-05-17T...",
     }
@@ -46,7 +46,7 @@ flowchart TD
 }
 ```
 
-永久规则只按完整 `toolName` 匹配，不比较调用参数；仅 version 2 且没有旧 `argHash` 的规则会生效。
+Codex 委托遵循本策略，拒绝时不启动 CLI；内部命令审批与沙箱仍归用户 Codex 配置，Wisp 不逐命令转交审批。永久规则只按完整 `toolName` 匹配，不比较任务参数；仅 version 2 且没有旧 `argHash` 的规则会生效。
 
 ## 编辑此目录的约束
 

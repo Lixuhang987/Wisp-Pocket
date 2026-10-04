@@ -23,9 +23,9 @@
 ## 通道与内容合约
 
 - [DynamicToolProviderConnectionClient](../AgentServer/agent-server.md) 使用独立 `/api/dynamic-tools` WebSocket，连接或工具选择变化时发送 `provider_hello`。同一 socket、同一 `clientId=swift-host` 的再次声明保留待完成调用，server 身份边界见 [server](../../../../agent-server/src/server/server.md)。
-- Swift 创建 Thread 时把当时的工具集合写入 `thread.start.payload.dynamicTools`；桌宠与 ThreadWindow 不显式传集合时采用服务端当前在线声明。刷新保留当前连接 token，旧连接不能改写新 Provider 声明；已有 Thread metadata 不随 hello 更新。启用后以新建 Thread 验证新能力，禁用后即使旧声明仍在，模块也拒绝调用。
+- Swift 创建 Thread 时把当时的工具集合写入 `thread.start.payload.dynamicTools`；桌宠与 ThreadWindow 不显式传集合时采用服务端当前在线声明。刷新保留当前连接 token，旧连接不能改写新 Provider 声明；已有 Thread metadata 不随 hello 更新。Issue #10 后这些声明不再进入主 Agent 可见目录，也未迁入 Codex；能力专项使用显式 Provider 测试客户端验证。禁用后即使旧声明仍在，模块也拒绝调用。
 - 结果沿用 `success` / `contentItems`；JSON 元数据放在 `inputText`，可显示图片放在 `inputImage`。截图查询保留图片与样本关联；权限不足、损坏数据和未知调用返回明确失败。
-- 动态工具通道不承载 `/api/thread` 消息，不自动向 UserInput 注入宿主状态。上下文与操作仍由 Agent 按需调用。
+- 动态工具通道不承载 `/api/thread` 消息，不自动向 UserInput 注入宿主状态。保存历史由主 Agent 默认读取工具按需查询；实时宿主操作的实现/通道保留，不表示主 Agent 或 Codex 已接管。
 
 ## macOS 边界
 

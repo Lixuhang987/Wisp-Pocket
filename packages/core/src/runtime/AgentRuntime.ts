@@ -17,10 +17,6 @@ import {
   type SystemPromptSection,
 } from "./SystemPrompt.ts";
 import { timeContextUpdate } from "./TimeContext.ts";
-import {
-  META_TOOL_NAME,
-  META_TOOL_ALREADY_ACTIVE_RESULT,
-} from "../tools/MetaToolUseTool.ts";
 
 import type { AgentRunResult, AssistantMessageStartEvent, AssistantMessageDeltaEvent, AssistantMessageEndEvent, ToolCallEvent, ToolResultEvent, PermissionDecisionEvent, RuntimeErrorEvent, AgentRuntimeEvent, AgentRuntimeRunOptions, AgentRuntimeEventSink, ToolExecutionResult } from "./types/AgentRuntime.ts";
 import { USER_QUESTION_TOOL_NAME, userQuestionTool, userQuestionSchema } from "./UserQuestion.ts";
@@ -33,8 +29,6 @@ export class AgentRuntime {
   private readonly turnSummarizer?: TurnSummarizerLike;
   private readonly systemPromptSections: SystemPromptSection[];
   private pendingTurnSummary: Promise<void> = Promise.resolve();
-  private readonly onMetaToolActivate?: (threadId: string) => Promise<void>;
-  private readonly isThreadActivated?: (threadId: string) => boolean;
 
   constructor(
     private readonly client: LLMClientLike,
@@ -45,8 +39,6 @@ export class AgentRuntime {
       blobStore?: BlobStore;
       turnSummarizer?: TurnSummarizerLike;
       systemPromptSections?: SystemPromptSection[];
-      onMetaToolActivate?: (threadId: string) => Promise<void>;
-      isThreadActivated?: (threadId: string) => boolean;
     }
   ) {
     this.maxTimes = options?.maxTimes ?? 100;
@@ -54,8 +46,6 @@ export class AgentRuntime {
     this.blobStore = options?.blobStore;
     this.turnSummarizer = options?.turnSummarizer;
     this.systemPromptSections = options?.systemPromptSections ?? buildDefaultSystemPromptSections();
-    this.onMetaToolActivate = options?.onMetaToolActivate;
-    this.isThreadActivated = options?.isThreadActivated;
   }
 
   async run(userInput: string): Promise<AgentRunResult> {
@@ -159,12 +149,6 @@ export class AgentRuntime {
       throw new Error(`Unknown tool: ${toolCall.name}`);
     }
 
-    // Meta-tool short-circuit: skip permission checks entirely
-    if (toolCall.name === META_TOOL_NAME) {
-      await this.handleMetaToolCall({ tool, toolCall, messages, onEvent, runOptions });
-      return;
-    }
-
     if (tool.requiresPermission !== false) {
       const decision = await this.resolveToolPermission(toolCall, onEvent, runOptions);
       if (decision === "deny") {
@@ -197,65 +181,6 @@ export class AgentRuntime {
       status: execution.status,
       output: truncateOutput(execution.content),
       durationMs: execution.durationMs,
-    });
-  }
-
-  private async handleMetaToolCall(input: {
-    tool: AgentTool;
-    toolCall: ToolCallEnvelope;
-    messages: AgentMessage[];
-    onEvent: AgentRuntimeEventSink;
-    runOptions: AgentRuntimeRunOptions;
-  }): Promise<void> {
-    const { tool, toolCall, messages, onEvent, runOptions } = input;
-    const { threadId } = runOptions;
-    const startedAt = Date.now();
-
-    throwIfAborted(runOptions.signal);
-
-    onEvent({
-      type: "tool_call",
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      input: toolCall.arguments,
-    });
-
-    let content: string;
-
-    if (threadId !== undefined && this.isThreadActivated?.(threadId) === true) {
-      // Already activated — return the already-active result without calling the tool
-      content = META_TOOL_ALREADY_ACTIVE_RESULT;
-    } else {
-      // First activation: invoke the callback, then call the tool to get the result
-      if (threadId !== undefined) {
-        await this.onMetaToolActivate?.(threadId);
-      }
-      throwIfAborted(runOptions.signal);
-      const result = await tool.call(toolCall.arguments, {
-        threadId,
-        turnId: runOptions.turnId,
-        toolCallId: toolCall.id,
-        rootPath: runOptions.rootPath,
-        signal: runOptions.signal,
-      });
-      throwIfAborted(runOptions.signal);
-      content = serializeToolResult(result);
-    }
-
-    messages.push({
-      role: "tool",
-      toolCallId: toolCall.id,
-      name: toolCall.name,
-      content,
-    });
-
-    onEvent({
-      type: "tool_result",
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      status: "success",
-      output: truncateOutput(content),
-      durationMs: Date.now() - startedAt,
     });
   }
 

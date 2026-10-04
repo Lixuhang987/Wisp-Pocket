@@ -1,5 +1,7 @@
 # 验收与完成门槛
 
+Issue #10 后续边界：主 Agent 的 use_tools、内置 file.write 与扩展执行入口已删除，全部文件修改委托 Codex；Workspace 工作目录不是沙箱。下文内置写入、文件锁与激活相关条款只作历史追溯，当前验收以 [manual QA](../../../manual-qa.md) 为准。
+
 本文是[多桌宠规格](./multi-pet-pocket-dialogue.md)的验收合约。实现及自动化检查见 [合并计划](../../plans/2026-10-02-pets-default-reading.md)；M01–M07 与真实模型均待验，详细状态见 [manual QA](../../../manual-qa.md)。
 
 历史范围：本表验证 Issue #7 当时的模型，不能整表重跑后用旧 petId / 固定根要求判定新设计失败。Issue #8 已替换项目模型，Issue #9 已实现前端伙伴分配；当前人工验收看 manual QA，后端身份与角色快照条款只作历史依据。替代关系由主文档路由。

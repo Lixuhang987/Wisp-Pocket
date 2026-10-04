@@ -8,7 +8,6 @@ import type { BlobRecord } from "../../src/blob/types/BlobRecord";
 import type { BlobStore } from "../../src/blob/types/BlobStore";
 import { TurnSummarizer, type TurnSummarizerLike } from "../../src/runtime/TurnSummarizer";
 import { parseStub, renderStub, type StubRecord } from "../../src/runtime/Stub";
-import { MetaToolUseTool, META_TOOL_NAME, META_TOOL_ALREADY_ACTIVE_RESULT } from "../../src/tools/MetaToolUseTool";
 import type { PermissionPolicy, PermissionRequest, PermissionResolution } from "../../src/permission/PermissionPolicy";
 
 class FakeTool implements AgentTool {
@@ -164,7 +163,7 @@ describe("AgentRuntime", () => {
     expect(seenMessages[0]).toEqual([
       {
         role: "system",
-        content: expect.stringContaining("structured tool calls"),
+        content: expect.stringContaining("结构化读取调用"),
       },
       {
         role: "user",
@@ -172,7 +171,7 @@ describe("AgentRuntime", () => {
       },
     ]);
     expect(result.messages).toEqual([
-      { role: "system", promptSection: "tool-use-policy", content: expect.stringContaining("structured tool calls") },
+      { role: "system", promptSection: "tool-use-policy", content: expect.stringContaining("结构化读取调用") },
       { role: "user", content: "执行一个流程，使用两个tool调用" },
       { role: "assistant", id: "assistant-1", content: "ok" },
     ]);
@@ -702,14 +701,14 @@ describe("AgentRuntime", () => {
     expect(seenTurns[0]).toEqual([
       {
         role: "system",
-        content: expect.stringContaining("structured tool calls"),
+        content: expect.stringContaining("结构化读取调用"),
       },
       ...initialMessages,
     ]);
     expect(seenTurns[1]).toEqual([
       {
         role: "system",
-        content: expect.stringContaining("structured tool calls"),
+        content: expect.stringContaining("结构化读取调用"),
       },
       ...initialMessages,
       {
@@ -881,145 +880,7 @@ describe("AgentRuntime", () => {
     expect(events).toEqual(["completed", "tool_call"]);
   });
 
-  it("invokes onMetaToolActivate the first time use_tools is called and returns the activation result", async () => {
-    const activations: string[] = [];
-    const events: unknown[] = [];
-
-    // LLM: first turn returns use_tools call, second turn returns text
-    const client = {
-      async complete(messages: AgentMessage[]) {
-        const last = messages[messages.length - 1];
-        if (last.role === "user") {
-          return {
-            message: { role: "assistant" as const, content: "activating tools" },
-            toolCalls: [{ id: "meta-1", name: META_TOOL_NAME, arguments: {} }],
-          };
-        }
-        return {
-          message: { role: "assistant" as const, content: "tools are ready" },
-          toolCalls: [],
-        };
-      },
-    };
-
-    const registry = new ToolRegistry([MetaToolUseTool.create(undefined)]);
-    const runtime = new AgentRuntime(client, registry, {
-      onMetaToolActivate: async (threadId: string) => {
-        activations.push(threadId);
-      },
-      isThreadActivated: () => false,
-    });
-
-    const result = await runtime.runWithMessages(
-      [{ role: "user", content: "do something" }],
-      (event) => events.push(event),
-      { threadId: "thread-A" },
-    );
-
-    expect(activations).toEqual(["thread-A"]);
-
-    const toolResultEvent = events.find(
-      (e) => (e as { type: string }).type === "tool_result" &&
-        (e as { toolName: string }).toolName === META_TOOL_NAME,
-    ) as { output: string } | undefined;
-    expect(toolResultEvent?.output).toContain("Tools activated");
-
-    expect(result.messages.at(-1)).toEqual({
-      role: "assistant",
-      id: expect.any(String),
-      content: "tools are ready",
-    });
-  });
-
-  it("skips activation callback and returns the already-active result on repeat calls", async () => {
-    const activations: string[] = [];
-    const events: unknown[] = [];
-
-    const client = {
-      async complete(messages: AgentMessage[]) {
-        const last = messages[messages.length - 1];
-        if (last.role === "user") {
-          return {
-            message: { role: "assistant" as const, content: "activating tools" },
-            toolCalls: [{ id: "meta-2", name: META_TOOL_NAME, arguments: {} }],
-          };
-        }
-        return {
-          message: { role: "assistant" as const, content: "done" },
-          toolCalls: [],
-        };
-      },
-    };
-
-    const registry = new ToolRegistry([MetaToolUseTool.create(undefined)]);
-    const runtime = new AgentRuntime(client, registry, {
-      onMetaToolActivate: async (threadId: string) => {
-        activations.push(threadId);
-      },
-      isThreadActivated: () => true, // already activated
-    });
-
-    await runtime.runWithMessages(
-      [{ role: "user", content: "do something" }],
-      (event) => events.push(event),
-      { threadId: "thread-B" },
-    );
-
-    expect(activations).toHaveLength(0);
-
-    const toolResultEvent = events.find(
-      (e) => (e as { type: string }).type === "tool_result" &&
-        (e as { toolName: string }).toolName === META_TOOL_NAME,
-    ) as { output: string } | undefined;
-    expect(toolResultEvent?.output).toBe(META_TOOL_ALREADY_ACTIVE_RESULT);
-  });
-
-  it("skips permission policy entirely for meta-tool calls", async () => {
-    let permissionChecks = 0;
-
-    const countingPolicy: PermissionPolicy = {
-      async check(_request: PermissionRequest) {
-        permissionChecks += 1;
-        return "allow" as const;
-      },
-      async resolveAsk(_request: PermissionRequest): Promise<PermissionResolution> {
-        return { decision: "allow" };
-      },
-      async remember(): Promise<void> {},
-    };
-
-    const client = {
-      async complete(messages: AgentMessage[]) {
-        const last = messages[messages.length - 1];
-        if (last.role === "user") {
-          return {
-            message: { role: "assistant" as const, content: "activating" },
-            toolCalls: [{ id: "meta-3", name: META_TOOL_NAME, arguments: {} }],
-          };
-        }
-        return {
-          message: { role: "assistant" as const, content: "done" },
-          toolCalls: [],
-        };
-      },
-    };
-
-    const registry = new ToolRegistry([MetaToolUseTool.create(undefined)]);
-    const runtime = new AgentRuntime(client, registry, {
-      permissionPolicy: countingPolicy,
-      isThreadActivated: () => false,
-    });
-
-    await runtime.runWithMessages(
-      [{ role: "user", content: "activate" }],
-      () => {},
-      { threadId: "thread-C" },
-    );
-
-    expect(permissionChecks).toBe(0);
-  });
 });
-
 
 describe("Turn summaries and stubbed tool content", () => {
   it("renders parseable stubs for image, persisted, and summarized turn content", () => {

@@ -280,6 +280,22 @@ export class ThreadStore {
     });
   }
 
+  listCodexSessions(threadId: string): { sessionId: string; summary: string; createdAt: string }[] {
+    return this.db.prepare(`SELECT session_id AS sessionId, summary, created_at AS createdAt
+      FROM codex_sessions WHERE thread_id = ? ORDER BY created_at, session_id`).all(threadId) as { sessionId: string; summary: string; createdAt: string }[];
+  }
+
+  async registerCodexSession(threadId: string, sessionId: string, summary: string): Promise<ThreadStoreResult<void>> {
+    return this.withThreadQueue(threadId, () => {
+      if (!this.threadExists(threadId)) return err("thread_not_found", `Thread not found: ${threadId}`);
+      const owner = this.db.prepare("SELECT thread_id FROM codex_sessions WHERE session_id = ?").get(sessionId) as {thread_id: string} | undefined;
+      if (owner && owner.thread_id !== threadId) throw new Error("Codex session already belongs to another Thread");
+      this.db.prepare(`INSERT OR IGNORE INTO codex_sessions(session_id, thread_id, summary, created_at)
+        VALUES (?, ?, ?, ?)`).run(sessionId, threadId, summary.slice(0, 240), this.now());
+      return ok(undefined);
+    });
+  }
+
   async getPersistedThread(threadId: ThreadId): Promise<ThreadStoreResult<PersistedThread | null>> {
     return this.capture(() => ok(this.derivePersistedThread(threadId)));
   }
@@ -389,6 +405,13 @@ export class ThreadStore {
         workspace_id TEXT NOT NULL REFERENCES workspaces(id),
         closed_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS codex_sessions (
+        session_id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
+        summary TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_codex_sessions_thread ON codex_sessions(thread_id);
       CREATE TABLE IF NOT EXISTS deleted_threads (thread_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS thread_items (
         thread_id TEXT NOT NULL,

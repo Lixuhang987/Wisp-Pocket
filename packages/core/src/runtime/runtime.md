@@ -14,7 +14,7 @@
 ## 执行边界
 
 - AgentRuntime 消费独立的消息副本；Thread 只接收本轮生成的 delta。runtime 不拥有 WebSocket、持久化或 UI projection。
-- 普通 Tool 经 Permission policy 后调用；默认 file.read 与四个历史读取 Tool 免 Permission。`use_tools` 激活其余工具，默认工具始终保留。
+- 普通 Tool 经 Permission policy 后调用；默认 file.read 与四个历史读取 Tool 免 Permission。生产目录首轮包含 Codex 委托，不存在工具激活步骤；复杂任务与全部文件修改交给 codex.execute。具体组合与子进程边界见 [actions](../../../../apps/agent-server/src/actions/actions.md)。
 - 所有 UserInput 采用同一规则，没有首轮读取阶段或后续回复阶段；是否追问由模型按任务判断。
 - 项目 AGENTS.md 由 Thread 每轮读取并作为固定运行参数注入同轮模型请求，用户明确要求优先。角色提示仅是前端提交的普通输入历史，不具有单独 system section 或后端身份；文本不能改写工具权限与文件边界。
 - 工具策略和项目规则按 section 保存内容变化，清除规则保存空版本；Runtime 通过 Thread 回调先持久化再请求模型。完整历史保留旧版本，模型只前置各 section 最新非空值，旧规则不再生效。工具循环和相同内容不重复保存。
