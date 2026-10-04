@@ -11,3 +11,4 @@
 - [0005-settings-data-ownership.md](./0005-settings-data-ownership.md)：设置按数据使用方划分读写边界，原生独立偏好与后端配置接口已实现；MCP 运行刷新后续实现，实机待验。
 - [0006-workspace-pet-separation.md](./0006-workspace-pet-separation.md)：固定项目根与 Pet 归属、逐 Turn AGENTS.md、Thread 双归属、项目一级导航和自动基础 Pet 已实现，实机待验。
 - [0007-frontend-pet-workspace-threads.md](./0007-frontend-pet-workspace-threads.md)：Pet 改为前端伙伴、Thread 仅归 Workspace 的破坏性重构目标；Issue #9 已发布，尚未实现。
+- [0008-codex-execution-delegation.md](./0008-codex-execution-delegation.md)：主 Agent 收敛为问答、读取与 Codex 委托，复杂任务、写文件和扩展执行交给 Codex 的目标；访谈中，尚未实现。

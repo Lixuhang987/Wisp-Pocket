@@ -7,6 +7,26 @@
 
 最后核对日期：2026-10-04。
 
+## 移除 use_tools，委托 Codex CLI（访谈中）
+
+用户确认移除 `use_tools`，主 Agent 只保留问答、读取与 Codex 委托；主 Agent 判断任务复杂度，复杂任务和所有写文件委托 Codex。首版依赖用户安装并登录的 CLI，沿用其模型与配置，由主 Agent 决定新建或 resume；现有扩展能力迁移单独列为后续 TODO，本期暂不改动。此项尚未实施；会话关联与执行契约仍需收敛，产品目标见 [PRODUCT](./PRODUCT.md)，决定见 [ADR 0008](./adr/0008-codex-execution-delegation.md)。
+
+- [x] 读取根架构、领域路由、产品与工程文档规则，按 grill-with-docs 启动访谈。
+- [x] 确认复杂任务由主 Agent 判断、所有写文件委托，以及用户预装并登录 Codex CLI 的产品前提。
+- [x] 确认主 Agent 只保留问答、读取和 Codex 委托，扩展执行能力全部迁到 Codex；记录与仅移除懒激活门槛的区别。
+- [x] 完成只读工具链与 Codex CLI 事实调查，核对删除 `use_tools` 的影响。
+- [x] 确认扩展能力迁移暂不实施、沿用用户 Codex 模型与配置，以及由主 Agent 判断新建或 resume。
+- [ ] 逐轮确认委托边界、运行环境、权限、上下文、取消、结果和后续接续策略；形成适当的产品记录与架构决策。
+- [ ] 用户确认共同理解后，收敛实施规格。
+- [ ] 从主 checkout 运行 `scripts/create-worktree.sh`，确认独立 CodeGraph 索引；后续 MCP 显式传绝对 projectPath。
+- [ ] 在 worktree 执行 `scripts/test.sh` 基线；若影响桌面或启动链，再执行 `scripts/swiftw build`；沿 owning 文档链实施。
+- [ ] 完成必要验证、三项提交前检查，并同步相关文档。
+- [ ] 完成 spec 实现后分发不继承上下文的独立文档审核子 agent，确认结论；更新 `manual-qa.md` 并迁出完成 TODO 后提交。
+
+### 现有扩展能力迁到 Codex（本期之外）
+
+- [ ] 单独设计 Wisp MCP、macOS 与 Automation 能力供 Codex 调用的接入方式；目前 Wisp 只有外部 MCP client 与 Swift Dynamic Tool Provider 通道，没有可供 Codex 消费这些宿主能力的 MCP 出口。本期不新增接口、不改动原有能力实现；主 Agent 收敛后，未迁移的能力不能据此声称已被 Codex 接管。
+
 ## Pet 前端所有权破坏性重构（规格已发布，待实现）
 
 实施规格见 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)，架构决策见 [ADR 0007](./adr/0007-frontend-pet-workspace-threads.md)；尚未实现，不计入已实现 manual QA。
