@@ -13,11 +13,18 @@
 - Workspace 管理页支持选择文件夹创建 Workspace，并以一级入口随机召来一只隐藏 Pet。
 - 本次允许破坏性重构，不以保留旧后端 Pet 或旧兼容层为目标。
 
+## 第一轮已确定的边界
+
+- 后端继续拥有 Workspace 注册表、目录校验、持久化与逐 Turn AGENTS.md；只删除 Pet 的后端概念，创建 Workspace 不再自动生成 Pet。
+- 本期创建 Thread 时由前端发送 rolePrompt，后端作为通用角色提示快照持久保存，后续 Turn 固定使用。更改 Pet 角色或用另一只 Pet 接续历史不改写既有 Thread 的角色；后端不因此保存 Pet 身份或 Pet 版本。
+- 隐藏 Pet 保留 Workspace 与当前 Thread。同 Workspace 召唤恢复原对话；跨 Workspace 召唤清空当前 Thread，旧 Thread 仍留在原 Workspace。
+- 隐藏 Pet 可以未绑定 Workspace；可见 Pet 必须绑定有效 Workspace。模型允许未绑定库存，不将无 Workspace 的 Pet 展示到桌面。
+- 角色快照是本期简化方案；后续角色策略单独记入 [TODO](../TODO.md)，不扩大本期实现。
+
+目标术语由 [Desktop Experience](../../apps/desktop/CONTEXT.md) 的 Pet 和 [Conversation Runtime](../../packages/core/CONTEXT.md) 的 Thread / 角色提示快照分别拥有；词表记录已确定目标，不代表旧实现已迁移。
+
 ## 当前待决边界
 
-- 后端是否继续拥有 Workspace 注册表、目录校验和持久化；“只保留 Thread → Workspace”是否只针对 Pet 关系。
-- 隐藏 Pet 是否保留原 Workspace / Thread；召到新 Workspace 时是否清空旧 Thread。
-- 角色提示是在 Thread 创建时形成通用执行快照，还是每个 Turn 随当前 Pet 提交；打开同工作区其他 Pet 的历史时采用哪个角色。
 - 库存的创建、默认 Pet 标记及首次启动的初始 Workspace / Pet 行为。
 - 运行中切换 Workspace / 新建对话、同一 Thread 被多个 Pet 打开、Permission 召回和草稿归属。
 - Pet 一级 store 的跨 renderer 所有权、持久化位置及图片资源归属。

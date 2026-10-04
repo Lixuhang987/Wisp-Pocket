@@ -2,6 +2,14 @@
 
 Desktop Experience 描述用户在 macOS 上发起、查看和配置 Agent 工作的产品界面与主动输入边界。
 
+Pet 术语按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 已确认目标更新，尚未实现；旧模型见 [ADR 0006](../../docs/adr/0006-workspace-pet-separation.md)。
+
+## 伙伴
+
+**Pet**:
+具有稳定身份、形象和角色设定的前端伙伴，可更换所绑定的 Workspace 并选择该工作区的 Thread；可见时必须绑定有效 Workspace，隐藏时可以未绑定。
+_Avoid_: Workspace、Profile（指代伙伴身份时）、基础 Pet（指代工作区自动生成的伙伴时）
+
 ## Surfaces
 
 **Swift Host**:

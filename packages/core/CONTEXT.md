@@ -2,12 +2,12 @@
 
 Conversation Runtime 描述用户与 Agent 的持久交互，以及一次输入如何形成有边界的执行过程。
 
-Workspace 与 Pet 的术语边界遵循 [ADR 0006](../../docs/adr/0006-workspace-pet-separation.md)。
+Thread 与角色提示快照按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 已确认目标更新，尚未实现；旧模型见 [ADR 0006](../../docs/adr/0006-workspace-pet-separation.md)。Pet 的目标术语归 [Desktop Experience](../../apps/desktop/CONTEXT.md)。
 
 ## Interaction
 
 **Thread**:
-归属一只 Pet 及该 Pet 所属 Workspace 的可持久化用户交互，包含输入、Turn 和历史。
+归属一个 Workspace 的可持久化用户交互，包含输入、Turn 和历史，其归属不随前端伙伴的工作区选择改变。
 _Avoid_: Session、Conversation、Chat（指代持久交互单元时）
 
 **Turn**:
@@ -44,17 +44,9 @@ _Avoid_: LLM Provider、Tool Registry
 具有独立身份、固定项目目录和项目指令的工作上下文；同一实际目录复用同一个 Workspace，项目指令来自根目录 AGENTS.md。
 _Avoid_: Pet、Profile（指代项目上下文时）
 
-**Pet**:
-具有稳定身份和角色设定、固定归属一个 Workspace 的桌面伙伴；多个 Pet 可共享 Workspace，但不合并身份或 Thread。
-_Avoid_: Workspace、Profile（指代伙伴身份时）
-
-**基础 Pet**:
-创建 Workspace 时自动生成的初始伙伴，与用户创建的 Pet 一同参与该项目的任务分配；它不是随机选择时的优先对象。
-_Avoid_: 默认 Pet（指代 Workspace 自动生成的伙伴时）
-
-**Pet Snapshot**:
-Thread 创建时保存的角色版本，供该 Thread 的后续交互持续使用；项目目录属于 Workspace，不属于角色快照。
-_Avoid_: Workspace Snapshot
+**角色提示快照**:
+Thread 创建时固定的角色提示内容，供其后续交互持续使用，不构成对某个伙伴身份的归属。
+_Avoid_: Pet Snapshot、Workspace Snapshot
 
 **Permission**:
 对 Tool 调用的允许或拒绝决定，可仅用于本次调用，或按 Tool 名称持久记忆；持久决定不区分调用参数。
