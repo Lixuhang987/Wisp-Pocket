@@ -70,13 +70,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
   const visible = snapshot.bubbleVisible;
   const expanded = visible && hovered;
   const layout = managerOpen || historyOpen || workspaceOpen ? "expanded" : expanded ? "expanded" : visible || sizeControlsOpen || contextMenuOpen ? "compact" : "pet";
-  const pending = thread?.messages.filter((item) => item.type === "user_message" && item.pending).length ?? 0;
   const waiting = !!(snapshot.latestAssistant?.awaitingReply || thread?.permissionRequests.length);
-  const status = snapshot.connection !== "connected" ? "正在连接…"
-    : reading ? "正在接收…" : submitting ? "正在发送…" : pending ? `${pending} 条待处理`
-    : waiting ? "等你回复" : thread?.status === "running" ? "正在处理…" : snapshot.pet?.name ?? "月见八千代";
-  const showStatus = snapshot.connection !== "connected" || reading || submitting || pending > 0 || thread?.status === "running"
-    || !!thread?.permissionRequests.length;
 
   useEffect(() => {
     controller.connect();
@@ -137,7 +131,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       stage?.removeEventListener("scroll", reportRegions, true);
       window.removeEventListener("resize", reportRegions);
     };
-  }, [layout, historyOpen, managerOpen, workspaceOpen, petSize, sizeControlsOpen, contextMenuOpen, visible, status, displayedError, thread?.messages, thread?.permissionRequests, snapshot.files, snapshot.pet]);
+  }, [layout, historyOpen, managerOpen, workspaceOpen, petSize, sizeControlsOpen, contextMenuOpen, visible, displayedError, thread?.messages, thread?.permissionRequests, snapshot.files, snapshot.pet]);
 
   function attempt(action: () => void): boolean {
     try { action(); setError(null); return true; }
@@ -253,11 +247,12 @@ export function App({ controller: suppliedController }: { controller?: PetThread
       {visible && (
         <section data-testid="pet-conversation" aria-label="当前对话"
           className={`pet-conversation ${expanded ? "is-expanded" : ""} ${dropTarget === "conversation" ? "is-drop-target" : ""}`}
-          onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+          onMouseEnter={() => { setHovered(true); controller.markReplyRead(); }} onMouseLeave={() => setHovered(false)}
+          onFocusCapture={() => controller.markReplyRead()}
           onDragEnter={(event) => dragOver(event, "conversation")}
           onDragOver={(event) => dragOver(event, "conversation")} onDrop={(event) => void drop(event, "conversation")}>
           <PetConversation thread={thread} latestAssistant={snapshot.latestAssistant} expanded={expanded}
-            status={showStatus ? status : undefined} error={displayedError}
+            error={displayedError}
             controller={controller} attempt={attempt} onRespond={respond} threadURL={threadURL()} />
           <PetReply draft={draft} setDraft={updateDraft} files={snapshot.files} onRemoveFile={id => controller.removeFile(id)}
             onChooseFiles={() => void chooseFiles()} onNewTopic={newTopic} onStop={() => attempt(() => controller.stop())}
@@ -299,6 +294,7 @@ export function App({ controller: suppliedController }: { controller?: PetThread
         onDragEnter={(event) => dragOver(event, "pet")} onDragOver={(event) => dragOver(event, "pet")}
         onDrop={(event) => void drop(event, "pet")}>
         {snapshot.pet?.imageRef.type === "imported" && !imageFailed ? <img className="pet-custom-image" draggable={false} alt={snapshot.pet.name} src={snapshot.pet.imageRef.url} onError={event => { setImageFailed(true); setError("桌宠图片不可用，请在伙伴设置中重新导入。"); }} /> : <PetSprite scale={petScale} state={moving ? "moving" : displayedError || thread?.status === "failed" ? "failed" : waiting ? "waiting" : thread?.status === "running" ? "running" : "idle"} />}
+        {snapshot.replyUnread && <span className="pet-reply-dot" role="img" aria-label="有已完成的回复" />}
         {dropTarget === "pet" && <span className="pet-drop-label">{snapshot.pet?.name} · 新对话</span>}
       </button>
       {sizeControlsOpen && <PetSizeControl size={petSize} bottom={petHeight + 8}
