@@ -1,10 +1,11 @@
 # 产品、规格与实现对齐记录
 
-核对日期：2026-10-04。范围为 GitHub Issues #1–#9 的正文与评论、全部本地 spec、产品 / surface、相关架构与关键代码路径；九个 issue 当前均无评论。本文记录决定演进与适用范围，产品背景仍由 [PRODUCT](./PRODUCT.md) 维护。
+核对日期：2026-10-04。范围为 GitHub Issues #1–#9 的正文与评论、全部本地 spec、产品 / surface、相关架构与关键代码路径；九个 issue 当前均无评论。本文记录决定演进、实现差距与适用范围；[PRODUCT](./PRODUCT.md) 直接表达最终产品意图，不承载实现状态。
 
 ## 判断依据
 
 - 产品目标采用用户确认的后续决定；待实现目标不能按旧代码回退，草案中的推荐方案不能当成已确认要求。
+- 产品文档按最终意图统一书写，不并列新旧模型或“已实现 / 待实现”版本；下面的状态与历史对照只用于工程追溯。
 - 当前行为采用代码与 owning 模块文档；历史规格说明当时意图，发布、合入、自动检查与实机验收分别判断。
 - 后续决定只覆盖明确改变的范围；旧规格中的点击、hover、资料交付与任务持续等未变合约继续保留。
 
@@ -35,7 +36,7 @@
 | 历史采集 | Plugin spec / #4 默认关闭，动态查询 | #6 常驻采集，Node 直接读取保存证据 | 已实现；Automation 的开关与已有修复数据入口仍保留。 |
 | 项目与伙伴 | #7 Pet 直接拥有文件根、替代 Workspace | #8 独立 Workspace、固定 Pet 归属与 Thread 双归属 | #8 已实现；同目录共享文件，不合并各 Thread 的模型历史。 |
 | 伙伴重新安排 | #8 固定归属、后端角色快照、无 Workspace 管理页 | #9 前端 Pet 可换项目、项目历史分配与独占、首轮普通角色输入 | #9 待实现；当前固定归属和后端快照是迁移对象，不能当作永久产品原则。 |
-| 时间与证据 | 活动仅 limit，缩略图支持 start/end；未注入当前时间 | 时间草案提出本地证据、时间注入与查询过滤 | 尚未实现；偏移格式、相对窗口及消息接收时间基准仍是待确认推荐。 |
+| 时间与证据 | 活动仅 limit，缩略图支持 start/end；未注入当前时间 | 10-04 已确认简版：首个实际 Turn 注入，距最近已保存注入严格超过一小时才追加；本地偏移证据与显式 start/end | 已实现、真实宿主 / 模型待验；不采用相对窗口、消息接收时刻锚定、时钟工具或额外刷新条件。system 规则版本与时间基准持久化，模型只使用最新有效规则。 |
 
 #7 GitHub 正文中的文件根快照与纯文本路径已被本地后续确认修订；#8 的角色快照不包含文件根，执行根从 Workspace 派生。#9 将进一步删除后端 Pet 与角色快照，不代表本轮已执行迁移。
 
@@ -45,13 +46,13 @@
 - Chrome 文件夹选择与默认 Websearch 已实现；真实扩展连接、触发及 provider 验收继续按 manual QA，不能从旧 Background 推断它们仍待开发。
 - Context History Plugin 与自进化 Automation spec 的独立插件 / RPC 方案已由 #4 替代；Context History 启停与查询再由 #6 修订。完整模型自主修复仍是后续方向。
 - 多宠子树属于 #7 的历史规格。每个子文档应带历史范围说明，保留原验收及设计原因，当前项目模型看 #8，下一轮产品目标看 #9。
-- 时间草案保持讨论状态；本轮不补写未确认决定，也不列入已实现功能 QA。
+- [时间简版 spec](./medium-powers/specs/2026-10-04-time-context-draft.md) 已按后续确认替换讨论草案并完成实现；实施记录与 manual QA 保留自动化范围和实机待验。早期相对窗口或消息接收时刻锚定推荐不再作为本期需求或待确认事项。
 
 ## 关键实现证据
 
 - [PetRegistry](../packages/core/src/pet/PetRegistry.ts) 与 [ThreadStore](../packages/thread-store/src/ThreadStore.ts)：后端 Pet、固定项目引用、基础 Pet 与角色快照仍存在，说明 #9 尚未迁移。
-- [Thread](../packages/core/src/thread/Thread.ts)：实际 Turn 开始读取根 AGENTS.md，角色来自已有快照；未实现时间草案的持久时间注入。
-- [默认读取工具](../apps/agent-server/src/actions/DefaultReadTools.ts)：活动索引仅有 limit，缩略图已有 start/end；文件与四个历史读取免 Permission。
+- [Thread](../packages/core/src/thread/Thread.ts)、[Runtime 合约](../packages/core/src/runtime/runtime.md)：实际 Turn 读取根 AGENTS.md，当前角色仍来自已有快照；system 更新先落盘再请求模型，规则保留版本但模型只使用最新有效值。首轮及严格超过一小时的时间注入保存 metadata，恢复沿最近已保存基准判断；#9 的首轮普通角色输入仍待迁移。
+- [默认读取工具](../apps/agent-server/src/actions/DefaultReadTools.ts)、[Swift/Node 历史合约](../apps/agent-server/src/actions/actions.md)：活动与缩略图均支持 ISO/epoch 的 start/end，包含端点、先过滤再倒序和 limit；Swift 保存本地偏移，Node 对旧 Z 证据也转换为后端本地偏移。文件与四个历史读取免 Permission。
 - [SettingsApp](../apps/thread-window-web/src/SettingsApp.tsx) 与 [PetWindowCollection](../apps/electron-shell/src/main/windows/petWindowCollection.ts)：当前 AI / Agent / Pets 导航、后端身份观察与按所属 Pet 召回，尚无 #9 的前端伙伴分配。
 
-本轮只修正文档职责、状态与过期说明，未修改功能代码或执行新一轮实机验收。检查结果与文档回归步骤记录到 manual QA；原有待验项继续保留。
+本对齐记录修订只同步文档职责、状态与过期说明，未新增功能代码或执行新一轮实机验收。时间实现与共享消息投影合并后，TypeScript/Web、隔离 Foundation home 的 Swift test、Swift build 已通过；内部 system 隐藏和纯建议等待恢复均保留。其后合入 PRODUCT 最终意图的纯文档提交，生产代码与已通过检查的合并版本一致；原有实机待验项继续保留。

@@ -71,4 +71,4 @@
 
 ## 文档与实施边界
 
-当前产品与 surface 文档继续描述已实现行为；目标术语、决策及 [Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9) 均描述待实现行为，实施后再替换现状说明。用户已确认以 Electron 前端公开分配 / 恢复 / 承接操作作为主要测试边界，后端公开协议验证执行和请求仲裁；详细用户故事与验收以 GitHub 规格为准，本 ADR 不代表已经通过验收。
+PRODUCT 直接表达最终确认的产品意图，CONTEXT 定义相应领域词表，不等代码落地才更新产品模型。surface 与源码目录文档描述现状；本 ADR、[Issue #9](https://github.com/Lixuhang987/Wisp-Pocket/issues/9)、对齐记录和 QA 承载实现及验收状态，实施后更新现状说明。用户已确认以 Electron 前端公开分配 / 恢复 / 承接操作作为主要测试边界，后端公开协议验证执行和请求仲裁；详细用户故事与验收以 GitHub 规格为准，本 ADR 不代表已经通过验收。

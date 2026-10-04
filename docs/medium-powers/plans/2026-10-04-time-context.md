@@ -41,3 +41,5 @@ worktree：`.worktrees/time-context-persistence`；CodeGraph projectPath 必须�
 - [x] 最终 `bash ./scripts/test.sh`、隔离 Foundation home 的 `bash ./scripts/swiftw test`、`bash ./scripts/swiftw build` 均 success。专项 35 项通过，前置 system 标题回归所在 ThreadPersistence 9 项通过；此前 core/server/thread-store 集合 283 passed、1 skipped。本 spec 累计新增 3 项测试，其余扩展既有用例。
 
 自动化使用真实 Thread/SQLite、Swift Store 和真实保存夹具，在模型网络与宿主系统边界使用可控输入；本轮未执行完整宿主与真实模型验收。小时内时间基准、采集空档和 limit 截断的限制继续保留，不能把本轮检查当作“最近十分钟”自然语言回答已经正确的证据。
+
+合并后复验：时间实现与共享消息投影一并合入后，TypeScript/Web、隔离 Foundation home 的 Swift test、Swift build 均通过，内部 system 隐藏与纯建议等待恢复同时保留。后续 PRODUCT 最终意图的纯文档提交已同步时间合约，生产代码与已验合并版本一致；本轮只核对文档和链接，不新增真实宿主 / 模型验收结论。
