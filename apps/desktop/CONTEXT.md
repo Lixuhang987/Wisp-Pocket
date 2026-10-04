@@ -10,6 +10,10 @@ Pet 术语按 [ADR 0007](../../docs/adr/0007-frontend-pet-workspace-threads.md) 
 具有稳定身份、形象和角色设定的前端伙伴，可更换所绑定的 Workspace 并选择该工作区的 Thread；可见时必须绑定有效 Workspace，隐藏时可以未绑定。
 _Avoid_: Workspace、Profile（指代伙伴身份时）、基础 Pet（指代工作区自动生成的伙伴时）
 
+**当前 Thread**:
+某只 Pet 当前选择接续的 Thread，可以运行中、已结束或等待输入；改变这项选择不等于结束旧 Thread 的任务。
+_Avoid_: 正在执行的 Thread（指代前端选择时）
+
 ## Surfaces
 
 **Swift Host**:

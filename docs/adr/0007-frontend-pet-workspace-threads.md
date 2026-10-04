@@ -23,13 +23,22 @@
 
 目标术语由 [Desktop Experience](../../apps/desktop/CONTEXT.md) 的 Pet 和 [Conversation Runtime](../../packages/core/CONTEXT.md) 的 Thread / 角色提示快照分别拥有；词表记录已确定目标，不代表旧实现已迁移。
 
+## 第二轮已确定的边界
+
+- 隐藏、清空当前 Thread / 新建对话、切换 Workspace 均允许在任务运行中发生，不取消旧任务；旧 Thread 的 Workspace 和运行状态不随 Pet 变化。
+- 前端限制一个 Thread 只能由一只 Pet 打开，不允许多 Pet 同时打开同一 Thread；该限制是否覆盖隐藏 Pet 的保留关联仍待澄清。
+- Workspace 管理应列出该工作区的 Thread 历史。点击历史后将对应 Thread 交给桌面 Pet；桌面已有打开该 Thread 的 Pet 时复用，不新增分配，重复点击幂等。
+- 首次使用自动准备一个 Workspace 和一只可见伙伴。isDefault 仅服务无数据时的首次初始化，不再承担快捷输入默认目标或随机召唤优先级。
+- 第一版不提供 Pet / Workspace 删除；不据此撤销已有 Thread 删除能力。
+
 ## 当前待决边界
 
-- 库存的创建、默认 Pet 标记及首次启动的初始 Workspace / Pet 行为。
-- 运行中切换 Workspace / 新建对话、同一 Thread 被多个 Pet 打开、Permission 召回和草稿归属。
+- 新建 Pet 的默认显隐、初始化幂等与默认标记的后续编辑边界。
+- Thread 唯一 Pet 关联是否覆盖隐藏状态；历史分配的候选、库存为空时行为及是否覆盖现有 ThreadWindow 选择。
+- 脱离 Pet 的后台任务请求如何呈现；有 Pet 时 Permission 召回及草稿归属。
 - Pet 一级 store 的跨 renderer 所有权、持久化位置及图片资源归属。
 - PromptPanel / ThreadWindow / AgentTrigger 在后端没有 Pet 后如何选择 Workspace 与角色上下文。
-- 本期 Pet / Workspace 删除与目录失效处置、旧开发数据处置和手工验收范围。
+- Workspace 目录失效处置、旧开发数据处置和手工验收范围。
 
 ## 文档与实施边界
 
